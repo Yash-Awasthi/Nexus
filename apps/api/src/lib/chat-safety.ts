@@ -19,7 +19,8 @@ function luhn(digits: string): boolean {
 const SECRET = new RegExp(
   [
     "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-    "\\b(?:sk|gsk|nxk|pk|rk)[-_][\\w-]{20,}",
+    // A digit in the body keeps hyphenated slugs such as "sk-learn-..." out.
+    "\\b(?:sk|gsk|nxk|pk|rk)[-_](?=[\\w-]*\\d)[\\w-]{20,}",
     "\\bgh[pousr]_\\w{36,}",
     "\\bgithub_pat_\\w{40,}",
     "\\bAKIA[0-9A-Z]{16}\\b",
