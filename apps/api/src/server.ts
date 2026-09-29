@@ -621,6 +621,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   if (spaDir) {
     const fastifyStatic = (await import("@fastify/static")).default;
     await app.register(fastifyStatic, { root: spaDir, wildcard: false });
+    // Other sites' pages load the embeddable widget; every other file stays same-origin.
+    app.addHook("onSend", async (request, reply) => {
+      if (request.url.split("?")[0] === "/widget.js")
+        reply.header("Cross-Origin-Resource-Policy", "cross-origin");
+    });
     // Client-side routing: any non-/api path that matched no file is the SPA
     // shell, not a 404. API paths keep answering 404 as JSON — a deep link
     // typo must not look like a working endpoint returning HTML.

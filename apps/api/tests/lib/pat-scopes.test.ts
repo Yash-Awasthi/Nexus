@@ -26,6 +26,13 @@ describe("patScopesAllow", () => {
     expect(patScopesAllow(["chat", "memory"], "/api/memory/entries")).toBe(true);
   });
 
+  it("search reaches only the search endpoint, which is all the embedded widget needs", () => {
+    expect(patScopesAllow(["search"], "/api/search")).toBe(true);
+    expect(patScopesAllow(["search"], "/api/chat/stream")).toBe(false);
+    expect(patScopesAllow(["search"], "/api/kb")).toBe(false);
+    expect(isValidPatScope("search")).toBe(true);
+  });
+
   it("council covers its real surfaces and segments never prefix-leak", () => {
     // The leak guard is about unrelated segments — /councilor must not unlock.
     expect(patScopesAllow(["council"], "/api/council/deliberate")).toBe(true);
