@@ -8,6 +8,7 @@ import {
   Eye,
   History,
   MessageSquarePlus,
+  Mic,
   Plus,
   Radio,
   Settings2,
@@ -80,6 +81,7 @@ import {
   updateThreadMeta,
   type MoleculeOpinion,
 } from "~/lib/deliberate";
+import { dictationSupported, startDictation } from "~/lib/dictation";
 import { hostCan, hostInvoke, hostOn } from "~/lib/host";
 import { Markdown } from "~/lib/markdown";
 import { opinionParts, verdictParts } from "~/lib/opinion";
@@ -216,6 +218,22 @@ export default function Chat() {
   const [speaking, setSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const [canDictate, setCanDictate] = useState(false);
+  const stopDictation = useRef<(() => void) | null>(null);
+  const [listening, setListening] = useState(false);
+  useEffect(() => setCanDictate(dictationSupported()), []);
+  const dictate = () => {
+    if (stopDictation.current) return stopDictation.current();
+    stopDictation.current = startDictation(
+      (text) => setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text)),
+      () => {
+        stopDictation.current = null;
+        setListening(false);
+        taRef.current?.focus();
+      },
+    );
+    setListening(Boolean(stopDictation.current));
+  };
   const endRef = useRef<HTMLDivElement | null>(null);
   const mention = useContextMention();
   const { copied, copy } = useCopy();
@@ -745,6 +763,17 @@ export default function Chat() {
                   <span className="hidden text-xs text-muted-foreground sm:inline">
                     Enter to send · Shift+Enter new line
                   </span>
+                  {canDictate && !streaming && (
+                    <Button
+                      size="icon"
+                      variant={listening ? "secondary" : "ghost"}
+                      onClick={dictate}
+                      aria-label={listening ? "Stop dictation" : "Dictate"}
+                      aria-pressed={listening}
+                    >
+                      <Mic className={listening ? "text-destructive" : undefined} />
+                    </Button>
+                  )}
                   {streaming ? (
                     <Button size="icon" variant="secondary" onClick={stop} aria-label="Stop">
                       <Square className="fill-current" />
