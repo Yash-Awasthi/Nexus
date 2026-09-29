@@ -54,6 +54,20 @@ route table — roughly 515 paths and 650 operations — and tags every operatio
 `dedicated-volatile`, or `bridge`. The committed `openapi.yaml` is the same document; CI
 fails if it drifts from the routes. Regenerate it with `pnpm openapi:generate`.
 
+## Embedding Nexus in another site
+
+Any page can ask your knowledge bases through the widget the server hosts:
+
+```html
+<script src="https://your-nexus/widget.js" defer></script>
+<nexus-widget token="nxk_..." kbs="kb-id" heading="Ask us"></nexus-widget>
+```
+
+Mint the token on the API Tokens page with only the **search** scope: visitors can read it from
+the page, and such a token reaches `POST /api/search` and nothing else. `web` and `graph`
+attributes add those sources, `mode="inline"` draws an open panel instead of a floating button,
+and `api` points at another Nexus origin. When `ALLOWED_ORIGINS` is set, add the host site to it.
+
 ## Core concepts
 
 **Agent runtime** — a multi-step tool loop. Agents plan, call tools, observe results, and

@@ -71,7 +71,7 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
         error: "UNKNOWN_SCOPE",
         message:
           "Unknown scope — choose from " +
-          "chat, memory, council, sandbox, research, ab, threads, tokens, auth",
+          "chat, memory, council, sandbox, research, search, ab, threads, tokens, auth",
       });
     }
 

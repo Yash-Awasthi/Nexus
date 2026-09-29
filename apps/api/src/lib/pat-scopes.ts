@@ -8,7 +8,8 @@
  * coherent semantics and is the ONLY place that knows them:
  *
  *   - A scope names an AREA of the product (chat, memory, council, sandbox,
- *     research, ab, threads, tokens, auth).
+ *     research, search, ab, threads, tokens, auth). A "search" token is what
+ *     the embeddable widget carries: it can ask, and reach nothing else.
  *   - Sub-scopes are informational: the first dot-separated segment selects
  *     the area ("memory.read" unlocks the same memory endpoints as "memory").
  *   - The default for tokens minted WITHOUT a scopes field is ["*"] (full
@@ -32,6 +33,7 @@ const PAT_SCOPE_PATHS: Record<string, string[]> = {
   council: ["/council"],
   sandbox: ["/sandbox"],
   research: ["/research"],
+  search: ["/search"],
   ab: ["/ab"],
   threads: ["/threads"],
   tokens: ["/tokens"],

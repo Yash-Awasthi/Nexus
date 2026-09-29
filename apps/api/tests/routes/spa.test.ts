@@ -23,6 +23,7 @@ beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "nexus-spa-"));
   writeFileSync(join(dir, "index.html"), "<!doctype html><title>Nexus</title>", "utf8");
   writeFileSync(join(dir, "app.js"), "export const x = 1;\n", "utf8");
+  writeFileSync(join(dir, "widget.js"), "customElements.define('x-w', class {});\n", "utf8");
 
   savedSpaDir = process.env.NEXUS_SPA_DIR;
   process.env.NEXUS_SPA_DIR = dir;
@@ -50,6 +51,14 @@ describe("SPA serving", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("export const x = 1;");
+  });
+
+  it("lets other sites load the widget script but not the app's own files", async () => {
+    const widget = await app.inject({ method: "GET", url: "/widget.js?v=1" });
+    expect(widget.statusCode).toBe(200);
+    expect(widget.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+    const asset = await app.inject({ method: "GET", url: "/app.js" });
+    expect(asset.headers["cross-origin-resource-policy"]).toBe("same-origin");
   });
 
   it("hands a client-side route the shell instead of a 404", async () => {

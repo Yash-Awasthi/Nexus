@@ -60,6 +60,7 @@ const AVAILABLE_SCOPES: { name: string; hint: string }[] = [
   { name: "council", hint: "Council deliberations and checkpoints" },
   { name: "sandbox", hint: "Sandbox execution" },
   { name: "research", hint: "Deep research" },
+  { name: "search", hint: "Search and answers; all the embeddable widget needs" },
   { name: "ab", hint: "A/B arena" },
   { name: "threads", hint: "Conversation threads" },
   { name: "tokens", hint: "Manage API tokens" },
