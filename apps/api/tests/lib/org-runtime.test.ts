@@ -259,6 +259,49 @@ describe("agent runs", () => {
     release();
   });
 
+  it("tells the next run what an interrupted attempt had already done", async () => {
+    let { org, work, rt } = await boot();
+    const c = org.createCompany("alice", { name: "Resume" });
+    const a = org.createAgent("alice", c.id, { name: "A" });
+    const t = work.createTask("alice", c.id, { title: "Migrate", assigneeAgentId: a.id });
+    rt.registerAdapter("nexus", async (ctx) => {
+      ctx.log("agent", "ran the schema migration");
+      await new Promise((res) => setTimeout(res, 1100));
+      ctx.log("agent", "started copying rows");
+      return new Promise(() => undefined);
+    });
+    const r = rt.enqueueWake("alice", a.id, { source: "manual" });
+    await vi.waitFor(
+      () =>
+        expect(rt.getRun("alice", r.id).log.map((l) => l.text)).toContain("started copying rows"),
+      { timeout: 5000 },
+    );
+    await new Promise((res) => setTimeout(res, 100));
+
+    ({ org, work, rt } = await boot());
+    const prompts: string[] = [];
+    rt.registerAdapter("nexus", async (ctx) => {
+      prompts.push(ctx.prompt.user);
+      return { ok: true, output: reply("done", { status: "done" }) };
+    });
+    // A run skipped in between (here by a gate) did no work and hides nothing.
+    let hold = true;
+    rt.addRunGate(() => (hold ? ((hold = false), "not yet") : null));
+    rt.enqueueWake("alice", a.id, { source: "manual" });
+    await rt.idle();
+    rt.enqueueWake("alice", a.id, { source: "manual" });
+    await rt.idle();
+    expect(prompts[0]).toContain("An earlier attempt at this task was cut off");
+    expect(prompts[0]).toContain("ran the schema migration");
+    expect(prompts[0]).toContain("started copying rows");
+
+    // Once a run finishes the task, later runs are not told about the old cut-off one.
+    work.setTaskStatus("alice", t.id, "todo");
+    rt.enqueueWake("alice", a.id, { source: "manual" });
+    await rt.idle();
+    expect(prompts[1]).not.toContain("cut off");
+  }, 15_000);
+
   it("hands work off from outside the org and waits for the deliverable", async () => {
     // The scheduler is what wakes an agent on assignment.
     const { org, work, rt } = await bootOrg(async () => ({
