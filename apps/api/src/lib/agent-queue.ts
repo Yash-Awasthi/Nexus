@@ -76,6 +76,8 @@ export interface LaunchAgentInput {
   maxSteps?: number;
   /** Directory the coding tools work in. */
   workspaceDir?: string;
+  /** Per-command limit for the agent's shell tool. */
+  commandTimeoutMs?: number;
   /** Run inside an isolated git-worktree workspace (Phase 3). */
   worktree?: Record<string, unknown>;
   /** Resume an existing session instead of starting a new one. */

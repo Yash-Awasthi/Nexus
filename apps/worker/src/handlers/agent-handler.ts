@@ -120,6 +120,8 @@ export interface AgentRunPayload {
    * `x-nexus-compress` request header at the API edge.
    */
   compressToolOutput?: PresetName | false;
+  /** Per-command limit for run_command (default 30s); installs and builds need longer. */
+  commandTimeoutMs?: number;
   /** Resume an existing agent_sessions row (loads its messages, continues it). */
   sessionId?: string;
   /** Owning user id, persisted on a new session. */
@@ -483,6 +485,9 @@ export async function handleAgentRunJob(
 
   const toolSet = createCodingToolSet({
     rootDir: workingDir,
+    ...(payload.commandTimeoutMs
+      ? { commandTimeoutMs: Math.min(payload.commandTimeoutMs, 600_000) }
+      : {}),
     ...(provisioned ? { env: provisioned.ws.env } : {}),
   });
   if (payload.mcpServers?.length) {

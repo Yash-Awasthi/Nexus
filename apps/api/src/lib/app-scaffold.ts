@@ -112,14 +112,15 @@ export async function pickDesign(
   }
 }
 
-/** A folder name for the app: a slug of the prompt plus a hash, stable for one owner and prompt. */
+// A slug of the prompt plus a hash, stable per owner and prompt. Short, because npm on Windows
+// fails once node_modules paths pass 260 characters.
 export function appFolderName(ownerId: string, prompt: string): string {
   const slug =
     prompt
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 32)
+      .slice(0, 20)
       .replace(/-+$/, "") || "app";
   const hash = crypto.createHash("sha256").update(`${ownerId}:${prompt}`).digest("hex").slice(0, 6);
   return `${slug}-${hash}`;
@@ -140,8 +141,12 @@ function starterFiles(name: string, design: AppDesign): Record<string, string> {
       version: "0.0.0",
       type: "module",
       scripts: { dev: "vite", build: "tsc -b && vite build", preview: "vite preview" },
+      // What shadcn components import, so adding one needs no install of its own.
       dependencies: {
+        "class-variance-authority": "^0.7.1",
         clsx: "^2.1.1",
+        "lucide-react": "^1.48.0",
+        "radix-ui": "^1.6.7",
         react: "^19.1.0",
         "react-dom": "^19.1.0",
         "react-router": "^7.6.0",
@@ -297,6 +302,7 @@ export function codegenInstruction(prompt: string, design: AppDesign): string {
     "- shadcn/ui is configured: run `npx shadcn@latest add <component>` for buttons, cards,",
     "  dialogs and the like instead of writing them by hand.",
     "- Install packages with npm. When done, run `npm run build` and fix every error it reports.",
+    "- Run each command plainly, without piping or trimming its output.",
     "- Finally delete node_modules and dist so the project stays small.",
   ].join("\n");
 }

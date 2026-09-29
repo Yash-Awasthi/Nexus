@@ -205,6 +205,7 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
         instruction: codegenInstruction(prompt, design),
         workspaceDir: dir,
         maxSteps: 60,
+        commandTimeoutMs: 180_000,
         ...(provider ? { provider } : {}),
         ...(model ? { model } : {}),
         ...(sessionId ? { sessionId } : {}),
