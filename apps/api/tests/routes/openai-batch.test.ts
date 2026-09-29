@@ -18,6 +18,8 @@ process.env.DATABASE_URL = DB;
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_SECRETS_KEY = "ab".repeat(32);
 process.env.NEXUS_DESKTOP = "1";
+// The fake provider counts real calls, so a cached answer must not hide one.
+process.env.LLM_CACHE_DISABLED = "1";
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-batch-"));
 
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
@@ -35,6 +37,10 @@ function authFor(userId: string) {
 
 let app: FastifyInstance;
 let upstream: http.Server;
+/** Every prompt the fake provider received, in order. */
+const asked: string[] = [];
+let release: () => void = () => {};
+let held = new Promise<void>((r) => (release = r));
 const auth = authFor(crypto.randomUUID());
 const other = authFor(crypto.randomUUID());
 
@@ -43,8 +49,12 @@ beforeAll(async () => {
   upstream = http.createServer((req, res) => {
     let raw = "";
     req.on("data", (c: Buffer) => (raw += c.toString()));
-    req.on("end", () => {
+    req.on("end", async () => {
       const body = JSON.parse(raw) as { messages: { content: string }[] };
+      const text = body.messages.at(-1)!.content;
+      asked.push(text);
+      if (text.startsWith("slow")) await new Promise((r) => setTimeout(r, 700));
+      if (text === "hold") await held;
       res.setHeader("content-type", "application/json");
       res.end(
         JSON.stringify({
@@ -199,3 +209,67 @@ it("refuses a batch on a file the caller does not own or an endpoint it cannot r
   expect((await createBatch(input.id, other)).statusCode).toBe(404);
   expect((await createBatch(input.id, auth, "/v1/responses")).statusCode).toBe(400);
 });
+
+function shortLived(userId: string, seconds: number) {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64({ alg: "HS256", typ: "JWT" });
+  const body = b64({ sub: userId, role: "admin", iat: now, exp: now + seconds });
+  const sig = crypto.createHmac("sha256", SECRET).update(`${head}.${body}`).digest("base64url");
+  return { authorization: `Bearer ${head}.${body}.${sig}` };
+}
+
+it("keeps running after the caller's token expires", async () => {
+  const sub = JSON.parse(
+    Buffer.from(auth.authorization.split(".")[1]!, "base64url").toString(),
+  ) as { sub: string };
+  const brief = shortLived(sub.sub, 2);
+  const input = (
+    await upload(
+      [
+        line("s1", "slow one"),
+        line("s2", "slow two"),
+        line("s3", "slow three"),
+        line("s4", "slow four"),
+      ].join("\n"),
+      brief,
+    )
+  ).json<{ id: string }>();
+  const created = await createBatch(input.id, brief);
+  expect(created.statusCode, created.body).toBe(200);
+  let done: Batch | undefined;
+  for (let i = 0; i < 200 && !done; i++) {
+    const b = (await get(`/v1/batches/${created.json<Batch>().id}`)).json<Batch>();
+    if (["completed", "failed", "cancelled"].includes(b.status)) done = b;
+    else await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(done?.request_counts).toEqual({ total: 4, completed: 4, failed: 0 });
+}, 30_000);
+
+it("picks a batch back up after a restart without asking again for lines already answered", async () => {
+  const input = (
+    await upload(
+      [line("r1", "before restart"), line("r2", "hold"), line("r3", "after restart")].join("\n"),
+    )
+  ).json<{ id: string }>();
+  const id = (await createBatch(input.id)).json<Batch>().id;
+  for (let i = 0; i < 100 && !asked.includes("hold"); i++)
+    await new Promise((r) => setTimeout(r, 50));
+  await app.close();
+  release();
+  held = Promise.resolve();
+  const before = asked.length;
+  app = await buildServer();
+  await app.ready();
+
+  const done = await settle(id);
+  expect(done.status).toBe("completed");
+  expect(done.request_counts).toEqual({ total: 3, completed: 3, failed: 0 });
+  expect(asked.slice(before)).toEqual(["hold", "after restart"]);
+  const rows = (await get(`/v1/files/${done.output_file_id}/content`)).body.trim().split("\n");
+  expect(rows.map((r) => (JSON.parse(r) as { custom_id: string }).custom_id)).toEqual([
+    "r1",
+    "r2",
+    "r3",
+  ]);
+}, 60_000);

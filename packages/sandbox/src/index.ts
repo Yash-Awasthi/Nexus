@@ -587,3 +587,4 @@ export {
 export type { DriveStat, DriveEntry } from "./drive-fs.js";
 export { tarGzDirectory } from "./tar.js";
 export { runOnDrive, RUN_COMPLETE, type DriveRunOptions } from "./drive-run.js";
+export { s3Bucket, s3ConfigFromEnv, type S3Bucket, type S3Config } from "./s3.js";

@@ -26,6 +26,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
-    "@nexus/plugin-sdk": "workspace:*"
+    "@nexus/plugin-sdk": "workspace:*",
+    "aws4fetch": "^1.0.20"
   }
 }
