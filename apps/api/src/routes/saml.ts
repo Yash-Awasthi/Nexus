@@ -1,40 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * SAML 2.0 SP-initiated SSO — zero external dependencies.
+ * SAML 2.0 SP-initiated SSO.
  *
  * Environment variables required:
  *   NEXUS_SAML_ENABLED=true          — feature gate
  *   NEXUS_SAML_IDP_SSO_URL           — IdP's SSO endpoint (HTTP-Redirect)
- *   NEXUS_SAML_IDP_ENTITY_ID         — IdP Entity ID URI
- *   NEXUS_SAML_IDP_CERT              — IdP X.509 certificate (PEM, no headers)
- *   NEXUS_SAML_SP_ENTITY_ID          — SP Entity ID (e.g. https://nexus.example.com)
+ *   NEXUS_SAML_IDP_ENTITY_ID         — IdP Entity ID URI (the assertion's Issuer)
+ *   NEXUS_SAML_IDP_CERT              — IdP X.509 signing certificate (PEM, headers optional)
+ *   NEXUS_SAML_SP_ENTITY_ID          — SP Entity ID, also the expected Audience
  *   NEXUS_SAML_SP_ACS_URL            — Assertion Consumer Service URL (callback)
- *   NEXUS_SAML_COOKIE_SECRET         — 32-byte hex string for state HMAC
+ *   NEXUS_SAML_COOKIE_SECRET         — 32-byte hex string for the RelayState HMAC
+ *   NEXUS_FRONTEND_URL               — where the browser goes after sign-in
  *
  * Routes:
  *   GET  /auth/saml/metadata  — SP metadata XML (for IdP registration)
  *   GET  /auth/saml/login     — initiate HTTP-Redirect binding
  *   POST /auth/saml/callback  — ACS endpoint (IdP POST binding)
  *
- * Implementation:
- *   • AuthnRequest built as XML, deflate-encoded, base64'd, HMAC-signed (query)
- *   • Response XML validated: InResponseTo, Audience, NotBefore/NotOnOrAfter
- *   • Signature verified via node:crypto createVerify (RS256/SHA256)
- *   • User upserted into users table (same pattern as oauth.ts)
- *   • Issues Nexus access + refresh token pair on success
- *   • Graceful 501 if NEXUS_SAML_ENABLED is not "true"
+ * @node-saml/node-saml checks the assertion: XML signature with digest and
+ * canonicalization, issuer, audience, time window, and that it answers a
+ * request this server made (IDs kept in the shared KV and spent on use).
+ * Graceful 501 if NEXUS_SAML_ENABLED is not "true".
  */
 
-import { createHash, createHmac, createVerify, randomBytes, createPublicKey } from "node:crypto";
-import { deflateRawSync } from "node:zlib";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
+import { SAML, ValidateInResponseTo, type CacheProvider, type Profile } from "@node-saml/node-saml";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { getSharedKV } from "../lib/shared-kv.js";
 import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.js";
 
@@ -52,6 +51,8 @@ const samlCallbackRateLimit = makeRateLimitPreHandler({
   keyPrefix: "auth:saml:callback",
 });
 
+const REQUEST_TTL_MS = 10 * 60_000;
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function env(key: string): string {
@@ -64,24 +65,7 @@ function nowSec(): number {
   return Math.floor(Date.now() / 1_000);
 }
 
-function isoNow(offsetSeconds = 0): string {
-  return new Date(Date.now() + offsetSeconds * 1_000).toISOString().replace(/\.\d+Z$/, "Z");
-}
-
-function safeBase64Encode(buf: Buffer): string {
-  return buf.toString("base64");
-}
-
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-// ── SAML state cookie (HMAC-signed) ───────────────────────────────────────────
+// ── RelayState (HMAC-signed return path) ──────────────────────────────────────
 
 function makeState(relayState: string): string {
   const secret = process.env.NEXUS_SAML_COOKIE_SECRET ?? randomBytes(32).toString("hex");
@@ -110,232 +94,145 @@ function verifyState(state: string): { relayState: string } | null {
   }
 }
 
-// ── AuthnRequest builder ───────────────────────────────────────────────────────
+// ── SAML client ────────────────────────────────────────────────────────────────
 
-function buildAuthnRequest(requestId: string, spEntityId: string, acsUrl: string): string {
-  const issueInstant = isoNow();
-  return [
-    `<samlp:AuthnRequest`,
-    ` xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"`,
-    ` xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"`,
-    ` ID="${xmlEscape(requestId)}"`,
-    ` Version="2.0"`,
-    ` IssueInstant="${issueInstant}"`,
-    ` ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"`,
-    ` AssertionConsumerServiceURL="${xmlEscape(acsUrl)}"`,
-    `>`,
-    `<saml:Issuer>${xmlEscape(spEntityId)}</saml:Issuer>`,
-    `<samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>`,
-    `</samlp:AuthnRequest>`,
-  ].join("");
+/** Outstanding AuthnRequest IDs, shared across instances so any one can take the answer. */
+const requestIds: CacheProvider = {
+  async saveAsync(key, value) {
+    await getSharedKV().set<string>(`saml:req:${key}`, value, REQUEST_TTL_MS);
+    return { value, createdAt: Date.now() };
+  },
+  async getAsync(key) {
+    return (await getSharedKV().get<string>(`saml:req:${key}`)) ?? null;
+  },
+  async removeAsync(key) {
+    if (!key) return null;
+    const kv = getSharedKV();
+    const value = (await kv.get<string>(`saml:req:${key}`)) ?? null;
+    await kv.delete(`saml:req:${key}`);
+    return value;
+  },
+};
+
+function samlClient(): SAML {
+  const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
+  return new SAML({
+    entryPoint: env("NEXUS_SAML_IDP_SSO_URL"),
+    idpIssuer: env("NEXUS_SAML_IDP_ENTITY_ID"),
+    idpCert: env("NEXUS_SAML_IDP_CERT"),
+    issuer: spEntityId,
+    audience: spEntityId,
+    callbackUrl: env("NEXUS_SAML_SP_ACS_URL"),
+    identifierFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+    // Most IdPs (Auth0, Okta, Entra) sign the assertion, not the envelope.
+    wantAssertionsSigned: true,
+    wantAuthnResponseSigned: false,
+    validateInResponseTo: ValidateInResponseTo.always,
+    requestIdExpirationPeriodMs: REQUEST_TTL_MS,
+    cacheProvider: requestIds,
+    acceptedClockSkewMs: 60_000,
+  });
 }
 
-function encodeAuthnRequest(xml: string): string {
-  const deflated = deflateRawSync(Buffer.from(xml, "utf8"));
-  return safeBase64Encode(deflated);
-}
+// ── Assertion → identity ──────────────────────────────────────────────────────
 
-// ── Response parser ────────────────────────────────────────────────────────────
+const CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/";
 
-interface SamlAssertion {
-  nameId: string;
+interface SamlIdentity {
   email: string;
-  firstName?: string;
-  lastName?: string;
-  sessionIndex?: string;
-  inResponseTo?: string;
-  notBefore?: string;
-  notOnOrAfter?: string;
-  audience?: string;
+  name?: string;
 }
 
-// Minimal XML attribute/text extraction — no external parser, no eval
-function xmlAttr(xml: string, attrName: string): string | undefined {
-  const re = new RegExp(`${attrName}="([^"]*)"`, "i");
-  return re.exec(xml)?.[1];
-}
+function identityOf(profile: Profile): SamlIdentity {
+  const attr = (name: string) => {
+    const v = profile[name];
+    return typeof v === "string" && v.trim() ? v.trim() : undefined;
+  };
+  const email = (
+    profile.email ??
+    profile.mail ??
+    attr(`${CLAIM}emailaddress`) ??
+    (profile.nameID.includes("@") ? profile.nameID : undefined)
+  )
+    ?.trim()
+    .toLowerCase();
+  if (!email) throw new SsoPolicyError(400, "no_email", "The assertion carries no email address.");
 
-function xmlTextContent(xml: string, tagName: string): string | undefined {
-  const re = new RegExp(`<[^>]*${tagName}[^>]*>([^<]*)<`, "i");
-  return re.exec(xml)?.[1]?.trim();
-}
-
-function xmlGetElement(xml: string, tagName: string): string | undefined {
-  const re = new RegExp(`<[^>]*${tagName}[^>]*>[\\s\\S]*?</[^>]*${tagName}>`, "i");
-  return re.exec(xml)?.[0];
-}
-
-function parseAssertion(responseXml: string): SamlAssertion | null {
-  try {
-    // Extract NameID
-    const nameId = xmlTextContent(responseXml, "NameID");
-    if (!nameId) return null;
-
-    const email = nameId.includes("@") ? nameId : (xmlAttr(responseXml, "emailAddress") ?? nameId);
-
-    // Conditions
-    const conditionsEl = xmlGetElement(responseXml, "Conditions");
-    const notBefore = conditionsEl ? xmlAttr(conditionsEl, "NotBefore") : undefined;
-    const notOnOrAfter = conditionsEl ? xmlAttr(conditionsEl, "NotOnOrAfter") : undefined;
-
-    // Audience
-    const audienceEl = xmlGetElement(responseXml, "AudienceRestriction");
-    const audience = audienceEl ? xmlTextContent(audienceEl, "Audience") : undefined;
-
-    // Attributes (common mappings from Okta/Azure/G Suite)
-    const attrs: Record<string, string> = {};
-    const attrRe =
-      /Name="([^"]+)"[^>]*>[\s\S]*?<[^>]*AttributeValue[^>]*>([^<]*)<\/[^>]*AttributeValue>/gi;
-    let attrMatch: RegExpExecArray | null;
-    while ((attrMatch = attrRe.exec(responseXml)) !== null) {
-      attrs[attrMatch[1]!] = attrMatch[2]!.trim();
-    }
-
-    const firstName =
-      attrs["firstName"] ??
-      attrs["givenName"] ??
-      attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"];
-    const lastName =
-      attrs["lastName"] ??
-      attrs["sn"] ??
-      attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"];
-
-    // SubjectConfirmation InResponseTo
-    const inResponseTo = xmlAttr(responseXml, "InResponseTo");
-
-    // AuthnStatement SessionIndex
-    const sessionIndex = xmlAttr(responseXml, "SessionIndex");
-
-    return {
-      nameId,
-      email: (
-        attrs["email"] ??
-        attrs["emailAddress"] ??
-        attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] ??
-        email
-      ).toLowerCase(),
-      firstName,
-      lastName,
-      sessionIndex,
-      inResponseTo,
-      notBefore,
-      notOnOrAfter,
-      audience,
-    };
-  } catch {
-    return null;
+  // An IdP that says the address is unverified has not proven it; linking on it
+  // would let anyone who can type a victim's email into that IdP take the account.
+  const verified = attr("http://schemas.auth0.com/email_verified") ?? attr("email_verified");
+  if (verified !== undefined && verified !== "true") {
+    throw new SsoPolicyError(
+      403,
+      "email_not_verified",
+      "The identity provider did not assert a verified email address.",
+    );
   }
-}
 
-// ── Signature verification ─────────────────────────────────────────────────────
-
-function buildPem(cert: string): string {
-  const stripped = cert.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/g, "");
-  return `-----BEGIN CERTIFICATE-----\n${stripped.match(/.{1,64}/g)?.join("\n") ?? stripped}\n-----END CERTIFICATE-----\n`;
-}
-
-function verifySamlSignature(responseXml: string, idpCert: string): boolean {
-  try {
-    // Extract SignatureValue
-    const sigValue = xmlTextContent(responseXml, "SignatureValue")?.replace(/\s/g, "");
-    if (!sigValue) return false;
-
-    // Extract SignedInfo block — this is what was signed
-    const signedInfo = xmlGetElement(responseXml, "SignedInfo");
-    if (!signedInfo) return false;
-
-    const pem = buildPem(idpCert);
-    const publicKey = createPublicKey({ key: pem, format: "pem" });
-
-    const verifier = createVerify("SHA256");
-    verifier.update(signedInfo, "utf8");
-    return verifier.verify(publicKey, sigValue, "base64");
-  } catch {
-    return false;
-  }
+  const name =
+    attr(`${CLAIM}name`) ??
+    ([attr(`${CLAIM}givenname`), attr(`${CLAIM}surname`)].filter(Boolean).join(" ") || undefined);
+  return { email, ...(name ? { name } : {}) };
 }
 
 // ── User upsert (same pattern as oauth.ts) ────────────────────────────────────
 
 async function upsertSamlUser(
-  assertion: SamlAssertion,
-  _idpEntityId: string,
+  identity: SamlIdentity,
   userAgent: string,
 ): Promise<{ accessToken: string; refreshToken: string; userId: string }> {
-  const JWT_SECRET = process.env.NEXUS_JWT_SECRET ?? "dev-secret-change-me";
+  const secret = process.env.NEXUS_JWT_SECRET;
+  if (!secret) throw new Error("NEXUS_JWT_SECRET not set");
 
-  // Upsert user
   // Erased and deactivated accounts stay gone: without the deletedAt filter an
-  // SSO sign-in revives a row the user asked to have deleted, which is how the
-  // other auth paths avoid it too.
+  // SSO sign-in revives a row the user asked to have deleted.
   const [existing] = await db
-    .select({ id: users.id, name: users.name })
+    .select({ id: users.id, name: users.name, role: users.role, tier: users.tier })
     .from(users)
-    .where(and(eq(users.email, assertion.email), isNull(users.deletedAt)))
+    .where(and(eq(users.email, identity.email), isNull(users.deletedAt)))
     .limit(1);
 
   let userId: string;
+  let role = "member";
+  let tier = "free";
   if (existing) {
     userId = existing.id;
-    if (!existing.name && (assertion.firstName || assertion.lastName)) {
-      await db
-        .update(users)
-        .set({ name: [assertion.firstName, assertion.lastName].filter(Boolean).join(" ") })
-        .where(eq(users.id, userId));
-    }
-    // Mark email verified for SAML-authenticated users
-    await db.update(users).set({ emailVerified: true }).where(eq(users.id, userId));
+    role = existing.role;
+    tier = existing.tier;
+    await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        ...(!existing.name && identity.name ? { name: identity.name } : {}),
+      })
+      .where(eq(users.id, userId));
   } else {
-    assertMayProvision(assertion.email);
+    assertMayProvision(identity.email);
     const [newUser] = await db
       .insert(users)
       .values({
-        email: assertion.email,
-        name:
-          [assertion.firstName, assertion.lastName].filter(Boolean).join(" ") || assertion.email,
-        passwordHash: "", // no password for SSO users
-        emailVerified: true, // IdP has verified the email
+        email: identity.email,
+        name: identity.name ?? identity.email,
+        passwordHash: "oauth:saml:no-password",
+        role: "member",
+        tier: "free",
+        emailVerified: true,
       })
       .returning({ id: users.id });
     userId = newUser!.id;
   }
 
-  // Issue access token (15 min) honoring NEXUS_JWT_ALG (§14.1)
-  const { accessToken } = issueAccessToken(userId, "read-only", undefined, JWT_SECRET);
+  const { accessToken } = issueAccessToken(userId, role, tier, secret);
 
-  // Opaque refresh token (30 days)
   const rawRefresh = randomBytes(32).toString("hex");
-  const tokenHash = createHash("sha256").update(rawRefresh).digest("hex");
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
-
   await db.insert(refreshTokens).values({
     userId,
-    tokenHash,
-    expiresAt,
+    tokenHash: createHash("sha256").update(rawRefresh).digest("hex"),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
     userAgent,
   });
 
   return { accessToken, refreshToken: rawRefresh, userId };
-}
-
-// ── SP Metadata XML ────────────────────────────────────────────────────────────
-
-function buildMetadataXml(spEntityId: string, acsUrl: string): string {
-  return [
-    `<?xml version="1.0"?>`,
-    `<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"`,
-    ` entityID="${xmlEscape(spEntityId)}">`,
-    `<md:SPSSODescriptor`,
-    ` AuthnRequestsSigned="false"`,
-    ` WantAssertionsSigned="true"`,
-    ` protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">`,
-    `<md:AssertionConsumerService`,
-    ` Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"`,
-    ` Location="${xmlEscape(acsUrl)}"`,
-    ` index="0" isDefault="true"/>`,
-    `</md:SPSSODescriptor>`,
-    `</md:EntityDescriptor>`,
-  ].join("");
 }
 
 // ── Route plugin ───────────────────────────────────────────────────────────────
@@ -362,16 +259,21 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
     return;
   }
 
+  // The IdP posts the response as an HTML form; this parser stays inside this plugin.
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string", bodyLimit: 1024 * 1024 },
+    (_req, body, done) => done(null, Object.fromEntries(new URLSearchParams(body as string))),
+  );
+
   /**
    * GET /auth/saml/metadata
    * Returns SP metadata XML — paste the URL into your IdP to register Nexus as an SP.
    */
   app.get("/auth/saml/metadata", async (_req, reply) => {
     try {
-      const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-      const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
       reply.header("Content-Type", "application/xml; charset=utf-8");
-      return reply.send(buildMetadataXml(spEntityId, acsUrl));
+      return reply.send(samlClient().generateServiceProviderMetadata(null, null));
     } catch (err) {
       return reply.code(503).send({ error: "saml_config_error", message: (err as Error).message });
     }
@@ -380,44 +282,18 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /auth/saml/login?redirect=<path>
    * Initiates SP-initiated SSO via HTTP-Redirect binding.
-   * Stores state in a signed cookie, redirects browser to IdP.
    */
   app.get<{ Querystring: { redirect?: string } }>(
     "/auth/saml/login",
     { preHandler: samlLoginRateLimit },
     async (request, reply) => {
       try {
-        const idpSsoUrl = env("NEXUS_SAML_IDP_SSO_URL");
-        const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-        const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
-
-        const requestId = `_${randomBytes(16).toString("hex")}`;
-        const relayState = request.query.redirect ?? "/";
-        const state = makeState(relayState);
-        const authnRequest = buildAuthnRequest(requestId, spEntityId, acsUrl);
-        const encoded = encodeAuthnRequest(authnRequest);
-
-        const params = new URLSearchParams({
-          SAMLRequest: encoded,
-          RelayState: state,
-        });
-
-        // Store requestId in a short-lived signed cookie for InResponseTo validation
-        const cookieVal = createHmac("sha256", process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret")
-          .update(requestId)
-          .digest("hex");
-
-        (
-          reply as unknown as { setCookie(n: string, v: string, o: Record<string, unknown>): void }
-        ).setCookie("saml_req_id", `${requestId}:${cookieVal}`, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 600,
-          path: "/",
-        });
-
-        return reply.redirect(`${idpSsoUrl}?${params.toString()}`);
+        const url = await samlClient().getAuthorizeUrlAsync(
+          makeState(request.query.redirect ?? "/"),
+          undefined,
+          {},
+        );
+        return reply.redirect(url);
       } catch (err) {
         return reply
           .code(503)
@@ -429,7 +305,6 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /auth/saml/callback
    * ACS endpoint — IdP POSTs the SAML response here after authentication.
-   * Validates signature, conditions, audience; upserts user; issues tokens.
    */
   app.post<{
     Body: { SAMLResponse?: string; RelayState?: string };
@@ -437,85 +312,33 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
     const frontendUrl = process.env.NEXUS_FRONTEND_URL ?? "http://localhost:5173";
     const fail = (status: number, body: { error: string } & Record<string, unknown>) =>
       failSignIn(request, reply, status, body, frontendUrl);
+
+    const { SAMLResponse, RelayState } = request.body ?? {};
+    if (!SAMLResponse) return fail(400, { error: "missing_saml_response" });
+
+    let profile: Profile | null;
     try {
-      const idpEntityId = env("NEXUS_SAML_IDP_ENTITY_ID");
-      const idpCert = env("NEXUS_SAML_IDP_CERT");
-      const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
+      ({ profile } = await samlClient().validatePostResponseAsync({ SAMLResponse }));
+    } catch (err) {
+      request.log.warn({ err }, "SAML response refused");
+      return fail(401, { error: "saml_response_invalid" });
+    }
+    if (!profile) return fail(400, { error: "saml_response_invalid" });
 
-      const { SAMLResponse, RelayState } = request.body;
-
-      if (!SAMLResponse) {
-        return fail(400, { error: "missing_saml_response" });
-      }
-
-      // Decode SAML response
-      const responseXml = Buffer.from(SAMLResponse, "base64").toString("utf8");
-
-      // 1 — Verify signature
-      if (!verifySamlSignature(responseXml, idpCert)) {
-        request.log.warn("SAML signature verification failed");
-        return fail(401, { error: "invalid_signature" });
-      }
-
-      // 2 — Parse assertion
-      const assertion = parseAssertion(responseXml);
-      if (!assertion || !assertion.email) {
-        return fail(400, { error: "assertion_parse_failed" });
-      }
-
-      // 3 — Validate InResponseTo (CSRF protection)
-      const reqCookie =
-        (request as unknown as { cookies: Record<string, string> }).cookies["saml_req_id"] ?? "";
-      if (reqCookie && assertion.inResponseTo) {
-        const [storedId, storedSig] = reqCookie.split(":");
-        const expectedSig = createHmac(
-          "sha256",
-          process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret",
-        )
-          .update(storedId ?? "")
-          .digest("hex");
-        if (storedSig !== expectedSig || storedId !== assertion.inResponseTo) {
-          return fail(401, { error: "inresponseto_mismatch" });
-        }
-      }
-      // Clear cookie
-      (
-        reply as unknown as { clearCookie(n: string, o: Record<string, unknown>): void }
-      ).clearCookie("saml_req_id", { path: "/" });
-
-      // 4 — Validate time conditions
-      const now = new Date();
-      if (assertion.notBefore && new Date(assertion.notBefore) > new Date(now.getTime() + 60_000)) {
-        return fail(401, { error: "assertion_not_yet_valid" });
-      }
-      if (
-        assertion.notOnOrAfter &&
-        new Date(assertion.notOnOrAfter) < new Date(now.getTime() - 60_000)
-      ) {
-        return fail(401, { error: "assertion_expired" });
-      }
-
-      // 5 — Validate Audience
-      if (assertion.audience && assertion.audience !== spEntityId) {
-        return fail(401, {
-          error: "audience_mismatch",
-          expected: spEntityId,
-          got: assertion.audience,
-        });
-      }
-
-      // 6 — Upsert user + issue tokens
-      const userAgent = request.headers["user-agent"] ?? "";
-      const { accessToken, refreshToken } = await upsertSamlUser(assertion, idpEntityId, userAgent);
-
-      // 7 — Hand the session to the browser and go where the sign-in started
-      const stateResult = RelayState ? verifyState(RelayState) : null;
+    try {
+      const { accessToken, refreshToken } = await upsertSamlUser(
+        identityOf(profile),
+        request.headers["user-agent"] ?? "",
+      );
       return finishSignIn(
         request,
         reply,
         refreshToken,
         { accessToken, refreshToken, provider: "saml" },
-        { appBase: frontendUrl, next: stateResult?.relayState },
+        {
+          appBase: frontendUrl,
+          next: RelayState ? verifyState(RelayState)?.relayState : undefined,
+        },
       );
     } catch (err) {
       // A refused identity is an answer, not a server fault.

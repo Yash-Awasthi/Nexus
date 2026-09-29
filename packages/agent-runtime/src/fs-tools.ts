@@ -316,7 +316,7 @@ function grepTool(): RuntimeTool {
         const lines = text.split("\n");
         for (let i = 0; i < lines.length; i++) {
           if (re.test(lines[i]!)) {
-            out.push({ file: rel, line: i + 1, text: (lines[i]!).slice(0, 500) });
+            out.push({ file: rel, line: i + 1, text: lines[i]!.slice(0, 500) });
             if (out.length >= limit) return out;
           }
         }
