@@ -141,8 +141,12 @@ function starterFiles(name: string, design: AppDesign): Record<string, string> {
       version: "0.0.0",
       type: "module",
       scripts: { dev: "vite", build: "tsc -b && vite build", preview: "vite preview" },
+      // What shadcn components import, so adding one needs no install of its own.
       dependencies: {
+        "class-variance-authority": "^0.7.1",
         clsx: "^2.1.1",
+        "lucide-react": "^1.48.0",
+        "radix-ui": "^1.6.7",
         react: "^19.1.0",
         "react-dom": "^19.1.0",
         "react-router": "^7.6.0",
