@@ -752,32 +752,63 @@ export interface LlmToolDriver {
 }
 
 /** Bridge a native-tool-calling LlmDriver to the LlmToolFn the loop expects. */
-export function llmDriverToToolFn(driver: LlmToolDriver, modelOverride?: string): LlmToolFn {
+/** Waits before retrying a model call that failed on a provider outage (5xx, timeout, reset). */
+export const TRANSIENT_RETRY_DELAYS_MS = [2_000, 5_000];
+
+function isTransient(err: unknown): boolean {
+  const e = err as { code?: unknown; statusCode?: unknown; message?: unknown };
+  if (e?.code === "SERVER_ERROR" || e?.code === "TIMEOUT") return true;
+  if (typeof e?.statusCode === "number" && e.statusCode >= 500) return true;
+  return /unavailable|ECONNRESET|ETIMEDOUT|socket hang up|fetch failed/i.test(String(e?.message));
+}
+
+export function llmDriverToToolFn(
+  driver: LlmToolDriver,
+  modelOverride?: string,
+  retryDelaysMs: readonly number[] = TRANSIENT_RETRY_DELAYS_MS,
+): LlmToolFn {
   return async (messages, opts): Promise<LlmTurnResult> => {
-    const resp = await driver.stream(
-      {
-        model: modelOverride ?? driver.model,
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-          ...(m.toolCalls?.length
-            ? {
-                toolCalls: m.toolCalls.map((tc) => ({
-                  id: tc.callId ?? "",
-                  name: tc.name,
-                  arguments: tc.arguments,
-                })),
-              }
-            : {}),
-          ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
-        })),
-        systemPrompt: opts.systemPrompt,
-        ...(opts.tools?.length ? { tools: opts.tools } : {}),
-      },
-      (delta) => {
-        if (!delta.done && delta.delta) opts.onText?.(delta.delta);
-      },
-    );
+    let streamed = false;
+    const attempt = () =>
+      driver.stream(
+        {
+          model: modelOverride ?? driver.model,
+          messages: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            ...(m.toolCalls?.length
+              ? {
+                  toolCalls: m.toolCalls.map((tc) => ({
+                    id: tc.callId ?? "",
+                    name: tc.name,
+                    arguments: tc.arguments,
+                  })),
+                }
+              : {}),
+            ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+          })),
+          systemPrompt: opts.systemPrompt,
+          ...(opts.tools?.length ? { tools: opts.tools } : {}),
+        },
+        (delta) => {
+          if (!delta.done && delta.delta) {
+            streamed = true;
+            opts.onText?.(delta.delta);
+          }
+        },
+      );
+    let resp: Awaited<ReturnType<typeof attempt>>;
+    for (let i = 0; ; i++) {
+      try {
+        resp = await attempt();
+        break;
+      } catch (err) {
+        // A retry after streamed text would repeat that text to the listener.
+        if (streamed || i >= retryDelaysMs.length || opts.signal?.aborted || !isTransient(err))
+          throw err;
+        await new Promise((r) => setTimeout(r, retryDelaysMs[i]));
+      }
+    }
     return {
       content: resp.content,
       toolCalls: (resp.toolCalls ?? []).map((tc) => ({
