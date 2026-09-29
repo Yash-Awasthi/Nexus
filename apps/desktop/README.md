@@ -36,9 +36,9 @@ rejects the parameter properties several of them use, so plain
 `node dist/index.js` dies on the first such import.
 
 The embedded database is migrated at boot, so a first launch asks for a local
-account (email and password) and keeps its session in the OS keychain. Vector
-memory falls back to in-memory — `PgVectorStore` needs a real Postgres with
-pgvector — and says so.
+account (email and password) and keeps its session in the OS keychain. PGlite
+loads pgvector, so memory is searched in the embedded database the same way a
+server does it.
 
 To point the shell at something already running instead:
 

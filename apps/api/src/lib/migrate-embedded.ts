@@ -32,8 +32,8 @@ function migrationsDir(): string {
 }
 
 /**
- * PGlite ships without pgvector, so `0002_auto_schema_tables` cannot run there
- * and memory lives in lib/kv-memory-store.ts locally instead. Every other
+ * A server Postgres without pgvector cannot run `0002_auto_schema_tables`
+ * (PGlite loads the extension, so the embedded database can). Every other
  * migration is independent of it, so the run continues past this one error and
  * says so. Any other failure is a real schema problem and throws.
  */

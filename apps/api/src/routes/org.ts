@@ -13,7 +13,7 @@ import type { FastifyInstance } from "fastify";
 
 import { ANON_OWNER, listArchetypes } from "../lib/archetype-store.js";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { nativeAdapter, type DriverResolver } from "../lib/org-adapters.js";
 import { setCouncilRunner } from "../lib/org-approvals.js";
 import { registerExternalAdapters, setSkillResolver } from "../lib/org-cli-adapters.js";

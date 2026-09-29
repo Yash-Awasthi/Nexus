@@ -99,7 +99,7 @@ import { sha256hex } from "../lib/crypto-utils.js";
 import { searchDuckDuckGo } from "../lib/duckduckgo.js";
 import { guardExec } from "../lib/exec-guard.js";
 import { getKG } from "../lib/knowledge-graph-store.js";
-import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { cachedDriver } from "../lib/llm-cache-driver.js";
 import { FailoverDriver, getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
 import { heuristicScores, openaiScores } from "../lib/moderation-score.js";

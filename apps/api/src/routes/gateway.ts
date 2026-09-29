@@ -71,7 +71,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { parseCompressHeader } from "../lib/agent-queue.js";
 import { costLogStore, scopeCostEntriesToUser, trackCost } from "../lib/cost-log.js";
-import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { getLlmCacheStats } from "../lib/llm-cache-driver.js";
 import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";

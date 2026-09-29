@@ -231,7 +231,7 @@ A failed run records the error and leaves the cursor alone, so the next run retr
 not land.
 
 Migrations run against the embedded database, so local accounts work (the first account becomes
-the owner), and memory, knowledge bases and shared state persist in it without pgvector or Redis.
+the owner), and memory, knowledge bases and shared state persist in it without Redis; PGlite loads pgvector for memory search.
 The served UI's inline boot scripts are allowed by hash in the script policy.
 
 **Checked end to end (2026-09-28).** `pnpm --filter @nexus/desktop test:e2e` drives the built app
