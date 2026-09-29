@@ -9,6 +9,8 @@
  *   GET  /drive/ls          — list workspace files
  *   GET  /drive/read        — read workspace file
  *   GET  /drive/export      — the workspace as .tar.gz, every .env left out
+ *   POST /drive/link        — a signed, expiring download link for one file
+ *   GET  /drive/file        — the file behind a link, no session needed
  *   DELETE /drive/destroy   — tear down workspace
  *
  * Builds on @nexus/sandbox (Docker runner) and agent-tools (path-guarded fs ops).
@@ -16,6 +18,8 @@
  */
 
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
+import { createReadStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
@@ -34,7 +38,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { guardExec } from "../lib/exec-guard.js";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -108,6 +112,19 @@ export async function safeResolve(rootDir: string, p: string): Promise<string> {
     return resolved;
   }
 }
+
+/** Rotating the secrets key (or the JWT secret it falls back to) revokes every link. */
+function linkKey(): string | undefined {
+  const s = process.env.NEXUS_SECRETS_KEY || process.env.NEXUS_JWT_SECRET;
+  return s ? crypto.createHash("sha256").update(`drive-link:${s}`).digest("hex") : undefined;
+}
+
+function linkSig(key: string, body: string): string {
+  return crypto.createHmac("sha256", key).update(body).digest("base64url");
+}
+
+const LINK_TTL_MIN = 30;
+const LINK_TTL_MAX = 7 * 24 * 60;
 
 function clip(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}\n…[truncated]` : s;
@@ -407,6 +424,84 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         .header("Content-Type", "application/gzip")
         .header("Content-Disposition", 'attachment; filename="nexus-drive.tar.gz"')
         .send(tarGzDirectory(driveDir, (name) => name === ".env"));
+    },
+  );
+
+  // ── Download links ──────────────────────────────────────────────────────────
+  // The user's own keys are never linked, even by a link made before they were written.
+
+  app.post<{ Body: { path?: string; ttlMinutes?: number } }>(
+    "/drive/link",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+      const key = linkKey();
+      if (!key) return reply.code(503).send({ error: "links_unavailable" });
+      const filePath = request.body?.path?.trim();
+      if (!filePath) return reply.code(400).send({ error: "path is required" });
+
+      const driveDir = await ensureDriveDir(userId);
+      const resolved = await safeResolve(driveDir, filePath);
+      if (path.basename(resolved) === ".env")
+        return reply.code(403).send({ error: "The drive's key file is never linked." });
+      if (!(await fs.stat(resolved).catch(() => null))?.isFile())
+        return reply.code(404).send({ error: "file not found" });
+
+      const ttl = Math.min(
+        Math.max(Number(request.body?.ttlMinutes) || LINK_TTL_MIN, 1),
+        LINK_TTL_MAX,
+      );
+      const expires = Date.now() + ttl * 60_000;
+      const body = Buffer.from(
+        JSON.stringify({ u: userId, p: path.relative(driveDir, resolved), e: expires }),
+      ).toString("base64url");
+      return reply.send({
+        url: `/api/v1/drive/file?t=${body}.${linkSig(key, body)}`,
+        expiresAt: new Date(expires).toISOString(),
+      });
+    },
+  );
+
+  app.get<{ Querystring: { t?: string } }>(
+    "/drive/file",
+    {
+      preHandler: makeRateLimitPreHandler({ limit: 60, windowMs: 60_000, keyPrefix: "drive-file" }),
+    },
+    async (request, reply) => {
+      const refuse = () => reply.code(403).send({ error: "invalid_or_expired_link" });
+      const key = linkKey();
+      const [body, sig] = (request.query.t ?? "").split(".");
+      if (!key || !body || !sig) return refuse();
+      const want = Buffer.from(linkSig(key, body));
+      const got = Buffer.from(sig);
+      if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return refuse();
+      let claim: { u?: unknown; p?: unknown; e?: unknown };
+      try {
+        claim = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+      } catch {
+        return refuse();
+      }
+      if (typeof claim.u !== "string" || typeof claim.p !== "string") return refuse();
+      if (typeof claim.e !== "number" || claim.e < Date.now()) return refuse();
+
+      const resolved = await safeResolve(userDrivePath(claim.u), claim.p).catch(() => null);
+      if (!resolved || path.basename(resolved) === ".env") return refuse();
+      if (!(await fs.stat(resolved).catch(() => null))?.isFile())
+        return reply.code(404).send({ error: "file not found" });
+      const name = path.basename(resolved);
+      const ascii = name.replace(/[^\w.\- ]/g, "_");
+      return reply
+        .header("Content-Type", "application/octet-stream")
+        .header(
+          "Content-Disposition",
+          ascii === name
+            ? `attachment; filename="${name}"`
+            : `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+        )
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Cache-Control", "private, no-store")
+        .send(createReadStream(resolved));
     },
   );
 
