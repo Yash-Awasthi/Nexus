@@ -36,6 +36,7 @@ export default [
   route("terminals", "routes/terminals.tsx"),
   route("weather", "routes/weather.tsx"),
   route("drive", "routes/drive.tsx"),
+  route("app-builder", "routes/app-builder.tsx"),
   route("connectors/onboarding", "routes/connectors-onboarding.tsx"),
   route("connectors/sync", "routes/connectors-sync.tsx"),
   route("settings", "routes/settings.tsx"),

@@ -42,6 +42,7 @@ import {
   Wrench,
   TrendingUp,
   CloudSun,
+  Wand2,
 } from "lucide-react";
 import { useEffect } from "react";
 import {
@@ -168,6 +169,7 @@ const navGroups: { label: string; admin?: boolean; items: NavEntry[] }[] = [
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
       { to: "/terminals", icon: SquareTerminal, label: "Terminals" },
       { to: "/drive", icon: HardDrive, label: "Drive" },
+      { to: "/app-builder", icon: Wand2, label: "App builder" },
       { to: "/weather", icon: CloudSun, label: "Weather" },
     ],
   },
