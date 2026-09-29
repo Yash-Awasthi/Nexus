@@ -20,7 +20,13 @@ import crypto from "node:crypto";
 
 import { costLogStore, priceOf } from "./cost-log.js";
 import { createNotification } from "./notifications-store.js";
-import { buildPrompt, downline, parseOutcome, type ParsedOutcome } from "./org-protocol.js";
+import {
+  addPromptContributor,
+  buildPrompt,
+  downline,
+  parseOutcome,
+  type ParsedOutcome,
+} from "./org-protocol.js";
 import {
   OrgError,
   createAgent,
@@ -243,7 +249,7 @@ function recoverOrphans(): void {
     const next: Run = {
       ...r,
       status: "failed",
-      error: "Interrupted: the server stopped while this run was active.",
+      error: `${INTERRUPTED} the server stopped while this run was active.`,
       finishedAt: now(),
     };
     runs.set(r.id, next);
@@ -293,8 +299,13 @@ export function allRuns(): Run[] {
   return [...runs.values()];
 }
 
+/** When each running run was last written, so its log reaches the store while it runs. */
+const savedAt = new Map<string, number>();
+
 function save(run: Run): Run {
   runs.set(run.id, run);
+  if (run.status === "running") savedAt.set(run.id, Date.now());
+  else savedAt.delete(run.id);
   return run;
 }
 
@@ -418,7 +429,7 @@ export function reapStalled(at = Date.now()): string[] {
     if (at - Date.parse(r.startedAt) < timeoutSec * 1000 + STALL_GRACE_MS) continue;
     aborters.get(r.id)?.abort(new Error("timeout"));
     r.status = "failed";
-    r.error = "Stalled: the run outlived its deadline and was closed by the watchdog.";
+    r.error = `${STALLED} the run outlived its deadline and was closed by the watchdog.`;
     r.finishedAt = new Date(at).toISOString();
     push(r, "system", r.error);
     save(r);
@@ -537,10 +548,42 @@ function applyOutcome(
 
 // ── Execute ──────────────────────────────────────────────────────────────────
 
+// ponytail: a crash loses at most the last second of a run's log; write per line if that matters.
 function push(run: Run, stream: RunLogLine["stream"], text: string): void {
   run.log.push({ ts: now(), stream, text: text.slice(0, 4000) });
   if (run.log.length > LOG_LINES) run.log.splice(0, run.log.length - LOG_LINES);
+  if (run.status === "running" && Date.now() - (savedAt.get(run.id) ?? 0) >= 1000) save(run);
 }
+
+const INTERRUPTED = "Interrupted:";
+const STALLED = "Stalled:";
+
+// A cut-off run may have acted already (files written, messages sent), so the
+// next run on the task sees what it logged instead of starting blind.
+addPromptContributor(async ({ task, run }) => {
+  if (!task) return null;
+  const last = [...runs.values()]
+    .filter(
+      (r) =>
+        r.taskId === task.id &&
+        r.id !== run.id &&
+        TERMINAL.includes(r.status) &&
+        r.status !== "skipped",
+    )
+    .sort((a, b) => a.seq - b.seq)
+    .pop();
+  if (!last?.error?.startsWith(INTERRUPTED) && !last?.error?.startsWith(STALLED)) return null;
+  const trail = last.log
+    .filter((l) => l.stream !== "system")
+    .slice(-20)
+    .map((l) => `- ${l.text.slice(0, 300)}`);
+  return [
+    `An earlier attempt at this task was cut off (${last.error})`,
+    trail.length ? "What it logged before stopping:" : "It logged nothing.",
+    ...trail,
+    "Its actions may already have taken effect; check before repeating any of them.",
+  ].join("\n");
+});
 
 /** Persona text: the archetype's prompt when the agent has one. Injected by routes. */
 let personaFor: (ownerId: string, agent: Agent) => string = () => "";
