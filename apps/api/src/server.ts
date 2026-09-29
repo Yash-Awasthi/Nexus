@@ -106,6 +106,7 @@ import { oidcRoutes } from "./routes/oidc.js";
 import { openaiRoutes } from "./routes/openai.js";
 import { orgHookRoutes, orgRoutes } from "./routes/org.js";
 import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
+import { pluginRunRoutes } from "./routes/plugin-run.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
@@ -519,6 +520,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(rlhfRoutes);
       await api.register(sftRoutes);
       await api.register(pluginRegistryRoutes);
+      await api.register(pluginRunRoutes);
       await api.register(llmRoutes);
       await api.register(scenarioPlannerRoutes);
 
