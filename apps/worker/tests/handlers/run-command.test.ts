@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createCodingToolSet } from "../../src/handlers/agent-tools.js";
+import { createCodingToolSet, shellNote } from "../../src/handlers/agent-tools.js";
 
 function workspace(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), "run-command-"));
@@ -45,4 +45,12 @@ describe("run_command", () => {
     await new Promise((r) => setTimeout(r, 3_000));
     expect(existsSync(join(dir, "late.txt"))).toBe(false);
   }, 10_000);
+});
+
+describe("shellNote", () => {
+  it("tells the model which shell runs its commands", () => {
+    expect(shellNote(undefined, "win32")).toContain("cmd.exe");
+    expect(shellNote(undefined, "linux")).toContain("/bin/sh");
+    expect(shellNote({}, "win32")).toContain("/bin/sh");
+  });
 });
