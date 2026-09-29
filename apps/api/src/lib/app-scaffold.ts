@@ -297,6 +297,7 @@ export function codegenInstruction(prompt: string, design: AppDesign): string {
     "- shadcn/ui is configured: run `npx shadcn@latest add <component>` for buttons, cards,",
     "  dialogs and the like instead of writing them by hand.",
     "- Install packages with npm. When done, run `npm run build` and fix every error it reports.",
+    "- Run each command plainly, without piping or trimming its output.",
     "- Finally delete node_modules and dist so the project stays small.",
   ].join("\n");
 }
