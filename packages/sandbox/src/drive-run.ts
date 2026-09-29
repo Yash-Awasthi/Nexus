@@ -25,9 +25,13 @@ export const RUN_COMPLETE = ".nexus-run-complete";
 
 // $1 = working directory inside the tmpfs, $2 = the user's command. A function, not a constant:
 // index.ts re-exports this module, so its values are not ready while this one loads.
+// Entries are copied one by one: `cp -a dir/.` would also copy the tmpfs root's 1777 mode onto
+// the drive directory.
+const copyEntries = (from: string, to: string) =>
+  `find ${from} -mindepth 1 -maxdepth 1 -exec cp -a {} ${to}/ ';'`;
 const wrapper = () =>
-  `cp -a ${DRIVE_SOURCE_MOUNT}/. ${WORKSPACE_MOUNT}/ && cd "$1" && ` +
-  `{ sh -c "$2"; s=$?; cp -a ${WORKSPACE_MOUNT}/. ${DRIVE_OUTPUT_MOUNT}/ && ` +
+  `${copyEntries(DRIVE_SOURCE_MOUNT, WORKSPACE_MOUNT)} && cd "$1" && ` +
+  `{ sh -c "$2"; s=$?; ${copyEntries(WORKSPACE_MOUNT, DRIVE_OUTPUT_MOUNT)} && ` +
   `: > ${DRIVE_OUTPUT_MOUNT}/${RUN_COMPLETE}; exit $s; }`;
 
 export interface DriveRunOptions {
@@ -50,7 +54,10 @@ export async function runOnDrive(
   const run = opts.run ?? defaultRunner;
   const id = randomUUID();
   const staging = `${opts.driveDir}.run-${id}`;
+  const mode = (await fs.stat(opts.driveDir)).mode & 0o7777;
   await fs.mkdir(staging, { recursive: true });
+  // The container may run as another uid than this process; the drive gets its mode back below.
+  await fs.chmod(staging, 0o777);
   const quotaMb = Math.max(1, Math.ceil(opts.quotaBytes / (1024 * 1024)));
   const name = `nexus-drive-${id}`;
   const env = opts.env ?? buildSafeEnv();
@@ -62,6 +69,7 @@ export async function runOnDrive(
       quotaMb,
       outputPath: staging,
       name,
+      interactive: false,
     }),
     "/bin/sh",
     "-c",
@@ -90,6 +98,7 @@ export async function runOnDrive(
   const old = `${opts.driveDir}.old-${id}`;
   await fs.rename(opts.driveDir, old);
   await fs.rename(staging, opts.driveDir);
+  await fs.chmod(opts.driveDir, mode);
   await fs.rm(old, { recursive: true, force: true });
   return { ...result, applied: true };
 }

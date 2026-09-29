@@ -104,3 +104,54 @@ describe("buildDockerArgs hard quota", () => {
     expect(args.some((a) => a.endsWith(":/workspace:rw"))).toBe(false);
   });
 });
+
+describe("drive runs under a VM runtime", () => {
+  it("attach stdin only when there is input, since Kata never returns from an empty -i", async () => {
+    expect(buildDockerArgs({})).toContain("-i");
+    expect(buildDockerArgs({ interactive: false })).not.toContain("-i");
+    const { dir } = drive();
+    await mkdir(dir);
+    let seen: string[] = [];
+    const run: Runner = async (_cmd, args) => {
+      seen = args;
+      return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
+    };
+    await runOnDrive({ driveDir: dir, quotaBytes: 1 << 20, command: "x", timeoutMs: 10, run });
+    expect(seen).not.toContain("-i");
+  });
+
+  it("copies the drive's entries, not the tmpfs root, so the drive keeps its own mode", async () => {
+    const { dir } = drive();
+    await mkdir(dir);
+    let script = "";
+    const run: Runner = async (_cmd, args) => {
+      script = args[args.indexOf("-c") + 1]!;
+      return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
+    };
+    await runOnDrive({ driveDir: dir, quotaBytes: 1 << 20, command: "x", timeoutMs: 10, run });
+    expect(script).not.toMatch(/cp -a \S+\/\. /);
+    expect(script).toContain("-mindepth 1 -maxdepth 1");
+  });
+});
+
+describe("drive run permissions", () => {
+  it.skipIf(process.platform === "win32")(
+    "lets the container user write the staging copy and gives the drive back its own mode",
+    async () => {
+      const { dir } = drive();
+      await mkdir(dir, { mode: 0o750 });
+      const { chmodSync, statSync } = await import("node:fs");
+      chmodSync(dir, 0o750);
+      let stagingMode = 0;
+      const run: Runner = async (_cmd, args) => {
+        const out = mounted(args, "/nexus-out")!;
+        stagingMode = statSync(out).mode & 0o777;
+        writeFileSync(join(out, RUN_COMPLETE), "");
+        return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
+      };
+      await runOnDrive({ driveDir: dir, quotaBytes: 1 << 20, command: "x", timeoutMs: 10, run });
+      expect(stagingMode).toBe(0o777);
+      expect(statSync(dir).mode & 0o777).toBe(0o750);
+    },
+  );
+});
