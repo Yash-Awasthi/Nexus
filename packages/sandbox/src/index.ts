@@ -558,17 +558,33 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
  * const result = await executeCode({ taskType: "sandbox.execute", code: "console.log(1)", language: "javascript" }, runner);
  * ```
  */
-export function createDockerRunner(config: DockerSandboxConfig = {}): Runner {
-  const run = (cmd: string, args: string[], opts: RunnerOptions): Promise<RunnerResult> =>
-    defaultRunner(
+export function createDockerRunner(
+  config: DockerSandboxConfig = {},
+  spawnRunner: Runner = defaultRunner,
+): Runner {
+  const run = async (cmd: string, args: string[], opts: RunnerOptions): Promise<RunnerResult> => {
+    const name = config.name ?? `nexus-exec-${randomUUID()}`;
+    const result = await spawnRunner(
       "docker",
       [
-        ...buildDockerArgs({ ...config, interactive: config.interactive ?? Boolean(opts.stdin) }),
+        ...buildDockerArgs({
+          ...config,
+          name,
+          interactive: config.interactive ?? Boolean(opts.stdin),
+        }),
         cmd,
         ...args,
       ],
       opts,
     );
+    // Killing the docker client on timeout leaves its container running.
+    if (result.timedOut) {
+      await spawnRunner("docker", ["rm", "-f", name], { timeoutMs: 15_000, env: opts.env }).catch(
+        () => null,
+      );
+    }
+    return result;
+  };
   return Object.assign(run, { inContainer: true });
 }
 

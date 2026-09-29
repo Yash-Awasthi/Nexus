@@ -698,6 +698,30 @@ describe("createDockerRunner", () => {
     expect(call.args).toContain("test-image");
   });
 
+  it("removes the named container when the command times out", async () => {
+    const calls: string[][] = [];
+    const spawn: Runner = async (_cmd, args) => {
+      calls.push(args);
+      return { stdout: "", stderr: "", exitCode: null, timedOut: calls.length === 1 };
+    };
+    const result = await createDockerRunner({ image: "alpine" }, spawn)("sleep", ["99"], {
+      timeoutMs: 10,
+    });
+    expect(result.timedOut).toBe(true);
+    const name = calls[0]!.find((a) => a.startsWith("--name="))!.slice("--name=".length);
+    expect(calls[1]).toEqual(["rm", "-f", name]);
+  });
+
+  it("leaves a finished container alone", async () => {
+    const calls: string[][] = [];
+    const spawn: Runner = async (_cmd, args) => {
+      calls.push(args);
+      return { stdout: "ok", stderr: "", exitCode: 0, timedOut: false };
+    };
+    await createDockerRunner({}, spawn)("true", [], { timeoutMs: 10 });
+    expect(calls).toHaveLength(1);
+  });
+
   it("respects DockerSandboxConfig options in buildDockerArgs", () => {
     const config: DockerSandboxConfig = { image: "alpine", memoryMb: 64, cpuPercent: 25 };
     const args = buildDockerArgs(config);
