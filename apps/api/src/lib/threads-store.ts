@@ -78,24 +78,32 @@ export async function searchThreads(
   limit = 50,
 ): Promise<(Thread & { snippet?: string })[]> {
   const needle = query.trim().toLowerCase();
-  const hits: (Thread & { snippet?: string })[] = [];
-  for (const thread of await listThreads(userId, MAX_THREADS)) {
-    if (hits.length >= limit) break;
-    let snippet: string | undefined;
-    for (const m of await listMessages(userId, thread.id)) {
+  const snippetOf = (messages: ThreadMessage[]): string | undefined => {
+    for (const m of messages) {
       const at = m.content.toLowerCase().indexOf(needle);
-      if (at < 0) continue;
-      snippet = m.content
-        .slice(Math.max(0, at - 50), at + needle.length + 90)
-        .replace(/\s+/g, " ")
-        .trim();
-      break;
+      if (at >= 0) {
+        return m.content
+          .slice(Math.max(0, at - 50), at + needle.length + 90)
+          .replace(/\s+/g, " ")
+          .trim();
+      }
     }
-    if (snippet || thread.title.toLowerCase().includes(needle)) {
-      hits.push(snippet ? { ...thread, snippet } : thread);
-    }
+    return undefined;
+  };
+  const threads = await listThreads(userId, MAX_THREADS);
+  const hits: (Thread & { snippet?: string })[] = [];
+  // Each thread's messages are a KV read, so read a batch at a time rather than one by one.
+  for (let i = 0; i < threads.length && hits.length < limit; i += 10) {
+    const batch = threads.slice(i, i + 10);
+    const messages = await Promise.all(batch.map((t) => listMessages(userId, t.id)));
+    batch.forEach((thread, j) => {
+      const snippet = snippetOf(messages[j]!);
+      if (snippet || thread.title.toLowerCase().includes(needle)) {
+        hits.push(snippet ? { ...thread, snippet } : thread);
+      }
+    });
   }
-  return hits;
+  return hits.slice(0, limit);
 }
 
 /** Fetch a single thread (metadata only — use listMessages for content). */
