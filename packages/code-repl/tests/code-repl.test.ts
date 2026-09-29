@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   JupyterMode,
   MockReplExecutor,
@@ -286,6 +286,18 @@ describe("buildDockerRunArgs — isolation policy", () => {
     expect(args).toContain("--cap-drop=ALL");
     expect(args).toContain("--security-opt=no-new-privileges");
     expect(args).toContain("--pids-limit=128");
+  });
+
+  it("runs under the OCI runtime named by SANDBOX_RUNTIME, such as gVisor's runsc", () => {
+    vi.stubEnv("SANDBOX_RUNTIME", "runsc");
+    try {
+      expect(buildDockerRunArgs("python", baseLimits)).toContain("--runtime=runsc");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(buildDockerRunArgs("python", baseLimits).some((a) => a.startsWith("--runtime="))).toBe(
+      false,
+    );
   });
 
   it("fully locks down the shell language (non-root, read-only rootfs, tmpfs /tmp)", () => {

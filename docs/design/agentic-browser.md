@@ -65,7 +65,7 @@ guardrails.
    the existing sandbox image. Recommendation: dedicated image; the sandbox
    image stays lean.
 2. **Where do sessions run?** Worker-host local Chromium (simplest, matches
-   Firecracker-later plan) vs. browserless-style remote endpoint. Recommendation:
+   the drive's local sandbox) vs. browserless-style remote endpoint. Recommendation:
    worker-local first; the `BrowserSession` seam keeps a remote driver swappable.
 3. **TaskScript expressiveness.** Start declarative (JSON steps, no arbitrary
    JS) — safer to audit, enough for 80% of flows. Arbitrary-script mode is a

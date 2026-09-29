@@ -12,8 +12,7 @@
  *   DELETE /drive/destroy   — tear down workspace
  *
  * Builds on @nexus/sandbox (Docker runner) and agent-tools (path-guarded fs ops).
- * Phase 6 will upgrade to Firecracker microVMs; current implementation uses
- * Docker containers with resource caps for multi-tenant isolation.
+ * Commands run in capped Docker containers, under gVisor when SANDBOX_RUNTIME=runsc.
  */
 
 import { spawn } from "node:child_process";

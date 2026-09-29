@@ -462,6 +462,7 @@ export function buildDockerRunArgs(
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
   ];
+  if (process.env["SANDBOX_RUNTIME"]) args.push(`--runtime=${process.env["SANDBOX_RUNTIME"]}`);
   if (limits.user) args.push(`--user=${limits.user}`);
   if (limits.readonlyRootfs) args.push("--read-only");
   if (limits.tmpfsSizeMb > 0) args.push(`--tmpfs=/tmp:rw,nosuid,nodev,size=${limits.tmpfsSizeMb}m`);
