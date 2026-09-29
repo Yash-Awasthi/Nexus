@@ -50,9 +50,10 @@ idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, e
 
 ## Plugins and federation
 
-- **Plugin execution** — `DenoPluginRunner` runs a plugin under `deno` with read access to its
-  own directory only. No route runs plugin code yet, and a plugin granted network access would
-  need a localhost proxy, since `--allow-net` is never passed.
+- **Plugin host calls** _(Ceiling)_ — `POST /api/plugins/:id/run` runs a host-installed plugin
+  under `deno` with read access to its own directory only, so only plugins that request no
+  capabilities run. Capabilities need a host bridge (for network, a localhost proxy, since
+  `--allow-net` is never passed).
 - **SSO live round trip** _(Gate)_ — needs the operator's registered IdP.
 
 ## Desktop and mobile
