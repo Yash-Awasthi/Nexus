@@ -2,7 +2,8 @@
 /**
  * Workflows surface OWNER — extracted from api-bridge.ts (§16.7).
  *
- * /workflows CRUD + /workflows/:id/run. Runs are built on
+ * /workflows CRUD + /workflows/:id/run. A workflow with a `schedule` (five-field
+ * cron, server local time) also runs from a minute tick. Runs are built on
  * @nexus/workflow-chain (createWorkflowChain, dynamically imported); agent
  * steps delegate to an LLM via @nexus/gateway's runFallbackChain with BYOK
  * registry semantics. Response shapes are byte-identical to the
@@ -18,6 +19,7 @@
 import crypto from "node:crypto";
 
 import type { DriverRegistry, LlmDriver, LlmRole } from "@nexus/llm-drivers";
+import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 import type { FastifyInstance } from "fastify";
 
 import { handOff } from "../lib/org-work.js";
@@ -40,12 +42,34 @@ type _Workflow = {
   lastRunAt?: string;
   /** The editor's canvas; `steps` is what runs. */
   graph?: { nodes: unknown[]; edges: unknown[] };
+  schedule?: string | null;
+  nextRunAt?: string | null;
+  lastFiredMinute?: string | null;
 };
 const _workflowStore = new PersistentStore<_Workflow>("workflows");
 claimable("workflows", _workflowStore);
 
 /** Which key backs a chat member — surfaced to the UI as a per-member hint. */
 class WorkflowInputError extends Error {}
+
+/** Set `schedule` from a request body value: a cron, or empty/null to stop. */
+function applySchedule(wf: _Workflow, value: unknown): void {
+  if (value === undefined) return;
+  if (value !== null && typeof value !== "string")
+    throw new WorkflowInputError("schedule must be a cron string or null");
+  const expr = (value ?? "").trim();
+  if (expr && !parseCron(expr))
+    throw new WorkflowInputError("schedule must be a five-field cron, e.g. 0 9 * * 1-5");
+  wf.schedule = expr || null;
+  wf.nextRunAt = expr ? (nextCronRun(expr, new Date())?.toISOString() ?? null) : null;
+}
+
+let runDue: ((at: Date) => Promise<string[]>) | null = null;
+
+/** Run every scheduled workflow due at `at` and resolve with their ids once they finish. */
+export function runDueWorkflows(at = new Date()): Promise<string[]> {
+  return runDue ? runDue(at) : Promise.resolve([]);
+}
 
 type MemberKeySource = "user" | "oauth" | "env" | "local" | "none";
 
@@ -77,20 +101,28 @@ export async function workflowsRoutes(
     return reply.send([..._workflowStore.values()].filter((wf) => visible(request, wf)));
   });
 
-  app.post<{ Body: { name?: string; steps?: unknown[] } }>("/workflows", async (request, reply) => {
-    const name = request.body?.name?.trim();
-    if (!name) return reply.code(400).send({ error: "name is required" });
-    const wf: _Workflow = {
-      id: crypto.randomUUID(),
-      ownerId: request.nexusUserId ?? null,
-      name: name.slice(0, 200),
-      steps: Array.isArray(request.body.steps) ? request.body.steps : [],
-      status: "idle",
-      createdAt: now(),
-    };
-    _workflowStore.set(wf.id, wf);
-    return reply.code(201).send(wf);
-  });
+  app.post<{ Body: { name?: string; steps?: unknown[]; schedule?: unknown } }>(
+    "/workflows",
+    async (request, reply) => {
+      const name = request.body?.name?.trim();
+      if (!name) return reply.code(400).send({ error: "name is required" });
+      const wf: _Workflow = {
+        id: crypto.randomUUID(),
+        ownerId: request.nexusUserId ?? null,
+        name: name.slice(0, 200),
+        steps: Array.isArray(request.body.steps) ? request.body.steps : [],
+        status: "idle",
+        createdAt: now(),
+      };
+      try {
+        applySchedule(wf, request.body.schedule);
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
+      _workflowStore.set(wf.id, wf);
+      return reply.code(201).send(wf);
+    },
+  );
 
   app.patch<{
     Params: { id: string };
@@ -99,10 +131,16 @@ export async function workflowsRoutes(
       steps?: unknown[];
       name?: string;
       graph?: { nodes?: unknown; edges?: unknown };
+      schedule?: unknown;
     };
   }>("/workflows/:id", async (request, reply) => {
     const wf = mine(request, request.params.id);
     if (!wf) return reply.code(404).send({ error: "not_found" });
+    try {
+      applySchedule(wf, request.body?.schedule);
+    } catch (err) {
+      return reply.code(400).send({ error: (err as Error).message });
+    }
     if (request.body?.status) wf.status = request.body.status;
     if (Array.isArray(request.body?.steps)) wf.steps = request.body.steps;
     if (request.body?.name?.trim()) wf.name = request.body.name.trim().slice(0, 200);
@@ -331,6 +369,28 @@ export async function workflowsRoutes(
       clearTimeout(timer);
     }
   }
+
+  runDue = async (at) => {
+    const due = [..._workflowStore.values()].filter(
+      (wf) =>
+        wf.schedule &&
+        wf.status !== "running" &&
+        isDue({ cron: wf.schedule, lastFiredMinute: wf.lastFiredMinute }, at),
+    );
+    await Promise.allSettled(
+      due.map((wf) => {
+        wf.lastFiredMinute = minuteKey(at);
+        wf.nextRunAt = nextCronRun(wf.schedule!, at)?.toISOString() ?? null;
+        _workflowStore.set(wf.id, wf);
+        return runStoredWorkflow(wf, { scheduledAt: at.toISOString() }, wf.ownerId ?? undefined);
+      }),
+    );
+    return due.map((wf) => wf.id);
+  };
+  // Every half minute, so a late timer never skips a minute; lastFiredMinute stops a repeat.
+  const tick = setInterval(() => void runDueWorkflows(), 30_000);
+  tick.unref();
+  app.addHook("onClose", async () => clearInterval(tick));
 
   provideReactionDeps({
     runWorkflow: async (ownerId, workflowId, input) => {

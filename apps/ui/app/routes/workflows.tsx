@@ -72,6 +72,9 @@ type Workflow = {
   lastRun: string;
   steps?: StepDef[];
   graph?: { nodes: Node[]; edges: Edge[] };
+  /** Five-field cron the server runs the workflow on; null when unscheduled. */
+  schedule?: string | null;
+  nextRunAt?: string | null;
 };
 
 // No demo/workflow seeds here: the list starts empty and renders whatever the
@@ -123,6 +126,8 @@ function normalizeWorkflow(w: Record<string, unknown>): Workflow {
     lastRun,
     steps: steps.map((s) => s as StepDef),
     ...(w.graph ? { graph: w.graph as { nodes: Node[]; edges: Edge[] } } : {}),
+    schedule: typeof w.schedule === "string" ? w.schedule : null,
+    nextRunAt: typeof w.nextRunAt === "string" ? w.nextRunAt : null,
   };
 }
 
@@ -176,7 +181,7 @@ const nodeTypeStyles: Record<
 
 function NodePalette({ onAddNode }: { onAddNode: (type: string) => void }) {
   return (
-    <div className="w-56 border-r border-border flex flex-col bg-background shrink-0">
+    <div className="w-full md:w-56 max-h-56 md:max-h-none overflow-y-auto border-b md:border-b-0 md:border-r border-border flex flex-col bg-background shrink-0">
       <div className="p-3 border-b border-border">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Node Palette
@@ -394,7 +399,7 @@ function PropertiesPanel({
 }) {
   if (!selectedNode) {
     return (
-      <div className="w-64 border-l border-border flex flex-col bg-background shrink-0">
+      <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-border flex flex-col bg-background shrink-0">
         <div className="p-3 border-b border-border">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Properties
@@ -426,7 +431,7 @@ function PropertiesPanel({
   }, [nodeType, selectedNode, onUpdateModel, models]);
 
   return (
-    <div className="w-64 border-l border-border flex flex-col bg-background shrink-0">
+    <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-border flex flex-col bg-background shrink-0">
       <div className="p-3 border-b border-border">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Properties
@@ -556,6 +561,7 @@ function WorkflowEditor({
   const [runOutput, setRunOutput] = useState<string | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(true);
   const [models, setModels] = useState<GatewayModel[]>(FALLBACK_MODELS);
+  const [schedule, setSchedule] = useState(workflow.schedule ?? "");
 
   // Feed the model picker from the registry (seeded from models.dev, §1.5).
   // Falls back to the static list on any error / unauthorized.
@@ -653,19 +659,34 @@ function WorkflowEditor({
       const res = await fetch(`/api/workflows/${workflow.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ steps, graph: { nodes, edges } }),
+        body: JSON.stringify({ steps, graph: { nodes, edges }, schedule: schedule.trim() || null }),
       });
-      if (!res.ok) throw new Error(`server responded ${res.status}`);
+      const saved = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        nextRunAt?: string | null;
+      };
+      if (!res.ok) throw new Error(saved.error ?? `server responded ${res.status}`);
       // Carry the compiled steps back into the list object so the card's
       // Play button knows the workflow is runnable without a refetch.
-      onUpdateWorkflow({ ...workflow, nodeCount: nodes.length, steps, graph: { nodes, edges } });
-      setSaveMessage("Workflow saved successfully!");
+      onUpdateWorkflow({
+        ...workflow,
+        nodeCount: nodes.length,
+        steps,
+        graph: { nodes, edges },
+        schedule: schedule.trim() || null,
+        nextRunAt: saved.nextRunAt ?? null,
+      });
+      setSaveMessage(
+        saved.nextRunAt
+          ? `Saved. Next run ${new Date(saved.nextRunAt).toLocaleString()}.`
+          : "Workflow saved successfully!",
+      );
     } catch (err) {
       const reason = err instanceof Error ? ` (${err.message})` : "";
       setSaveMessage(`Failed to save to server${reason}.`);
     }
     setTimeout(() => setSaveMessage(null), 2500);
-  }, [workflow, nodes, edges, models, onUpdateWorkflow]);
+  }, [workflow, nodes, edges, models, schedule, onUpdateWorkflow]);
 
   const handleRun = useCallback(async () => {
     const steps = compileSteps(nodes, edges, models);
@@ -748,7 +769,7 @@ function WorkflowEditor({
   return (
     <div className="flex flex-col" style={{ height: "100%" }}>
       {/* Toolbar */}
-      <div className="h-14 border-b border-border flex items-center px-4 gap-3 bg-background shrink-0 z-10">
+      <div className="min-h-14 py-2 border-b border-border flex flex-wrap items-center px-4 gap-3 bg-background shrink-0 z-10">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
           <ChevronLeft className="size-4" />
           Back
@@ -762,13 +783,21 @@ function WorkflowEditor({
         >
           {statusConfig[workflow.status].label}
         </Badge>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">
             {nodes.length} nodes · {edges.length} edges
           </span>
           {saveMessage && (
             <span className="text-xs text-success animate-in fade-in">{saveMessage}</span>
           )}
+          <Input
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            placeholder="cron, e.g. 0 9 * * 1-5"
+            aria-label="Schedule (cron)"
+            title="Run on this five-field cron (server time); leave empty to run only by hand"
+            className="h-7 w-28 sm:w-40 text-xs font-mono"
+          />
           <Button
             variant="outline"
             size="sm"
@@ -787,11 +816,11 @@ function WorkflowEditor({
       </div>
 
       {/* Editor layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col md:flex-row overflow-y-auto md:overflow-hidden">
         <NodePalette onAddNode={handleAddNode} />
 
         {/* Canvas */}
-        <div className="flex-1" style={{ height: "calc(100% - 56px)" }}>
+        <div className="flex-1 min-h-[60vh] md:min-h-0 md:h-[calc(100%-56px)]">
           <div style={{ width: "100%", height: "100%" }}>
             <ReactFlow
               nodes={nodes}
