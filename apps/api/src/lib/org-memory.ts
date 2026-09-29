@@ -13,6 +13,8 @@
 
 import crypto from "node:crypto";
 
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
+
 import { addPromptContributor } from "./org-protocol.js";
 import { onRunFinished, type Run } from "./org-runtime.js";
 import { OrgError, getCompany, nextSeq, onOrgLoad, registerCompanyScoped } from "./org-store.js";
@@ -197,7 +199,9 @@ addPromptContributor(async ({ agent, company, task }) => {
   if (!query.trim()) return null;
   const hits = await knowledgeRecall(agent.ownerId, query, agent.knowledgeBaseIds ?? []);
   if (hits.length === 0) return null;
-  return `From the owner's knowledge bases and memory (cite what you use):\n${hits
-    .map((h) => `- [${h.source}] ${h.text.replace(/\s+/g, " ").slice(0, 800)}`)
+  return `From the owner's knowledge bases and memory (cite what you use). ${UNTRUSTED_NOTE}\n${hits
+    .map(
+      (h) => `- [${h.source}] ${screenUntrusted(h.text.replace(/\s+/g, " ").slice(0, 800)).text}`,
+    )
     .join("\n")}`;
 });

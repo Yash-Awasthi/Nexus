@@ -11,6 +11,7 @@ import {
   type ScoredChunk,
   type SourceRetrieverFn,
 } from "@nexus/retrieval";
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
 export interface CitedSource {
   n: number;
@@ -64,13 +65,13 @@ export function sourcesPrompt(set: SourceSet): string {
   const blocks = set.sources.map((s) => {
     const excerpts = set.chunks
       .filter((c) => set.numberOf.get(c.id) === s.n)
-      .map((c) => c.text.slice(0, EXCERPT_CHARS))
+      .map((c) => screenUntrusted(c.text.slice(0, EXCERPT_CHARS)).text)
       .join("\n\n");
     return `[${s.n}] ${s.title}${s.url ? ` (${s.url})` : ""}\n${excerpts}`;
   });
   return (
     "Sources for this question. Where your answer relies on one, cite it inline as [n], " +
-    `for example [1]. Do not cite a source for anything it does not say.\n\n${blocks.join("\n\n")}`
+    `for example [1]. Do not cite a source for anything it does not say. ${UNTRUSTED_NOTE}\n\n${blocks.join("\n\n")}`
   );
 }
 

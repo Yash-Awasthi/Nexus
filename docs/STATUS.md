@@ -264,6 +264,10 @@ operator action.
 Each concern has ONE owner; everything else imports it. Breaking any rule below
 reintroduces a bug that was found and fixed live — don't.
 
+**Outside text in prompts:** web pages, knowledge-base passages, webhook payloads and tool
+output pass through `screenUntrusted` (`@nexus/shared`) and sit under `UNTRUSTED_NOTE` before
+they reach a model. A new place that puts outside text into a prompt does the same.
+
 **Per-user durable stores (KV-backed, survive restarts):** notifications
 (`lib/notifications-store.ts`), threads (`lib/threads-store.ts`), research jobs
 (`lib/research-jobs.ts`), session/mission graphs (`lib/session-graph.ts`,

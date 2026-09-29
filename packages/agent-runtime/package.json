@@ -13,10 +13,11 @@
   },
   "dependencies": {
     "@nexus/best-of-n": "workspace:*",
-    "@nexus/llm-compress": "workspace:*"
+    "@nexus/llm-compress": "workspace:*",
+    "@nexus/shared": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "*",
-    "typescript": "*"
+    "typescript": "*",
+    "vitest": "*"
   }
 }

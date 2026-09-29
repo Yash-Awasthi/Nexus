@@ -65,8 +65,9 @@ idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, e
 
 ## Backlog
 
-- **Prompt-injection guard** — text from the web, knowledge bases and connectors goes into prompts
-  as it is; OmniRoute screens it for instructions aimed at the model.
+- **Prompt-injection guard** _(Ceiling)_ — pattern screening (`@nexus/shared` `screenUntrusted`)
+  cuts instruction-like spans from sources, KB passages, webhook payloads and tool output; a
+  reworded attack gets past it. A classifier model would catch more, at a call per source.
 - **Browser extension and embeddable widget** — Onyx asks its knowledge from any tab and from a
   script tag on another site; Nexus is reachable only through its own app, API and bots.
 - **Batch and Files APIs** — the OpenAI-compatible surface has chat, embeddings and models but no

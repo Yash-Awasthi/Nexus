@@ -52,7 +52,6 @@ const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
       body: JSON.stringify({
         model: "nexus/smart",
         messages: [{ role: "user", content: msg.text }],
-        system: (msg.raw as Record<string, unknown>)?.["system"] as string | undefined,
         stream: false,
       }),
     });

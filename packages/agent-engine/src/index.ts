@@ -8,6 +8,8 @@
  * configuration and result handling.
  */
 
+import { screenUntrusted } from "@nexus/shared";
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface EngineConfig {
@@ -159,7 +161,11 @@ export class OpenAIEngine implements Engine {
           } catch (err) {
             result = `Error: ${err instanceof Error ? err.message : String(err)}`;
           }
-          messages.push({ role: "tool", tool_call_id: call.id, content: result });
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: screenUntrusted(result).text,
+          });
         }
         continue;
       }

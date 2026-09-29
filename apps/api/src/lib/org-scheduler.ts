@@ -18,6 +18,7 @@
 
 import crypto from "node:crypto";
 
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 
 import { budgetOverview } from "./org-budget.js";
@@ -360,7 +361,7 @@ export function fireRoutine(
   const stamp = at.slice(0, 16).replace("T", " ");
   const extra =
     payload !== undefined && payload !== null && Object.keys(payload as object).length > 0
-      ? `\n\nTrigger payload:\n\`\`\`json\n${JSON.stringify(payload, null, 2).slice(0, 4000)}\n\`\`\``
+      ? `\n\nTrigger payload. ${UNTRUSTED_NOTE}\n\`\`\`json\n${screenUntrusted(JSON.stringify(payload, null, 2).slice(0, 4000)).text}\n\`\`\``
       : "";
   const task = createTask(
     ownerId,
