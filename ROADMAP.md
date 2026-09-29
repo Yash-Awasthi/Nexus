@@ -68,8 +68,6 @@ idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, e
 - **Prompt-injection guard** _(Ceiling)_ — pattern screening (`@nexus/shared` `screenUntrusted`)
   cuts instruction-like spans from sources, KB passages, webhook payloads and tool output; a
   reworded attack gets past it. A classifier model would catch more, at a call per source.
-- **Browser extension and embeddable widget** — Onyx asks its knowledge from any tab and from a
-  script tag on another site; Nexus is reachable only through its own app, API and bots.
 - **Batch runs** _(Ceiling)_ — `/v1/batches` runs one line at a time in the API process with the
   caller's token, so a restart fails the batch and a token that expires mid-run fails the rest;
   `/v1/files` keeps bytes on the API host's disk. A worker queue job with a service identity and
