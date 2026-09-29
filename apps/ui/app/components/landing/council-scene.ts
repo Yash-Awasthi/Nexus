@@ -147,7 +147,7 @@ const TREE: { pos: Vector3; parent: number; size: number }[] = (() => {
   return nodes;
 })();
 
-export interface MountOptions {
+interface MountOptions {
   reducedMotion: boolean;
   onSection?: (key: string) => void;
 }

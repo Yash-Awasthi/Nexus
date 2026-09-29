@@ -167,7 +167,7 @@ export class LlmDriversTransport implements ILLMTransport {
  * Answers every council call on the caller's own connections, each on its default model. Used
  * when no council alias provider is reachable, e.g. the caller saved only a custom endpoint.
  */
-export class OwnDriversTransport implements ILLMTransport {
+class OwnDriversTransport implements ILLMTransport {
   constructor(private readonly driver: FailoverDriver) {}
 
   async chat(

@@ -141,7 +141,7 @@ interface ConductorServer {
   stop: () => Promise<void>;
 }
 
-export async function createConductorServer(repoRoot: string): Promise<ConductorServer> {
+async function createConductorServer(repoRoot: string): Promise<ConductorServer> {
   const bootStarted = Date.now();
   const ctx = await createRuntimeContext(repoRoot);
   await startRuntime(ctx);

@@ -1072,10 +1072,6 @@ importers:
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/governance:
-    dependencies:
-      '@nexus/shared':
-        specifier: workspace:*
-        version: link:../shared
     devDependencies:
       fast-check:
         specifier: ^3.23.2
@@ -1435,9 +1431,6 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@nexus/agent-runtime':
-        specifier: workspace:*
-        version: link:../agent-runtime
       '@nexus/governance':
         specifier: workspace:*
         version: link:../governance

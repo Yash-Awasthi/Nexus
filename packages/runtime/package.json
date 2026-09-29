@@ -23,7 +23,6 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@nexus/agent-runtime": "workspace:*",
     "@nexus/governance": "workspace:*",
     "@nexus/memory": "workspace:*",
     "@nexus/telemetry": "workspace:*",

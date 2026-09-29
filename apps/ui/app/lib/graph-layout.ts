@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A 3D force layout: nodes push apart, linked nodes pull together, everything drifts to the centre. */
 
-export interface LayoutEdge {
+interface LayoutEdge {
   subjectId: string;
   objectId: string;
 }
