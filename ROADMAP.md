@@ -2,88 +2,49 @@
 
 # NEXUS — Roadmap
 
-Open work only. Shipped work is described by the code, `docs/STATUS.md` and git history, not
-listed here.
+Open work only. What ships is described by the code and `docs/`; git history is the record. When
+an item is done, its line goes.
 
-Legend: **Gate** = needs a live or external action (provider key, OAuth app, live probe,
-host-mutating install) · **Ceiling** = a known limit of what shipped, with the upgrade path.
+**Gate** = needs an operator action or an outside account. **Ceiling** = a known limit of something
+that shipped, with the way past it. Nexus is free and open: "billing" below means spend guards on
+the user's own keys, never charging for Nexus.
 
-> **Nexus is free/open** — no paid tier, no payment provider. "billing"/"quota" below = BYOK
-> spend-guards on the user's own keys, never charging for Nexus.
+## Gated
 
-Conventions for new work: build against mocks (`MockTransport`, injectable
-`fetchFn`/`TokenHttp`); every live outbound call is a **Gate**; new env vars go in
-`.env.example`; every new file carries the SPDX `Apache-2.0` header (`pnpm check:headers`);
-migrations follow the `packages/db/migrations/` recipe (next free number, add a
-`meta/_journal.json` entry or `db:migrate` skips the file); UI routes register in
-`apps/ui/app/routes.ts`, compose `app/components/page.tsx`, and mirror `provider-keys.tsx`
-(CRUD) or `costs.tsx` (dashboards).
+- **Provider OAuth live round trip** — needs the operator's OAuth apps (Google, GitHub) and
+  redirect URIs; unit coverage is in `packages/llm-oauth/tests/`. Never log token-exchange bodies.
+- **SSO live round trip** — needs the operator's identity provider.
+- **Drive backups on the operator's bucket** — runs against a bucket mock and an S3-compatible
+  server that checks SigV4; a run on a real bucket needs the operator's credentials.
+- **Desktop packaging** — code-signing certificates and macOS notarization; auto-update refuses
+  unsigned builds.
+- **Mobile app** — an Expo client for approvals, runs and alerts, with push notifications that
+  carry ids and titles, never content; needs Apple and Google developer accounts.
+- **Managed infrastructure** — Redis cluster rate limits (Upstash or managed Redis), PgBouncer
+  (database admin), Kubernetes autoscaling (a cluster; the chart is in `infra/helm/nexus/`).
 
----
+## Ceilings
 
-## Provider OAuth
+- **Drive isolation** — Docker, or gVisor with `SANDBOX_RUNTIME=runsc`. A Firecracker runner would
+  move each drive into a block image behind a VM and most hosts lack KVM, so it stays a spike
+  (`scripts/drive-microvm-spike.sh`).
+- **Drive quota** — checked before and re-measured after each command, so an overrun is bounded by
+  one command's writes. A hard stop mid-write needs root (XFS project quota or a loopback ext4).
+- **Drive links** — a signed link cannot be revoked on its own before it expires (7 days at most);
+  rotating `NEXUS_SECRETS_KEY` revokes every link.
+- **Plugin host calls** — `POST /api/plugins/:id/run` runs a plugin under `deno` with read access
+  to its own directory only, so only plugins that ask for no capabilities run. Capabilities need a
+  host bridge (for network, a localhost proxy).
+- **Prompt-injection guard** — pattern screening cuts instruction-like text from sources, passages,
+  webhook payloads and tool output; a reworded attack gets past it. A classifier model would catch
+  more, at a call per source.
+- **Batch runs** — `/v1/batches` runs one line at a time in the API process with the caller's
+  token, so a restart fails the batch; `/v1/files` keeps bytes on the API host's disk. A worker
+  queue job with a service identity and the drive's S3 bucket would lift both.
 
-- **OAuth live E2E** _(Gate)_ — unit coverage exists in `packages/llm-oauth/tests/`; a live run
-  needs the operator's registered OAuth app and redirect URI. Never log token-exchange bodies.
+## On hold (billing)
 
-## Nexus Drive
-
-**Spec (locked):** gVisor primary, Docker limits as fallback; Firecracker only if a host needs a
-hardware boundary. 512 MB quota at `/workspace`; soft-warn at 90%, then hard-block. 30-day
-idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, excluded from backups and exports.
-
-- **Isolation** — the drive runs on Docker; `SANDBOX_RUNTIME=runsc` puts every sandbox
-  container under gVisor. `scripts/drive-microvm-spike.sh` boots a Firecracker microVM with a
-  512 MB ext4 at `/workspace` and shows a 600 MB write failing with ENOSPC; it runs wherever
-  `/dev/kvm` exists, including Docker Desktop on WSL2. No Firecracker runner is planned: it
-  would move the drive into a per-user block image and route every drive call through the VM,
-  and most cloud hosts lack KVM. ext4 overhead leaves 477 MB of a 512 MB image usable.
-- **Quota ceiling** — enforced by a pre-check plus a re-measure after each command, so an
-  overrun is bounded by one command's writes. A mid-write hard fail needs root (XFS project
-  quota or a loopback ext4); `--storage-opt` caps a container's layer, not a bind mount.
-- **Off-machine backups** _(Gate)_ — drives back up to an S3 or R2 bucket (`DRIVE_BACKUP_S3_*`),
-  tested against a mock of the bucket API and run against an S3-compatible server (Scality
-  CloudServer, which checks SigV4); a run on the operator's own bucket needs their credentials.
-- **Drive table** — deliberately not built: size and last activity live on the filesystem
-  (`packages/sandbox/src/drive-fs.ts`). Build it when a drive needs something the disk does not
-  know, such as a per-user quota override or a reclaim auditable after the files are gone.
-
-## Plugins and federation
-
-- **Plugin host calls** _(Ceiling)_ — `POST /api/plugins/:id/run` runs a host-installed plugin
-  under `deno` with read access to its own directory only, so only plugins that request no
-  capabilities run. Capabilities need a host bridge (for network, a localhost proxy, since
-  `--allow-net` is never passed).
-- **SSO live round trip** _(Gate)_ — needs the operator's registered IdP.
-
-## Desktop and mobile
-
-- **Packaging (M4)** _(Gate)_ — signing certificates and macOS notarization are operator
-  actions; auto-update refuses unsigned builds.
-- **Mobile** — spec in `docs/design/nexus-mobile.md` (Expo RN + push); developer accounts are
-  Gates.
-
-## Backlog
-
-- **Prompt-injection guard** _(Ceiling)_ — pattern screening (`@nexus/shared` `screenUntrusted`)
-  cuts instruction-like spans from sources, KB passages, webhook payloads and tool output; a
-  reworded attack gets past it. A classifier model would catch more, at a call per source.
-- **Batch runs** _(Ceiling)_ — `/v1/batches` runs one line at a time in the API process with the
-  caller's token, so a restart fails the batch and a token that expires mid-run fails the rest;
-  `/v1/files` keeps bytes on the API host's disk. A worker queue job with a service identity and
-  the drive's S3 bucket would lift both.
-
-## Blocked on external infra
-
-| Task                     | Blocker                                    |
-| ------------------------ | ------------------------------------------ |
-| Redis cluster rate-limit | Upstash / managed Redis                    |
-| PgBouncer pooling        | DB admin                                   |
-| K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`) |
-| Provider OAuth app reg   | Google/GitHub dev consoles for client IDs  |
-
-## Reference note
-
-`nexus/omni` can front any self-hosted OpenAI-compatible router to inherit a large provider
-catalog with zero native driver work. Fine for dev/self-host; for production prefer native
-drivers over shipping the sidecar as a silent hard dependency.
+- Bridge calls record spend under `DEFAULT_MODEL` instead of the model that answered, so cost pages
+  price every call at one rate. Needs the answering provider on `LlmResponse`.
+- Billing-only package code with no caller: billing `billingPreHandler`, gateway
+  `CostCallbackRegistry`, telemetry `aggregateSessionCost` and the pricing helpers beside it.

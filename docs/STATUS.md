@@ -69,8 +69,7 @@ STM, A/B Arena, Agents) describe API that outlived its page.
 ## 🏢 Company (org layer)
 
 `/org` runs companies of agents. The API is `/api/org/*` (`apps/api/src/routes/org*.ts` over
-`apps/api/src/lib/org-*.ts`) and the CLI is `nexus org`. The design and the Paperclip comparison it
-came from are in `docs/design/paperclip-comparison.md`.
+`apps/api/src/lib/org-*.ts`) and the CLI is `nexus org`.
 
 - **Structure.** Companies, agents with roles, reporting lines and an archetype persona, and goals.
   Tasks carry identifiers like `ACME-12`, priorities, blockers, comments and work modes (do the work,
