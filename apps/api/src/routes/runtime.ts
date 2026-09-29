@@ -227,6 +227,9 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
         workspaceDir: dir,
         maxSteps: 60,
         commandTimeoutMs: 180_000,
+        // Every advertised tool is resent on each step; building an app needs only the coding set.
+        disableCouncilTools: true,
+        disablePtc: true,
         ...(provider ? { provider } : {}),
         ...(model ? { model } : {}),
         ...(sessionId ? { sessionId } : {}),
