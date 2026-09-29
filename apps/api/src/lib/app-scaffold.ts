@@ -345,6 +345,7 @@ export function codegenInstruction(prompt: string, design: AppDesign): string {
     "  dialogs and the like instead of writing them by hand.",
     "- Install packages with npm. When done, run `npm run build` and fix every error it reports.",
     "- Run each command plainly, without piping or trimming its output.",
-    "- Finally delete node_modules and dist so the project stays small.",
+    "- A clean `npm run build` is the check: once it passes, do not write check scripts or",
+    "  inspect the built files. Delete node_modules and dist, then reply with a short summary.",
   ].join("\n");
 }
