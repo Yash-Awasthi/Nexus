@@ -69,16 +69,24 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 
 - **Cheap extraction model** — deterministic distillation works today; a small model would
   improve recall.
+- **Company config history** — an agent's role, instructions and budget are overwritten on edit;
+  Paperclip keeps each revision and can roll a bad change back.
+- **Prompt-injection guard** — text from the web, knowledge bases and connectors goes into prompts
+  as it is; OmniRoute screens it for instructions aimed at the model.
+- **Browser extension and embeddable widget** — Onyx asks its knowledge from any tab and from a
+  script tag on another site; Nexus is reachable only through its own app, API and bots.
+- **Batch and Files APIs** — the OpenAI-compatible surface has chat, embeddings and models but no
+  `/v1/batches` or `/v1/files`.
 
 ## Blocked on external infra
 
-| Task                     | Blocker                                   |
-| ------------------------ | ----------------------------------------- |
-| Firecracker / gVisor     | Linux host with KVM                       |
-| Redis cluster rate-limit | Upstash / managed Redis                   |
-| PgBouncer pooling        | DB admin                                  |
-| K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`)|
-| Provider OAuth app reg   | Google/GitHub dev consoles for client IDs |
+| Task                     | Blocker                                    |
+| ------------------------ | ------------------------------------------ |
+| Firecracker / gVisor     | Linux host with KVM                        |
+| Redis cluster rate-limit | Upstash / managed Redis                    |
+| PgBouncer pooling        | DB admin                                   |
+| K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`) |
+| Provider OAuth app reg   | Google/GitHub dev consoles for client IDs  |
 
 ## Reference note
 
