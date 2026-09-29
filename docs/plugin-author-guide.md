@@ -309,3 +309,45 @@ case "myservice.get":
 4. A maintainer will review within 5 business days
 
 See `CONTRIBUTING.md` for DCO sign-off requirements.
+
+---
+
+## 11. Host plugins in the Deno sandbox
+
+A plugin can also run on the Nexus host itself: put a directory holding `manifest.json`
+(`id`, `name`, `version`, `entry`, `capabilities`) and its entry script under `NEXUS_PLUGINS_DIR`
+(default `<data dir>/plugins`), and `POST /api/v1/plugins/:id/run { input }` runs it under
+`deno`. The script reads its own directory and nothing else: no env, writes, subprocesses or
+network, except one address.
+
+That address is the host bridge, opened for the run and passed as the script's second argument
+(`{ url, token }`). Each capability the manifest declares is a call on it, answered as the user who
+ran the plugin; a capability the manifest does not declare is refused with 403.
+
+```ts
+const input = JSON.parse(Deno.args[0]);
+const host = JSON.parse(Deno.args[1]);
+const call = async (capability: string, body: unknown) =>
+  (
+    await fetch(`${host.url}/call`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${host.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ capability, input: body }),
+    })
+  ).json(); // { result } or { error }
+
+const answer = await call("llm.inference", { prompt: `Summarise ${input.topic}`, maxTokens: 200 });
+console.log(JSON.stringify({ summary: answer.result }));
+```
+
+| Capability         | Input                    | Result                               |
+| ------------------ | ------------------------ | ------------------------------------ |
+| `llm.inference`    | `{ prompt, maxTokens? }` | the reply text, on the user's models |
+| `search.web`       | `{ query, max? }`        | `[{ title, url, snippet }]`          |
+| `storage.read`     | `{ key }`                | the stored value or `null`           |
+| `storage.write`    | `{ key, value }`         | `true`; up to 64 KB per value        |
+| `monitoring.log`   | `{ message }`            | `true`; lines come back as `logs`    |
+| `monitoring.alert` | `{ title, message? }`    | `true`; a notification for the user  |
+
+Storage is kept per plugin and per user. A plugin that declares any other capability is refused
+with 409 before it starts.

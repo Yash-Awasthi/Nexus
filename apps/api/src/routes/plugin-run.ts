@@ -8,15 +8,17 @@
  * A plugin is a directory under NEXUS_PLUGINS_DIR (default <data dir>/plugins)
  * holding `manifest.json` and its entry script. The script gets the input as
  * JSON in its first argument, may read its own directory and nothing else (no
- * network, env, writes or subprocesses), and answers on stdout.
+ * env, writes, subprocesses or network), and answers on stdout. Its declared
+ * capabilities are served by a host bridge (lib/plugin-host.ts) named in its
+ * second argument, as the user who ran it.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
   DenoPluginRunner,
-  PluginManifestError,
   SandboxUnavailableError,
   loadPlugin,
   validatePluginManifest,
@@ -25,8 +27,13 @@ import {
 } from "@nexus/plugin-sdk";
 import type { FastifyInstance } from "fastify";
 
-import { dataDir } from "../lib/persistent-store.js";
+import { searchDuckDuckGo } from "../lib/duckduckgo.js";
+import { createNotification } from "../lib/notifications-store.js";
+import { dataDir, PersistentStore } from "../lib/persistent-store.js";
+import { withPluginBridge, type HostHandler } from "../lib/plugin-host.js";
 import { requireAuth } from "../middleware/auth.js";
+
+import { getDefaultDriver } from "./api-bridge.js";
 
 /** Passed to the script as one argv entry, so it stays well under OS command-line limits. */
 const MAX_INPUT_BYTES = 16 * 1024;
@@ -35,6 +42,63 @@ const MAX_STDERR = 2_000;
 function pluginsDir(): string {
   return process.env.NEXUS_PLUGINS_DIR ?? path.join(dataDir(), "plugins");
 }
+
+const pluginStorage = new PersistentStore<{ value: unknown }>("plugin_storage");
+const MAX_STORED = 64 * 1024;
+const MAX_LOG_LINES = 200;
+
+/** Capabilities this host serves over the bridge, each as the user who ran the plugin. */
+function hostHandlers(
+  userId: string,
+  pluginId: string,
+  logs: string[],
+): Record<string, HostHandler> {
+  // Bridge calls arrive on their own socket; this keeps the caller's keys and context.
+  const asCaller = AsyncLocalStorage.snapshot();
+  const key = (k: unknown) => {
+    const name = String(k ?? "").slice(0, 200);
+    if (!name) throw new Error("key is required");
+    return `${userId}:${pluginId}:${name}`;
+  };
+  return {
+    "llm.inference": (input) =>
+      asCaller(async () => {
+        const driver = getDefaultDriver();
+        if (!driver) throw new Error("No model is configured for this account.");
+        const res = await driver.complete({
+          model: driver.model,
+          messages: [{ role: "user", content: String(input.prompt ?? "").slice(0, 20_000) }],
+          maxTokens: Math.min(Number(input.maxTokens) || 512, 2048),
+        });
+        return res.content;
+      }),
+    "search.web": (input) =>
+      searchDuckDuckGo(
+        String(input.query ?? "").slice(0, 300),
+        Math.min(Number(input.max) || 5, 10),
+      ),
+    "storage.read": async (input) => pluginStorage.get(key(input.key))?.value ?? null,
+    "storage.write": async (input) => {
+      if (JSON.stringify(input.value ?? null).length > MAX_STORED)
+        throw new Error("A stored value is at most 64 KB.");
+      await pluginStorage.save(key(input.key), { value: input.value ?? null });
+      return true;
+    },
+    "monitoring.log": async (input) => {
+      if (logs.length < MAX_LOG_LINES) logs.push(String(input.message ?? "").slice(0, 2000));
+      return true;
+    },
+    "monitoring.alert": async (input) => {
+      await createNotification(userId, {
+        type: "plugin",
+        title: `${pluginId}: ${String(input.title ?? "").slice(0, 200)}`,
+        message: String(input.message ?? "").slice(0, 2000),
+      });
+      return true;
+    },
+  };
+}
+const BACKED = new Set(Object.keys(hostHandlers("", "", [])));
 
 interface Installed {
   dir: string;
@@ -74,6 +138,8 @@ export async function pluginRunRoutes(
   app: FastifyInstance,
   opts: { runnerFn?: DenoRunnerFn } = {},
 ): Promise<void> {
+  await pluginStorage.load();
+
   app.get("/plugins/local", { preHandler: requireAuth }, async () => ({
     plugins: (await installed()).map((p) => p.manifest),
   }));
@@ -85,17 +151,15 @@ export async function pluginRunRoutes(
       const plugin = (await installed()).find((p) => p.manifest.id === request.params.id);
       if (!plugin) return reply.code(404).send({ error: "not_found", message: "No such plugin." });
 
-      // No host calls reach the sandbox yet, so a plugin that needs one cannot run.
-      let loaded;
-      try {
-        loaded = loadPlugin(plugin.manifest);
-      } catch (err) {
-        if (!(err instanceof PluginManifestError)) throw err;
+      const unbacked = plugin.manifest.capabilities.filter((c) => !BACKED.has(c));
+      if (unbacked.length)
         return reply.code(409).send({
           error: "capabilities_unavailable",
-          message: `This plugin needs ${plugin.manifest.capabilities.join(", ")}, which the sandbox does not provide yet.`,
+          message: `This plugin needs ${unbacked.join(", ")}, which this host does not provide.`,
         });
-      }
+      const loaded = loadPlugin(plugin.manifest, {
+        grantedCapabilities: [...plugin.manifest.capabilities],
+      });
 
       const entry = await entryPath(plugin);
       if (!entry)
@@ -109,7 +173,12 @@ export async function pluginRunRoutes(
         return reply.code(413).send({ error: "too_large", message: "Input is over 16 KB." });
 
       const runner = new DenoPluginRunner(loaded, { runnerFn: opts.runnerFn });
-      const res = await runner.run(entry, input);
+      const logs: string[] = [];
+      const res = await withPluginBridge(
+        loaded.grantedCapabilities,
+        hostHandlers(request.nexusUserId ?? "anonymous", plugin.manifest.id, logs),
+        (bridge) => runner.run(entry, input, bridge),
+      );
       if (res.error instanceof SandboxUnavailableError)
         return reply.code(503).send({ error: "sandbox_unavailable", message: res.error.message });
       if (res.error) throw res.error;
@@ -120,7 +189,7 @@ export async function pluginRunRoutes(
           exitCode: r.exitCode,
           stderr: r.stderr.slice(-MAX_STDERR),
         });
-      return { output: r.parsed ?? r.stdout };
+      return { output: r.parsed ?? r.stdout, ...(logs.length ? { logs } : {}) };
     },
   );
 }
