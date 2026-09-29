@@ -337,16 +337,63 @@ export function createFilesystemTools(): RuntimeTool[] {
 
 // ── edit_file (mutating, gated) ────────────────────────────────────────────────
 
-/** Count non-overlapping occurrences of `needle` in `haystack`. */
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle === "") return 0;
-  let n = 0;
-  let i = haystack.indexOf(needle);
-  while (i !== -1) {
-    n++;
-    i = haystack.indexOf(needle, i + needle.length);
+const LOOKALIKES: [RegExp, string][] = [
+  [/[\u2018\u2019\u201A\u201B]/g, "'"],
+  [/[\u201C\u201D\u201E\u201F]/g, '"'],
+  [/[\u2010-\u2015\u2212]/g, "-"],
+  [/[\u00A0\u2002-\u200A\u202F\u205F\u3000]/g, " "],
+];
+const looseLine = (line: string): string =>
+  LOOKALIKES.reduce((s, [re, to]) => s.replace(re, to), line).trimEnd();
+const toLf = (s: string): string => s.replace(/\r\n?/g, "\n");
+const notUnique = (n: number): Error =>
+  new Error(`old text is not unique (${n} matches); include more surrounding context`);
+
+/**
+ * Replace `oldStr` with `newStr` in a file's text, the edit shared by every
+ * `edit_file` tool. Line endings and a BOM survive; when the exact text is
+ * absent, whole lines match through smart quotes, dashes, odd spaces and
+ * trailing whitespace. A match that is not unique is refused unless `replaceAll`.
+ */
+export function applyEdit(
+  content: string,
+  oldStr: string,
+  newStr: string,
+  replaceAll = false,
+): { content: string; replaced: number } {
+  if (!oldStr) throw new Error("old text is empty");
+  if (oldStr === newStr) throw new Error("old and new text are identical");
+  const bom = content.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const firstEol = /\r?\n/.exec(content)?.[0];
+  const text = toLf(content.slice(bom.length));
+  const from = toLf(oldStr);
+  const to = toLf(newStr);
+
+  let out: string;
+  let replaced: number;
+  const exact = text.split(from).length - 1;
+  if (exact > 0) {
+    if (exact > 1 && !replaceAll) throw notUnique(exact);
+    out = replaceAll ? text.split(from).join(to) : text.replace(from, () => to);
+    replaced = replaceAll ? exact : 1;
+  } else {
+    const lines = text.split("\n");
+    const want = from.replace(/\n$/, "").split("\n").map(looseLine);
+    const hits: number[] = [];
+    for (let i = 0; i + want.length <= lines.length; i++) {
+      if (hits.length && i < hits[hits.length - 1]! + want.length) continue;
+      if (want.every((w, j) => looseLine(lines[i + j]!) === w)) hits.push(i);
+    }
+    if (!hits.length) throw new Error("old text not found");
+    if (hits.length > 1 && !replaceAll) throw notUnique(hits.length);
+    const body = from.endsWith("\n") ? to.replace(/\n$/, "") : to;
+    const insert = body === "" ? [] : body.split("\n");
+    for (const i of hits.reverse()) lines.splice(i, want.length, ...insert);
+    out = lines.join("\n");
+    replaced = hits.length;
   }
-  return n;
+  if (out === text) throw new Error("the edit changes nothing");
+  return { content: bom + (firstEol === "\r\n" ? out.replace(/\n/g, "\r\n") : out), replaced };
 }
 
 /**
@@ -363,7 +410,8 @@ export function createEditFileTool(): RuntimeTool {
     name: "edit_file",
     description:
       "Replace an exact string in a workspace file. `old_string` must appear exactly " +
-      "once unless `replace_all` is true. Paths outside the workspace are rejected. " +
+      "once unless `replace_all` is true; whole lines also match through smart quotes, " +
+      "dashes and trailing spaces. Paths outside the workspace are rejected. " +
       "This is a mutating, permission-gated tool.",
     parameters: {
       type: "object",
@@ -380,24 +428,16 @@ export function createEditFileTool(): RuntimeTool {
       const target = resolveInWorkspace(root, asString(args.path, "path"));
       const oldStr = asString(args.old_string, "old_string");
       const newStr = typeof args.new_string === "string" ? args.new_string : "";
-      if (oldStr === newStr) throw new Error("`old_string` and `new_string` are identical");
       const stat = await fs.stat(target);
       if (!stat.isFile()) throw new Error(`not a file: ${String(args.path)}`);
-      const content = await fs.readFile(target, "utf8");
-      const count = countOccurrences(content, oldStr);
-      if (count === 0) throw new Error(`\`old_string\` not found in ${String(args.path)}`);
-      const replaceAll = args.replace_all === true;
-      if (count > 1 && !replaceAll) {
-        throw new Error(
-          `\`old_string\` is not unique in ${String(args.path)} (${count} matches); ` +
-            "pass replace_all: true or include more surrounding context",
-        );
-      }
-      const updated = replaceAll
-        ? content.split(oldStr).join(newStr)
-        : content.replace(oldStr, () => newStr);
-      await fs.writeFile(target, updated, "utf8");
-      return { path: toRel(root, target), replaced: replaceAll ? count : 1 };
+      const edit = applyEdit(
+        await fs.readFile(target, "utf8"),
+        oldStr,
+        newStr,
+        args.replace_all === true,
+      );
+      await fs.writeFile(target, edit.content, "utf8");
+      return { path: toRel(root, target), replaced: edit.replaced };
     },
   };
 }

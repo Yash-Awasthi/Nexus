@@ -31,6 +31,18 @@ describe("buildLocalCodingTools", () => {
     expect(escape.error).toMatch(/escapes workspace/);
   });
 
+  it("refuses an edit whose old_str appears twice instead of changing the first", async () => {
+    const tools = buildLocalCodingTools(dir);
+    await tools.invoke("write_file", { path: "b.txt", content: "x = 1\nx = 1\n" });
+    const r = await tools.invoke("edit_file", {
+      path: "b.txt",
+      old_str: "x = 1",
+      new_str: "x = 2",
+    });
+    expect(r.error).toMatch(/not unique/);
+    expect(await readFile(join(dir, "b.txt"), "utf8")).toBe("x = 1\nx = 1\n");
+  });
+
   it("omits run_command when shell is disabled", () => {
     expect(buildLocalCodingTools(dir, false).names()).not.toContain("run_command");
   });

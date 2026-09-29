@@ -14,6 +14,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
 import {
+  applyEdit,
   RuntimeToolSet,
   ToolAgentRuntime,
   llmDriverToToolFn,
@@ -145,7 +146,9 @@ export function buildLocalCodingTools(rootDir: string, enableShell = true): Runt
 
   set.add({
     name: "edit_file",
-    description: "Replace the first exact occurrence of old_str with new_str in a workspace file.",
+    description:
+      "Replace old_str with new_str in a workspace file. old_str must match once; whole lines " +
+      "also match through smart quotes, dashes and trailing spaces.",
     parameters: {
       type: "object",
       properties: {
@@ -158,13 +161,8 @@ export function buildLocalCodingTools(rootDir: string, enableShell = true): Runt
     handler: async (args) => {
       const p = await safeResolve(root, String(args.path ?? ""));
       const oldStr = String(args.old_str ?? "");
-      const content = await fs.readFile(p, "utf8");
-      if (!content.includes(oldStr)) throw new Error("old_str not found in file");
-      await fs.writeFile(
-        p,
-        content.replace(oldStr, () => String(args.new_str ?? "")),
-        "utf8",
-      );
+      const edit = applyEdit(await fs.readFile(p, "utf8"), oldStr, String(args.new_str ?? ""));
+      await fs.writeFile(p, edit.content, "utf8");
       return `edited ${path.relative(root, p)}`;
     },
   });
