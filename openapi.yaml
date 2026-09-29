@@ -3323,6 +3323,26 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/plugins/local:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/plugins/{id}/run:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/v1/llm/complete:
     post:
       tags:
@@ -7303,6 +7323,37 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/org/agents/{id}/revisions:
+    get:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/org/agents/{id}/revisions/{revisionId}/rollback:
+    post:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: revisionId
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/org/companies/{id}/pause:
     post:
       tags:
@@ -8212,6 +8263,96 @@ paths:
     post:
       tags:
         - durable
+      responses:
+        "200":
+          description: Default Response
+  /v1/files:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /v1/files/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /v1/files/{id}/content:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /v1/batches:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /v1/batches/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /v1/batches/{id}/cancel:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
       responses:
         "200":
           description: Default Response
