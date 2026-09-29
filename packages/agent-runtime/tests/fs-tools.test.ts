@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  applyEdit,
   AUTO_ALLOWED_TOOLS,
   classifyTool,
   createEditFileTool,
@@ -270,6 +271,27 @@ describe("edit_file", () => {
         { workingDir: ws },
       ),
     ).rejects.toThrow(/escapes workspace/);
+  });
+});
+
+describe("applyEdit", () => {
+  it("edits a CRLF file with an LF old_string and keeps CRLF and the BOM", () => {
+    const out = applyEdit("\uFEFFone\r\ntwo\r\nthree\r\n", "one\ntwo", "ONE\nTWO");
+    expect(out).toEqual({ content: "\uFEFFONE\r\nTWO\r\nthree\r\n", replaced: 1 });
+  });
+
+  it("matches whole lines through smart quotes, dashes and trailing spaces", () => {
+    const file = "const s = \u201Chi\u201D;  \nconst d = a \u2013 b;\nkeep\n";
+    const out = applyEdit(file, 'const s = "hi";\nconst d = a - b;', "changed();");
+    expect(out.content).toBe("changed();\nkeep\n");
+  });
+
+  it("refuses a fuzzy match that is not unique", () => {
+    expect(() => applyEdit("\u201Cx\u201D\n\u201Cx\u201D\n", '"x"', "y")).toThrow(/not unique/);
+  });
+
+  it("refuses an edit that changes nothing", () => {
+    expect(() => applyEdit("same\n", "same", "same")).toThrow(/identical/);
   });
 });
 
