@@ -13,7 +13,8 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@nexus/agent-runtime": "workspace:*"
+    "@nexus/agent-runtime": "workspace:*",
+    "@nexus/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "*",

@@ -293,6 +293,9 @@ importers:
       '@nexus/sft-tagger':
         specifier: workspace:*
         version: link:../../packages/sft-tagger
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@nexus/sse':
         specifier: workspace:*
         version: link:../../packages/sse
@@ -717,6 +720,9 @@ importers:
       '@nexus/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: '*'
@@ -733,6 +739,9 @@ importers:
       '@nexus/llm-compress':
         specifier: workspace:*
         version: link:../llm-compress
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: '*'

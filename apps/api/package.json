@@ -102,6 +102,7 @@
     "@nexus/search-orchestrator": "workspace:*",
     "@nexus/session-sync": "workspace:*",
     "@nexus/sft-tagger": "workspace:*",
+    "@nexus/shared": "workspace:*",
     "@nexus/sse": "workspace:*",
     "@nexus/stealth-browser": "workspace:*",
     "@nexus/stm": "workspace:*",
