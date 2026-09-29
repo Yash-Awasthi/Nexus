@@ -103,6 +103,7 @@ import { nlpRoutes } from "./routes/nlp.js";
 import { notificationsRoutes } from "./routes/notifications.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { oidcRoutes } from "./routes/oidc.js";
+import { openaiBatchRoutes } from "./routes/openai-batch.js";
 import { openaiRoutes } from "./routes/openai.js";
 import { orgHookRoutes, orgRoutes } from "./routes/org.js";
 import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
@@ -601,6 +602,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       v1.addHook("preHandler", enterUserContext);
       v1.addHook("onResponse", traceLlmRequest);
       await v1.register(openaiRoutes);
+      await v1.register(openaiBatchRoutes);
     },
     { prefix: "/v1" },
   );
