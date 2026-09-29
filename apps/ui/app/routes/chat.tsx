@@ -985,7 +985,10 @@ function EmptyState({
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
             {members.map((m, i) => (
-              <li key={m.id} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
+              <li
+                key={m.id}
+                className="flex min-w-0 items-center gap-2.5 rounded-lg border px-3 py-2"
+              >
                 <span className={cn("size-2 shrink-0 rounded-full", SWATCH[i % SWATCH.length])} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{m.label}</p>
