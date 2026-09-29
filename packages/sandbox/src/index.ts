@@ -426,6 +426,17 @@ export interface DockerSandboxConfig {
   workspacePath?: string;
   /** Container working directory (`--workdir`). Default: Docker image default. */
   workdir?: string;
+  /**
+   * With `outputPath`, the hard-quota drive layout (see drive-run.ts): the
+   * workspace is mounted read-only at {@link DRIVE_SOURCE_MOUNT}, a tmpfs of
+   * this many megabytes sits at {@link WORKSPACE_MOUNT}, and the memory cap
+   * grows by the same amount because tmpfs pages count against it.
+   */
+  quotaMb?: number;
+  /** Host directory mounted writable at {@link DRIVE_OUTPUT_MOUNT} to receive the result. */
+  outputPath?: string;
+  /** Container name, so a timed-out run can be removed by name. */
+  name?: string;
 }
 
 /**
@@ -442,6 +453,8 @@ export const SCRATCH_DIR = "/nexus-scratch";
 
 /** In-container mount point for {@link DockerSandboxConfig.workspacePath}. */
 export const WORKSPACE_MOUNT = "/workspace";
+export const DRIVE_SOURCE_MOUNT = "/nexus-src";
+export const DRIVE_OUTPUT_MOUNT = "/nexus-out";
 
 /**
  * Build the `docker run` argument list for a given config.
@@ -449,7 +462,8 @@ export const WORKSPACE_MOUNT = "/workspace";
  */
 export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
   const image = config.image ?? "node:20-alpine";
-  const memoryMb = config.memoryMb ?? 128;
+  const hardQuota = Boolean(config.quotaMb && config.outputPath && config.workspacePath);
+  const memoryMb = (config.memoryMb ?? 128) + (hardQuota ? config.quotaMb! : 0);
   const pidsLimit = config.pidsLimit ?? 64;
   const cpuPercent = Math.min(100, Math.max(1, config.cpuPercent ?? 50));
   const cpuPeriod = 100_000;
@@ -476,6 +490,7 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     `--cpu-quota=${cpuQuota}`,
   ];
   if (process.env["SANDBOX_RUNTIME"]) args.push(`--runtime=${process.env["SANDBOX_RUNTIME"]}`);
+  if (config.name) args.push(`--name=${config.name}`);
 
   if (readOnlyRootfs) {
     // Immutable rootfs. A writable scratch tmpfs is mounted at SCRATCH_DIR and
@@ -486,7 +501,11 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     args.push(`--env=TMPDIR=${SCRATCH_DIR}`);
   }
 
-  if (config.workspacePath) {
+  if (hardQuota) {
+    args.push(`-v`, `${config.workspacePath}:${DRIVE_SOURCE_MOUNT}:ro`);
+    args.push(`-v`, `${config.outputPath}:${DRIVE_OUTPUT_MOUNT}:rw`);
+    args.push(`--tmpfs=${WORKSPACE_MOUNT}:rw,nosuid,nodev,size=${config.quotaMb}m,mode=1777`);
+  } else if (config.workspacePath) {
     // Read-write on purpose, and the only writable bind mount: the point of the
     // drive is that a command can change the files it was pointed at. The
     // read-only rootfs above still covers everything outside this path.
@@ -554,3 +573,4 @@ export {
 } from "./drive-fs.js";
 export type { DriveStat, DriveEntry } from "./drive-fs.js";
 export { tarGzDirectory } from "./tar.js";
+export { runOnDrive, RUN_COMPLETE, type DriveRunOptions } from "./drive-run.js";
