@@ -81,10 +81,10 @@ claimable("knowledge_graph", {
 });
 
 /** Adapt an LlmDriver to the minimal client @nexus/nlp-utils expects. */
-export function nlpClientFromDriver(driver: LlmDriver): NlpLlmClient {
+export function nlpClientFromDriver(driver: LlmDriver, model?: string): NlpLlmClient {
   return async (messages, opts) => {
     const res = await driver.complete({
-      model: driver.model || "default",
+      model: model ?? (driver.model || "default"),
       messages: messages.map((m) => ({ role: m.role as LlmRole, content: m.content })),
       temperature: opts?.temperature,
       maxTokens: opts?.maxTokens,
@@ -93,16 +93,25 @@ export function nlpClientFromDriver(driver: LlmDriver): NlpLlmClient {
   };
 }
 
-// Deferred: api-bridge imports this module, so a static import would cycle.
-async function defaultNlpClient(): Promise<NlpLlmClient | null> {
-  const { getDefaultDriver } = await import("../routes/api-bridge.js");
+/**
+ * Extraction is two model calls per document or chunk, so NEXUS_EXTRACT_MODEL ("provider/model")
+ * can name a cheap one. A provider the caller has no key for falls back to the default chain.
+ */
+export async function extractionClient(): Promise<NlpLlmClient | null> {
+  // Deferred: api-bridge imports this module, so a static import would cycle.
+  const { getDefaultDriver, getPinnedDriver } = await import("../routes/api-bridge.js");
+  const { resolveMemberModel } = await import("../routes/council.js");
+  const choice = process.env.NEXUS_EXTRACT_MODEL?.trim();
+  const wanted = choice ? resolveMemberModel(choice) : null;
+  const pinned = wanted ? getPinnedDriver(wanted.provider) : undefined;
+  if (wanted && pinned) return nlpClientFromDriver(pinned, wanted.model);
   const driver = getDefaultDriver();
   return driver ? nlpClientFromDriver(driver) : null;
 }
 
 const entityExtractor: EntityExtractor = async (text) => {
   try {
-    const llm = await defaultNlpClient();
+    const llm = await extractionClient();
     return llm ? await extractEntities(text, llm) : [];
   } catch {
     return [];
@@ -111,7 +120,7 @@ const entityExtractor: EntityExtractor = async (text) => {
 
 const relationshipExtractor: RelationshipExtractor = async (text, entities) => {
   try {
-    const llm = await defaultNlpClient();
+    const llm = await extractionClient();
     return llm ? await extractRelationships(text, entities, llm) : [];
   } catch {
     return [];

@@ -5,13 +5,13 @@
  */
 import { SpiderCrawler, type AdaptiveScraper, type RobotsChecker } from "@nexus/adaptive-scraper";
 
-export interface ImportedPage {
+interface ImportedPage {
   url: string;
   title: string;
   text: string;
 }
 
-export interface SiteImport {
+interface SiteImport {
   pages: ImportedPage[];
   /** Pages robots.txt told us to leave alone. */
   disallowed: number;

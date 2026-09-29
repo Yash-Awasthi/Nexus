@@ -31,6 +31,10 @@ describe("findPii / redactPii", () => {
     expect(redactPii(`key:\n${pem}\nend`)).toBe("key:\n[SECRET]\nend");
   });
 
+  it("leaves hyphenated slugs that only start like a key alone", () => {
+    expect(findPii("pip install sk-learn-preprocessing-pipeline-helpers")).toEqual([]);
+  });
+
   it("leaves ordinary numbers alone", () => {
     expect(findPii("Order 1234567890123 shipped in 2026, version 3.10.0")).toEqual([]);
   });
