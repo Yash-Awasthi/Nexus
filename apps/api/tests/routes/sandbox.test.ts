@@ -124,7 +124,7 @@ describe("POST /api/sandbox/execute (javascript — local vm)", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/sandbox/execute",
-      payload: { code: "for (let i = 0; i < 100000; i++) console.log(i);" },
+      payload: { code: 'for (let i = 0; i < 2000; i++) console.log("x".repeat(200));' },
     });
     const body = res.json<ExecResult>();
     expect(body.status).toBe("done");
