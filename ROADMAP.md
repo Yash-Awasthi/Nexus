@@ -16,8 +16,8 @@ means spend guards on the user's own keys, never charging for Nexus.
   unsigned builds.
 - **Mobile app** — an Expo client for approvals, runs and alerts, with push notifications that
   carry ids and titles, never content; needs Apple and Google developer accounts.
-- **Managed infrastructure** — Redis cluster rate limits (Upstash or managed Redis), PgBouncer
-  (database admin), Kubernetes autoscaling (a cluster; the chart is in `infra/helm/nexus/`).
+- **Managed infrastructure** — PgBouncer (database admin), Kubernetes autoscaling (a cluster; the
+  chart is in `infra/helm/nexus/`).
 
 ## On hold (billing)
 

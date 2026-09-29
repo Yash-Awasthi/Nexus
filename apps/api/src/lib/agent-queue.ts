@@ -78,6 +78,9 @@ export interface LaunchAgentInput {
   workspaceDir?: string;
   /** Per-command limit for the agent's shell tool. */
   commandTimeoutMs?: number;
+  /** Leave out the council/debate tools and the batch-script tool. */
+  disableCouncilTools?: boolean;
+  disablePtc?: boolean;
   /** Run inside an isolated git-worktree workspace (Phase 3). */
   worktree?: Record<string, unknown>;
   /** Resume an existing session instead of starting a new one. */

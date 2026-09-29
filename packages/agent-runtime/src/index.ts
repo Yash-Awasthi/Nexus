@@ -696,6 +696,42 @@ export function reconcileJournal(messages: RuntimeMessage[]): RuntimeMessage[] {
   return out;
 }
 
+export const TRIMMED_OUTPUT_NOTE =
+  "\n…[older output trimmed to save context; run the tool again if you need all of it]";
+
+/**
+ * The history as the model should see it: the last `keep` tool outputs whole, and older long
+ * outputs and tool-call arguments (a whole file passed to write_file) cut to their start.
+ */
+export function trimOldToolOutputs(
+  messages: RuntimeMessage[],
+  keep: number,
+  headChars = 400,
+): RuntimeMessage[] {
+  const cut = (text: string) =>
+    text.length <= headChars + TRIMMED_OUTPUT_NOTE.length
+      ? text
+      : text.slice(0, headChars) + TRIMMED_OUTPUT_NOTE;
+  let seen = 0;
+  const out = [...messages];
+  for (let i = out.length - 1; i >= 0; i--) {
+    const m = out[i]!;
+    if (m.role === "tool" && ++seen > keep) out[i] = { ...m, content: cut(m.content) };
+    if (m.role === "assistant" && m.toolCalls?.length && seen > keep) {
+      out[i] = {
+        ...m,
+        toolCalls: m.toolCalls.map((c) => ({
+          ...c,
+          arguments: Object.fromEntries(
+            Object.entries(c.arguments).map(([k, v]) => [k, typeof v === "string" ? cut(v) : v]),
+          ),
+        })),
+      };
+    }
+  }
+  return out;
+}
+
 /** A tool advertised to the model (name + description + JSON-Schema params). */
 export interface ToolSpec {
   name: string;
@@ -1022,6 +1058,8 @@ export interface ToolRuntimeOptions {
    * tool result, before the next side effect, so a crash loses at most the call in flight.
    */
   onJournal?: (messages: RuntimeMessage[]) => void | Promise<void>;
+  /** Send only the last this-many tool outputs whole (see trimOldToolOutputs). Off by default. */
+  keepToolOutputs?: number;
   /**
    * Optional steering hook. Drained at each step
    * boundary — after a step's LLM call + tools complete, before the next model
@@ -1094,6 +1132,7 @@ export class ToolAgentRuntime {
   private initialMessages?: RuntimeMessage[];
   private resumeTurn: boolean;
   private onJournal?: (messages: RuntimeMessage[]) => void | Promise<void>;
+  private keepToolOutputs?: number;
   private drainSteeringMessages?: () => string[];
   private toolCompressFilters: readonly CompressFilter[];
   private readonly dedup = new SessionDedup();
@@ -1118,6 +1157,7 @@ export class ToolAgentRuntime {
     this.initialMessages = opts.initialMessages;
     this.resumeTurn = opts.resumeTurn ?? false;
     this.onJournal = opts.onJournal;
+    this.keepToolOutputs = opts.keepToolOutputs;
     this.drainSteeringMessages = opts.drainSteeringMessages;
     // Default to lossless: meaning-preserving, so safe to run on every tool result.
     this.toolCompressFilters =
@@ -1181,7 +1221,10 @@ export class ToolAgentRuntime {
       }
 
       const s0 = Date.now();
-      const turn = await this.llm(messages, {
+      const sent = this.keepToolOutputs
+        ? trimOldToolOutputs(messages, this.keepToolOutputs)
+        : messages;
+      const turn = await this.llm(sent, {
         systemPrompt: this.systemPrompt,
         tools,
         signal,
