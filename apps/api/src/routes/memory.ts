@@ -10,7 +10,7 @@
  * DELETE /api/v1/memory/entries      — bulk-delete entries by ID list
  *
  * Backing store:
- *   lib/kv-memory-store.ts getMemoryStore() — shared by every memory surface
+ *   lib/memory-store.ts getMemoryStore() — shared by every memory surface
  *
  * Embedder:
  *   GroqEmbedder   — when GROQ_API_KEY is set (768-dim nomic-embed-text-v1.5)
@@ -27,7 +27,7 @@ import {
 } from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
-import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────

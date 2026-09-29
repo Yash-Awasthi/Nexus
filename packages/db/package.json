@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "0.0.9",
     "@neondatabase/serverless": "^0.10.4",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0"

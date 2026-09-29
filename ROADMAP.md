@@ -59,8 +59,6 @@ idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, e
 
 - **Packaging (M4)** _(Gate)_ — signing certificates and macOS notarization are operator
   actions; auto-update refuses unsigned builds.
-- **Vector memory on desktop** — PGlite ships without pgvector, so `0002_auto_schema_tables` is
-  skipped there and vector memory stays in its in-memory store locally.
 - **Mobile** — spec in `docs/design/nexus-mobile.md` (Expo RN + push); developer accounts are
   Gates.
 

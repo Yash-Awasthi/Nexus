@@ -52,12 +52,14 @@ export function getEmbeddedDb(url: string): EmbeddedDb {
   const dir = embeddedDataDir(url);
   let db = instances.get(dir);
   if (!db) {
-    const { PGlite } = createRequire(import.meta.url)("@electric-sql/pglite") as {
-      PGlite: new (dataDir: string) => EmbeddedDb;
+    const require = createRequire(import.meta.url);
+    const { PGlite } = require("@electric-sql/pglite") as {
+      PGlite: new (dataDir: string, opts: { extensions: Record<string, unknown> }) => EmbeddedDb;
     };
+    const { vector } = require("@electric-sql/pglite-pgvector") as { vector: unknown };
     // PGlite creates its own directory but not the parents above it.
     if (dir !== "memory://") mkdirSync(path.dirname(dir), { recursive: true });
-    db = new PGlite(dir);
+    db = new PGlite(dir, { extensions: { vector } });
     instances.set(dir, db);
   }
   return db;
