@@ -22,9 +22,6 @@ the user's own keys, never charging for Nexus.
 
 ## Ceilings
 
-- **Plugin host calls** — `POST /api/plugins/:id/run` runs a plugin under `deno` with read access
-  to its own directory only, so only plugins that ask for no capabilities run. Capabilities need a
-  host bridge (for network, a localhost proxy).
 - **Prompt-injection guard** — pattern screening cuts instruction-like text from sources, passages,
   webhook payloads and tool output; a reworded attack gets past it. A classifier model would catch
   more, at a call per source.
