@@ -139,7 +139,9 @@ describe("POST /apps/generate", () => {
     const name = appFolderName(USER, prompt);
     expect(r.json()).toMatchObject({ app: `apps/${name}`, design: { color: "teal" } });
     const dir = join(userDrivePath(USER), "apps", name);
-    expect(readFileSync(join(dir, "src/index.css"), "utf8")).toContain("#0d9488");
+    const css = readFileSync(join(dir, "src/index.css"), "utf8");
+    expect(css).toContain("#0d9488");
+    expect(css).toContain("--color-card: var(--card);");
     expect(readFileSync(join(dir, "index.html"), "utf8")).toContain("family=Lora");
 
     const { sessionId } = r.json<{ sessionId: string }>();

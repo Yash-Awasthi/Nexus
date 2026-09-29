@@ -173,7 +173,9 @@ function runCommand(
 export function shellNote(docker?: DockerSandboxConfig, platform = process.platform): string {
   return !docker && platform === "win32"
     ? " The shell is Windows cmd.exe: chain with &&, and do not use Unix tools or syntax " +
-        "(tail, grep, head, ls, rm, $?, ;). Run commands plainly, without piping their output."
+        "(tail, grep, head, ls, rm, $?, ;). Run commands plainly, without piping their output. " +
+        "Delete folders with rmdir /s /q, and put anything that needs quoting in a script file " +
+        "run with node instead of node -e."
     : " The shell is /bin/sh.";
 }
 
