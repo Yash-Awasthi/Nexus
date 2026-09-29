@@ -16,7 +16,8 @@
  *   DELETE /drive/destroy   — tear down workspace
  *
  * Builds on @nexus/sandbox (Docker runner) and agent-tools (path-guarded fs ops).
- * Commands run in capped Docker containers, under gVisor when SANDBOX_RUNTIME=runsc.
+ * Commands run in capped Docker containers, under gVisor when SANDBOX_RUNTIME=runsc,
+ * on a tmpfs the size of the quota so a write past it fails (see runOnDrive).
  */
 
 import { spawn } from "node:child_process";
@@ -29,8 +30,8 @@ import type { ExecAction } from "@nexus/exec-policy";
 import { globalFlags } from "@nexus/feature-flags";
 import {
   buildSafeEnv,
-  createDockerRunner,
   DRIVE_QUOTA_BYTES,
+  runOnDrive,
   statDrive,
   tarGzDirectory,
   userDrivePath,
@@ -42,6 +43,7 @@ import type { FastifyInstance } from "fastify";
 import { guardExec } from "../lib/exec-guard.js";
 import { PersistentStore } from "../lib/persistent-store.js";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { withKeyLock } from "../lib/with-key-lock.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -202,10 +204,6 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
       const driveDir = await ensureDriveDir(userId);
 
-      // ponytail: quota is checked before the command and swept after it, so an
-      // overrun is bounded by one command's writes rather than hard-failed
-      // mid-write. A real FS ceiling needs an XFS project quota or a loopback
-      // image, both of which need root — see ROADMAP §8.2.
       const usedBefore = await getDriveUsage(driveDir);
       if (usedBefore >= QUOTA_BYTES) {
         return reply
@@ -230,21 +228,18 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       if ((await guardExec(request, reply, action, request.body.approvalId)) === "handled") return;
 
       if (useDocker) {
-        const runner = createDockerRunner({
-          ...DEFAULT_DOCKER_CONFIG,
-          workspacePath: driveDir,
-          workdir: containerWorkdir(driveDir, workDir),
-          runAsUser: hostUser(),
-        });
-        const result = await runner("/bin/sh", ["-c", command], {
-          timeoutMs: timeout,
-          env: safeEnv,
-        }).catch((err: Error) => ({
-          stdout: "",
-          stderr: err.message,
-          exitCode: null,
-          timedOut: false,
-        }));
+        // The run replaces the drive directory, so nothing else may write to it meanwhile.
+        const result = await withKeyLock(`drive:${userId}`, () =>
+          runOnDrive({
+            driveDir,
+            quotaBytes: QUOTA_BYTES,
+            command,
+            workdir: containerWorkdir(driveDir, workDir),
+            timeoutMs: timeout,
+            env: safeEnv as Record<string, string>,
+            docker: { ...DEFAULT_DOCKER_CONFIG, runAsUser: hostUser() },
+          }),
+        );
 
         const usedAfter = await getDriveUsage(driveDir);
         return reply.send({
@@ -252,6 +247,8 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
           stderr: clip(result.stderr, MAX_OUTPUT_BYTES),
           exitCode: result.exitCode,
           timedOut: result.timedOut,
+          // A command that timed out or never finished leaves the drive as it was.
+          applied: result.applied,
           quota: { used: usedAfter, limit: QUOTA_BYTES, exceeded: usedAfter > QUOTA_BYTES },
         });
       }
@@ -411,8 +408,10 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      await fs.mkdir(path.dirname(resolved), { recursive: true });
-      await fs.writeFile(resolved, content, "utf8");
+      await withKeyLock(`drive:${userId}`, async () => {
+        await fs.mkdir(path.dirname(resolved), { recursive: true });
+        await fs.writeFile(resolved, content, "utf8");
+      });
       return reply.code(201).send({
         path: filePath,
         size: newSize,
@@ -564,7 +563,9 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
       const driveDir = userDrivePath(userId);
       try {
-        await fs.rm(driveDir, { recursive: true, force: true });
+        await withKeyLock(`drive:${userId}`, () =>
+          fs.rm(driveDir, { recursive: true, force: true }),
+        );
         return reply.send({ message: "workspace destroyed" });
       } catch {
         return reply.send({ message: "workspace already clean" });

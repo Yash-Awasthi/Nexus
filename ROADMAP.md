@@ -25,8 +25,6 @@ the user's own keys, never charging for Nexus.
 - **Drive isolation** — Docker, or gVisor with `SANDBOX_RUNTIME=runsc`. A Firecracker runner would
   move each drive into a block image behind a VM and most hosts lack KVM, so it stays a spike
   (`scripts/drive-microvm-spike.sh`).
-- **Drive quota** — checked before and re-measured after each command, so an overrun is bounded by
-  one command's writes. A hard stop mid-write needs root (XFS project quota or a loopback ext4).
 - **Plugin host calls** — `POST /api/plugins/:id/run` runs a plugin under `deno` with read access
   to its own directory only, so only plugins that ask for no capabilities run. Capabilities need a
   host bridge (for network, a localhost proxy).
