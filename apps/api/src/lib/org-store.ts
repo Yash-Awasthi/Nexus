@@ -120,6 +120,37 @@ export interface Agent {
   updatedAt: string;
 }
 
+/** The fields an edit can change; a revision snapshots them. */
+const CONFIG_KEYS = [
+  "name",
+  "role",
+  "title",
+  "reportsTo",
+  "capabilities",
+  "archetypeId",
+  "instructions",
+  "model",
+  "adapterType",
+  "adapterConfig",
+  "heartbeat",
+  "skills",
+  "knowledgeBaseIds",
+  "secretNames",
+] as const;
+
+export type AgentConfig = Pick<Agent, (typeof CONFIG_KEYS)[number]>;
+
+/** An agent's config as it was before one edit. */
+export interface AgentRevision {
+  id: string;
+  ownerId: string;
+  companyId: string;
+  agentId: string;
+  config: AgentConfig;
+  createdAt: string;
+  seq: number;
+}
+
 /** `member`: a workspace member commenting on a shared company; never the board. */
 export type ActorType = "user" | "member" | "agent" | "system";
 
@@ -143,6 +174,7 @@ export interface Activity {
 const companies = new PersistentStore<Company>("org_companies");
 const agents = new PersistentStore<Agent>("org_agents");
 const activity = new PersistentStore<Activity>("org_activity");
+const revisions = new PersistentStore<AgentRevision>("org_agent_revisions");
 
 /**
  * Stores whose rows belong to a company. Deleting a company purges each one;
@@ -151,6 +183,7 @@ const activity = new PersistentStore<Activity>("org_activity");
 const companyScoped: PersistentStore<{ id: string; companyId: string }>[] = [
   agents as unknown as PersistentStore<{ id: string; companyId: string }>,
   activity as unknown as PersistentStore<{ id: string; companyId: string }>,
+  revisions as unknown as PersistentStore<{ id: string; companyId: string }>,
 ];
 
 export function registerCompanyScoped<T extends { id: string; companyId: string }>(
@@ -181,6 +214,7 @@ export function loadOrgStore(): Promise<void> {
     companies.load(),
     agents.load(),
     activity.load(),
+    revisions.load(),
     ..._extraLoaders.map((l) => l()),
   ]).then(() => {
     for (const hook of _bootHooks) hook();
@@ -619,19 +653,72 @@ export function createAgent(
   return agent;
 }
 
-export function updateAgent(ownerId: string, id: string, input: AgentInput): Agent {
+/** Revisions kept per agent; the oldest go first. */
+const REVISIONS_KEPT = 50;
+
+function configOf(agent: Agent): AgentConfig {
+  const config = Object.fromEntries(CONFIG_KEYS.map((k) => [k, agent[k]])) as AgentConfig;
+  // Absent on agents made before knowledge bases; [] lets a rollback clear them.
+  config.knowledgeBaseIds ??= [];
+  return config;
+}
+
+function revisionsOf(agentId: string): AgentRevision[] {
+  return [...revisions.values()].filter((r) => r.agentId === agentId).sort((a, b) => b.seq - a.seq);
+}
+
+function editAgent(
+  ownerId: string,
+  id: string,
+  input: AgentInput,
+  action: string,
+  details?: Record<string, unknown>,
+): Agent {
   const existing = getAgent(ownerId, id);
   if (existing.status === "terminated") throw conflict("A terminated agent cannot be edited.");
   const next = { ...applyAgentInput(ownerId, existing, input), updatedAt: now() };
+  const before = configOf(existing);
+  if (JSON.stringify(before) !== JSON.stringify(configOf(next))) {
+    const rev: AgentRevision = {
+      id: crypto.randomUUID(),
+      ownerId,
+      companyId: existing.companyId,
+      agentId: id,
+      config: before,
+      createdAt: now(),
+      seq: nextSeq(),
+    };
+    revisions.set(rev.id, rev);
+    for (const old of revisionsOf(id).slice(REVISIONS_KEPT)) revisions.delete(old.id);
+  }
   agents.set(id, next);
   logActivity(getCompany(ownerId, existing.companyId), {
     actorType: "user",
     actorId: ownerId,
-    action: "agent.updated",
+    action,
     entityType: "agent",
     entityId: id,
+    details,
   });
   return next;
+}
+
+export function updateAgent(ownerId: string, id: string, input: AgentInput): Agent {
+  return editAgent(ownerId, id, input, "agent.updated");
+}
+
+/** Newest first: each is the config an edit replaced. */
+export function listAgentRevisions(ownerId: string, agentId: string): AgentRevision[] {
+  getAgent(ownerId, agentId);
+  return revisionsOf(agentId);
+}
+
+/** Restore a revision's config. The config it replaces becomes a revision too, so this can be undone. */
+export function rollbackAgent(ownerId: string, agentId: string, revisionId: string): Agent {
+  getAgent(ownerId, agentId);
+  const rev = revisions.get(revisionId);
+  if (!rev || rev.agentId !== agentId) throw notFound("Revision");
+  return editAgent(ownerId, agentId, rev.config, "agent.rolled_back", { revisionId });
 }
 
 /**
@@ -714,6 +801,7 @@ export function deleteAgent(ownerId: string, id: string): void {
   const existing = getAgent(ownerId, id);
   if (existing.status !== "terminated") throw conflict("Terminate the agent before deleting it.");
   agents.delete(id);
+  for (const r of revisionsOf(id)) revisions.delete(r.id);
 }
 
 /**

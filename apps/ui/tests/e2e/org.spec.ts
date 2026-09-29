@@ -332,6 +332,26 @@ test("an agent can be given knowledge bases to read", async ({ page, api }) => {
   expect(saved.knowledgeBaseIds).toEqual([kbId]);
 });
 
+test("an agent's earlier config can be restored from its history", async ({ page, api }) => {
+  const cid = await newCompany(api, { name: unique("PW History") });
+  const ag = await api.post<{ id: string }>(`/api/org/companies/${cid}/agents`, {
+    name: "Scribe",
+    instructions: "Write plainly.",
+  });
+  await api.call("PATCH", `/api/org/agents/${ag.id}`, { instructions: "Write in riddles." });
+  await page.goto(`/org?c=${cid}&tab=org`);
+  await page.locator('[data-agent-name="Scribe"]').getByRole("button").first().click();
+  const history = page.getByTestId("config-history");
+  await history.getByText("differs in instructions").waitFor();
+  await history.getByRole("button", { name: "Restore" }).click();
+  await expect
+    .poll(
+      async () =>
+        (await api.get<{ instructions: string }>(`/api/org/agents/${ag.id}`)).instructions,
+    )
+    .toBe("Write plainly.");
+});
+
 test("a skill attached to an agent asks once, then runs before its turn", async ({ page, api }) => {
   const skillName = unique("Echo skill");
   await api.post("/api/skills", {

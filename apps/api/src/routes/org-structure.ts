@@ -20,9 +20,11 @@ import {
   getAgent,
   getCompany,
   listActivity,
+  listAgentRevisions,
   listAgents,
   listCompanies,
   orgChart,
+  rollbackAgent,
   setAgentStatus,
   setCompanyStatus,
   sharedCompanies,
@@ -132,6 +134,18 @@ export async function orgStructureRoutes(app: FastifyInstance): Promise<void> {
       updateCompany(ownerOf(request), request.params.id, request.body ?? {}),
     );
   });
+
+  app.get<Id>("/org/agents/:id/revisions", async (request, reply) =>
+    orgReply(reply, () => listAgentRevisions(ownerOf(request), request.params.id)),
+  );
+
+  app.post<{ Params: { id: string; revisionId: string } }>(
+    "/org/agents/:id/revisions/:revisionId/rollback",
+    async (request, reply) =>
+      orgReply(reply, () =>
+        rollbackAgent(ownerOf(request), request.params.id, request.params.revisionId),
+      ),
+  );
 
   for (const [verb, status] of [
     ["pause", "paused"],
