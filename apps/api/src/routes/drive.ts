@@ -11,6 +11,8 @@
  *   GET  /drive/export      — the workspace as .tar.gz, every .env left out
  *   POST /drive/link        — a signed, expiring download link for one file
  *   GET  /drive/file        — the file behind a link, no session needed
+ *   GET  /drive/links       — the caller's live links
+ *   DELETE /drive/links/:id — revoke one link
  *   DELETE /drive/destroy   — tear down workspace
  *
  * Builds on @nexus/sandbox (Docker runner) and agent-tools (path-guarded fs ops).
@@ -38,6 +40,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { guardExec } from "../lib/exec-guard.js";
+import { PersistentStore } from "../lib/persistent-store.js";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
@@ -123,6 +126,15 @@ function linkSig(key: string, body: string): string {
   return crypto.createHmac("sha256", key).update(body).digest("base64url");
 }
 
+/** A link serves only while its row exists, so deleting the row revokes it. */
+interface DriveLink {
+  id: string;
+  ownerId: string;
+  path: string;
+  expiresAt: number;
+}
+const driveLinks = new PersistentStore<DriveLink>("drive_links");
+
 const LINK_TTL_MIN = 30;
 const LINK_TTL_MAX = 7 * 24 * 60;
 
@@ -135,6 +147,7 @@ function clip(s: string, max: number): string {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function driveRoutes(app: FastifyInstance): Promise<void> {
+  await driveLinks.load();
   // Per-user rate limiters for drive routes (defense against abuse / DoS).
   const driveRL = makeUserRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "drive" });
   // Tighter limit for command execution — far more expensive than fs ops.
@@ -453,10 +466,14 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         LINK_TTL_MAX,
       );
       const expires = Date.now() + ttl * 60_000;
-      const body = Buffer.from(
-        JSON.stringify({ u: userId, p: path.relative(driveDir, resolved), e: expires }),
-      ).toString("base64url");
+      const rel = path.relative(driveDir, resolved).split(path.sep).join("/");
+      const id = crypto.randomUUID();
+      await driveLinks.save(id, { id, ownerId: userId, path: rel, expiresAt: expires });
+      const body = Buffer.from(JSON.stringify({ i: id, u: userId, p: rel, e: expires })).toString(
+        "base64url",
+      );
       return reply.send({
+        id,
         url: `/api/v1/drive/file?t=${body}.${linkSig(key, body)}`,
         expiresAt: new Date(expires).toISOString(),
       });
@@ -476,7 +493,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const want = Buffer.from(linkSig(key, body));
       const got = Buffer.from(sig);
       if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return refuse();
-      let claim: { u?: unknown; p?: unknown; e?: unknown };
+      let claim: { i?: unknown; u?: unknown; p?: unknown; e?: unknown };
       try {
         claim = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
       } catch {
@@ -484,6 +501,8 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       }
       if (typeof claim.u !== "string" || typeof claim.p !== "string") return refuse();
       if (typeof claim.e !== "number" || claim.e < Date.now()) return refuse();
+      if (typeof claim.i !== "string" || driveLinks.get(claim.i)?.ownerId !== claim.u)
+        return refuse();
 
       const resolved = await safeResolve(userDrivePath(claim.u), claim.p).catch(() => null);
       if (!resolved || path.basename(resolved) === ".env") return refuse();
@@ -502,6 +521,35 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         .header("X-Content-Type-Options", "nosniff")
         .header("Cache-Control", "private, no-store")
         .send(createReadStream(resolved));
+    },
+  );
+
+  app.get(
+    "/drive/links",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+      const now = Date.now();
+      const links: { id: string; path: string; expiresAt: string }[] = [];
+      for (const l of [...driveLinks.values()]) {
+        if (l.expiresAt < now) driveLinks.delete(l.id);
+        else if (l.ownerId === userId)
+          links.push({ id: l.id, path: l.path, expiresAt: new Date(l.expiresAt).toISOString() });
+      }
+      return reply.send({ links: links.sort((a, b) => a.expiresAt.localeCompare(b.expiresAt)) });
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/drive/links/:id",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const link = driveLinks.get(request.params.id);
+      if (!link || link.ownerId !== request.nexusUserId)
+        return reply.code(404).send({ error: "not_found" });
+      driveLinks.delete(link.id);
+      return reply.code(204).send();
     },
   );
 

@@ -90,3 +90,30 @@ it("needs a session to make a link", async () => {
   });
   expect(r.statusCode).toBe(401);
 });
+
+it("lists the caller's live links and stops one the owner revokes", async () => {
+  const made = (await link("out/chart.png")).json() as { id: string; url: string };
+  expect(made.id).toBeTruthy();
+  const listed = await app.inject({ method: "GET", url: "/api/v1/drive/links", headers });
+  expect(listed.json<{ links: { id: string; path: string }[] }>().links).toContainEqual(
+    expect.objectContaining({ id: made.id, path: "out/chart.png" }),
+  );
+  const other = { authorization: `Bearer ${tokenFor(crypto.randomUUID())}` };
+  const theirs = await app.inject({
+    method: "DELETE",
+    url: `/api/v1/drive/links/${made.id}`,
+    headers: other,
+  });
+  expect(theirs.statusCode).toBe(404);
+  expect((await app.inject({ method: "GET", url: made.url })).statusCode).toBe(200);
+
+  const revoked = await app.inject({
+    method: "DELETE",
+    url: `/api/v1/drive/links/${made.id}`,
+    headers,
+  });
+  expect(revoked.statusCode).toBe(204);
+  expect((await app.inject({ method: "GET", url: made.url })).statusCode).toBe(403);
+  const after = await app.inject({ method: "GET", url: "/api/v1/drive/links", headers });
+  expect(after.json<{ links: { id: string }[] }>().links.map((l) => l.id)).not.toContain(made.id);
+});
