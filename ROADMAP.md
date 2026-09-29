@@ -29,9 +29,8 @@ migrations follow the `packages/db/migrations/` recipe (next free number, add a
 ## Nexus Drive
 
 **Spec (locked):** gVisor primary, Docker limits as fallback; Firecracker only if a host needs a
-hardware boundary. 512 MB
-quota at `/workspace`; soft-warn at 90%, then hard-block. 30-day idle reclaim. The user's own
-LLM key lives in `/workspace/.env`, never logged, excluded from backups and exports.
+hardware boundary. 512 MB quota at `/workspace`; soft-warn at 90%, then hard-block. 30-day
+idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, excluded from backups and exports.
 
 - **Isolation** — the drive runs on Docker; `SANDBOX_RUNTIME=runsc` puts every sandbox
   container under gVisor. `scripts/drive-microvm-spike.sh` boots a Firecracker microVM with a
