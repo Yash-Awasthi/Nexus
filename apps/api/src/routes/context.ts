@@ -38,7 +38,7 @@ import { FixedEmbedder, MemoryManager, createBestEmbedder } from "@nexus/memory"
 import { and, desc, or, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { ownerScope } from "../lib/owner.js";
 import { requireAuth } from "../middleware/auth.js";
 

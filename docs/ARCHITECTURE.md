@@ -80,7 +80,7 @@ nexus/
 │   ├── mcp-openapi/            OpenAPI → MCP tool auto-generation
 │   ├── code-repl/              DockerReplExecutor — sandboxed Python/R/Julia
 │   ├── runtime/                Orchestrator + PlanningEngine (11 blueprints), GovernanceEngine, TaskExecutor, circuit breaker, crash recovery, OTel tracing
-│   ├── memory/                 pgvector, MemoryGraph BFS, IVFFlat ANN
+│   ├── memory/                 pgvector, MemoryGraph BFS, HNSW ANN
 │   ├── stm/                    Short-term memory: HedgeReducer, STMPipeline
 │   ├── knowledge-graph/        Entity graph, Leiden clustering, multi-hop BFS
 │   ├── retrieval/              RAG: chunk→embed→retrieve→rerank, hybrid search

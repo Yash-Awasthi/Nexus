@@ -26,16 +26,17 @@ async function tableExists(name: string): Promise<boolean> {
 }
 
 describe("migrateEmbedded", () => {
-  it("creates the tables sign-in needs, and skips only the pgvector migration", async () => {
+  it("applies every migration, pgvector's included, and creates the tables sign-in needs", async () => {
     const { applied, skipped } = await migrateEmbedded(getPgPool(DB)!);
 
-    expect(applied).toContain("0003_enterprise_auth");
-    expect(skipped).toEqual(["0002_auto_schema_tables"]);
+    expect(applied).toContain("0002_auto_schema_tables");
+    expect(skipped).toEqual([]);
+    const tables = ["users", "refresh_tokens", "provider_models", "api_keys", "memory_entries"];
     const present = [];
-    for (const t of ["users", "refresh_tokens", "provider_models", "api_keys"]) {
+    for (const t of tables) {
       if (await tableExists(t)) present.push(t);
     }
-    expect(present).toEqual(["users", "refresh_tokens", "provider_models", "api_keys"]);
+    expect(present).toEqual(tables);
   }, 120_000);
 
   it("accepts a user row, so local sign-in has somewhere to write", async () => {
