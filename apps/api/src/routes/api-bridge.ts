@@ -99,6 +99,7 @@ import {
 import { sha256hex } from "../lib/crypto-utils.js";
 import { searchDuckDuckGo } from "../lib/duckduckgo.js";
 import { guardExec } from "../lib/exec-guard.js";
+import { screenForPrompt } from "../lib/injection-classifier.js";
 import { getKG } from "../lib/knowledge-graph-store.js";
 import { cachedDriver } from "../lib/llm-cache-driver.js";
 import {
@@ -1086,6 +1087,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       _mentionContext(request.body.mentions, request.nexusUserId, message, ["kb", "web"]),
       _citationSources(request.body.mentions, request.nexusUserId, message),
     ]);
+    const screened = await screenForPrompt(sourceSet.chunks.map((c) => c.text));
+    sourceSet.chunks.forEach((c, i) => (c.text = screened[i]!));
     const sourcesBlock = sourcesPrompt(sourceSet);
     const style = [
       {
@@ -4366,7 +4369,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
           if (unsafeUrlReason(value)) continue;
           const page = await getScraper().scrape(value, { timeout: 15_000 });
           if (isScraped(page)) {
-            const text = screenUntrusted(page.text.slice(0, 8_000)).text;
+            const [text] = await screenForPrompt([page.text.slice(0, 8_000)]);
             parts.push(`### Web page: ${value}. ${UNTRUSTED_NOTE}\n${text}`);
           }
         }

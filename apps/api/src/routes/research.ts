@@ -23,9 +23,10 @@
 
 import type { LlmRole } from "@nexus/llm-drivers";
 import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus/researcher";
-import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
+import { UNTRUSTED_NOTE } from "@nexus/shared";
 import type { FastifyInstance } from "fastify";
 
+import { screenForPrompt } from "../lib/injection-classifier.js";
 import { createNotification } from "../lib/notifications-store.js";
 import { emitReaction } from "../lib/reactions.js";
 import {
@@ -320,10 +321,9 @@ export function registerResearchRoutes(app: FastifyInstance, deps: ResearchBridg
             ? `Found ${results.length} results for "${q}". Top source: ${results[0]?.url}`
             : `No results found for "${q}".`;
         }
-        const context = results
-          .slice(0, 5)
-          .map((r) => `Source: ${r.url}\n${screenUntrusted(r.snippet).text}`)
-          .join("\n\n");
+        const top = results.slice(0, 5);
+        const snippets = await screenForPrompt(top.map((r) => r.snippet));
+        const context = top.map((r, i) => `Source: ${r.url}\n${snippets[i]}`).join("\n\n");
         // Bounded — a hung provider used to leave the job `running` forever.
         const res = await withTimeout(
           driver.complete({

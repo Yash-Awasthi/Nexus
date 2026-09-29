@@ -102,11 +102,16 @@ export function nlpClientFromDriver(driver: LlmDriver, model?: string): NlpLlmCl
  * Extraction is two model calls per document or chunk, so NEXUS_EXTRACT_MODEL ("provider/model")
  * can name a cheap one. A provider the caller has no key for falls back to the default chain.
  */
-export async function extractionClient(): Promise<NlpLlmClient | null> {
+export function extractionClient(): Promise<NlpLlmClient | null> {
+  return namedModelClient(process.env.NEXUS_EXTRACT_MODEL);
+}
+
+/** A client for `choice` ("provider/model"), else the caller's default chain; null with neither. */
+export async function namedModelClient(choice?: string): Promise<NlpLlmClient | null> {
   // Deferred: api-bridge imports this module, so a static import would cycle.
   const { getDefaultDriver, getPinnedDriver } = await import("../routes/api-bridge.js");
   const { resolveMemberModel } = await import("../routes/council.js");
-  const choice = process.env.NEXUS_EXTRACT_MODEL?.trim();
+  choice = choice?.trim();
   const wanted = choice ? resolveMemberModel(choice) : null;
   const pinned = wanted ? getPinnedDriver(wanted.provider) : undefined;
   if (wanted && pinned) return nlpClientFromDriver(pinned, wanted.model);

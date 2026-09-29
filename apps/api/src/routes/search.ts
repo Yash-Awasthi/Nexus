@@ -12,6 +12,7 @@ import type { RetrievalSource, ScoredChunk, SourceRetrieverFn } from "@nexus/ret
 import type { FastifyInstance } from "fastify";
 
 import { citedNumbers, numberSources, sourcesPrompt } from "../lib/citations.js";
+import { screenForPrompt } from "../lib/injection-classifier.js";
 import { getKGStore, searchGraph } from "../lib/knowledge-graph-store.js";
 
 import { listKbsFor, searchKb } from "./kb.js";
@@ -156,6 +157,8 @@ export async function searchRoutes(app: FastifyInstance, deps: SearchDeps): Prom
     let answer: string | undefined;
     let answerError: string | undefined;
     if (request.body?.answer && set.chunks.length) {
+      const screened = await screenForPrompt(set.chunks.map((c) => c.text));
+      set.chunks.forEach((c, i) => (c.text = screened[i]!));
       try {
         answer = await deps.llm(
           [
