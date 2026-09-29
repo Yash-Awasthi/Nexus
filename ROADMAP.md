@@ -51,9 +51,6 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 - **Plugin execution** — `DenoPluginRunner` runs a plugin under `deno` with read access to its
   own directory only. No route runs plugin code yet, and a plugin granted network access would
   need a localhost proxy, since `--allow-net` is never passed.
-- **Knowledge-graph node and edge tombstones** — property deletes survive a sync; a deleted node
-  or edge comes back from a peer that still holds it. Same mechanism as property clocks, one
-  level up. No route deletes a node or edge today, so nothing asks for it yet.
 - **SSO live round trip** _(Gate)_ — needs the operator's registered IdP.
 
 ## Desktop and mobile

@@ -78,6 +78,69 @@ describe("POST /api/kg/sync", () => {
   });
 });
 
+describe("deleting from the graph", () => {
+  const edge = (id: string, from: string, to: string) => ({
+    id,
+    subjectId: from,
+    predicate: "partners with",
+    objectId: to,
+    confidence: 0.7,
+    sources: ["peer-doc"],
+    createdAt: 1_000,
+    updatedAt: 2_000,
+  });
+  const graph = (headers: object) =>
+    app
+      .inject({ method: "GET", url: "/api/kg/graph", headers })
+      .then((r) => r.json<{ nodes: { id: string }[]; edges: { id: string }[] }>());
+
+  it("removes a node and its edges, and a stale peer cannot bring them back", async () => {
+    const alice = as(crypto.randomUUID());
+    const snapshot = {
+      nodes: [node("del-a", "Alpha"), node("del-b", "Beta")],
+      edges: [edge("del-e", "del-a", "del-b")],
+    };
+    await sync(alice, snapshot);
+
+    const res = await app.inject({ method: "DELETE", url: "/api/kg/nodes/del-a", headers: alice });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ deleted: { nodes: 1, edges: 1 } });
+    const after = await graph(alice);
+    expect(after.nodes.map((n) => n.id)).toEqual(["del-b"]);
+    expect(after.edges).toEqual([]);
+
+    const replay = await sync(alice, snapshot);
+    const body = replay.json<{ nodes: { id: string; deletedAt?: number }[] }>();
+    expect(body.nodes.find((n) => n.id === "del-a")?.deletedAt).toBeGreaterThan(0);
+    expect((await graph(alice)).nodes.map((n) => n.id)).toEqual(["del-b"]);
+  });
+
+  it("removes one edge and leaves its nodes", async () => {
+    const alice = as(crypto.randomUUID());
+    await sync(alice, {
+      nodes: [node("del-c", "Gamma"), node("del-d", "Delta")],
+      edges: [edge("del-e2", "del-c", "del-d")],
+    });
+
+    const res = await app.inject({ method: "DELETE", url: "/api/kg/edges/del-e2", headers: alice });
+    expect(res.statusCode).toBe(200);
+    const after = await graph(alice);
+    expect(after.nodes.length).toBe(2);
+    expect(after.edges).toEqual([]);
+  });
+
+  it("answers 404 for what is not in the caller's graph", async () => {
+    const alice = as(crypto.randomUUID());
+    await sync(alice, { nodes: [node("del-f", "Phi")], edges: [] });
+
+    const other = as(crypto.randomUUID());
+    for (const url of ["/api/kg/nodes/del-f", "/api/kg/nodes/nope", "/api/kg/edges/nope"]) {
+      expect((await app.inject({ method: "DELETE", url, headers: other })).statusCode).toBe(404);
+    }
+    expect((await graph(alice)).nodes.map((n) => n.id)).toEqual(["del-f"]);
+  });
+});
+
 it("lets the librarian find entities named inside a question", async () => {
   const alice = as(crypto.randomUUID());
   await sync(alice, { nodes: [node("lib-heron", "Heronsgate Labs")], edges: [] });

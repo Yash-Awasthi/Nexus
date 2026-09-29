@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 
 import { detectCommunities, type CommunityOptions } from "./community.js";
-import { mergeEdge, mergeNode } from "./merge.js";
+import { isDeleted, mergeEdge, mergeNode, tombstoneEdge, tombstoneNode } from "./merge.js";
 import { runCypher, type CypherResult } from "./query.js";
 /**
  * @nexus/knowledge-graph — entity/relationship graph over agent memory.
@@ -67,6 +67,9 @@ export const nullEntityExtractor: EntityExtractor = async () => [];
 /** No-op relationship extractor — returns [] without calling any LLM */
 export const nullRelationshipExtractor: RelationshipExtractor = async () => [];
 
+/** Row clocks are whole seconds, as `KnowledgeGraph.ingest` writes them. */
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+
 // ── Graph node / edge ─────────────────────────────────────────────────────────
 
 export interface KGNode {
@@ -89,6 +92,8 @@ export interface KGNode {
   sources: string[];
   createdAt: number;
   updatedAt: number;
+  /** Set when the node was deleted; the node is gone while this is at or after `updatedAt`. */
+  deletedAt?: number;
 }
 
 /** Kg edge interface definition. */
@@ -103,6 +108,8 @@ export interface KGEdge {
   sources: string[];
   createdAt: number;
   updatedAt: number;
+  /** Set when the edge was deleted; the edge is gone while this is at or after `updatedAt`. */
+  deletedAt?: number;
 }
 
 // ── Store query types ─────────────────────────────────────────────────────────
@@ -113,6 +120,8 @@ export interface NodeQuery {
   nameContains?: string;
   minConfidence?: number;
   limit?: number;
+  /** Also return deleted rows (tombstones), which federation sync must pass on. */
+  includeDeleted?: boolean;
 }
 
 /** Edge query interface definition. */
@@ -123,6 +132,8 @@ export interface EdgeQuery {
   predicate?: string;
   minConfidence?: number;
   limit?: number;
+  /** Also return deleted rows (tombstones), which federation sync must pass on. */
+  includeDeleted?: boolean;
 }
 
 /** Kg stats interface definition. */
@@ -180,11 +191,13 @@ export class InMemoryKGStore implements KGStore {
   }
 
   async getNode(id: string): Promise<KGNode | undefined> {
-    return this.nodes.get(id);
+    const found = this.nodes.get(id);
+    return found && !isDeleted(found) ? found : undefined;
   }
 
   async findNodes(query: NodeQuery): Promise<KGNode[]> {
     let results = Array.from(this.nodes.values());
+    if (!query.includeDeleted) results = results.filter((n) => !isDeleted(n));
 
     if (query.type !== undefined) {
       results = results.filter((n) => n.type === query.type);
@@ -204,7 +217,8 @@ export class InMemoryKGStore implements KGStore {
   }
 
   async deleteNode(id: string): Promise<void> {
-    this.nodes.delete(id);
+    const found = this.nodes.get(id);
+    if (found) this.nodes.set(id, tombstoneNode(found, nowSeconds()));
   }
 
   // ── Edges ────────────────────────────────────────────────────────────────
@@ -221,11 +235,13 @@ export class InMemoryKGStore implements KGStore {
   }
 
   async getEdge(id: string): Promise<KGEdge | undefined> {
-    return this.edges.get(id);
+    const found = this.edges.get(id);
+    return found && !isDeleted(found) ? found : undefined;
   }
 
   async findEdges(query: EdgeQuery): Promise<KGEdge[]> {
     let results = Array.from(this.edges.values());
+    if (!query.includeDeleted) results = results.filter((e) => !isDeleted(e));
 
     if (query.subjectId !== undefined) {
       results = results.filter((e) => e.subjectId === query.subjectId);
@@ -248,27 +264,29 @@ export class InMemoryKGStore implements KGStore {
   }
 
   async deleteEdge(id: string): Promise<void> {
-    this.edges.delete(id);
+    const found = this.edges.get(id);
+    if (found) this.edges.set(id, tombstoneEdge(found, nowSeconds()));
   }
 
   async stats(): Promise<KGStats> {
     const nodesByType: Partial<Record<EntityType, number>> = {};
     for (const node of this.nodes.values()) {
+      if (isDeleted(node)) continue;
       nodesByType[node.type] = (nodesByType[node.type] ?? 0) + 1;
     }
     return {
-      nodes: this.nodes.size,
-      edges: this.edges.size,
+      nodes: this.nodeCount,
+      edges: this.edgeCount,
       nodesByType,
     };
   }
 
   get nodeCount(): number {
-    return this.nodes.size;
+    return [...this.nodes.values()].filter((n) => !isDeleted(n)).length;
   }
 
   get edgeCount(): number {
-    return this.edges.size;
+    return [...this.edges.values()].filter((e) => !isDeleted(e)).length;
   }
 }
 
@@ -683,6 +701,8 @@ export class NeonKGStore implements KGStore {
       await this.queryFn(
         `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT ''`,
       );
+      // A deleted row stays as a tombstone so the delete outranks a peer still holding the fact.
+      await this.queryFn(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at BIGINT`);
       await this.queryFn(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_pkey`);
       await this.queryFn(
         `CREATE UNIQUE INDEX IF NOT EXISTS ${table}_owner_id ON ${table} (owner, id)`,
@@ -692,35 +712,40 @@ export class NeonKGStore implements KGStore {
 
   // ── Nodes ──────────────────────────────────────────────────────────────────
 
+  private async writeNode(merged: KGNode): Promise<void> {
+    await this.queryFn(
+      `UPDATE ${this.nodesTable}
+         SET name=$1, type=$2, confidence=$3, sources=$4, properties=$5,
+             property_clocks=$6, created_at=$7, updated_at=$8, deleted_at=$11
+       WHERE owner=$10 AND id=$9`,
+      [
+        merged.name,
+        merged.type,
+        merged.confidence,
+        JSON.stringify(merged.sources),
+        JSON.stringify(merged.properties),
+        JSON.stringify(merged.propertyClocks ?? {}),
+        merged.createdAt,
+        merged.updatedAt,
+        merged.id,
+        this.owner,
+        merged.deletedAt ?? null,
+      ],
+    );
+  }
+
   async upsertNode(node: KGNode): Promise<KGNode> {
-    const existing = await this.getNode(node.id);
+    const existing = await this.getNodeRow(node.id);
     if (existing) {
       const merged = mergeNode(existing, node);
-      await this.queryFn(
-        `UPDATE ${this.nodesTable}
-           SET name=$1, type=$2, confidence=$3, sources=$4, properties=$5,
-               property_clocks=$6, created_at=$7, updated_at=$8
-         WHERE owner=$10 AND id=$9`,
-        [
-          merged.name,
-          merged.type,
-          merged.confidence,
-          JSON.stringify(merged.sources),
-          JSON.stringify(merged.properties),
-          JSON.stringify(merged.propertyClocks ?? {}),
-          merged.createdAt,
-          merged.updatedAt,
-          merged.id,
-          this.owner,
-        ],
-      );
+      await this.writeNode(merged);
       return merged;
     }
 
     await this.queryFn(
       `INSERT INTO ${this.nodesTable}
-         (id, name, type, confidence, properties, property_clocks, sources, created_at, updated_at, owner)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         (id, name, type, confidence, properties, property_clocks, sources, created_at, updated_at, owner, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         node.id,
         node.name,
@@ -732,17 +757,24 @@ export class NeonKGStore implements KGStore {
         node.createdAt,
         node.updatedAt,
         this.owner,
+        node.deletedAt ?? null,
       ],
     );
     return node;
   }
 
-  async getNode(id: string): Promise<KGNode | undefined> {
+  /** The stored row, tombstone or not. */
+  private async getNodeRow(id: string): Promise<KGNode | undefined> {
     const { rows } = await this.queryFn(
       `SELECT * FROM ${this.nodesTable} WHERE owner=$1 AND id=$2`,
       [this.owner, id],
     );
     return rows[0] ? rowToNode(rows[0]) : undefined;
+  }
+
+  async getNode(id: string): Promise<KGNode | undefined> {
+    const found = await this.getNodeRow(id);
+    return found && !isDeleted(found) ? found : undefined;
   }
 
   async findNodes(query: NodeQuery): Promise<KGNode[]> {
@@ -761,6 +793,7 @@ export class NeonKGStore implements KGStore {
       params.push(query.minConfidence);
       conditions.push(`confidence>=$${params.length}`);
     }
+    if (!query.includeDeleted) conditions.push("(deleted_at IS NULL OR deleted_at < updated_at)");
 
     const where = `WHERE ${conditions.join(" AND ")}`;
     const limit = query.limit !== undefined ? ` LIMIT ${query.limit}` : "";
@@ -772,35 +805,41 @@ export class NeonKGStore implements KGStore {
   }
 
   async deleteNode(id: string): Promise<void> {
-    await this.queryFn(`DELETE FROM ${this.nodesTable} WHERE owner=$1 AND id=$2`, [this.owner, id]);
+    const found = await this.getNodeRow(id);
+    if (found) await this.writeNode(tombstoneNode(found, nowSeconds()));
   }
 
   // ── Edges ──────────────────────────────────────────────────────────────────
 
+  private async writeEdge(merged: KGEdge): Promise<void> {
+    await this.queryFn(
+      `UPDATE ${this.edgesTable}
+         SET confidence=$1, sources=$2, created_at=$3, updated_at=$4, deleted_at=$7
+       WHERE owner=$6 AND id=$5`,
+      [
+        merged.confidence,
+        JSON.stringify(merged.sources),
+        merged.createdAt,
+        merged.updatedAt,
+        merged.id,
+        this.owner,
+        merged.deletedAt ?? null,
+      ],
+    );
+  }
+
   async upsertEdge(edge: KGEdge): Promise<KGEdge> {
-    const existing = await this.getEdge(edge.id);
+    const existing = await this.getEdgeRow(edge.id);
     if (existing) {
       const merged = mergeEdge(existing, edge);
-      await this.queryFn(
-        `UPDATE ${this.edgesTable}
-           SET confidence=$1, sources=$2, created_at=$3, updated_at=$4
-         WHERE owner=$6 AND id=$5`,
-        [
-          merged.confidence,
-          JSON.stringify(merged.sources),
-          merged.createdAt,
-          merged.updatedAt,
-          merged.id,
-          this.owner,
-        ],
-      );
+      await this.writeEdge(merged);
       return merged;
     }
 
     await this.queryFn(
       `INSERT INTO ${this.edgesTable}
-         (id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at, owner)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         (id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at, owner, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [
         edge.id,
         edge.subjectId,
@@ -811,17 +850,24 @@ export class NeonKGStore implements KGStore {
         edge.createdAt,
         edge.updatedAt,
         this.owner,
+        edge.deletedAt ?? null,
       ],
     );
     return edge;
   }
 
-  async getEdge(id: string): Promise<KGEdge | undefined> {
+  /** The stored row, tombstone or not. */
+  private async getEdgeRow(id: string): Promise<KGEdge | undefined> {
     const { rows } = await this.queryFn(
       `SELECT * FROM ${this.edgesTable} WHERE owner=$1 AND id=$2`,
       [this.owner, id],
     );
     return rows[0] ? rowToEdge(rows[0]) : undefined;
+  }
+
+  async getEdge(id: string): Promise<KGEdge | undefined> {
+    const found = await this.getEdgeRow(id);
+    return found && !isDeleted(found) ? found : undefined;
   }
 
   async findEdges(query: EdgeQuery): Promise<KGEdge[]> {
@@ -844,6 +890,7 @@ export class NeonKGStore implements KGStore {
       params.push(query.minConfidence);
       conditions.push(`confidence>=$${params.length}`);
     }
+    if (!query.includeDeleted) conditions.push("(deleted_at IS NULL OR deleted_at < updated_at)");
 
     const where = `WHERE ${conditions.join(" AND ")}`;
     const limit = query.limit !== undefined ? ` LIMIT ${query.limit}` : "";
@@ -855,18 +902,19 @@ export class NeonKGStore implements KGStore {
   }
 
   async deleteEdge(id: string): Promise<void> {
-    await this.queryFn(`DELETE FROM ${this.edgesTable} WHERE owner=$1 AND id=$2`, [this.owner, id]);
+    const found = await this.getEdgeRow(id);
+    if (found) await this.writeEdge(tombstoneEdge(found, nowSeconds()));
   }
 
   // ── Meta ───────────────────────────────────────────────────────────────────
 
   async stats(): Promise<KGStats> {
     const { rows: nodeRows } = await this.queryFn(
-      `SELECT type, COUNT(*) AS cnt FROM ${this.nodesTable} WHERE owner=$1 GROUP BY type`,
+      `SELECT type, COUNT(*) AS cnt FROM ${this.nodesTable} WHERE owner=$1 AND (deleted_at IS NULL OR deleted_at < updated_at) GROUP BY type`,
       [this.owner],
     );
     const { rows: edgeRows } = await this.queryFn(
-      `SELECT COUNT(*) AS cnt FROM ${this.edgesTable} WHERE owner=$1`,
+      `SELECT COUNT(*) AS cnt FROM ${this.edgesTable} WHERE owner=$1 AND (deleted_at IS NULL OR deleted_at < updated_at)`,
       [this.owner],
     );
 
@@ -913,7 +961,12 @@ function rowToNode(row: NeonRow): KGNode {
     sources: parseJsonField<string[]>(row["sources"], []),
     createdAt: Number(row["created_at"]),
     updatedAt: Number(row["updated_at"]),
+    ...deletedFromRow(row),
   };
+}
+
+function deletedFromRow(row: NeonRow): { deletedAt?: number } {
+  return row["deleted_at"] == null ? {} : { deletedAt: Number(row["deleted_at"]) };
 }
 
 /**
@@ -935,6 +988,7 @@ function rowToEdge(row: NeonRow): KGEdge {
     sources: parseJsonField<string[]>(row["sources"], []),
     createdAt: Number(row["created_at"]),
     updatedAt: Number(row["updated_at"]),
+    ...deletedFromRow(row),
   };
 }
 

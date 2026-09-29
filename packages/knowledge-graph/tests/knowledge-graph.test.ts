@@ -433,6 +433,26 @@ describe("KnowledgeGraph.ingest", () => {
     expect(store.nodeCount).toBe(1);
   });
 
+  it("brings back an entity that was deleted once a later document names it", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = makeStore();
+      const { entityExtractor, relationshipExtractor } = makeExtractors(makeEntities("Alice"));
+      const kg = new KnowledgeGraph(store, entityExtractor, relationshipExtractor);
+      await kg.ingest("First doc.", { source: "doc-1" });
+      const id = makeNodeId("Alice", "PERSON");
+      await store.deleteNode(id);
+      expect(await store.getNode(id)).toBeUndefined();
+
+      vi.advanceTimersByTime(60_000);
+      const again = await kg.ingest("Second doc.", { source: "doc-2" });
+      expect(again.nodesAdded).toBe(1);
+      expect((await store.getNode(id))?.sources).toEqual(["doc-2"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("adds edges for extracted relationships", async () => {
     const store = makeStore();
     const entities = makeEntities("Alice", "Acme");
@@ -622,6 +642,10 @@ describe("KGError", () => {
 // nodes and edges.  This exercises all application-layer merge logic without
 // needing a real Postgres/Neon connection.
 
+/** A row the store has not deleted (or has seen again since). */
+const liveRow = (r: NeonRow) =>
+  r["deleted_at"] == null || Number(r["deleted_at"]) < Number(r["updated_at"]);
+
 /** Build an in-memory NeonQueryFn that implements the subset of SQL used by NeonKGStore */
 function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
   const nodesTable = `${tablePrefix}nodes`;
@@ -664,7 +688,9 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
       // SELECT type, COUNT(*) AS cnt FROM kg_nodes GROUP BY type  (stats)
       if (/GROUP BY type/i.test(sql)) {
         const counts = new Map<string, number>();
-        for (const row of [...nodesMap.values()].filter((r) => r["owner"] === params[0])) {
+        for (const row of [...nodesMap.values()].filter(
+          (r) => r["owner"] === params[0] && liveRow(r),
+        )) {
           const t = row["type"] as string;
           counts.set(t, (counts.get(t) ?? 0) + 1);
         }
@@ -681,6 +707,10 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
           let paramIdx = 0;
           const conditions = whereMatch[1]!.split(/\s+AND\s+/i);
           for (const cond of conditions) {
+            if (/deleted_at/i.test(cond)) {
+              results = results.filter(liveRow);
+              continue;
+            }
             const p = params[paramIdx++];
             if (/^owner=/i.test(cond.trim())) {
               results = results.filter((r) => r["owner"] === p);
@@ -730,7 +760,12 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
       // SELECT COUNT(*) AS cnt FROM kg_edges  (stats edge count)
       if (/COUNT\(\*\)/i.test(sql)) {
         return {
-          rows: [{ cnt: [...edgesMap.values()].filter((r) => r["owner"] === params[0]).length }],
+          rows: [
+            {
+              cnt: [...edgesMap.values()].filter((r) => r["owner"] === params[0] && liveRow(r))
+                .length,
+            },
+          ],
         };
       }
 
@@ -743,6 +778,10 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
           let paramIdx = 0;
           const conditions = whereMatch[1]!.split(/\s+AND\s+/i);
           for (const cond of conditions) {
+            if (/deleted_at/i.test(cond)) {
+              results = results.filter(liveRow);
+              continue;
+            }
             const p = params[paramIdx++];
             if (/^owner=/i.test(cond.trim())) {
               results = results.filter((r) => r["owner"] === p);
@@ -905,6 +944,46 @@ describe("NeonKGStore — node operations", () => {
 
   it("deleteNode is a no-op for unknown id", async () => {
     await expect(store.deleteNode("ghost")).resolves.not.toThrow();
+  });
+});
+
+describe("NeonKGStore — deletes are tombstones", () => {
+  let store: NeonKGStore;
+
+  beforeEach(async () => {
+    store = await makeNeonStore();
+  });
+
+  it("keeps a deleted node deleted against a stale upsert, until it is seen again", async () => {
+    const n = node("Alice", "PERSON", { properties: { role: "cto" }, updatedAt: NOW });
+    await store.upsertNode(n);
+    await store.deleteNode(n.id);
+    await store.upsertNode({ ...n, updatedAt: NOW + 1 });
+
+    expect(await store.getNode(n.id)).toBeUndefined();
+    expect(await store.findNodes({})).toEqual([]);
+    expect((await store.stats()).nodes).toBe(0);
+    const dead = await store.findNodes({ includeDeleted: true });
+    expect(dead.map((d) => d.id)).toEqual([n.id]);
+    expect(dead[0]!.deletedAt).toBeGreaterThanOrEqual(NOW);
+
+    await store.upsertNode({ ...n, updatedAt: Math.floor(Date.now() / 1000) + 60 });
+    expect((await store.getNode(n.id))?.name).toBe("Alice");
+    expect((await store.stats()).nodes).toBe(1);
+  });
+
+  it("does the same for an edge", async () => {
+    const sId = makeNodeId("Alice", "PERSON");
+    const oId = makeNodeId("Acme", "ORG");
+    const e = edge(sId, "works at", oId);
+    await store.upsertEdge(e);
+    await store.deleteEdge(e.id);
+    await store.upsertEdge({ ...e, updatedAt: NOW + 1 });
+
+    expect(await store.getEdge(e.id)).toBeUndefined();
+    expect(await store.findEdges({})).toEqual([]);
+    expect((await store.stats()).edges).toBe(0);
+    expect((await store.findEdges({ includeDeleted: true })).length).toBe(1);
   });
 });
 

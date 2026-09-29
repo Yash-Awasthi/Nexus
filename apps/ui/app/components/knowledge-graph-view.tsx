@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { Loader2, Minus, Pause, Play, Plus, Search } from "lucide-react";
+import { Loader2, Minus, Pause, Play, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GraphEdge, GraphHandle, GraphNode } from "~/components/graph-3d";
@@ -38,6 +38,7 @@ export function KnowledgeGraphView({
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
   const [spinning, setSpinning] = useState(true);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -86,7 +87,24 @@ export function KnowledgeGraphView({
 
   useEffect(() => {
     handle.current?.select(selected);
+    setConfirming(false);
   }, [selected]);
+
+  async function remove(id: string) {
+    try {
+      await apiFetch(`/api/kg/nodes/${encodeURIComponent(id)}`, { method: "DELETE" });
+      setData(
+        (d) =>
+          d && {
+            nodes: d.nodes.filter((n) => n.id !== id),
+            edges: d.edges.filter((e) => e.subjectId !== id && e.objectId !== id),
+            total: { nodes: d.total.nodes - 1, edges: d.total.edges },
+          },
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const byId = useMemo(() => new Map((data?.nodes ?? []).map((n) => [n.id, n])), [data]);
   const links = useMemo(() => {
@@ -185,10 +203,20 @@ export function KnowledgeGraphView({
               {chosen.name}{" "}
               <span className="font-normal text-muted-foreground">· {chosen.type}</span>
             </p>
-            <Button size="sm" variant="outline" onClick={() => onSearch(chosen.name)}>
-              <Search className="size-3.5" /> Search
-            </Button>
+            <div className="flex shrink-0 gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => onSearch(chosen.name)}>
+                <Search className="size-3.5" /> Search
+              </Button>
+              <Button
+                size="sm"
+                variant={confirming ? "destructive" : "outline"}
+                onClick={() => (confirming ? void remove(chosen.id) : setConfirming(true))}
+              >
+                <Trash2 className="size-3.5" /> {confirming ? "Confirm" : "Delete"}
+              </Button>
+            </div>
           </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
           {links.length === 0 ? (
             <p className="text-xs text-muted-foreground">No relationships drawn for this one.</p>
           ) : (

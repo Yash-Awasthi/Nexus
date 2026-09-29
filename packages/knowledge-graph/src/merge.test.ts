@@ -8,10 +8,13 @@ import { describe, it, expect } from "vitest";
 
 import { InMemoryKGStore, type KGEdge, type KGNode } from "./index.js";
 import {
+  isDeleted,
   mergeEdge,
   mergeNode,
   mergeSnapshots,
   removeNodeProperty,
+  tombstoneEdge,
+  tombstoneNode,
   type KGSnapshot,
 } from "./merge.js";
 
@@ -238,5 +241,118 @@ describe("InMemoryKGStore with tombstones", () => {
     await store.upsertNode(original);
 
     expect((await store.getNode("n1"))!.properties).toEqual({});
+  });
+});
+
+describe("node and edge tombstones", () => {
+  const alive = node({ properties: { sector: "mining" }, sources: ["doc-a"], updatedAt: 1_000 });
+  /** The peer that never heard about the delete. */
+  const stale = node({ properties: { sector: "mining" }, sources: ["doc-a"], updatedAt: 1_500 });
+
+  it("hides a node deleted at or after its last sighting and clears what it held", () => {
+    const dead = tombstoneNode(alive, 2_000);
+
+    expect(isDeleted(dead)).toBe(true);
+    expect(isDeleted(alive)).toBe(false);
+    expect(dead.properties).toEqual({});
+    expect(dead.sources).toEqual([]);
+    expect(dead.name).toBe("Acme Corp");
+  });
+
+  it("never dates a delete before the node's own last sighting", () => {
+    expect(tombstoneNode(node({ updatedAt: 9_000 }), 2_000).deletedAt).toBe(9_000);
+  });
+
+  it("keeps a deleted node deleted when a stale peer still has it, in both orders", () => {
+    const dead = tombstoneNode(alive, 2_000);
+
+    expect(isDeleted(mergeNode(dead, stale))).toBe(true);
+    expect(isDeleted(mergeNode(stale, dead))).toBe(true);
+    expect(mergeNode(dead, stale)).toEqual(mergeNode(stale, dead));
+  });
+
+  it("lets a later sighting bring the node back", () => {
+    const dead = tombstoneNode(alive, 2_000);
+    const seenAgain = node({ properties: { sector: "energy" }, updatedAt: 3_000 });
+
+    expect(isDeleted(mergeNode(dead, seenAgain))).toBe(false);
+    expect(mergeNode(dead, seenAgain).properties.sector).toBe("energy");
+  });
+
+  it("gives the delete the tie so a concurrent sighting cannot undo it", () => {
+    const dead = tombstoneNode(alive, 2_000);
+    const concurrent = node({ updatedAt: 2_000 });
+
+    expect(isDeleted(mergeNode(dead, concurrent))).toBe(true);
+    expect(mergeNode(dead, concurrent)).toEqual(mergeNode(concurrent, dead));
+  });
+
+  it("stays a join with tombstones in play", () => {
+    const dead = tombstoneNode(alive, 2_000);
+    const other = node({ confidence: 0.9, sources: ["doc-z"], updatedAt: 2_500 });
+
+    expect(mergeNode(mergeNode(dead, stale), other)).toEqual(
+      mergeNode(dead, mergeNode(stale, other)),
+    );
+    const m = mergeNode(dead, stale);
+    expect(mergeNode(m, m)).toEqual(m);
+  });
+
+  it("does the same for edges", () => {
+    const e = edge({ sources: ["doc-a"], updatedAt: 1_000 });
+    const old = edge({ sources: ["doc-a"], updatedAt: 1_500 });
+    const dead = tombstoneEdge(e, 2_000);
+
+    expect(isDeleted(dead)).toBe(true);
+    expect(dead.sources).toEqual([]);
+    expect(isDeleted(mergeEdge(dead, old))).toBe(true);
+    expect(mergeEdge(dead, old)).toEqual(mergeEdge(old, dead));
+    expect(isDeleted(mergeEdge(dead, edge({ updatedAt: 3_000 })))).toBe(false);
+  });
+
+  it("carries the tombstone through a snapshot exchange", () => {
+    const mine: KGSnapshot = { nodes: [tombstoneNode(alive, 2_000)], edges: [] };
+    const theirs: KGSnapshot = { nodes: [stale], edges: [] };
+
+    expect(mergeSnapshots(mine, theirs)).toEqual(mergeSnapshots(theirs, mine));
+    expect(isDeleted(mergeSnapshots(mine, theirs).nodes[0]!)).toBe(true);
+  });
+});
+
+describe("InMemoryKGStore deletes", () => {
+  it("keeps a deleted node deleted when a stale peer upserts it, until it is seen again", async () => {
+    const store = new InMemoryKGStore();
+    const seen = node({ properties: { sector: "mining" }, updatedAt: 1_000 });
+    await store.upsertNode(seen);
+    await store.deleteNode("n1");
+
+    await store.upsertNode({ ...seen, updatedAt: 1_500 });
+    expect(await store.getNode("n1")).toBeUndefined();
+    expect(await store.findNodes({})).toEqual([]);
+    expect((await store.stats()).nodes).toBe(0);
+    expect(store.nodeCount).toBe(0);
+    expect((await store.findNodes({ includeDeleted: true })).map((n) => n.id)).toEqual(["n1"]);
+
+    await store.upsertNode({ ...seen, updatedAt: Math.floor(Date.now() / 1000) + 60 });
+    expect((await store.getNode("n1"))!.name).toBe("Acme Corp");
+  });
+
+  it("does the same for an edge", async () => {
+    const store = new InMemoryKGStore();
+    const e = edge({ updatedAt: 1_000 });
+    await store.upsertEdge(e);
+    await store.deleteEdge("e1");
+    await store.upsertEdge({ ...e, updatedAt: 1_500 });
+
+    expect(await store.getEdge("e1")).toBeUndefined();
+    expect(await store.findEdges({})).toEqual([]);
+    expect(store.edgeCount).toBe(0);
+    expect((await store.findEdges({ includeDeleted: true })).length).toBe(1);
+  });
+
+  it("has nothing to tombstone for an id it never held", async () => {
+    const store = new InMemoryKGStore();
+    await store.deleteNode("ghost");
+    expect(await store.findNodes({ includeDeleted: true })).toEqual([]);
   });
 });

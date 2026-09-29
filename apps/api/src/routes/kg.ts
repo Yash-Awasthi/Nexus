@@ -2,7 +2,9 @@
 /**
  * POST /kg/sync exchanges knowledge-graph state with a federated peer over the
  * CRDT join in @nexus/knowledge-graph, so one round trip converges both sides.
- * GET /kg/communities, GET /kg/search and GET /kg/graph read the caller's own graph.
+ * GET /kg/communities, GET /kg/search and GET /kg/graph read the caller's own graph;
+ * DELETE /kg/nodes/:id and DELETE /kg/edges/:id remove from it, leaving tombstones that
+ * a sync carries to peers so a deleted fact does not come back.
  *
  * Mounted inside apiBridgeRoutes (same /api/* scope, same auth hooks).
  */
@@ -60,6 +62,30 @@ export async function kgRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  /** Removes an entity and every relationship that touches it. */
+  app.delete<{ Params: { id: string } }>("/kg/nodes/:id", async (request, reply) => {
+    const store = getKGStore();
+    if (!(await store.getNode(request.params.id))) {
+      return reply.code(404).send({ error: "entity not found" });
+    }
+    const touching = new Map<string, true>();
+    for (const q of [{ subjectId: request.params.id }, { objectId: request.params.id }]) {
+      for (const e of await store.findEdges(q)) touching.set(e.id, true);
+    }
+    for (const id of touching.keys()) await store.deleteEdge(id);
+    await store.deleteNode(request.params.id);
+    return reply.send({ deleted: { nodes: 1, edges: touching.size } });
+  });
+
+  app.delete<{ Params: { id: string } }>("/kg/edges/:id", async (request, reply) => {
+    const store = getKGStore();
+    if (!(await store.getEdge(request.params.id))) {
+      return reply.code(404).send({ error: "relationship not found" });
+    }
+    await store.deleteEdge(request.params.id);
+    return reply.send({ deleted: { edges: 1 } });
+  });
+
   app.get("/kg/communities", async (_request, reply) =>
     reply.send({ communities: await summarizeCommunities(getKGStore()) }),
   );
@@ -108,8 +134,8 @@ export async function kgRoutes(app: FastifyInstance): Promise<void> {
         edges: request.body?.edges ?? [],
       };
       const mine = {
-        nodes: await store.findNodes({}),
-        edges: await store.findEdges({}),
+        nodes: await store.findNodes({ includeDeleted: true }),
+        edges: await store.findEdges({ includeDeleted: true }),
       };
 
       const merged = mergeSnapshots(mine, incoming);
