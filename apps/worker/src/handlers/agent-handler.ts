@@ -107,7 +107,7 @@ export interface AgentRunPayload {
    * converging debate tool, on by default when a driver is present).
    */
   disableCouncilTools?: boolean;
-  /** Run PTC scripts in a worker_thread sandbox (hard timeout for sync loops). Default false. */
+  /** Run PTC scripts in this process instead of the sandboxed child Node when false. Default true. */
   ptcSandbox?: boolean;
   /** Run a forked post-run learning review (off by default — extra LLM call). */
   review?: boolean;
@@ -530,7 +530,7 @@ export async function handleAgentRunJob(
       createProgrammaticToolTool({
         toolSet,
         permissionGate,
-        ...(payload.ptcSandbox ? { sandbox: true } : {}),
+        sandbox: payload.ptcSandbox !== false,
       }),
     );
   }

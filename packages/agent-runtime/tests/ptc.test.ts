@@ -7,7 +7,6 @@ import {
   gatedInvoke,
   type PermissionGate,
 } from "../src/index.js";
-import { executePtcScript } from "../src/ptc-sandbox.js";
 
 function toolSet(): RuntimeToolSet {
   const ts = new RuntimeToolSet();
@@ -101,49 +100,81 @@ describe("createProgrammaticToolTool", () => {
   });
 });
 
-describe("executePtcScript — RPC + stdout-only contract (§7.2)", () => {
-  it("bridges every tool call through `call` and returns only printed output", async () => {
-    const calls: { name: string; args: Record<string, unknown> }[] = [];
-    // Stand-in for the sandbox's local RPC: records the call, returns canned output.
-    const call = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
-      calls.push({ name, args });
-      return `contents-of-${String(args.path)}`;
-    };
-    const code = `
-      const a = await call("read_file", { path: "a" });
-      const b = await call("read_file", { path: "b" });
-      print("chosen:", a.includes("a") ? "a" : b);
-    `;
-    const out = await executePtcScript(code, { tools: [] }, call);
-
-    // Both tool calls went over the bridge (RPC), in order.
-    expect(calls.map((c) => c.args.path)).toEqual(["a", "b"]);
-    // Only the printed value re-enters context — b's raw contents never do.
-    expect(out).toContain("chosen: a");
-    expect(out).not.toContain("contents-of-b");
-  });
-
-  it("appends a [return] line and surfaces errors as [error]", async () => {
-    const noop = async (): Promise<unknown> => undefined;
-    expect(await executePtcScript("return 6*7;", {}, noop)).toContain("[return] 42");
-    const err = await executePtcScript(`throw new Error("boom");`, {}, noop);
-    expect(err).toContain("[error]");
-    expect(err).toContain("boom");
-  });
-
-  it("enforces a cooperative timeout", async () => {
-    const noop = async (): Promise<unknown> => undefined;
-    const out = await executePtcScript("await new Promise(() => {});", {}, noop, { timeoutMs: 30 });
-    expect(out).toContain("timed out");
-  });
-});
-
 describe("createProgrammaticToolTool sandbox option (§7.2)", () => {
   it("accepts sandbox:true and still builds a gated meta-tool", () => {
     const ptc = createProgrammaticToolTool({ toolSet: toolSet(), sandbox: true });
     expect(ptc.tier).toBe("requires_permission");
     expect(ptc.name).toBe("run_tool_script");
   });
+
+  const sandboxed = (timeoutMs = 20_000) =>
+    createProgrammaticToolTool({
+      toolSet: toolSet(),
+      permissionGate: allow,
+      sandbox: true,
+      timeoutMs,
+    });
+
+  it("runs in a separate process that sees none of the host's environment", async () => {
+    process.env.PTC_TEST_SECRET = "s3cret-value";
+    const out = (await sandboxed().handler(
+      {
+        code: `print(String(globalThis.process?.env?.PTC_TEST_SECRET)); print(process.pid !== ${process.pid});`,
+      },
+      {},
+    )) as string;
+    delete process.env.PTC_TEST_SECRET;
+    expect(out).not.toContain("s3cret-value");
+    expect(out).toContain("true");
+  }, 30_000);
+
+  it("cannot read files, start processes or open sockets", async () => {
+    const out = (await sandboxed().handler(
+      {
+        code: `
+          for (const [label, attempt] of [
+            ["fs", () => import("node:fs").then((fs) => fs.readFileSync("package.json", "utf8"))],
+            ["exec", () => import("node:child_process").then((cp) => cp.execSync("echo hi").toString())],
+            ["net", () => fetch("http://127.0.0.1:9")],
+            ["dns", () => require("node:dns").promises.resolve4("example.com")],
+            ["udp", () => require("node:dgram").createSocket("udp4").send("x", 53, "127.0.0.1")],
+          ]) {
+            try { await attempt(); print(label + ":allowed"); } catch { print(label + ":blocked"); }
+          }`,
+      },
+      {},
+    )) as string;
+    expect(out).toContain("fs:blocked");
+    expect(out).toContain("exec:blocked");
+    expect(out).toContain("net:blocked");
+    expect(out).toContain("dns:blocked");
+    expect(out).toContain("udp:blocked");
+  }, 30_000);
+
+  it("still reaches tools through call() and returns only what it prints", async () => {
+    const out = (await sandboxed().handler(
+      {
+        code: `const a = await call("read_file", { path: "a" }); print(a.toUpperCase()); return 7;`,
+      },
+      {},
+    )) as string;
+    expect(out).toContain("CONTENTS-OF-A");
+    expect(out).toContain("[return] 7");
+  }, 30_000);
+
+  it("surfaces a thrown error after what was printed", async () => {
+    const out = (await sandboxed().handler(
+      { code: `print("before"); throw new Error("boom");` },
+      {},
+    )) as string;
+    expect(out.indexOf("before")).toBeGreaterThanOrEqual(0);
+    expect(out.indexOf("before")).toBeLessThan(out.indexOf("[error] boom"));
+  }, 30_000);
+
+  it("kills a script stuck in a synchronous loop", async () => {
+    const out = (await sandboxed(1500).handler({ code: "while (true) {}" }, {})) as string;
+    expect(out).toContain("timed out");
+  }, 30_000);
 });
 
 describe("gatedInvoke", () => {

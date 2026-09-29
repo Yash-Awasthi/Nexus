@@ -21,6 +21,13 @@ describe("runUntrustedJs", () => {
     expect(cp.exitCode).not.toBe(0);
     const net = await runUntrustedJs('require("node:net").connect(80, "127.0.0.1")');
     expect(net.stderr).toMatch(/network access is disabled/);
+    for (const code of [
+      'require("node:dns").lookup("example.com", () => {})',
+      'require("node:dns").promises.resolve4("example.com")',
+      'require("node:dgram").createSocket("udp4").send("x", 53, "127.0.0.1")',
+    ]) {
+      expect((await runUntrustedJs(code)).stderr).toMatch(/network access is disabled/);
+    }
   });
 
   it("sees none of the server's environment", async () => {
