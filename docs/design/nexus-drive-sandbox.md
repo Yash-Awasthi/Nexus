@@ -22,8 +22,8 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
 
 ## Locked decisions (2026-06-22)
 
-- **Isolation:** **Firecracker microVMs** (primary target; spike confirms). Chosen for the
-  strongest multi-tenant isolation of arbitrary user CLIs.
+- **Isolation:** **gVisor** (`SANDBOX_RUNTIME=runsc`) around the hardened Docker runner. It runs
+  on any Docker host; Firecracker needs `/dev/kvm` and a per-user block image, so it stays a spike.
 - **Quota-full behavior:** **soft warn + grace** — warn as the user nears 512 MB, allow a small
   temporary grace overage, then block writes. (More nuance than a hard ENOSPC fail; see Open
   questions.)
@@ -34,9 +34,10 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
 
 ## Design sketch
 
-- **Isolation:** one **Firecracker microVM** per user session (primary).
-  - Fallbacks if the spike hits blockers: **gVisor** (syscall-level, lighter) or **Docker +
-    resource limits** (MVP/trusted-user only, weakest isolation).
+- **Isolation:** one **gVisor** container per command (primary), or plain **Docker + resource
+  limits** where runsc is not installed (weakest isolation).
+  - Upgrade path for hosts that need a hardware boundary: a **Firecracker microVM**
+    (`scripts/drive-microvm-spike.sh`), with the drive moved into a per-user ext4 image.
 - **512 MB storage cap (FS-level, tamper-proof — not app-level):**
   - 512 MB loopback ext4 image per user, **or** XFS/overlay project quota, **or** a
     quota-enforced disk-backed volume. Mounted at `/workspace`.
@@ -56,7 +57,7 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
   - Egress policy must still allow the CLI to reach the relevant provider API endpoints.
 - **Shell / git / clone / push:** allowed _inside_ the sandbox, scoped to `/workspace`;
   outbound git over HTTPS with stored credentials. Egress is policy-gated.
-- **Lifecycle:** workspace volume **persists** across sessions; compute microVM is
+- **Lifecycle:** workspace volume **persists** across sessions; compute container is
   **ephemeral**, spun up on demand. Idle volumes are reclaimed after **30 days idle** (warn
   first); track `lastActiveAt` per workspace to drive cleanup.
 - **Resource caps per sandbox:** CPU / RAM / PIDs / wall-clock timeout to prevent abuse.
@@ -64,10 +65,6 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
 ## Open questions (resolve during the spike)
 
 - Soft-quota tuning: exact warn threshold (~90%?) and grace size/duration before hard block.
-- Firecracker jailer setup in the target deploy env. KVM itself is available on any Linux host
-  with `/dev/kvm`, and on Docker Desktop (WSL2) once `kvm_intel` is loaded in its VM.
-- Per-user rootfs/kernel image strategy and how the persistent 512 MB volume attaches to a
-  fresh microVM on each session.
 - Warning + reclaim UX for the 30-day idle policy (notification channel, grace to restore).
 
 ## Surface area
