@@ -437,6 +437,11 @@ export interface DockerSandboxConfig {
   outputPath?: string;
   /** Container name, so a timed-out run can be removed by name. */
   name?: string;
+  /**
+   * Attach stdin (`-i`). Default true; the runner sets it only when it pipes input, because
+   * under Kata a `docker run -i` whose stdin is empty never returns.
+   */
+  interactive?: boolean;
 }
 
 /**
@@ -519,7 +524,7 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     // TypeScript temp files written by executeCode, read-only.
     `-v`,
     `${tmpdir()}:${HOST_TMP_MOUNT}:ro`,
-    "-i", // keep stdin open for piped input
+    ...(config.interactive === false ? [] : ["-i"]),
     image,
   );
 
@@ -555,7 +560,15 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
  */
 export function createDockerRunner(config: DockerSandboxConfig = {}): Runner {
   const run = (cmd: string, args: string[], opts: RunnerOptions): Promise<RunnerResult> =>
-    defaultRunner("docker", [...buildDockerArgs(config), cmd, ...args], opts);
+    defaultRunner(
+      "docker",
+      [
+        ...buildDockerArgs({ ...config, interactive: config.interactive ?? Boolean(opts.stdin) }),
+        cmd,
+        ...args,
+      ],
+      opts,
+    );
   return Object.assign(run, { inContainer: true });
 }
 
