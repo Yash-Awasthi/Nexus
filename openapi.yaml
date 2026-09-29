@@ -4758,6 +4758,32 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/kg/nodes/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/kg/edges/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/kg/communities:
     get:
       tags:
