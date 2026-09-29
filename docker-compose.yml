@@ -164,6 +164,10 @@ services:
       OTEL_SERVICE_NAME: nexus-api
       POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # Shared with the worker, whose agent runs build generated apps inside users' drives.
+      NEXUS_DRIVE_ROOT: /data/drives
+    volumes:
+      - drives:/data/drives
     depends_on:
       postgres:
         condition: service_healthy
@@ -218,6 +222,9 @@ services:
       OTEL_SERVICE_NAME: nexus-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       SEARXNG_BASE_URL: http://searxng:8080
+      NEXUS_DRIVE_ROOT: /data/drives
+    volumes:
+      - drives:/data/drives
     depends_on:
       postgres:
         condition: service_healthy
@@ -440,6 +447,7 @@ services:
         max-file: "3"
 
 volumes:
+  drives:
   postgres_data:
   redis_data:
   searxng_data:

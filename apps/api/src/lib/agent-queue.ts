@@ -74,6 +74,8 @@ export interface LaunchAgentInput {
   apiKey?: string;
   systemPrompt?: string;
   maxSteps?: number;
+  /** Directory the coding tools work in. */
+  workspaceDir?: string;
   /** Run inside an isolated git-worktree workspace (Phase 3). */
   worktree?: Record<string, unknown>;
   /** Resume an existing session instead of starting a new one. */
