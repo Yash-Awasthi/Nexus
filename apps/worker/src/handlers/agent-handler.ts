@@ -120,6 +120,8 @@ export interface AgentRunPayload {
    * `x-nexus-compress` request header at the API edge.
    */
   compressToolOutput?: PresetName | false;
+  /** Tool outputs the model sees whole (default 6; 0 sends every one whole). */
+  keepToolOutputs?: number;
   /** Per-command limit for run_command (default 30s); installs and builds need longer. */
   commandTimeoutMs?: number;
   /** Resume an existing agent_sessions row (loads its messages, continues it). */
@@ -578,6 +580,7 @@ export async function handleAgentRunJob(
     workingDir,
     ...(initialMessages.length ? { initialMessages } : {}),
     ...(resumed.inFlight ? { resumeTurn: true } : {}),
+    ...(payload.keepToolOutputs !== 0 ? { keepToolOutputs: payload.keepToolOutputs ?? 6 } : {}),
     ...(payload.sessionId
       ? {
           onJournal: async (messages: RuntimeMessage[]) => {
