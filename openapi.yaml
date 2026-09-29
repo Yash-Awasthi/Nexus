@@ -449,6 +449,19 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/agent/run/{sessionId}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: sessionId
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/v1/apps/generate:
     post:
       tags:

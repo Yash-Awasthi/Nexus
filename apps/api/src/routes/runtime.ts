@@ -6,6 +6,7 @@
  *   GET    /api/v1/runtime/tasks/:taskId
  *   PATCH  /api/v1/runtime/tasks/:taskId   (cancel)
  *   POST   /api/v1/agent/run
+ *   GET    /api/v1/agent/run/:sessionId
  *   POST   /api/v1/apps/generate
  */
 
@@ -14,7 +15,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
 import { db } from "@nexus/db";
-import { ingestedEvents, runtimeTasks, signals } from "@nexus/db/schema";
+import { agentSessions, ingestedEvents, runtimeTasks, signals } from "@nexus/db/schema";
 import type { ExecAction } from "@nexus/exec-policy";
 import { userDrivePath } from "@nexus/sandbox";
 import type { SQL } from "drizzle-orm";
@@ -154,6 +155,26 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
     "/agent/run",
     { preHandler: requireAuthWithTier },
     async (request, reply) => launchAgent(request, reply, request.body),
+  );
+
+  // GET /agent/run/:sessionId — a run's status, for clients that joined its stream late
+  app.get<{ Params: { sessionId: string } }>(
+    "/agent/run/:sessionId",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+      const [row] = await db
+        .select({ status: agentSessions.status, error: agentSessions.error })
+        .from(agentSessions)
+        .where(
+          and(eq(agentSessions.id, request.params.sessionId), eq(agentSessions.userId, userId)),
+        )
+        .limit(1)
+        .catch(() => []);
+      if (!row) return reply.code(404).send({ error: "not_found" });
+      return reply.send({ status: row.status, ...(row.error ? { error: row.error } : {}) });
+    },
   );
 
   // POST /apps/generate — scaffold a themed starter in the drive, then have an agent build on it
