@@ -101,7 +101,12 @@ import { searchDuckDuckGo } from "../lib/duckduckgo.js";
 import { guardExec } from "../lib/exec-guard.js";
 import { getKG } from "../lib/knowledge-graph-store.js";
 import { cachedDriver } from "../lib/llm-cache-driver.js";
-import { FailoverDriver, getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
+import {
+  FailoverDriver,
+  getFailoverDriver,
+  setFailoverProviders,
+  type FailoverProviderEntry,
+} from "../lib/llm-failover.js";
 import { getMemoryStore } from "../lib/memory-store.js";
 import { heuristicScores, openaiScores } from "../lib/moderation-score.js";
 import { resolveOAuthDriver } from "../lib/oauth-drivers.js";
@@ -299,14 +304,24 @@ function buildFailoverEntries(): { id: string; driver: LlmDriver }[] {
     .filter((e): e is { id: string; driver: LlmDriver } => Boolean(e.driver));
 }
 
+/**
+ * The caller's own connections as chain entries: one per model a connection lists, so a model
+ * that is out of allowance hands over to its sibling before the chain leaves the connection.
+ */
+function ownEntries(skip?: string): FailoverProviderEntry[] {
+  return getUserDrivers()
+    .filter((e) => e.id !== skip)
+    .flatMap<FailoverProviderEntry>((e) =>
+      e.models && e.models.length > 1
+        ? e.models.map((model) => ({ id: `user:${e.id}`, driver: e.driver, model }))
+        : [{ id: `user:${e.id}`, driver: e.driver, ownModel: true }],
+    );
+}
+
 export function getDefaultDriver() {
   const entries = buildFailoverEntries();
   // The caller's own saved keys come first; the server's keys stay as fallback.
-  const own = getUserDrivers().map((e) => ({
-    id: `user:${e.id}`,
-    driver: e.driver,
-    ownModel: true,
-  }));
+  const own = ownEntries();
   if (own.length > 0) return new FailoverDriver([...own, ...entries]);
   if (entries.length === 0) return undefined;
   setFailoverProviders(entries);
@@ -333,7 +348,12 @@ export function getPinnedDriver(provider?: string, alone = false): FailoverDrive
     ...(pin ? [{ id: pin.id, driver: pin.driver }] : []),
     ...(pin && alone
       ? []
-      : all.filter((e) => e !== pin).map((e) => ({ id: e.id, driver: e.driver, ownModel: true }))),
+      : [
+          ...ownEntries(pin?.id.startsWith("user:") ? pin.provider : undefined),
+          ...buildFailoverEntries()
+            .filter((e) => e.id !== pin?.id)
+            .map((e) => ({ id: e.id, driver: e.driver, ownModel: true })),
+        ]),
   ]);
 }
 
