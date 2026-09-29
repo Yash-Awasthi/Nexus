@@ -667,6 +667,35 @@ export interface RuntimeMessage {
   toolCallId?: string;
 }
 
+export const INTERRUPTED_TOOL_RESULT =
+  "Error: interrupted: the run stopped while this tool call was in flight, so its outcome is " +
+  "unknown. Check the current state before retrying it.";
+
+/**
+ * Repair a journal saved mid-turn: every dispatched tool call without a recorded result gets an
+ * interrupted result instead of being re-run, since it may already have had side effects.
+ */
+export function reconcileJournal(messages: RuntimeMessage[]): RuntimeMessage[] {
+  const out: RuntimeMessage[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const m = messages[i++]!;
+    out.push(m);
+    if (m.role !== "assistant" || !m.toolCalls?.length) continue;
+    const answered = new Set<string | undefined>();
+    while (i < messages.length && messages[i]!.role === "tool") {
+      answered.add(messages[i]!.toolCallId);
+      out.push(messages[i++]!);
+    }
+    for (const call of m.toolCalls) {
+      if (!answered.has(call.callId)) {
+        out.push({ role: "tool", content: INTERRUPTED_TOOL_RESULT, toolCallId: call.callId });
+      }
+    }
+  }
+  return out;
+}
+
 /** A tool advertised to the model (name + description + JSON-Schema params). */
 export interface ToolSpec {
   name: string;
@@ -953,6 +982,16 @@ export interface ToolRuntimeOptions {
    */
   initialMessages?: RuntimeMessage[];
   /**
+   * `initialMessages` already end inside this instruction's turn (a journal saved mid-run), so
+   * the loop continues it instead of appending the instruction again.
+   */
+  resumeTurn?: boolean;
+  /**
+   * Durable turn journal: awaited with the full history after each assistant message and each
+   * tool result, before the next side effect, so a crash loses at most the call in flight.
+   */
+  onJournal?: (messages: RuntimeMessage[]) => void | Promise<void>;
+  /**
    * Optional steering hook. Drained at each step
    * boundary — after a step's LLM call + tools complete, before the next model
    * call. Any returned texts are appended to the message history as user
@@ -1022,6 +1061,8 @@ export class ToolAgentRuntime {
   private compaction?: CompactionOptions;
   private onCompaction?: (info: CompactionResult) => void;
   private initialMessages?: RuntimeMessage[];
+  private resumeTurn: boolean;
+  private onJournal?: (messages: RuntimeMessage[]) => void | Promise<void>;
   private drainSteeringMessages?: () => string[];
   private toolCompressFilters: readonly CompressFilter[];
   private readonly dedup = new SessionDedup();
@@ -1044,6 +1085,8 @@ export class ToolAgentRuntime {
     this.compaction = opts.compaction;
     this.onCompaction = opts.onCompaction;
     this.initialMessages = opts.initialMessages;
+    this.resumeTurn = opts.resumeTurn ?? false;
+    this.onJournal = opts.onJournal;
     this.drainSteeringMessages = opts.drainSteeringMessages;
     // Default to lossless: meaning-preserving, so safe to run on every tool result.
     this.toolCompressFilters =
@@ -1060,10 +1103,10 @@ export class ToolAgentRuntime {
 
   async run(instruction: string, signal?: AbortSignal): Promise<ToolRuntimeResult> {
     const t0 = Date.now();
-    let messages: RuntimeMessage[] = [
-      ...(this.initialMessages ?? []),
-      { role: "user", content: instruction },
-    ];
+    let messages: RuntimeMessage[] =
+      this.resumeTurn && this.initialMessages?.length
+        ? reconcileJournal(this.initialMessages)
+        : [...(this.initialMessages ?? []), { role: "user", content: instruction }];
     const steps: ToolStepRecord[] = [];
     const totalUsage: RuntimeUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     const tools = this.tools ?? deriveToolSpecs(this.toolSet);
@@ -1127,6 +1170,7 @@ export class ToolAgentRuntime {
         content: turn.content,
         ...(turn.toolCalls.length ? { toolCalls: turn.toolCalls } : {}),
       });
+      await this.onJournal?.(messages);
 
       // Execute each tool call and append its result to history.
       const toolResults: ToolResult[] = [];
@@ -1150,6 +1194,7 @@ export class ToolAgentRuntime {
             content: stringifyToolOutput(result, this.structuredEncoding),
             toolCallId: call.callId,
           });
+          await this.onJournal?.(messages);
           continue;
         }
 
@@ -1234,6 +1279,7 @@ export class ToolAgentRuntime {
           content,
           toolCallId: call.callId,
         });
+        await this.onJournal?.(messages);
       }
 
       const step: ToolStepRecord = {

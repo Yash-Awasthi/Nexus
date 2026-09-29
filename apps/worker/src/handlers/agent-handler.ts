@@ -26,6 +26,7 @@ import {
   type LlmToolDriver,
   type LlmToolFn,
   type ToolStepRecord,
+  reconcileJournal,
   type RuntimeMessage,
   type CompactionResult,
   type PresetName,
@@ -151,17 +152,32 @@ export interface AgentRunPayload {
   };
 }
 
-/** Load prior messages for a session being resumed; [] if none/not found. */
-async function loadSessionMessages(sessionId: string): Promise<RuntimeMessage[]> {
+/**
+ * Load prior messages for a session being resumed; [] if none/not found. `inFlight` marks a
+ * journal a crashed run left mid-turn on this same instruction, so the run continues that turn.
+ */
+async function loadSessionMessages(
+  sessionId: string,
+  instruction: string,
+): Promise<{ messages: RuntimeMessage[]; inFlight: boolean }> {
   try {
     const [row] = await db
-      .select({ messages: agentSessions.messages })
+      .select({
+        messages: agentSessions.messages,
+        status: agentSessions.status,
+        instruction: agentSessions.instruction,
+      })
       .from(agentSessions)
       .where(eq(agentSessions.id, sessionId))
       .limit(1);
-    return (row?.messages as RuntimeMessage[] | undefined) ?? [];
+    const messages = reconcileJournal((row?.messages as RuntimeMessage[] | undefined) ?? []);
+    return {
+      messages,
+      inFlight:
+        messages.length > 0 && row?.status === "running" && row.instruction?.trim() === instruction,
+    };
   } catch {
-    return [];
+    return { messages: [], inFlight: false };
   }
 }
 
@@ -187,6 +203,7 @@ async function saveSession(
       .onConflictDoUpdate({
         target: agentSessions.id,
         set: {
+          instruction: payload.instruction ?? payload.prompt ?? payload.goal ?? null,
           status: data.status,
           messages: data.messages,
           ...(data.usage ? { usage: data.usage } : {}),
@@ -543,7 +560,11 @@ export async function handleAgentRunJob(
       };
 
   // Resume: load prior conversation when a sessionId is supplied.
-  const initialMessages = payload.sessionId ? await loadSessionMessages(payload.sessionId) : [];
+  const resumed = payload.sessionId
+    ? await loadSessionMessages(payload.sessionId, instruction)
+    : { messages: [], inFlight: false };
+  const initialMessages = resumed.messages;
+  let journaled = initialMessages;
 
   const runtime = new ToolAgentRuntime({
     llm,
@@ -551,6 +572,15 @@ export async function handleAgentRunJob(
     permissionGate,
     workingDir,
     ...(initialMessages.length ? { initialMessages } : {}),
+    ...(resumed.inFlight ? { resumeTurn: true } : {}),
+    ...(payload.sessionId
+      ? {
+          onJournal: async (messages: RuntimeMessage[]) => {
+            journaled = messages;
+            await saveSession(payload.sessionId!, payload, { status: "running", messages });
+          },
+        }
+      : {}),
     ...(compaction ? { compaction } : {}),
     ...(payload.sessionId
       ? { sessionId: payload.sessionId }
@@ -612,7 +642,7 @@ export async function handleAgentRunJob(
     if (payload.sessionId) {
       await saveSession(payload.sessionId, payload, {
         status: "error",
-        messages: initialMessages,
+        messages: journaled,
         error: e instanceof Error ? e.message : String(e),
       });
     }
