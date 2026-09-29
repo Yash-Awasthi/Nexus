@@ -25,6 +25,7 @@ import {
   type CompressFilter,
   type StructuredFormat,
 } from "@nexus/llm-compress";
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
 import { HookDispatcher, type AgentHooks, type HookDecision } from "./hooks.js";
 
@@ -462,7 +463,7 @@ export class AgentStepExecutor {
     let fullContent = "";
 
     const toolResultContext = input.toolResults?.length
-      ? `\n\nPrevious tool results:\n${JSON.stringify(input.toolResults, null, 2)}`
+      ? `\n\nPrevious tool results. ${UNTRUSTED_NOTE}\n${screenUntrusted(JSON.stringify(input.toolResults, null, 2)).text}`
       : "";
 
     const userPrompt = input.instruction + toolResultContext;
@@ -1197,7 +1198,7 @@ export class ToolAgentRuntime {
           result,
         })) as HookDecision | undefined;
 
-        let content = stringifyToolOutput(result, this.structuredEncoding);
+        let content = screenUntrusted(stringifyToolOutput(result, this.structuredEncoding)).text;
         if (post?.suppressOutput) {
           content = "[output suppressed by hook]";
         } else if (post?.feedback !== undefined) {

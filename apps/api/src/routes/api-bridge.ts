@@ -59,6 +59,7 @@ import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@ne
 import type { RetrievalSource, ScoredChunk, SourceRetrieverFn } from "@nexus/retrieval";
 import { pinnedFetch } from "@nexus/runtime";
 import { searchBrave, searchExa, searchSearxNG, searchSerper } from "@nexus/search-orchestrator";
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 import { StealthBrowser, PatchrightDriver, isPatchrightAvailable } from "@nexus/stealth-browser";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -99,9 +100,9 @@ import { sha256hex } from "../lib/crypto-utils.js";
 import { searchDuckDuckGo } from "../lib/duckduckgo.js";
 import { guardExec } from "../lib/exec-guard.js";
 import { getKG } from "../lib/knowledge-graph-store.js";
-import { getMemoryStore } from "../lib/memory-store.js";
 import { cachedDriver } from "../lib/llm-cache-driver.js";
 import { FailoverDriver, getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
+import { getMemoryStore } from "../lib/memory-store.js";
 import { heuristicScores, openaiScores } from "../lib/moderation-score.js";
 import { resolveOAuthDriver } from "../lib/oauth-drivers.js";
 import { pendingCount } from "../lib/org-approvals.js";
@@ -4336,14 +4337,17 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         } else if (type === "kb") {
           const hits = await searchKb(getMemory(), userId, message, value, 5);
           if (hits.length) {
-            const excerpts = hits.map((h) => `[${h.docName}]\n${h.text}`).join("\n\n");
-            parts.push(`### Knowledge base excerpts\n${excerpts}`);
+            const excerpts = hits
+              .map((h) => `[${h.docName}]\n${screenUntrusted(h.text).text}`)
+              .join("\n\n");
+            parts.push(`### Knowledge base excerpts. ${UNTRUSTED_NOTE}\n${excerpts}`);
           }
         } else if (type === "web") {
           if (unsafeUrlReason(value)) continue;
           const page = await getScraper().scrape(value, { timeout: 15_000 });
           if (isScraped(page)) {
-            parts.push(`### Web page: ${value}\n${page.text.slice(0, 8_000)}`);
+            const text = screenUntrusted(page.text.slice(0, 8_000)).text;
+            parts.push(`### Web page: ${value}. ${UNTRUSTED_NOTE}\n${text}`);
           }
         }
       } catch {

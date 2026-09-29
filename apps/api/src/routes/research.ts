@@ -23,6 +23,7 @@
 
 import type { LlmRole } from "@nexus/llm-drivers";
 import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus/researcher";
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 import type { FastifyInstance } from "fastify";
 
 import { createNotification } from "../lib/notifications-store.js";
@@ -321,7 +322,7 @@ export function registerResearchRoutes(app: FastifyInstance, deps: ResearchBridg
         }
         const context = results
           .slice(0, 5)
-          .map((r) => `Source: ${r.url}\n${r.snippet}`)
+          .map((r) => `Source: ${r.url}\n${screenUntrusted(r.snippet).text}`)
           .join("\n\n");
         // Bounded — a hung provider used to leave the job `running` forever.
         const res = await withTimeout(
@@ -330,8 +331,7 @@ export function registerResearchRoutes(app: FastifyInstance, deps: ResearchBridg
             messages: [
               {
                 role: "system" as LlmRole,
-                content:
-                  "You are a research assistant. Synthesise the provided search results into a clear, factual summary.",
+                content: `You are a research assistant. Synthesise the provided search results into a clear, factual summary. ${UNTRUSTED_NOTE}`,
               },
               {
                 role: "user" as LlmRole,
