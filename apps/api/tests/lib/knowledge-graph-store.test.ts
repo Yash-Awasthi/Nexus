@@ -63,6 +63,25 @@ describe("nlpClientFromDriver", () => {
     });
   });
 
+  it("rejects an answer that is empty or cut off at the token limit", async () => {
+    const answer = (content: string, finishReason: LlmResponse["finishReason"]): LlmDriver => ({
+      ...stubDriver([]),
+      complete: async () => ({
+        id: "s",
+        content,
+        model: "stub-model",
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        finishReason,
+        durationMs: 0,
+      }),
+    });
+    const ask = (d: LlmDriver) => nlpClientFromDriver(d)([{ role: "user", content: "x" }]);
+
+    await expect(ask(answer("  ", "stop"))).rejects.toThrow(/empty answer/);
+    await expect(ask(answer('[{"text": "Al', "length"))).rejects.toThrow(/cut off/);
+    await expect(ask(answer("[]", "stop"))).resolves.toMatchObject({ content: "[]" });
+  });
+
   it("drives a real ingest: entities and relationships land in the graph", async () => {
     const driver = stubDriver([ENTITIES, RELATIONSHIPS]);
     const llm = nlpClientFromDriver(driver);

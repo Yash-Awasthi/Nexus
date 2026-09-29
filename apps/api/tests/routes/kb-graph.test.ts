@@ -4,10 +4,12 @@ import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+let failing = false;
 const extractor = {
   provider: "scripted",
   model: "scripted",
   complete: async (opts: LlmRequestOptions) => {
+    if (failing) throw new Error("rate limited");
     const system = String(opts.messages[0]?.content ?? "");
     const content = system.includes("relationship extraction")
       ? JSON.stringify([
@@ -113,6 +115,23 @@ describe("POST /api/kb/:id/graph", () => {
       entities: 1,
       relationships: 0,
     });
+  });
+
+  it("ends as an error, not an empty graph, when the model never answers", async () => {
+    // Different text from the other cases, whose answers the model cache would replay.
+    const id = await makeKb("silent", { "team.txt": "Grace joined Initech last spring." });
+    failing = true;
+    try {
+      expect(await build(id)).toMatchObject({
+        state: "error",
+        entities: 0,
+        failed: 1,
+        error: expect.stringMatching(/rate limited/),
+      });
+    } finally {
+      failing = false;
+    }
+    expect(await build(id)).toMatchObject({ state: "done", entities: 3, failed: 0 });
   });
 
   it("refuses an unknown entity type, an empty knowledge base and an unknown id", async () => {

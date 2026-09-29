@@ -861,7 +861,7 @@ export async function extractEntities(
       { role: "system", content: ENTITY_SYSTEM_PROMPT },
       { role: "user", content: text },
     ],
-    { temperature: 0.0, maxTokens: 512 },
+    { temperature: 0.0, maxTokens: 1024 },
   );
 
   const raw = parseJsonArray<{ text: unknown; type: unknown; confidence: unknown }>(
@@ -919,7 +919,7 @@ export async function extractRelationships(
       { role: "system", content: RELATIONSHIP_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
     ],
-    { temperature: 0.0, maxTokens: 512 },
+    { temperature: 0.0, maxTokens: 1024 },
   );
 
   const raw = parseJsonArray<{

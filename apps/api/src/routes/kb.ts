@@ -94,7 +94,7 @@ function formatSize(bytes: number): string {
 
 /** Bridge-owned helpers handed in at registration (no circular import). */
 interface KbRoutesDeps {
-  getKG: () => KnowledgeGraph;
+  getKG: (strict?: boolean) => KnowledgeGraph;
   getMemory: () => MemoryManager;
   /** Fetches through the SSRF guard. */
   getScraper: () => AdaptiveScraper;
@@ -406,7 +406,7 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
     };
     graphJobs.set(kb.id, job);
     const userId = request.nexusUserId;
-    extractGraphFromChunks(deps.getKG(), chunks, {
+    extractGraphFromChunks(deps.getKG(true), chunks, {
       source: kb.id,
       concurrency: 4,
       validator: types?.length ? strictTypeValidator(types as EntityType[]) : undefined,
@@ -416,11 +416,13 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
     })
       .then((result) => {
         Object.assign(job, {
-          state: "done",
+          state: result.chunksErrored === chunks.length ? "error" : "done",
           entities: result.totalNodesAdded + result.totalNodesMerged,
           relationships: result.totalEdgesAdded + result.totalEdgesMerged,
           failed: result.chunksErrored,
         });
+        // Every chunk failing means the model never answered: say why instead of an empty graph.
+        if (job.state === "error") job.error = result.perChunk.find((c) => c.error)?.error;
       })
       .catch((err: unknown) => {
         job.state = "error";
@@ -435,7 +437,9 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
               : `Graph build failed for ${kb.name}`,
           message:
             job.state === "done"
-              ? `${job.entities} entities and ${job.relationships} relationships.`
+              ? `${job.entities} entities and ${job.relationships} relationships${
+                  job.failed ? `; ${job.failed} of ${job.chunksTotal} chunks could not be read` : ""
+                }.`
               : job.error,
           link: "/knowledge-graph",
         });
