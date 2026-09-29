@@ -9,11 +9,8 @@
  *  • Language routing: JavaScript, TypeScript (tsx), Python, Bash
  *  • Injectable runner for full unit-test coverage without spawning real processes
  *
- * Production hardening roadmap (not yet implemented):
- *  • Replace child_process with gVisor/Firecracker container
- *  • Network namespace isolation (no outbound calls)
- *  • cgroups memory limit enforcement
- *  • seccomp syscall filter
+ * createDockerRunner adds container isolation (no network, memory/PID caps, seccomp,
+ * read-only rootfs) and gVisor when SANDBOX_RUNTIME=runsc.
  *
  * Task type: "sandbox.execute"
  */
