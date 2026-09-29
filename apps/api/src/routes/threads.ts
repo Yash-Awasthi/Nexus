@@ -4,7 +4,8 @@
  * (lib/threads-store.ts). Backs the dashboard "Recent Deliberations" card, the
  * chat sidebar, and message history.
  *
- *   GET    /api/threads?limit=N    → { threads } (newest-updated first)
+ *   GET    /api/threads?limit=N&q= → { threads } (newest-updated first; q keeps the ones whose
+ *                                    title or messages contain it, with a snippet)
  *   POST   /api/threads            → { id?, title?, mode? } → 201 thread
  *   PATCH  /api/threads/:id        → { title?, mode? } → thread | 404
  *   DELETE /api/threads/:id        → 204 | 404
@@ -27,6 +28,7 @@ import {
   getThread,
   listMessages,
   listThreads,
+  searchThreads,
   updateThread,
   type ThreadMessage,
 } from "../lib/threads-store.js";
@@ -39,10 +41,19 @@ const msgRole = (r: string): ThreadMessage["role"] =>
 
 export async function threadsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /threads?limit=N — recent deliberations, newest-updated first. */
-  app.get<{ Querystring: { limit?: string } }>("/threads", AUTH, async (request, reply) => {
-    const limit = Math.min(Math.max(parseInt(request.query.limit ?? "50", 10) || 50, 1), 1000);
-    return reply.send({ threads: await listThreads(request.nexusUserId, limit) });
-  });
+  app.get<{ Querystring: { limit?: string; q?: string } }>(
+    "/threads",
+    AUTH,
+    async (request, reply) => {
+      const limit = Math.min(Math.max(parseInt(request.query.limit ?? "50", 10) || 50, 1), 1000);
+      const q = request.query.q?.trim().slice(0, 200);
+      return reply.send({
+        threads: q
+          ? await searchThreads(request.nexusUserId, q, limit)
+          : await listThreads(request.nexusUserId, limit),
+      });
+    },
+  );
 
   /** POST /threads — create (client id accepted so UI UUIDs survive). */
   app.post<{ Body: { id?: string; title?: string; mode?: string } }>(

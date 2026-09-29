@@ -68,6 +68,36 @@ export async function listThreads(userId: string | undefined, limit = 50): Promi
   }
 }
 
+/**
+ * Threads whose title or messages contain `query` (case-insensitive), in list order. A match in a
+ * message carries a snippet around it; a title-only match has none.
+ */
+export async function searchThreads(
+  userId: string | undefined,
+  query: string,
+  limit = 50,
+): Promise<(Thread & { snippet?: string })[]> {
+  const needle = query.trim().toLowerCase();
+  const hits: (Thread & { snippet?: string })[] = [];
+  for (const thread of await listThreads(userId, MAX_THREADS)) {
+    if (hits.length >= limit) break;
+    let snippet: string | undefined;
+    for (const m of await listMessages(userId, thread.id)) {
+      const at = m.content.toLowerCase().indexOf(needle);
+      if (at < 0) continue;
+      snippet = m.content
+        .slice(Math.max(0, at - 50), at + needle.length + 90)
+        .replace(/\s+/g, " ")
+        .trim();
+      break;
+    }
+    if (snippet || thread.title.toLowerCase().includes(needle)) {
+      hits.push(snippet ? { ...thread, snippet } : thread);
+    }
+  }
+  return hits;
+}
+
 /** Fetch a single thread (metadata only — use listMessages for content). */
 export async function getThread(
   userId: string | undefined,

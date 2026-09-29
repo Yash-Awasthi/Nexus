@@ -315,6 +315,26 @@ interface ThreadMessage {
   round: number;
 }
 
+/** Threads whose title or messages contain `q`; a message match carries a snippet. */
+export async function searchThreads(q: string): Promise<(StoredThread & { snippet?: string })[]> {
+  if (hostCan("threads")) {
+    const needle = q.toLowerCase();
+    return (await listThreads()).filter((t) => t.title.toLowerCase().includes(needle));
+  }
+  const res = await fetch(`/api/threads?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    threads?: { id: string; title: string; mode?: string; updatedAt?: string; snippet?: string }[];
+  };
+  return (data.threads ?? []).map((t) => ({
+    id: t.id,
+    title: t.title,
+    updated_at: new Date(t.updatedAt ?? Date.now()).getTime(),
+    mode: t.mode,
+    snippet: t.snippet,
+  }));
+}
+
 export async function listThreads(): Promise<StoredThread[]> {
   if (hostCan("threads")) return hostInvoke<StoredThread[]>("threads", "listThreads");
   const local = _loadThreads();
