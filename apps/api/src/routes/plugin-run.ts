@@ -99,12 +99,10 @@ export async function pluginRunRoutes(
 
       const entry = await entryPath(plugin);
       if (!entry)
-        return reply
-          .code(400)
-          .send({
-            error: "bad_entry",
-            message: "The plugin's entry is missing or outside its directory.",
-          });
+        return reply.code(400).send({
+          error: "bad_entry",
+          message: "The plugin's entry is missing or outside its directory.",
+        });
 
       const input = request.body?.input ?? null;
       if (Buffer.byteLength(JSON.stringify(input)) > MAX_INPUT_BYTES)
@@ -117,13 +115,11 @@ export async function pluginRunRoutes(
       if (res.error) throw res.error;
       const r = res.result!;
       if (!r.ok)
-        return reply
-          .code(422)
-          .send({
-            error: "plugin_failed",
-            exitCode: r.exitCode,
-            stderr: r.stderr.slice(-MAX_STDERR),
-          });
+        return reply.code(422).send({
+          error: "plugin_failed",
+          exitCode: r.exitCode,
+          stderr: r.stderr.slice(-MAX_STDERR),
+        });
       return { output: r.parsed ?? r.stdout };
     },
   );
