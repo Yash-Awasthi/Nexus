@@ -914,12 +914,12 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         message = redactPii(message);
         sseWrite(raw, {
           type: "notice",
-          message: `Removed personal details (${kinds}) before sending.`,
+          message: `Removed personal details or secrets (${kinds}) before sending.`,
         });
       } else {
         sseWrite(raw, {
           type: "notice",
-          message: `This message contains personal details (${kinds}). Turn on auto-anonymize in Settings to remove them before sending.`,
+          message: `This message contains personal details or secrets (${kinds}). Turn on auto-anonymize in Settings to remove them before sending.`,
         });
       }
     }

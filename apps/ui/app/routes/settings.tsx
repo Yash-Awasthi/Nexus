@@ -183,7 +183,7 @@ export default function SettingsPage() {
       >
         <SettingRow
           label="Warn about personal details"
-          description="Flags emails, phone numbers and similar in what you send."
+          description="Flags emails, phone numbers, card numbers and API keys in what you send."
           htmlFor="piiDetection"
         >
           {toggle("piiDetection")}
