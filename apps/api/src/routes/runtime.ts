@@ -198,15 +198,20 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
         ));
       await scaffoldApp(dir, name, design);
     }
-    return launchAgent(request, reply, {
-      instruction: codegenInstruction(prompt, design),
-      workspaceDir: dir,
-      maxSteps: 60,
-      ...(provider ? { provider } : {}),
-      ...(model ? { model } : {}),
-      ...(sessionId ? { sessionId } : {}),
-      ...(approvalId ? { approvalId } : {}),
-    });
+    return launchAgent(
+      request,
+      reply,
+      {
+        instruction: codegenInstruction(prompt, design),
+        workspaceDir: dir,
+        maxSteps: 60,
+        ...(provider ? { provider } : {}),
+        ...(model ? { model } : {}),
+        ...(sessionId ? { sessionId } : {}),
+        ...(approvalId ? { approvalId } : {}),
+      },
+      { app: `apps/${name}`, design },
+    );
   });
 
   // GET /runtime/tasks/:taskId
@@ -271,6 +276,7 @@ async function launchAgent(
   request: FastifyRequest,
   reply: FastifyReply,
   body: (LaunchAgentInput & { approvalId?: string; disableGovernance?: unknown }) | undefined,
+  extra: Record<string, unknown> = {},
 ): Promise<FastifyReply | undefined> {
   const instruction = (body?.instruction ?? "").trim();
   if (!instruction) return reply.code(400).send({ error: "instruction is required" });
@@ -332,6 +338,7 @@ async function launchAgent(
   }
   return reply.code(202).send({
     ...launched,
+    ...extra,
     stream: `/api/v1/sse/agent/${launched.sessionId}`,
   });
 }

@@ -137,6 +137,7 @@ describe("POST /apps/generate", () => {
     expect(r.statusCode, r.body).toBe(202);
 
     const name = appFolderName(USER, prompt);
+    expect(r.json()).toMatchObject({ app: `apps/${name}`, design: { color: "teal" } });
     const dir = join(userDrivePath(USER), "apps", name);
     expect(readFileSync(join(dir, "src/index.css"), "utf8")).toContain("#0d9488");
     expect(readFileSync(join(dir, "index.html"), "utf8")).toContain("family=Lora");
