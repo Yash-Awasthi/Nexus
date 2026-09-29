@@ -35,6 +35,7 @@ import type { FastifyInstance } from "fastify";
 
 import { issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.js";
 
 // 30 SAML initiations per 15 min per IP — prevents SSO redirect spam
@@ -433,16 +434,18 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: { SAMLResponse?: string; RelayState?: string };
   }>("/auth/saml/callback", { preHandler: samlCallbackRateLimit }, async (request, reply) => {
+    const frontendUrl = process.env.NEXUS_FRONTEND_URL ?? "http://localhost:5173";
+    const fail = (status: number, body: { error: string } & Record<string, unknown>) =>
+      failSignIn(request, reply, status, body, frontendUrl);
     try {
       const idpEntityId = env("NEXUS_SAML_IDP_ENTITY_ID");
       const idpCert = env("NEXUS_SAML_IDP_CERT");
       const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-      const frontendUrl = process.env.NEXUS_FRONTEND_URL ?? "http://localhost:5173";
 
       const { SAMLResponse, RelayState } = request.body;
 
       if (!SAMLResponse) {
-        return reply.code(400).send({ error: "missing_saml_response" });
+        return fail(400, { error: "missing_saml_response" });
       }
 
       // Decode SAML response
@@ -451,13 +454,13 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
       // 1 — Verify signature
       if (!verifySamlSignature(responseXml, idpCert)) {
         request.log.warn("SAML signature verification failed");
-        return reply.code(401).send({ error: "invalid_signature" });
+        return fail(401, { error: "invalid_signature" });
       }
 
       // 2 — Parse assertion
       const assertion = parseAssertion(responseXml);
       if (!assertion || !assertion.email) {
-        return reply.code(400).send({ error: "assertion_parse_failed" });
+        return fail(400, { error: "assertion_parse_failed" });
       }
 
       // 3 — Validate InResponseTo (CSRF protection)
@@ -472,7 +475,7 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
           .update(storedId ?? "")
           .digest("hex");
         if (storedSig !== expectedSig || storedId !== assertion.inResponseTo) {
-          return reply.code(401).send({ error: "inresponseto_mismatch" });
+          return fail(401, { error: "inresponseto_mismatch" });
         }
       }
       // Clear cookie
@@ -483,18 +486,18 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
       // 4 — Validate time conditions
       const now = new Date();
       if (assertion.notBefore && new Date(assertion.notBefore) > new Date(now.getTime() + 60_000)) {
-        return reply.code(401).send({ error: "assertion_not_yet_valid" });
+        return fail(401, { error: "assertion_not_yet_valid" });
       }
       if (
         assertion.notOnOrAfter &&
         new Date(assertion.notOnOrAfter) < new Date(now.getTime() - 60_000)
       ) {
-        return reply.code(401).send({ error: "assertion_expired" });
+        return fail(401, { error: "assertion_expired" });
       }
 
       // 5 — Validate Audience
       if (assertion.audience && assertion.audience !== spEntityId) {
-        return reply.code(401).send({
+        return fail(401, {
           error: "audience_mismatch",
           expected: spEntityId,
           got: assertion.audience,
@@ -505,20 +508,22 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
       const userAgent = request.headers["user-agent"] ?? "";
       const { accessToken, refreshToken } = await upsertSamlUser(assertion, idpEntityId, userAgent);
 
-      // 7 — Redirect to frontend with tokens
+      // 7 — Hand the session to the browser and go where the sign-in started
       const stateResult = RelayState ? verifyState(RelayState) : null;
-      const destination = stateResult?.relayState ?? "/";
-
-      return reply.redirect(
-        `${frontendUrl}${destination}?access_token=${accessToken}&refresh_token=${refreshToken}`,
+      return finishSignIn(
+        request,
+        reply,
+        refreshToken,
+        { accessToken, refreshToken, provider: "saml" },
+        { appBase: frontendUrl, next: stateResult?.relayState },
       );
     } catch (err) {
       // A refused identity is an answer, not a server fault.
       if (err instanceof SsoPolicyError) {
-        return reply.code(err.statusCode).send({ error: err.code, message: err.message });
+        return fail(err.statusCode, { error: err.code, message: err.message });
       }
       request.log.error({ err }, "SAML callback error");
-      return reply.code(500).send({ error: "saml_callback_error" });
+      return fail(500, { error: "saml_callback_error" });
     }
   });
 }

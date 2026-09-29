@@ -42,6 +42,7 @@ import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
 import { issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
 
 // IP-keyed limiter for unauthenticated OAuth callback routes (no user yet).
 const oauthRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "oauth" });
@@ -189,16 +190,16 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
-      if (error) return reply.code(400).send({ error });
-      if (!code) return reply.code(400).send({ error: "missing_code" });
+      if (error) return failSignIn(request, reply, 400, { error });
+      if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
       if (!state || !(await _consumeState(state))) {
-        return reply.code(400).send({ error: "invalid_state" });
+        return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
 
       const clientId = process.env.GOOGLE_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
       if (!clientId || !clientSecret) {
-        return reply.code(501).send({ error: "Google OAuth not configured" });
+        return failSignIn(request, reply, 501, { error: "google_not_configured" });
       }
 
       try {
@@ -215,7 +216,9 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         });
         const tokens = (await tokenRes.json()) as { access_token?: string; error?: string };
         if (!tokens.access_token) {
-          return reply.code(401).send({ error: tokens.error ?? "token_exchange_failed" });
+          return failSignIn(request, reply, 401, {
+            error: tokens.error ?? "token_exchange_failed",
+          });
         }
 
         const userRes = await fetch(GOOGLE_USERINFO, {
@@ -229,10 +232,16 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           "google",
           request.headers["user-agent"],
         );
-        return reply.send({ accessToken, refreshToken, userId, email, provider: "google" });
+        return finishSignIn(request, reply, refreshToken, {
+          accessToken,
+          refreshToken,
+          userId,
+          email,
+          provider: "google",
+        });
       } catch (err) {
         app.log.error(err, "Google OAuth callback error");
-        return reply.code(500).send({ error: "oauth_failed" });
+        return failSignIn(request, reply, 500, { error: "oauth_failed" });
       }
     },
   );
@@ -270,16 +279,16 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
-      if (error) return reply.code(400).send({ error });
-      if (!code) return reply.code(400).send({ error: "missing_code" });
+      if (error) return failSignIn(request, reply, 400, { error });
+      if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
       if (!state || !(await _consumeState(state))) {
-        return reply.code(400).send({ error: "invalid_state" });
+        return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
 
       const clientId = process.env.GITHUB_CLIENT_ID;
       const clientSecret = process.env.GITHUB_CLIENT_SECRET;
       if (!clientId || !clientSecret) {
-        return reply.code(501).send({ error: "GitHub OAuth not configured" });
+        return failSignIn(request, reply, 501, { error: "github_not_configured" });
       }
 
       try {
@@ -298,7 +307,9 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         });
         const tokens = (await tokenRes.json()) as { access_token?: string; error?: string };
         if (!tokens.access_token) {
-          return reply.code(401).send({ error: tokens.error ?? "token_exchange_failed" });
+          return failSignIn(request, reply, 401, {
+            error: tokens.error ?? "token_exchange_failed",
+          });
         }
 
         const userRes = await fetch(GITHUB_USERINFO, {
@@ -320,10 +331,16 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           "github",
           request.headers["user-agent"],
         );
-        return reply.send({ accessToken, refreshToken, userId, email, provider: "github" });
+        return finishSignIn(request, reply, refreshToken, {
+          accessToken,
+          refreshToken,
+          userId,
+          email,
+          provider: "github",
+        });
       } catch (err) {
         app.log.error(err, "GitHub OAuth callback error");
-        return reply.code(500).send({ error: "oauth_failed" });
+        return failSignIn(request, reply, 500, { error: "oauth_failed" });
       }
     },
   );
@@ -358,15 +375,15 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
-      if (error) return reply.code(400).send({ error });
-      if (!code) return reply.code(400).send({ error: "missing_code" });
+      if (error) return failSignIn(request, reply, 400, { error });
+      if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
       if (!state || !(await _consumeState(state))) {
-        return reply.code(400).send({ error: "invalid_state" });
+        return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
       const clientId = process.env.SLACK_CLIENT_ID;
       const clientSecret = process.env.SLACK_CLIENT_SECRET;
       if (!clientId || !clientSecret) {
-        return reply.code(501).send({ error: "Slack OAuth not configured" });
+        return failSignIn(request, reply, 501, { error: "slack_not_configured" });
       }
       try {
         const tokenRes = await fetch("https://slack.com/api/oauth.v2.access", {
@@ -387,7 +404,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           error?: string;
         };
         if (!data.ok || !data.access_token) {
-          return reply.code(401).send({ error: data.error ?? "token_exchange_failed" });
+          return failSignIn(request, reply, 401, { error: data.error ?? "token_exchange_failed" });
         }
         const email = `${data.authed_user?.id ?? "slack_user"}@slack.workspace`;
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
@@ -396,10 +413,15 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           "slack",
           request.headers["user-agent"],
         );
-        return reply.send({ accessToken, refreshToken, userId, provider: "slack" });
+        return finishSignIn(request, reply, refreshToken, {
+          accessToken,
+          refreshToken,
+          userId,
+          provider: "slack",
+        });
       } catch (err) {
         app.log.error(err, "Slack OAuth callback error");
-        return reply.code(500).send({ error: "oauth_failed" });
+        return failSignIn(request, reply, 500, { error: "oauth_failed" });
       }
     },
   );
