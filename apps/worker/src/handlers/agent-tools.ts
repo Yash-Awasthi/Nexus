@@ -103,7 +103,8 @@ function runCommand(
     cwd,
     sandbox: dockerConfig ? "docker" : "subprocess",
   });
-  const safeEnv = buildSafeEnv(env);
+  // Tools that would stop to ask a question answer it or fail instead of waiting out the timeout.
+  const safeEnv = buildSafeEnv({ CI: "1", npm_config_yes: "true", ...env });
 
   // ── Docker path ──────────────────────────────────────────────────
   if (dockerConfig) {
@@ -134,7 +135,13 @@ function runCommand(
   // ── Direct subprocess path (scrubbed env) ────────────────────────
   return new Promise((resolve) => {
     const si = shellInvocation(command);
-    const child = spawn(si.file, si.args, { cwd, env: safeEnv });
+    const child = spawn(si.file, si.args, {
+      cwd,
+      env: safeEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      // Its own process group on POSIX, so a timeout can kill everything the shell started.
+      detached: process.platform !== "win32",
+    });
     let out = "";
     let killed = false;
     const append = (d: Buffer): void => {
@@ -142,7 +149,7 @@ function runCommand(
     };
     const timer = setTimeout(() => {
       killed = true;
-      child.kill("SIGKILL");
+      killTree(child);
     }, timeoutMs);
     timer.unref();
     child.stdout.on("data", append);
@@ -160,6 +167,23 @@ function runCommand(
       resolve(`error: ${err.message}`);
     });
   });
+}
+
+/** Kill a shell and every process it started; killing only the shell leaves them running. */
+function killTree(child: ReturnType<typeof spawn>): void {
+  if (child.pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" }).on(
+      "error",
+      () => child.kill("SIGKILL"),
+    );
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
 }
 
 /** Build the coding tool set (read/write/edit/list[/run]) for a workspace. */
