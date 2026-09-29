@@ -51,9 +51,6 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 - **Plugin execution** — `DenoPluginRunner` runs a plugin under `deno` with read access to its
   own directory only. No route runs plugin code yet, and a plugin granted network access would
   need a localhost proxy, since `--allow-net` is never passed.
-- **Knowledge-graph node and edge tombstones** — property deletes survive a sync; a deleted node
-  or edge comes back from a peer that still holds it. Same mechanism as property clocks, one
-  level up. No route deletes a node or edge today, so nothing asks for it yet.
 - **SSO live round trip** _(Gate)_ — needs the operator's registered IdP.
 
 ## Desktop and mobile
@@ -69,16 +66,24 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 
 - **Cheap extraction model** — deterministic distillation works today; a small model would
   improve recall.
+- **Company config history** — an agent's role, instructions and budget are overwritten on edit;
+  Paperclip keeps each revision and can roll a bad change back.
+- **Prompt-injection guard** — text from the web, knowledge bases and connectors goes into prompts
+  as it is; OmniRoute screens it for instructions aimed at the model.
+- **Browser extension and embeddable widget** — Onyx asks its knowledge from any tab and from a
+  script tag on another site; Nexus is reachable only through its own app, API and bots.
+- **Batch and Files APIs** — the OpenAI-compatible surface has chat, embeddings and models but no
+  `/v1/batches` or `/v1/files`.
 
 ## Blocked on external infra
 
-| Task                     | Blocker                                   |
-| ------------------------ | ----------------------------------------- |
-| Firecracker / gVisor     | Linux host with KVM                       |
-| Redis cluster rate-limit | Upstash / managed Redis                   |
-| PgBouncer pooling        | DB admin                                  |
-| K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`)|
-| Provider OAuth app reg   | Google/GitHub dev consoles for client IDs |
+| Task                     | Blocker                                    |
+| ------------------------ | ------------------------------------------ |
+| Firecracker / gVisor     | Linux host with KVM                        |
+| Redis cluster rate-limit | Upstash / managed Redis                    |
+| PgBouncer pooling        | DB admin                                   |
+| K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`) |
+| Provider OAuth app reg   | Google/GitHub dev consoles for client IDs  |
 
 ## Reference note
 

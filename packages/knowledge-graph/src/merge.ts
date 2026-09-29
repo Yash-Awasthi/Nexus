@@ -31,11 +31,16 @@
  * rows and older peers keep working. The merge writes clocks back, so a value
  * gains its own clock the first time it is merged.
  *
+ * Nodes and edges are deleted the same way one level up: a row with
+ * `deletedAt` at or after its `updatedAt` is a tombstone. Every peer keeps the
+ * row (emptied of properties and sources) so the delete outranks a peer that
+ * still holds the fact, and a sighting after the delete brings it back.
+ *
  * Ceiling: a tie on the same clock is still settled by comparing serialised
  * values — stable and identical on every peer, but arbitrary. A delete wins
  * that tie, on the grounds that a removal the user asked for should not be
- * undone by a concurrent write. Node and edge deletion has no tombstone
- * either; `deleteNode` still resurrects from a peer that has the node.
+ * undone by a concurrent write. A tombstone is never collected, so the graph
+ * keeps one small row per deleted fact.
  */
 
 import type { KGEdge, KGNode } from "./index.js";
@@ -99,6 +104,34 @@ function mergeProperties(a: KGNode, b: KGNode): MergedProperties {
   return Object.keys(propertyClocks).length > 0 ? { properties, propertyClocks } : { properties };
 }
 
+/** True for a row deleted at or after its last sighting; a later sighting revives it. */
+export function isDeleted(row: { updatedAt: number; deletedAt?: number }): boolean {
+  return row.deletedAt !== undefined && row.deletedAt >= row.updatedAt;
+}
+
+/** The later of two optional delete times, as a spreadable field. */
+function latestDelete(a?: number, b?: number): { deletedAt?: number } {
+  const at = a === undefined || b === undefined ? (a ?? b) : Math.max(a, b);
+  return at === undefined ? {} : { deletedAt: at };
+}
+
+/** Delete a node so the deletion survives a sync. Never dated before the node's last sighting. */
+export function tombstoneNode(node: KGNode, at: number): KGNode {
+  const dead: KGNode = {
+    ...node,
+    properties: {},
+    sources: [],
+    deletedAt: Math.max(at, node.updatedAt),
+  };
+  delete dead.propertyClocks;
+  return dead;
+}
+
+/** Delete an edge so the deletion survives a sync. Never dated before the edge's last sighting. */
+export function tombstoneEdge(edge: KGEdge, at: number): KGEdge {
+  return { ...edge, sources: [], deletedAt: Math.max(at, edge.updatedAt) };
+}
+
 /**
  * Delete a property so the deletion survives a sync: the key leaves
  * `properties` but keeps a clock, which is what outranks a peer still holding
@@ -127,6 +160,7 @@ export function mergeNode(a: KGNode, b: KGNode): KGNode {
     sources: unionSorted(a.sources, b.sources),
     createdAt: Math.min(a.createdAt, b.createdAt),
     updatedAt: Math.max(a.updatedAt, b.updatedAt),
+    ...latestDelete(a.deletedAt, b.deletedAt),
   };
 }
 
@@ -142,6 +176,7 @@ export function mergeEdge(a: KGEdge, b: KGEdge): KGEdge {
     sources: unionSorted(a.sources, b.sources),
     createdAt: Math.min(a.createdAt, b.createdAt),
     updatedAt: Math.max(a.updatedAt, b.updatedAt),
+    ...latestDelete(a.deletedAt, b.deletedAt),
   };
 }
 
