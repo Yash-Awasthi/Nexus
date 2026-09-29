@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 
+import { runDueWorkflows } from "../../src/routes/workflows.js";
 import { buildServer } from "../../src/server.js";
 
 let app: FastifyInstance;
@@ -203,5 +204,48 @@ describe("workflow canvas", () => {
     >();
     const rows = Array.isArray(found) ? found : found.workflows;
     expect(rows.find((w) => w.id === id)?.graph).toEqual(graph);
+  });
+});
+
+describe("scheduled workflows", () => {
+  it("runs a workflow on its cron once per minute and refuses a bad schedule", async () => {
+    const id = await createWorkflow(freshName());
+    const bad = await app.inject({
+      method: "PATCH",
+      url: `/api/workflows/${id}`,
+      payload: { schedule: "every monday" },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    const saved = await app.inject({
+      method: "PATCH",
+      url: `/api/workflows/${id}`,
+      payload: { steps: [{ id: "s1", kind: "fn" }], schedule: "30 9 * * 1" },
+    });
+    expect(saved.json<{ schedule: string; nextRunAt: string }>()).toMatchObject({
+      schedule: "30 9 * * 1",
+      nextRunAt: expect.any(String),
+    });
+
+    const monday = new Date(2026, 8, 28, 9, 30, 5);
+    expect(await runDueWorkflows(new Date(2026, 8, 28, 9, 31))).not.toContain(id);
+    expect(await runDueWorkflows(monday)).toContain(id);
+    expect(await runDueWorkflows(new Date(2026, 8, 28, 9, 30, 40))).not.toContain(id);
+
+    const list = await app.inject({ method: "GET", url: "/api/workflows" });
+    const row = list
+      .json<{ id: string; status: string; lastResult?: { result?: unknown } }[]>()
+      .find((w) => w.id === id);
+    expect(row?.status).toBe("completed");
+    expect(row?.lastResult?.result).toEqual({ scheduledAt: monday.toISOString() });
+
+    const off = await app.inject({
+      method: "PATCH",
+      url: `/api/workflows/${id}`,
+      payload: { schedule: null },
+    });
+    expect(off.json<{ schedule: unknown }>().schedule).toBeNull();
+    expect(await runDueWorkflows(new Date(2026, 9, 5, 9, 30))).not.toContain(id);
+    await app.inject({ method: "DELETE", url: `/api/workflows/${id}` });
   });
 });
