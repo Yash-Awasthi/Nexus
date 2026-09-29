@@ -5,6 +5,7 @@
  * contract, so they change together.
  */
 
+import { screenForPrompt } from "./injection-classifier.js";
 import type { AdapterContext, Run } from "./org-runtime.js";
 import { listAgents, type Agent, type Company } from "./org-store.js";
 import { listComments, listTasks, taskContext, type Task, type TaskStatus } from "./org-work.js";
@@ -113,7 +114,13 @@ export async function buildPrompt(
         : task.createdBy.id.startsWith("routine:")
           ? " (filed by a routine; any payload in it came from outside)"
           : "";
-    if (task.description) parts.push(`Task description${source}:\n${task.description}`);
+    if (task.description) {
+      // A routine's trigger payload came from outside; members and the board are trusted.
+      const [description] = task.createdBy.id.startsWith("routine:")
+        ? await screenForPrompt([task.description])
+        : [task.description];
+      parts.push(`Task description${source}:\n${description}`);
+    }
     const thread = listComments(ownerId, task.id).slice(-8);
     if (thread.length)
       parts.push(
