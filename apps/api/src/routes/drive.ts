@@ -423,19 +423,30 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
   // ── Export ──────────────────────────────────────────────────────────────────
   // The user's own keys stay out of every copy of the drive.
 
-  app.get(
+  // `dir` exports one folder, such as a generated app, without its installed packages.
+  app.get<{ Querystring: { dir?: string } }>(
     "/drive/export",
     { preHandler: [requireAuthWithTier, driveRL] },
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(401).send({ error: "auth_required" });
       const driveDir = userDrivePath(userId);
-      const st = await fs.stat(driveDir).catch(() => null);
-      if (!st?.isDirectory()) return reply.code(404).send({ error: "no_drive" });
+      const dir = request.query.dir;
+      const root = dir ? await safeResolve(driveDir, dir) : driveDir;
+      const st = await fs.stat(root).catch(() => null);
+      if (!st?.isDirectory())
+        return reply.code(404).send({ error: dir ? "not_found" : "no_drive" });
+      const file =
+        dir && root !== driveDir ? path.basename(root).replace(/[^\w.-]/g, "_") : "nexus-drive";
       return reply
         .header("Content-Type", "application/gzip")
-        .header("Content-Disposition", 'attachment; filename="nexus-drive.tar.gz"')
-        .send(tarGzDirectory(driveDir, (name) => name === ".env"));
+        .header("Content-Disposition", `attachment; filename="${file}.tar.gz"`)
+        .send(
+          tarGzDirectory(
+            root,
+            (name) => name === ".env" || (root !== driveDir && name === "node_modules"),
+          ),
+        );
     },
   );
 

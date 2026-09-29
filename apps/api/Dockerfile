@@ -59,7 +59,8 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Non-root user for security
-RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus
+RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus \
+  && mkdir -p /data/drives && chown nexus:nexus /data/drives
 
 # /deploy contains: dist/ (api compiled output) + node_modules/ (all runtime deps
 # including workspace packages with their dist/ files intact — no symlinks)

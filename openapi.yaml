@@ -449,6 +449,13 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/apps/generate:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/runtime/tasks/{taskId}:
     get:
       tags:
