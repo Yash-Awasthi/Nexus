@@ -89,6 +89,11 @@ export function nlpClientFromDriver(driver: LlmDriver, model?: string): NlpLlmCl
       temperature: opts?.temperature,
       maxTokens: opts?.maxTokens,
     });
+    // Extraction parses JSON, so a blank or truncated answer must fail loudly, not read as no entities.
+    if (res.finishReason === "length") {
+      throw new Error("The model's answer was cut off at its token limit. Try another model.");
+    }
+    if (!res.content.trim()) throw new Error("The model returned an empty answer.");
     return { content: res.content, model: res.model };
   };
 }
