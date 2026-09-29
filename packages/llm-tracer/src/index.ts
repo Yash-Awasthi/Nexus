@@ -363,10 +363,7 @@ export function recordLlmCompletion(
 }
 
 // ── OTLP/HTTP (JSON) trace export ─────────────────────────────────────────────
-export {
-  spanToOtlpSpan,
-  exportSpansOtlp,
-} from "./otlp-exporter.js";
+export { spanToOtlpSpan, exportSpansOtlp } from "./otlp-exporter.js";
 export type {
   OtlpJsonPayload,
   OtlpExportResponse,

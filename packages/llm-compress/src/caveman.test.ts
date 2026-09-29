@@ -53,7 +53,9 @@ describe("compressCaveman — filler removal", () => {
   it("restores masked spans when the savings gate lets compression through", () => {
     const filler =
       "Basically, I would really like to kindly ask you to please just check the deployment logs. ";
-    const out = compressCaveman(`${filler.repeat(4)}See https://example.com/a and \`npm run build\`.`);
+    const out = compressCaveman(
+      `${filler.repeat(4)}See https://example.com/a and \`npm run build\`.`,
+    );
     expect(out.length).toBeLessThan(filler.length * 4);
     expect(out).not.toContain("\u0000");
     expect(out).toContain("https://example.com/a");

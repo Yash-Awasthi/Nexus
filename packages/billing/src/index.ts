@@ -23,12 +23,7 @@
  * usage of the user's own BYOK keys; they never charge anyone to use Nexus.
  */
 
-export {
-  createApiKey,
-  lookupApiKey,
-  revokeApiKey,
-  listApiKeys,
-} from "./api-keys.js";
+export { createApiKey, lookupApiKey, revokeApiKey, listApiKeys } from "./api-keys.js";
 export type { CreateApiKeyInput, CreateApiKeyResult } from "./api-keys.js";
 
 export { QuotaChecker } from "./quota.js";
