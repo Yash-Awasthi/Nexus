@@ -35,6 +35,8 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await app.close();
+  // The quota test leaves a file the size of a drive behind.
+  fs.rmSync(process.env.NEXUS_DRIVE_ROOT!, { recursive: true, force: true });
 });
 
 it("refuses a listing outside the drive with 403", async () => {
@@ -53,14 +55,20 @@ it("answers non-text upload content with 400", async () => {
 });
 
 it("lets a full drive overwrite a file with one of the same size", async () => {
-  const first = await as("POST", "/api/v1/drive/upload", { path: "notes.txt", content: "x".repeat(1000) });
+  const first = await as("POST", "/api/v1/drive/upload", {
+    path: "notes.txt",
+    content: "x".repeat(1000),
+  });
   expect(first.statusCode, first.body).toBe(201);
   // A sparse file fills the quota to within 500 bytes without using the disk.
   const big = path.join(userDrivePath(USER), "big.bin");
   fs.writeFileSync(big, "");
   fs.truncateSync(big, DRIVE_QUOTA_BYTES - 1000 - 500);
 
-  const again = await as("POST", "/api/v1/drive/upload", { path: "notes.txt", content: "y".repeat(1000) });
+  const again = await as("POST", "/api/v1/drive/upload", {
+    path: "notes.txt",
+    content: "y".repeat(1000),
+  });
   expect(again.statusCode, again.body).toBe(201);
   expect(again.json<{ quotaRemaining: number }>().quotaRemaining).toBe(500);
 });

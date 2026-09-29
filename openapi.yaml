@@ -4927,7 +4927,7 @@ paths:
   /api/search:
     post:
       tags:
-        - bridge
+        - durable
       responses:
         "200":
           description: Default Response

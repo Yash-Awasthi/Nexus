@@ -73,7 +73,6 @@ describe("removed features", () => {
     ["GET", "/api/repos"],
     ["GET", "/api/v1/gs/jobs"],
     ["GET", "/api/session-graph"],
-    ["GET", "/api/kg/graph"],
     ["GET", "/api/v1/knowledge-graph/nodes"],
     ["GET", "/api/v1/domain-feeds/intel/status"],
     ["POST", "/api/negation/detect"],

@@ -40,7 +40,8 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
   overrun is bounded by one command's writes. A mid-write hard fail needs root (XFS project
   quota or a loopback ext4); `--storage-opt` caps a container's layer, not a bind mount.
 - **Off-machine backups** _(Gate)_ — drives back up to an S3 or R2 bucket (`DRIVE_BACKUP_S3_*`),
-  tested against a mock of the bucket API; a run against a real bucket needs the operator's credentials.
+  tested against a mock of the bucket API and run against an S3-compatible server (Scality
+  CloudServer, which checks SigV4); a run on the operator's own bucket needs their credentials.
 - **Drive table** — deliberately not built: size and last activity live on the filesystem
   (`packages/sandbox/src/drive-fs.ts`). Build it when a drive needs something the disk does not
   know, such as a per-user quota override or a reclaim auditable after the files are gone.

@@ -44,6 +44,7 @@ const DEDICATED_UNDER_API: readonly string[] = [
   "/api/pty",
   "/api/research",
   "/api/sandbox",
+  "/api/search",
   "/api/skills",
   "/api/stm",
   "/api/threads",

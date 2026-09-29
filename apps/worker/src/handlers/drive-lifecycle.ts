@@ -114,7 +114,7 @@ function dirBackupStore(backupDir: string): BackupStore {
   };
 }
 
-export interface S3BackupConfig {
+interface S3BackupConfig {
   /** e.g. https://<account>.r2.cloudflarestorage.com or https://s3.<region>.amazonaws.com */
   endpoint: string;
   bucket: string;

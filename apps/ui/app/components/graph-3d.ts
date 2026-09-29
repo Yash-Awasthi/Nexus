@@ -36,7 +36,7 @@ export interface GraphEdge {
 
 const FADED = new Color(0xb4b8c8);
 
-export const TYPE_COLORS: Record<string, number> = {
+const TYPE_COLORS: Record<string, number> = {
   PERSON: 0x7c83ff,
   ORG: 0x3fd0e0,
   LOCATION: 0x6ee7a8,
@@ -54,7 +54,7 @@ export interface GraphHandle {
   dispose(): void;
 }
 
-export interface GraphOptions {
+interface GraphOptions {
   reducedMotion: boolean;
   onSelect(id: string | null): void;
   onHover(id: string | null, x: number, y: number): void;
