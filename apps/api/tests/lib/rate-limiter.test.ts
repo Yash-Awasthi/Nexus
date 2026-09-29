@@ -6,9 +6,10 @@ import { MemoryKVStore } from "@nexus/kv";
 // We need to control which KV the rate limiter uses.
 // Patch shared-kv before importing the module under test.
 const _mockKV = new MemoryKVStore();
+const kv = { current: _mockKV };
 
 vi.mock("../../src/lib/shared-kv.js", () => ({
-  getSharedKV: () => _mockKV,
+  getSharedKV: () => kv.current,
 }));
 
 // Import AFTER mock is registered
@@ -143,20 +144,23 @@ describe("makeRateLimitPreHandler", () => {
     expect(r2._code).toBe(429);
   });
 
-  it("fails open when KV is unavailable", async () => {
-    const brokenKV = new MemoryKVStore();
-    // Override get to throw
-    brokenKV.get = async () => {
+  it("keeps limiting in this process when the shared store is down", async () => {
+    const broken = new MemoryKVStore();
+    broken.incr = async () => {
       throw new Error("KV down");
     };
-
-    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => brokenKV }));
-
-    // Even with broken KV, handler should not throw or block request
-    const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "broken" });
-    const reply = makeReply();
-    await handler(makeRequest("5.5.5.5"), reply);
-    expect(reply._code).toBe(200); // passes through
+    kv.current = broken;
+    try {
+      const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "broken" });
+      const first = makeReply();
+      await handler(makeRequest("5.5.5.5"), first);
+      expect(first._code).toBe(200);
+      const second = makeReply();
+      await handler(makeRequest("5.5.5.5"), second);
+      expect(second._code).toBe(429);
+    } finally {
+      kv.current = _mockKV;
+    }
   });
 });
 

@@ -28,7 +28,7 @@
 import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
-import { getSharedKV } from "../lib/shared-kv.js";
+import { countRequest } from "../lib/rate-limiter.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -162,16 +162,10 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
     // ── Rate limit check ─────────────────────────────────────────────────────
     const ip = getClientIp(request);
     const kvKey = `${LIBERTAS_KV_PREFIX}:${ip}`;
-    const kv = getSharedKV();
+    // Counted atomically, and locally when the shared store is down: this spends the server's key.
+    const current = await countRequest(kvKey, LIBERTAS_WINDOW_MS);
 
-    let current = 0;
-    try {
-      current = (await kv.get<number>(kvKey)) ?? 0;
-    } catch {
-      /* fail open */
-    }
-
-    if (current >= LIBERTAS_RATE_LIMIT) {
+    if (current > LIBERTAS_RATE_LIMIT) {
       const retryAfterSec = Math.ceil(LIBERTAS_WINDOW_MS / 1000);
       return reply
         .code(429)
@@ -184,9 +178,6 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
           retryAfterSec,
         });
     }
-
-    // Increment counter (fire-and-forget — don't block on KV write)
-    kv.set<number>(kvKey, current + 1, LIBERTAS_WINDOW_MS).catch(() => {});
 
     // ── Validate body ────────────────────────────────────────────────────────
     const body = request.body as { prompt?: string; max_tokens?: number };
@@ -219,7 +210,7 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
       })
       .catch(() => {});
 
-    const remaining = Math.max(0, LIBERTAS_RATE_LIMIT - current - 1);
+    const remaining = Math.max(0, LIBERTAS_RATE_LIMIT - current);
 
     reply.header("X-RateLimit-Limit", String(LIBERTAS_RATE_LIMIT));
     reply.header("X-RateLimit-Remaining", String(remaining));

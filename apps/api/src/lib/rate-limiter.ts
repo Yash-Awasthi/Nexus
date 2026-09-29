@@ -17,7 +17,9 @@
 
 import { createHash } from "node:crypto";
 
+import { MemoryKVStore } from "@nexus/kv";
 import type { FastifyRequest, FastifyReply } from "fastify";
+
 
 import { getSharedKV } from "./shared-kv.js";
 
@@ -59,6 +61,9 @@ function _apiKeyId(req: FastifyRequest): string | null {
 // Uses the Upstash REST pipeline to atomically increment and set TTL.
 // This eliminates the read-check-set race condition present in the old code.
 
+/** A hung Upstash host would otherwise hold every rate-limited request. */
+const UPSTASH_TIMEOUT_MS = 2_000;
+
 async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<number | null> {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -73,6 +78,7 @@ async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<numbe
         "Content-Type": "application/json",
       },
       body: JSON.stringify([["INCR", key]]),
+      signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const results = (await res.json()) as { result: number; error?: string }[];
@@ -93,6 +99,7 @@ async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<numbe
             "Content-Type": "application/json",
           },
           body: JSON.stringify([["EXPIRE", key, windowSec]]),
+          signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
         });
       } catch {
         /* ignored — see above */
@@ -100,7 +107,7 @@ async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<numbe
     }
     return count;
   } catch {
-    return null; // fail open
+    return null; // the shared store, or a local count, takes over
   }
 }
 
@@ -144,7 +151,7 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
     try {
       // Try atomic Redis INCR first (no race condition)
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? (await _getCurrentCount(key, windowMs));
+      const current = atomicCount ?? (await countRequest(key, windowMs));
 
       if (current > limit) {
         const retryAfter = windowSec;
@@ -166,7 +173,7 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
       reply.header("X-RateLimit-Limit", limit);
       reply.header("X-RateLimit-Remaining", Math.max(0, limit - current));
     } catch {
-      // KV unavailable — fail open to avoid cascading downtime.
+      // Counting falls back locally, so only a failed reply lands here; let the request through.
     }
   };
 }
@@ -177,9 +184,16 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
  * creates the key, so the expiry is never refreshed by in-window traffic —
  * the bucket drains at the window boundary even under continuous requests.
  */
-async function _getCurrentCount(key: string, windowMs: number): Promise<number> {
-  return getSharedKV().incr(key, windowMs);
+export async function countRequest(key: string, windowMs: number): Promise<number> {
+  try {
+    return await getSharedKV().incr(key, windowMs);
+  } catch {
+    // An unreachable shared store must not lift every limit: count in this process instead.
+    return localCounts.incr(key, windowMs);
+  }
 }
+
+const localCounts = new MemoryKVStore();
 
 /**
  * Per-identity rate limiter. Buckets by the strongest identity available:
@@ -220,7 +234,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
 
     try {
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? (await _getCurrentCount(key, windowMs));
+      const current = atomicCount ?? (await countRequest(key, windowMs));
 
       if (current > limit) {
         const retryAfter = windowSec;
@@ -244,7 +258,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
       reply.header("X-RateLimit-Remaining", Math.max(0, limit - current));
       reply.header("X-RateLimit-User", identity);
     } catch {
-      // KV unavailable — fail open to avoid cascading downtime.
+      // Counting falls back locally, so only a failed reply lands here; let the request through.
     }
   };
 }
