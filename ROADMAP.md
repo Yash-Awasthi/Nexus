@@ -22,9 +22,6 @@ the user's own keys, never charging for Nexus.
 
 ## Ceilings
 
-- **Drive isolation** — Docker, or gVisor with `SANDBOX_RUNTIME=runsc`. A Firecracker runner would
-  move each drive into a block image behind a VM and most hosts lack KVM, so it stays a spike
-  (`scripts/drive-microvm-spike.sh`).
 - **Plugin host calls** — `POST /api/plugins/:id/run` runs a plugin under `deno` with read access
   to its own directory only, so only plugins that ask for no capabilities run. Capabilities need a
   host bridge (for network, a localhost proxy).
