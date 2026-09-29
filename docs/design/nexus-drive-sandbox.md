@@ -64,7 +64,8 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
 ## Open questions (resolve during the spike)
 
 - Soft-quota tuning: exact warn threshold (~90%?) and grace size/duration before hard block.
-- Firecracker host requirements (KVM availability, jailer setup) in the target deploy env.
+- Firecracker jailer setup in the target deploy env. KVM itself is available on any Linux host
+  with `/dev/kvm`, and on Docker Desktop (WSL2) once `kvm_intel` is loaded in its VM.
 - Per-user rootfs/kernel image strategy and how the persistent 512 MB volume attaches to a
   fresh microVM on each session.
 - Warning + reclaim UX for the 30-day idle policy (notification channel, grace to restore).

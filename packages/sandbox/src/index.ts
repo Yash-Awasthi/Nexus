@@ -478,6 +478,7 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     `--cpu-period=${cpuPeriod}`,
     `--cpu-quota=${cpuQuota}`,
   ];
+  if (process.env["SANDBOX_RUNTIME"]) args.push(`--runtime=${process.env["SANDBOX_RUNTIME"]}`);
 
   if (readOnlyRootfs) {
     // Immutable rootfs. A writable scratch tmpfs is mounted at SCRATCH_DIR and
