@@ -893,7 +893,10 @@ function ThreadList({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDelete(t.id)}
+                  onClick={() => {
+                    setHits((h) => h && h.filter((x) => x.id !== t.id));
+                    onDelete(t.id);
+                  }}
                   aria-label={`Delete ${t.title}`}
                   className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
                 >
