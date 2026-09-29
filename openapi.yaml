@@ -4227,6 +4227,20 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/drive/link:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/drive/file:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/drive/destroy:
     delete:
       tags:
