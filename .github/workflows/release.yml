@@ -30,7 +30,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
       - name: Create Release PR or publish
-        uses: changesets/action@v2
+        uses: changesets/action@v1
         with:
           publish: ${{ secrets.NPM_TOKEN && 'pnpm release' || '' }}
           version: pnpm version-packages
@@ -56,11 +56,11 @@ jobs:
           - service: api
             context: .
             dockerfile: apps/api/Dockerfile
-            image: ghcr.io/yash-awasthi/nexus-api
+            image: ghcr.io/yash-awasthi/nexus/api
           - service: worker
             context: .
             dockerfile: apps/worker/Dockerfile
-            image: ghcr.io/yash-awasthi/nexus-worker
+            image: ghcr.io/yash-awasthi/nexus/worker
 
     steps:
       - uses: actions/checkout@v7

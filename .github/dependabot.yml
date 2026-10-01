@@ -38,6 +38,10 @@ updates:
       time: "06:00"
       timezone: "UTC"
     open-pull-requests-limit: 5
+    ignore:
+      # changesets/action v2 requires @changesets/cli v3; keep v1 until the CLI moves.
+      - dependency-name: changesets/action
+        update-types: ["version-update:semver-major"]
 
   # Docker base images (api)
   - package-ecosystem: docker
