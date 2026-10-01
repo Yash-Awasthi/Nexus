@@ -3,7 +3,7 @@
 # Build: docker build -t nexus-worker -f apps/worker/Dockerfile .
 
 # Debian rather than Alpine: the browser agent's Chromium needs glibc.
-FROM node:22-bookworm-slim AS deps
+FROM node:26-bookworm-slim AS deps
 WORKDIR /app
 
 # python3/make/g++ compile node-pty's native extension during pnpm install.
@@ -47,7 +47,7 @@ WORKDIR /app
 RUN pnpm --filter @nexus/worker deploy --prod /deploy
 
 # ─── Stage 5: runner ─────────────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 WORKDIR /app
 
 RUN groupadd -g 1001 nexus && useradd -u 1001 -g nexus -s /bin/sh -m nexus \
