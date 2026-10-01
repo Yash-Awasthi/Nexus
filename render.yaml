@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# Render Blueprint — NEXUS backend services (free tier)
+#
+# Frontend → Vercel (nexus-ui, vercel.json at repo root)
+# Database → Neon   (external PostgreSQL, free forever)
+# Redis    → Upstash (external Redis, free forever)
+#
+# Secrets — set via Render dashboard or API (sync: false keeps them out of git):
+#   DATABASE_URL  — Neon pooler connection string
+#   REDIS_URL     — Upstash Redis URL  (rediss://default:TOKEN@host:6379)
+#   NEXUS_API_KEY, NEXUS_JWT_SECRET — auto-generated (the API exits without the first)
+#   NEXUS_SECRETS_KEY, NEXUS_AUDIT_KEY — 64 hex chars each: openssl rand -hex 32
+#   GROQ_API_KEY  — optional: enables Groq LLM provider
+#   TAVILY_API_KEY — optional: enables Tavily web search
+
+services:
+  # ── Nexus API ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: nexus-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NEXUS_API_KEY
+        generateValue: true
+      - key: NEXUS_JWT_SECRET
+        generateValue: true
+      - key: NEXUS_SECRETS_KEY
+        sync: false
+      - key: NEXUS_AUDIT_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # ── Nexus Worker ──────────────────────────────────────────────────────────────
+  - type: worker
+    name: nexus-worker
+    runtime: docker
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    plan: free
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

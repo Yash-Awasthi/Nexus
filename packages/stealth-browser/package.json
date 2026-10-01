@@ -1,0 +1,22 @@
+{
+  "name": "@nexus/stealth-browser",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vitest": "*"
+  },
+  "dependencies": {
+    "patchright": "^1.63.0",
+    "playwright-core": "^1.62.1"
+  }
+}

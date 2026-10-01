@@ -1,0 +1,156 @@
+// SPDX-License-Identifier: Apache-2.0
+import { readdirSync, existsSync } from "fs";
+import { resolve } from "path";
+
+import { defineConfig } from "vitest/config";
+
+// ── Auto-resolve @nexus/* workspace packages ──────────────────────────────────
+// Maps "@nexus/foo" → "<root>/packages/foo/src/index.ts" for integration tests.
+//
+// IMPORTANT: We use an array of {find, replacement} objects with RegExp `find`
+// values to ensure EXACT matching.  String-keyed aliases in Vite do prefix
+// replacement, which would cause "@nexus/db" to also match "@nexus/db/schema"
+// and produce an invalid resolution path.
+//
+// We also handle known subpath exports explicitly (e.g. @nexus/db/schema).
+
+const packagesDir = resolve(__dirname, "packages");
+
+interface ViteAlias {
+  find: string | RegExp;
+  replacement: string;
+}
+
+function buildNexusAliases(): ViteAlias[] {
+  const aliases: ViteAlias[] = [];
+  let pkgNames: string[] = [];
+  try {
+    pkgNames = readdirSync(packagesDir);
+  } catch {
+    return aliases;
+  }
+
+  for (const pkg of pkgNames) {
+    const entry = resolve(packagesDir, pkg, "src", "index.ts");
+    if (!existsSync(entry)) continue;
+
+    // Exact match on the package root: "@nexus/foo" (not "@nexus/foo/bar")
+    aliases.push({
+      find: new RegExp(`^@nexus/${pkg}$`),
+      replacement: entry,
+    });
+
+    // Handle subpath exports for packages that have them.
+    // Currently: @nexus/db/schema and @nexus/db/embedded.
+    const subpaths: Record<string, Record<string, string>> = {
+      db: {
+        schema: resolve(packagesDir, "db", "src", "schema", "index.ts"),
+        embedded: resolve(packagesDir, "db", "src", "embedded.ts"),
+      },
+    };
+    for (const [sub, file] of Object.entries(subpaths[pkg] ?? {})) {
+      if (!existsSync(file)) continue;
+      aliases.push({ find: new RegExp(`^@nexus/${pkg}/${sub}$`), replacement: file });
+    }
+  }
+
+  return aliases;
+}
+
+export default defineConfig({
+  resolve: {
+    alias: [
+      ...buildNexusAliases(),
+      // UI `~` alias (matches apps/ui/vite.config.ts) so apps/ui/app tests and
+      // any lazy imports inside them resolve under the root vitest run.
+      { find: "~", replacement: resolve(__dirname, "apps/ui/app") },
+    ],
+  },
+  test: {
+    globals: true,
+    environment: "node",
+    include: [
+      "packages/*/tests/**/*.test.ts",
+      "packages/*/src/**/*.test.ts",
+      "apps/*/tests/**/*.test.ts",
+      "apps/ui/app/**/*.test.ts",
+    ],
+    server: {
+      deps: {
+        // Mark native DB/Redis/crypto deps as external so Vite uses Node's
+        // built-in require() for them instead of trying to bundle them.
+        // These live in package-local node_modules (not hoisted to root).
+        external: [/^pg$/, /^pg-pool$/, /^ioredis$/, /^@neondatabase\/serverless$/, /^drizzle-orm/],
+      },
+    },
+    // passWithNoTests lets the root run succeed even if a glob resolves to
+    // zero files (e.g. packages without a tests/ dir yet).
+    passWithNoTests: true,
+    exclude: [
+      // Standard vitest defaults
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/cypress/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
+      // E2E tests — require live Postgres; run in the dedicated e2e CI job.
+      "apps/worker/tests/e2e/**",
+      // One suite, one config. These three app packages carry their own vitest
+      // config — apps/api's setup file stubs pg and Redis for every file in it,
+      // and running the same file under this config instead silently drops that
+      // setup. Half of apps/api was excluded here for that reason and therefore
+      // ran nowhere; the `app-suites` CI job now runs each package with its own
+      // config. Adding a path back here would give one file two owners.
+      "apps/api/tests/**",
+      "apps/ui/tests/**",
+      "apps/desktop/tests/**",
+    ],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov", "html", "json"],
+      // Scope coverage to package source only.
+      // apps/api route tests and apps/worker e2e tests require a live Fastify
+      // server + Postgres + Redis and run in the dedicated e2e CI job — measuring
+      // them here would produce artificially low line coverage and make thresholds
+      // impossible to enforce meaningfully.
+      include: ["packages/*/src/**/*.ts"],
+      exclude: [
+        "**/dist/**",
+        "**/node_modules/**",
+        "**/*.gen.ts",
+        "**/*.d.ts",
+        // Barrel re-export files — no executable logic
+        "**/src/index.ts",
+        // Pure-type / spec packages — nothing to instrument
+        "packages/contracts/**",
+        "packages/shared/**",
+        // Infrastructure packages — require live Docker / Redis / Postgres to
+        // exercise meaningfully. Covered by the dedicated e2e CI job instead.
+        "packages/conductor/**",
+        "packages/runtime/**",
+        // Telemetry bootstrap (OTel init, pino logger, SLO tracker) and LLM
+        // evaluation framework require live providers; excluded from unit coverage.
+        "packages/telemetry/**",
+        "packages/evals/**",
+        // Require a live browser / hosted CDP / network to exercise; covered at
+        // integration level, not unit. Same rationale as runtime/conductor above.
+        "packages/stealth-browser/**",
+        "packages/sandbox/**",
+        "packages/agent-runtime/**",
+      ],
+      thresholds: {
+        // Baseline measured 2026-09 after the Rework 2 import (87.97 lines /
+        // 86.96 functions / 82.86 branches were the first real CI numbers —
+        // the gate predates that code and never ran). Ratchet up as coverage
+        // improves; do not lower further.
+        statements: 87,
+        lines: 87,
+        functions: 86,
+        // Branches get extra headroom: catch-block error shapes and
+        // platform-specific fallbacks (Docker unavailable, pgvector < 0.4) are
+        // tested at integration level, not unit level.
+        branches: 82,
+      },
+    },
+  },
+});

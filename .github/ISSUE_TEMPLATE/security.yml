@@ -1,0 +1,26 @@
+name: Security Vulnerability (non-sensitive)
+description: Report a LOW severity security issue that does not require private disclosure
+labels: ["security", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "⚠️ For Critical/High vulnerabilities, use GitHub private vulnerability reporting or email yashawasthi12032006@gmail.com. Do NOT use this public form."
+  - type: textarea
+    id: description
+    attributes:
+      label: Vulnerability description
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options: ["Low", "Medium"]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true

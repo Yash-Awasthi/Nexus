@@ -1,0 +1,128 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * Doc-pipeline routes — document ingestion pipeline (extract → chunk → embed → store).
+ *
+ * POST /doc-pipeline/ingest   — run the full pipeline for a document
+ * GET  /doc-pipeline/formats  — list supported document formats
+ *
+ * Stages
+ * ──────
+ *   1. Extract  — text/html/markdown pass-through via defaultExtractor
+ *   2. Chunk    — overlapping fixed-size windows (default 256 tokens, 32 overlap)
+ *   3. Embed    — Groq nomic-embed-text-v1.5 if GROQ_API_KEY set; zero-vector fallback
+ *   4. Store    — nullStore (chunks logged but not persisted separately from memory store)
+ *
+ * PDF/DOCX: not supported without external Extractor — returns 422.
+ */
+
+import {
+  defaultExtractor,
+  nullStore,
+  runDocPipeline,
+  type DocFormat,
+  type DocInput,
+  type Embedder,
+} from "@nexus/doc-pipeline";
+import { createBestEmbedder } from "@nexus/memory";
+import type { FastifyInstance } from "fastify";
+
+import { extractText, ocrImage } from "../lib/extract-text.js";
+import { requireAuth } from "../middleware/auth.js";
+
+// ── Embedder ──────────────────────────────────────────────────────────────────
+
+// Batch wrapper: createBestEmbedder().embed() takes one string; doc-pipeline Embedder takes string[].
+const _bestEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return null;
+  }
+})();
+
+const embedder: Embedder = _bestEmbedder
+  ? async (texts: string[]) => Promise.all(texts.map((t) => _bestEmbedder.embed(t)))
+  : async (texts: string[]) => texts.map(() => [0, 0, 0, 0]); // null embedder
+
+// ── Supported formats ─────────────────────────────────────────────────────────
+
+/** PDF, DOCX and image content arrives base64-encoded; images are read by OCR. */
+const SUPPORTED_FORMATS: DocFormat[] = ["text", "markdown", "html", "pdf", "docx", "image"];
+
+const BINARY: DocFormat[] = ["pdf", "docx"];
+
+// ── Route plugin ──────────────────────────────────────────────────────────────
+
+export async function docPipelineRoutes(app: FastifyInstance): Promise<void> {
+  /**
+   * GET /doc-pipeline/formats
+   * List document formats supported by the built-in extractor.
+   * PDF, DOCX and images (via OCR) take base64 content.
+   */
+  app.get(
+    "/doc-pipeline/formats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      return reply.send({ formats: SUPPORTED_FORMATS });
+    },
+  );
+
+  /**
+   * POST /doc-pipeline/ingest
+   *
+   * Run the full document processing pipeline.
+   *
+   * Body:
+   *   format        — "text" | "markdown" | "html" | "pdf" | "docx" | "image"  (required)
+   *   content       — raw document content (required)
+   *   source        — optional human-readable label (URL, filename, …)
+   *   metadata      — optional key-value pairs persisted alongside chunks
+   *   chunkOptions  — optional { maxTokens, overlapTokens }
+   *
+   * Returns PipelineResult: { source, format, rawTextLength, chunks, embedded, storeResult, durationMs }
+   */
+  app.post<{
+    Body: DocInput & { chunkOptions?: { maxTokens?: number; overlapTokens?: number } };
+  }>("/doc-pipeline/ingest", { preHandler: requireAuth }, async (request, reply) => {
+    const { format, content, source, metadata, chunkOptions } = request.body;
+
+    if (!format || !content) {
+      return reply.code(400).send({ error: "format and content are required" });
+    }
+
+    if (!(SUPPORTED_FORMATS as string[]).includes(format)) {
+      return reply.code(422).send({
+        error: `Unsupported format: "${format}". Supported: ${SUPPORTED_FORMATS.join(", ")}`,
+      });
+    }
+
+    try {
+      const result = await runDocPipeline(
+        { format, content, source, metadata },
+        {
+          extractor: (fmt, body) =>
+            BINARY.includes(fmt)
+              ? extractText(fmt, Buffer.from(body, "base64"))
+              : defaultExtractor(fmt, body),
+          ocr: (base64) => ocrImage(Buffer.from(base64, "base64")),
+          embedder,
+          store: nullStore,
+          chunkOptions,
+        },
+      );
+
+      return reply.code(201).send(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: message });
+    }
+  });
+}

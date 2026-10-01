@@ -1,0 +1,22 @@
+{
+  "name": "@nexus/agent-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@nexus/best-of-n": "workspace:*",
+    "@nexus/llm-compress": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "*",
+    "typescript": "*"
+  }
+}

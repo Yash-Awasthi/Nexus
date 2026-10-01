@@ -1,0 +1,63 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"]
+    },
+    "packages/plugin-sdk": {
+      "entry": ["src/index.ts", "src/testing.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "apps/api": {
+      "entry": [
+        "src/index.ts",
+        "src/runtime-server.ts",
+        "src/migrate.ts",
+        "src/grant-admin.ts",
+        "scripts/*.ts",
+        "tests/**/*.test.ts"
+      ],
+      "project": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+    },
+    "apps/worker": {
+      "entry": ["src/index.ts", "src/bridge.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "apps/ui": {
+      "entry": [
+        "app/root.tsx",
+        "app/routes.ts",
+        "app/routes/**/*.tsx",
+        "app/entry.server.tsx",
+        "app/components/ui/*.tsx",
+        "tests/**/*.{test,spec}.ts"
+      ],
+      "project": ["app/**/*.{ts,tsx}", "src/**/*.{ts,tsx}", "tests/**/*.ts"]
+    },
+    "apps/desktop": {
+      "entry": ["src/main.ts", "src/preload.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "apps/cli": {
+      "entry": ["src/index.ts", "src/runtime-cli.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "packages/*": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": [
+    "@fontsource-variable/inter",
+    "@fontsource-variable/jetbrains-mono",
+    "@fontsource/instrument-serif",
+    "tw-animate-css",
+    "tailwindcss",
+    "pino-pretty",
+    "husky",
+    "lint-staged"
+  ],
+  "ignoreBinaries": ["syft", "lint-staged"],
+  "ignore": ["**/dist/**", "**/node_modules/**", "vendor/**", "**/*.gen.ts", "services/ingest/**"]
+}

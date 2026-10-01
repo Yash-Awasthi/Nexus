@@ -1,0 +1,445 @@
+# SPDX-License-Identifier: Apache-2.0
+# Nexus Unified — local development stack
+#
+# Core services (always started):
+#   postgres, redis, api (host :3000), worker, ui (built, host :4173)
+#
+# Optional profiles:
+#   --profile ui          → React UI dev server with hot reload (host :5173)
+#   --profile observability → OTel collector
+#   --profile finscrape   → fin-scrape ingest bridge
+#
+# Usage:
+#   docker compose up                          # core stack
+#   docker compose --profile ui up             # + UI dev server
+#   docker compose up -d                       # detached
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    # pgvector ships Postgres 16 + the `vector` extension
+    image: pgvector/pgvector:pg16
+    container_name: nexus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+
+  redis:
+    image: redis:7.2.5-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ── DB migrations (one-shot init container) ───────────────────────────────────
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: nexus-migrate
+    restart: "no"
+    command: ["node", "--import", "tsx/esm", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Nexus API ─────────────────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "3000:3001"
+    environment:
+      NODE_ENV: development
+      PORT: "3001"
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-dev-api-key-change-in-prod}
+      NEXUS_JWT_SECRET: ${NEXUS_JWT_SECRET:-dev-jwt-secret-change-in-prod}
+      # 64 hex chars each (openssl rand -hex 32); without the first, saved provider keys answer 503.
+      NEXUS_SECRETS_KEY: ${NEXUS_SECRETS_KEY:-dededededededededededededededededededededededededededededededede}
+      NEXUS_AUDIT_KEY: ${NEXUS_AUDIT_KEY:-dededededededededededededededededededededededededededededededede}
+      NEXUS_JWT_ISSUER: ${NEXUS_JWT_ISSUER:-nexus-api}
+      NEXUS_JWT_AUDIENCE: ${NEXUS_JWT_AUDIENCE:-nexus-client}
+      NEXUS_FRONTEND_URL: ${NEXUS_FRONTEND_URL:-http://localhost:4173}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OAUTH_SUCCESS_REDIRECT: ${OAUTH_SUCCESS_REDIRECT:-http://localhost:4173}
+      NEXUS_OIDC_ISSUER: ${NEXUS_OIDC_ISSUER:-}
+      NEXUS_OIDC_CLIENT_ID: ${NEXUS_OIDC_CLIENT_ID:-}
+      NEXUS_OIDC_CLIENT_SECRET: ${NEXUS_OIDC_CLIENT_SECRET:-}
+      NEXUS_SAML_ENABLED: ${NEXUS_SAML_ENABLED:-false}
+      NEXUS_SAML_IDP_SSO_URL: ${NEXUS_SAML_IDP_SSO_URL:-}
+      NEXUS_SAML_IDP_ENTITY_ID: ${NEXUS_SAML_IDP_ENTITY_ID:-}
+      NEXUS_SAML_IDP_CERT: ${NEXUS_SAML_IDP_CERT:-}
+      NEXUS_SAML_SP_ENTITY_ID: ${NEXUS_SAML_SP_ENTITY_ID:-}
+      NEXUS_SAML_SP_ACS_URL: ${NEXUS_SAML_SP_ACS_URL:-}
+      NEXUS_SAML_COOKIE_SECRET: ${NEXUS_SAML_COOKIE_SECRET:-dev-saml-cookie-secret-change-in-prod}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      LINEAR_API_KEY: ${LINEAR_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      NEXUS_BILLING_PLAN: ${NEXUS_BILLING_PLAN:-free}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      POLYMARKET_ENABLED: ${POLYMARKET_ENABLED:-false}
+      SEARXNG_BASE_URL: http://searxng:8080
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4173,http://localhost:5173,http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AUTH_LOGIN_RATE_LIMIT: ${AUTH_LOGIN_RATE_LIMIT:-10}
+      AUTH_REGISTER_RATE_LIMIT: ${AUTH_REGISTER_RATE_LIMIT:-5}
+      NEXUS_ORG_APPROVAL_STALE_HOURS: ${NEXUS_ORG_APPROVAL_STALE_HOURS:-24}
+      # The proxy (e.g. the ui container's address) whose X-Forwarded-For names the client.
+      # Leave empty while the API port is published: anyone could then forge the header.
+      NEXUS_TRUST_PROXY: ${NEXUS_TRUST_PROXY:-}
+      NEXUS_API_RATE_LIMIT: ${NEXUS_API_RATE_LIMIT:-300}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: nexus-api
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+
+  # ── Nexus Worker ──────────────────────────────────────────────────────────────
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: nexus-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      # Same key as the API: queued runs decrypt the keys their owners saved.
+      NEXUS_SECRETS_KEY: ${NEXUS_SECRETS_KEY:-dededededededededededededededededededededededededededededededede}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-dev-api-key-change-in-prod}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      RSS_FEED_URLS: ${RSS_FEED_URLS:-}
+      COUNCIL_MIN_PRIORITY: ${COUNCIL_MIN_PRIORITY:-high}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_SERVICE_NAME: nexus-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      SEARXNG_BASE_URL: http://searxng:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ── BullMQ dashboard (optional) ───────────────────────────────────────────────
+
+  bull-board:
+    image: deadly0/bull-board:0.1.3
+    container_name: nexus-bull-board
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - redis
+    profiles:
+      - queues
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ── Nexus UI (dev server) ─────────────────────────────────────────────────────
+
+  ui:
+    build:
+      context: .
+      dockerfile: apps/ui/Dockerfile
+    container_name: nexus-ui
+    restart: unless-stopped
+    ports:
+      - "4173:80"
+    environment:
+      NEXUS_API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  ui-dev:
+    image: node:22-alpine
+    container_name: nexus-ui-dev
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "corepack enable && pnpm --filter @nexus/ui dev"
+    ports:
+      - "5173:5173"
+    environment:
+      NEXUS_API_URL: http://api:3001
+    depends_on:
+      - api
+    profiles:
+      - ui
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ── Python ingest service ────────────────────────────────────────────────────
+
+  ingest:
+    build:
+      context: .
+      dockerfile: services/ingest/Dockerfile
+    container_name: nexus-ingest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      NEXUS_API_KEY: ${NEXUS_API_KEY}
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ── fin-scrape → Nexus ingest bridge ─────────────────────────────────────────
+
+  ingest-bridge:
+    build:
+      context: apps/ingest-py
+      dockerfile: Dockerfile
+    container_name: nexus-ingest-bridge
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      NEXUS_API_URL: http://api:3001
+      NEXUS_INGEST_API_KEY: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
+      FINSCRAPE_OUTPUT_DIR: /data/finscrape
+      FINSCRAPE_DONE_DIR: /data/finscrape/done
+      BRIDGE_PORT: "8001"
+      BRIDGE_API_KEY: ${BRIDGE_API_KEY:-}
+      LOG_LEVEL: info
+    volumes:
+      - finscrape_data:/data/finscrape
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles:
+      - finscrape
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ── SearXNG self-hosted metasearch ────────────────────────────────────────────
+
+  searxng:
+    image: searxng/searxng:2026.9.25-12f8b6515
+    container_name: nexus-searxng
+    restart: unless-stopped
+    ports:
+      - "4000:8080"
+    volumes:
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_data:/etc/searxng
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-nexus-dev-searxng-secret-change-in-prod}
+      SEARXNG_BASE_URL: http://searxng:8080
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ── Observability (optional) ──────────────────────────────────────────────────
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.109.0
+    container_name: nexus-otel
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+      - "8888:8888"
+    profiles:
+      - observability
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+  redis_data:
+  searxng_data:
+  finscrape_data:

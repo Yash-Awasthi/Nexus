@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "tests"],
+  // tsconfig.base.json excludes **/*.test.ts, so without this override the test
+  // files compile nowhere: vitest transpiles them without checking types, and a
+  // test that does not typecheck asserts nothing about the types it names.
+  "exclude": ["node_modules", "dist", "coverage"]
+}

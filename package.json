@@ -1,0 +1,80 @@
+{
+  "name": "@nexus/root",
+  "private": true,
+  "version": "0.0.0",
+  "description": "NEXUS — AI orchestration platform (monorepo root)",
+  "packageManager": "pnpm@9.14.4",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "openapi:generate": "pnpm --filter @nexus/api openapi:generate",
+    "openapi:check": "pnpm --filter @nexus/api openapi:check",
+    "types:generate": "openapi-typescript openapi.yaml --output packages/contracts/src/generated/openapi.ts",
+    "types:check": "node scripts/check-generated-types.mjs",
+    "dev": "turbo run dev --parallel",
+    "dev:api": "pnpm --filter @nexus/api dev",
+    "dev:ui": "pnpm --filter @nexus/ui dev",
+    "dev:spectre": "pnpm --filter @nexus/spectre dev",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "test": "turbo run test",
+    "test:campaign": "vitest run apps/ui/app/lib/install-auth-fetch.test.ts packages/agents/src/planner.test.ts packages/hybrid-search/tests/weighted-alpha.test.ts packages/council/src/mcp-server.test.ts packages/council/src/critique.test.ts packages/council/src/verify.test.ts packages/debate-engine/src/convergence.test.ts packages/knowledge-graph/src/query.test.ts packages/council/src/mcp-composition.test.ts packages/llm-compress/src/jsonl-compress.test.ts packages/llm-compress/src/token-saver.test.ts packages/llm-compress/src/token-saver-commands.test.ts packages/llm-compress/src/token-saver-git.test.ts packages/llm-compress/src/token-saver-build.test.ts packages/llm-compress/src/token-saver-k8s.test.ts packages/llm-compress/src/token-saver-tf.test.ts packages/llm-compress/src/token-saver-file.test.ts packages/llm-tracer/src/otlp-exporter.test.ts packages/graphrag-query/src/index-graphrag.test.ts packages/council/src/deliberative.test.ts packages/debate-engine/src/multiagent-debate.test.ts packages/retrieval/src/hnsw-index.test.ts packages/retrieval/src/where.test.ts packages/browser-automation/src/actor.test.ts packages/agent-runtime/tests/agent-hooks.test.ts packages/council/src/borda.test.ts packages/council/src/transcript.test.ts apps/worker/tests/handlers/council-transcript.test.ts apps/worker/tests/handlers/agent-mcp-council.test.ts apps/worker/tests/handlers/debate-tool.test.ts apps/worker/tests/handlers/tool-transcript.test.ts packages/agents/src/crew.test.ts packages/agent-runtime/tests/group-chat.test.ts packages/session-sync/src/raft-election.test.ts packages/agent-engine/src/engine.test.ts packages/workflow-chain/src/saga.test.ts packages/knowledge-graph/src/community.test.ts packages/mcp-client/src/server.test.ts packages/mcp-client/src/proxy.test.ts packages/hybrid-search/tests/where-filter.test.ts packages/hybrid-search/tests/rerank.test.ts packages/doc-pipeline/tests/pipeline.test.ts packages/graphrag-query/tests/local-search.test.ts packages/graphrag-query/tests/merge-ops.test.ts apps/cli/tests/lib/deliberation-tools.test.ts packages/council/src/run-transcript.test.ts packages/hybrid-search/tests/mcp-server.test.ts apps/worker/tests/handlers/agent-mcp-hybrid.test.ts packages/graphrag-query/tests/mcp-server.test.ts apps/worker/tests/handlers/agent-mcp-graphrag.test.ts apps/worker/tests/lib/reindex-strategies.test.ts packages/workflow-chain/src/durable.test.ts packages/retrieval/src/collection.test.ts packages/gateway/src/limit-learning.test.ts && pnpm --filter @nexus/api exec vitest run tests/lib/council-transcript.test.ts",
+    "typecheck": "turbo run typecheck",
+    "test:e2e": "playwright test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yaml,yml}\" --ignore-path .prettierignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yaml,yml}\" --ignore-path .prettierignore",
+    "clean": "turbo run clean && find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
+    "generate": "tsx scripts/generate-clients.ts",
+    "scaffold:adapter": "tsx scripts/scaffold.ts adapter",
+    "scaffold:driver": "tsx scripts/scaffold.ts driver",
+    "scaffold:feed": "tsx scripts/scaffold.ts feed",
+    "db:migrate": "turbo run db:migrate --filter @nexus/db",
+    "db:generate": "turbo run db:generate --filter @nexus/db",
+    "docs:check": "turbo run docs:check",
+    "check:headers": "tsx scripts/check-license-headers.ts",
+    "sbom": "syft . -o cyclonedx-json > sbom.json",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "prune:knip": "knip",
+    "prune:madge": "madge packages/ apps/ --warning",
+    "prune:depcheck": "depcheck"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.1",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.62.1",
+    "@types/node": "^20.14.0",
+    "@vitest/coverage-v8": "^2.1.4",
+    "depcheck": "^1.4.7",
+    "eslint": "^9.39.5",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-promise": "^7.1.0",
+    "eslint-plugin-vitest": "^0.5.4",
+    "husky": "^9.1.6",
+    "knip": "^5.33.0",
+    "lint-staged": "^15.2.10",
+    "madge": "^8.0.0",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.10",
+    "turbo": "^2.10.8",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^2.1.9"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "eslint --fix --quiet",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+name: Adapter Proposal
+description: Propose a new @nexus/adapter-* integration
+labels: ["adapter", "triage"]
+body:
+  - type: input
+    id: service
+    attributes:
+      label: Service name
+      placeholder: "e.g. Notion, Jira, Stripe"
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Proposed capabilities
+      description: List the actions this adapter should support (e.g. notion.page.create, notion.database.query)
+    validations:
+      required: true
+  - type: textarea
+    id: auth
+    attributes:
+      label: Authentication method
+      placeholder: "OAuth2, API key, webhook secret, etc."
+    validations:
+      required: true
+  - type: textarea
+    id: sdk
+    attributes:
+      label: Official SDK / API docs link
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      options:
+        - label: I am willing to implement this adapter
+          required: false
+        - label: The service has a stable public API
+          required: true

@@ -1,0 +1,558 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * @nexus/sandbox — Secure code execution sandbox.
+ *
+ * Runs untrusted code in an isolated child process with:
+ *  • Hard timeouts (AbortController → SIGKILL)
+ *  • Environment scrubbing (credentials stripped, PATH-only allowlist)
+ *  • Output truncation (64 KiB cap on stdout + stderr)
+ *  • Language routing: JavaScript, TypeScript (tsx), Python, Bash
+ *  • Injectable runner for full unit-test coverage without spawning real processes
+ *
+ * Production hardening roadmap (not yet implemented):
+ *  • Replace child_process with gVisor/Firecracker container
+ *  • Network namespace isolation (no outbound calls)
+ *  • cgroups memory limit enforcement
+ *  • seccomp syscall filter
+ *
+ * Task type: "sandbox.execute"
+ */
+
+import { spawn } from "child_process";
+import { randomUUID } from "crypto";
+import { writeFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { fileURLToPath } from "url";
+
+import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin-sdk";
+
+// ── Public types ──────────────────────────────────────────────────────────────
+
+export type SandboxLanguage = "javascript" | "typescript" | "python" | "bash";
+
+/** Sandbox task interface definition. */
+export interface SandboxTask {
+  taskType: "sandbox.execute";
+  /** Source code to execute */
+  code: string;
+  /** Runtime language */
+  language: SandboxLanguage;
+  /** Data piped to the process's stdin (optional) */
+  stdin?: string;
+  /** Execution timeout in milliseconds (default: 10 000, max: 30 000) */
+  timeoutMs?: number;
+  /**
+   * Extra environment variables made available to the subprocess.
+   * Only alphanumeric keys and a small safe allowlist are forwarded —
+   * callers cannot override PATH or inject credentials this way.
+   */
+  extraEnv?: Record<string, string>;
+}
+
+/** Sandbox result interface definition. */
+export interface SandboxResult {
+  ok: boolean;
+  /** stdout output (truncated at 64 KiB) */
+  stdout: string;
+  /** stderr output (truncated at 64 KiB) */
+  stderr: string;
+  /** Process exit code, or null if killed by timeout */
+  exitCode: number | null;
+  /** Whether the process was killed due to timeout */
+  timedOut: boolean;
+  /** Wall-clock execution time in milliseconds */
+  durationMs: number;
+  /** Language that was executed */
+  language: SandboxLanguage;
+  /** Error message if ok is false */
+  error?: string;
+}
+
+// ── Internal runner interface (injectable for tests) ──────────────────────────
+
+export interface RunnerOptions {
+  stdin?: string;
+  timeoutMs: number;
+  env: NodeJS.ProcessEnv;
+}
+
+/** Runner result interface definition. */
+export interface RunnerResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+}
+
+/** Runner type alias. */
+export type Runner = ((
+  cmd: string,
+  args: string[],
+  opts: RunnerOptions,
+) => Promise<RunnerResult>) & {
+  /** Runs inside a container, which sees the host temp dir at {@link HOST_TMP_MOUNT}. */
+  inContainer?: boolean;
+};
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const MAX_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_OUTPUT_BYTES = 64 * 1024; // 64 KiB
+
+/**
+ * Environment variables forwarded to sandboxed processes.
+ * Intentionally minimal — no credentials, no proxy settings.
+ */
+const SAFE_ENV_KEYS: ReadonlySet<string> = new Set([
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TMPDIR",
+  "TZ",
+]);
+
+// ── Safe environment builder ──────────────────────────────────────────────────
+
+export function buildSafeEnv(extraEnv?: Record<string, string>): NodeJS.ProcessEnv {
+  const safe: NodeJS.ProcessEnv = {};
+
+  for (const key of Array.from(SAFE_ENV_KEYS)) {
+    const val = process.env[key];
+    if (val !== undefined) safe[key] = val;
+  }
+
+  // Extra env: only allow alphanumeric + underscore keys, reject anything
+  // that looks like a credential (API_KEY, TOKEN, SECRET, PASSWORD, etc.)
+  const credentialPattern = /(?:key|token|secret|password|credential|auth|pass)/i;
+
+  if (extraEnv) {
+    for (const [k, v] of Object.entries(extraEnv)) {
+      if (/^\w+$/.test(k) && !credentialPattern.test(k)) {
+        safe[k] = v;
+      }
+    }
+  }
+
+  return safe;
+}
+
+// ── Output truncation ─────────────────────────────────────────────────────────
+
+function truncate(s: string, maxBytes = MAX_OUTPUT_BYTES): string {
+  if (s.length <= maxBytes) return s;
+  return s.slice(0, maxBytes) + `\n\n[output truncated at ${maxBytes} bytes]`;
+}
+
+// ── Language routing ──────────────────────────────────────────────────────────
+
+export interface PreparedExecution {
+  cmd: string;
+  args: string[];
+  /** If set, code is passed via stdin instead of a CLI arg */
+  useStdin: boolean;
+  /** If set, the host path the caller must write the code to and delete after */
+  tempFilePath?: string;
+}
+
+/** Where every container sees the host temp dir, read-only. */
+export const HOST_TMP_MOUNT = "/nexus-host-tmp";
+
+/**
+ * Determine the command, args, and code delivery mechanism for a given language.
+ * For TypeScript, a temp file path is returned (callers write + delete it); the
+ * args name it as the process will see it, inside a container or not.
+ */
+export function prepareExecution(
+  language: SandboxLanguage,
+  code: string,
+  inContainer = false,
+): PreparedExecution {
+  switch (language) {
+    case "javascript":
+      return {
+        cmd: "node",
+        args: ["--no-addons", "--no-experimental-require-module", "-e", code],
+        useStdin: false,
+      };
+
+    case "typescript": {
+      const name = `nexus-sandbox-${randomUUID()}.ts`;
+      const tmpPath = join(tmpdir(), name);
+      return {
+        cmd: "tsx",
+        args: [inContainer ? `${HOST_TMP_MOUNT}/${name}` : tmpPath],
+        useStdin: false,
+        tempFilePath: tmpPath,
+      };
+    }
+
+    case "python":
+      // Code via stdin (`python3 -`), NOT `-c` argv: on Windows the
+      // python3.exe app-execution alias mangles `-c` arguments (\n becomes a
+      // real newline, embedded quotes break), which silently corrupts any
+      // script with escapes inside string literals. stdin bypasses argv
+      // quoting entirely.
+      return {
+        cmd: "python3",
+        args: ["-"],
+        useStdin: true,
+      };
+
+    case "bash":
+      return {
+        cmd: "bash",
+        args: ["-c", code],
+        useStdin: false,
+      };
+  }
+}
+
+// ── Default runner (child_process) ────────────────────────────────────────────
+
+/**
+ * Default runner — spawns a real subprocess via Node's child_process.
+ * Uses AbortController for timeout enforcement.
+ */
+export const defaultRunner: Runner = (
+  cmd: string,
+  args: string[],
+  opts: RunnerOptions,
+): Promise<RunnerResult> => {
+  return new Promise<RunnerResult>((resolve) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+
+    // safe: array args, no shell — no shell-metachar interpretation, so the
+    // command and its arguments cannot be re-parsed into additional commands.
+    const proc = spawn(cmd, args, {
+      signal: controller.signal,
+      env: opts.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (opts.stdin && proc.stdin) {
+      proc.stdin.end(opts.stdin);
+    } else if (proc.stdin) {
+      proc.stdin.end();
+    }
+
+    // Cap in-memory accumulation so a runaway child cannot exhaust memory:
+    // stop appending once each stream reaches MAX_OUTPUT_BYTES. Final output is
+    // still passed through truncate() for the user-facing truncation marker.
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      if (stdout.length < MAX_OUTPUT_BYTES) {
+        stdout += chunk.toString("utf8");
+      }
+    });
+
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      if (stderr.length < MAX_OUTPUT_BYTES) {
+        stderr += chunk.toString("utf8");
+      }
+    });
+
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({
+        stdout: truncate(stdout),
+        stderr: truncate(stderr),
+        exitCode: timedOut ? null : code,
+        timedOut,
+      });
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      if ((err as NodeJS.ErrnoException).code === "ABORT_ERR" || err.name === "AbortError") {
+        timedOut = true;
+        resolve({
+          stdout: truncate(stdout),
+          stderr: truncate(stderr),
+          exitCode: null,
+          timedOut: true,
+        });
+      } else {
+        resolve({
+          stdout: truncate(stdout),
+          stderr: truncate(stderr) + `\n[spawn error: ${err.message}]`,
+          exitCode: 1,
+          timedOut: false,
+        });
+      }
+    });
+  });
+};
+
+// ── Core execution function ───────────────────────────────────────────────────
+
+/**
+ * Execute code in the sandbox.
+ *
+ * @param task     The sandbox task (code, language, options)
+ * @param runner   Process runner (injectable for tests, defaults to child_process)
+ */
+export async function executeCode(
+  task: SandboxTask,
+  runner: Runner = defaultRunner,
+): Promise<SandboxResult> {
+  const start = Date.now();
+  const timeoutMs = Math.min(task.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
+  const env = buildSafeEnv(task.extraEnv);
+  const prep = prepareExecution(task.language, task.code, runner.inContainer);
+
+  let tempFileWritten = false;
+
+  try {
+    // Write temp file for TypeScript
+    if (prep.tempFilePath) {
+      // Use exclusive flag to prevent TOCTOU on the randomised temp path
+      await writeFile(prep.tempFilePath, task.code, { encoding: "utf8", flag: "wx" });
+      tempFileWritten = true;
+    }
+
+    const result = await runner(prep.cmd, prep.args, {
+      stdin: prep.useStdin ? task.code : task.stdin,
+      timeoutMs,
+      env,
+    });
+
+    return {
+      ok: result.exitCode === 0 && !result.timedOut,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      timedOut: result.timedOut,
+      durationMs: Date.now() - start,
+      language: task.language,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      stdout: "",
+      stderr: "",
+      exitCode: 1,
+      timedOut: false,
+      durationMs: Date.now() - start,
+      language: task.language,
+      error: err instanceof Error ? err.message : "Unknown execution error",
+    };
+  } finally {
+    // Always clean up temp files
+    if (prep.tempFilePath && tempFileWritten) {
+      await unlink(prep.tempFilePath).catch(() => void 0);
+    }
+  }
+}
+
+// ── Adapter wiring ────────────────────────────────────────────────────────────
+
+async function execute(task: SandboxTask, ctx: IExecutionContext): Promise<SandboxResult> {
+  // Log the execution (ctx.logger is always available)
+  ctx.logger.info("sandbox.execute", {
+    language: task.language,
+    codeLength: task.code.length,
+    timeoutMs: task.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  });
+
+  // GROQ_API_KEY not required for sandbox — verify at least some env is present
+  // by checking the plugin-sdk requireEnv only when the caller provides extraEnv keys
+  // that reference env vars. For now the sandbox runs unauthenticated.
+  void requireEnv; // imported for potential future use
+
+  return executeCode(task);
+}
+
+/** Sandbox adapter. */
+export const sandboxAdapter = defineAdapter<SandboxTask, SandboxResult>({
+  name: "nexus-adapter-sandbox",
+  version: "0.1.0",
+  capabilities: ["llm.inference"], // repurposed: marks this as a compute task
+  taskTypes: ["sandbox.execute"],
+  execute,
+});
+
+// ── Docker runner ─────────────────────────────────────────────────────────────
+
+export interface DockerSandboxConfig {
+  /**
+   * Docker image to run code inside.
+   * Should include the required runtimes (node, python3, bash, tsx).
+   * Default: "node:20-alpine"
+   */
+  image?: string;
+  /** Memory limit for the container in megabytes. Default: 128 */
+  memoryMb?: number;
+  /**
+   * CPU usage cap as a percentage of a single core (1–100).
+   * Implemented via --cpu-period / --cpu-quota. Default: 50.
+   */
+  cpuPercent?: number;
+  /** Maximum number of processes the container may spawn. Default: 64 */
+  pidsLimit?: number;
+  /**
+   * Absolute path to a seccomp profile JSON applied via
+   * `--security-opt seccomp=<path>`. Default: the checked-in
+   * `seccomp-default.json` (default-allow denylist of dangerous syscalls).
+   */
+  seccompProfilePath?: string;
+  /**
+   * Mount the container root filesystem read-only (`--read-only`). A writable
+   * scratch tmpfs is provided at {@link SCRATCH_DIR} and pointed to via TMPDIR.
+   * Default: true.
+   */
+  readOnlyRootfs?: boolean;
+  /**
+   * Size in megabytes of the writable scratch tmpfs mounted at
+   * {@link SCRATCH_DIR}. Default: 64.
+   */
+  scratchMb?: number;
+  /**
+   * UID:GID the container process runs as (`--user`). Running as a non-root
+   * user is the container-level half of user-namespace de-privileging; the
+   * host complement is daemon-level `userns-remap` (see class docs).
+   * Default: "1000:1000".
+   */
+  runAsUser?: string;
+  /**
+   * Absolute host path bind-mounted read-write at {@link WORKSPACE_MOUNT}. The
+   * container runs against real user files only when this is set; without it
+   * every command sees an empty filesystem. Default: no mount.
+   */
+  workspacePath?: string;
+  /** Container working directory (`--workdir`). Default: Docker image default. */
+  workdir?: string;
+}
+
+/**
+ * Absolute path to the checked-in seccomp profile. Resolved relative to this
+ * module so it works from both `src` (vitest) and built `dist` — both sit one
+ * directory below the package root where `seccomp-default.json` lives.
+ */
+export const SECCOMP_PROFILE_PATH = fileURLToPath(
+  new URL("../seccomp-default.json", import.meta.url),
+);
+
+/** In-container writable scratch directory (tmpfs) used when the rootfs is read-only. */
+export const SCRATCH_DIR = "/nexus-scratch";
+
+/** In-container mount point for {@link DockerSandboxConfig.workspacePath}. */
+export const WORKSPACE_MOUNT = "/workspace";
+
+/**
+ * Build the `docker run` argument list for a given config.
+ * Exported for unit testing without spawning Docker.
+ */
+export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
+  const image = config.image ?? "node:20-alpine";
+  const memoryMb = config.memoryMb ?? 128;
+  const pidsLimit = config.pidsLimit ?? 64;
+  const cpuPercent = Math.min(100, Math.max(1, config.cpuPercent ?? 50));
+  const cpuPeriod = 100_000;
+  const cpuQuota = Math.floor(cpuPeriod * (cpuPercent / 100));
+  const seccompProfilePath = config.seccompProfilePath ?? SECCOMP_PROFILE_PATH;
+  const readOnlyRootfs = config.readOnlyRootfs ?? true;
+  const scratchMb = config.scratchMb ?? 64;
+  const runAsUser = config.runAsUser ?? "1000:1000";
+
+  const args = [
+    "run",
+    "--rm",
+    "--network=none", // no outbound network access
+    `--memory=${memoryMb}m`, // hard memory cap
+    `--pids-limit=${pidsLimit}`, // limit fork bombs
+    "--cap-drop=ALL", // drop all Linux capabilities
+    "--security-opt=no-new-privileges", // prevent privilege escalation
+    // Syscall filter: default-allow denylist neutralising namespace/mount,
+    // kernel-module, tracing, key-management and host time/reboot surfaces.
+    `--security-opt=seccomp=${seccompProfilePath}`,
+    // Run as a non-root UID:GID — container-level user de-privileging.
+    `--user=${runAsUser}`,
+    `--cpu-period=${cpuPeriod}`,
+    `--cpu-quota=${cpuQuota}`,
+  ];
+
+  if (readOnlyRootfs) {
+    // Immutable rootfs. A writable scratch tmpfs is mounted at SCRATCH_DIR and
+    // advertised via TMPDIR so tsx/esbuild/python temp writes land there rather
+    // than on the now read-only rootfs. nosuid/nodev harden the scratch mount.
+    args.push("--read-only");
+    args.push(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=${scratchMb}m`);
+    args.push(`--env=TMPDIR=${SCRATCH_DIR}`);
+  }
+
+  if (config.workspacePath) {
+    // Read-write on purpose, and the only writable bind mount: the point of the
+    // drive is that a command can change the files it was pointed at. The
+    // read-only rootfs above still covers everything outside this path.
+    args.push(`-v`, `${config.workspacePath}:${WORKSPACE_MOUNT}:rw`);
+  }
+  if (config.workdir ?? config.workspacePath) {
+    args.push(`--workdir=${config.workdir ?? WORKSPACE_MOUNT}`);
+  }
+
+  args.push(
+    // TypeScript temp files written by executeCode, read-only.
+    `-v`,
+    `${tmpdir()}:${HOST_TMP_MOUNT}:ro`,
+    "-i", // keep stdin open for piped input
+    image,
+  );
+
+  return args;
+}
+
+/**
+ * Creates a Runner that executes code inside a Docker container.
+ *
+ * Provides hard isolation guarantees:
+ *   • No outbound network (--network=none)
+ *   • Capped memory and CPU
+ *   • All Linux capabilities dropped
+ *   • No privilege escalation (no-new-privileges)
+ *   • PID limit to prevent fork bombs
+ *   • seccomp syscall filter (denylist of dangerous syscalls)
+ *   • Read-only rootfs + a bounded writable scratch tmpfs
+ *   • Non-root container user (--user)
+ *
+ * Host complement (daemon-level, not expressible as `docker run` args): enable
+ * `userns-remap` in the Docker daemon so container root maps to an unprivileged
+ * host UID. Combined with `--user` above, workloads run doubly de-privileged.
+ *
+ * Requires Docker to be installed and accessible on the host PATH.
+ * Falls back gracefully: if Docker is unavailable the spawned process
+ * will fail and executeCode() will return ok:false with the error message.
+ *
+ * @example
+ * ```ts
+ * const runner = createDockerRunner({ image: "node:20-alpine", memoryMb: 64 });
+ * const result = await executeCode({ taskType: "sandbox.execute", code: "console.log(1)", language: "javascript" }, runner);
+ * ```
+ */
+export function createDockerRunner(config: DockerSandboxConfig = {}): Runner {
+  const run = (cmd: string, args: string[], opts: RunnerOptions): Promise<RunnerResult> =>
+    defaultRunner("docker", [...buildDockerArgs(config), cmd, ...args], opts);
+  return Object.assign(run, { inContainer: true });
+}
+
+// ── Re-exports for testing ────────────────────────────────────────────────────
+
+export { DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, MAX_OUTPUT_BYTES, SAFE_ENV_KEYS };
+export {
+  DRIVE_ROOT,
+  DRIVE_QUOTA_BYTES,
+  DRIVE_IDLE_MS,
+  userDrivePath,
+  statDrive,
+  listDrives,
+  driveLastActiveMs,
+} from "./drive-fs.js";
+export type { DriveStat, DriveEntry } from "./drive-fs.js";
+export { tarGzDirectory } from "./tar.js";

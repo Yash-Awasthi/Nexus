@@ -1,0 +1,52 @@
+{
+  "_comment": "Nexus sandbox seccomp profile. Default-allow denylist: keeps ordinary node/python/bash workloads working while blocking syscalls that --cap-drop=ALL does not fully neutralise (namespace/mount manipulation, kernel module + tracing surfaces, key management, host time/reboot). Applied via `docker run --security-opt seccomp=<this file>`.",
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "architectures": ["SCMP_ARCH_X86_64", "SCMP_ARCH_X86", "SCMP_ARCH_X32", "SCMP_ARCH_AARCH64"],
+  "syscalls": [
+    {
+      "names": [
+        "acct",
+        "add_key",
+        "bpf",
+        "chroot",
+        "clock_adjtime",
+        "clock_settime",
+        "create_module",
+        "delete_module",
+        "finit_module",
+        "get_kernel_syms",
+        "init_module",
+        "kcmp",
+        "kexec_file_load",
+        "kexec_load",
+        "keyctl",
+        "mount",
+        "move_mount",
+        "mount_setattr",
+        "nfsservctl",
+        "open_by_handle_at",
+        "perf_event_open",
+        "pivot_root",
+        "process_vm_readv",
+        "process_vm_writev",
+        "ptrace",
+        "query_module",
+        "quotactl",
+        "reboot",
+        "request_key",
+        "setns",
+        "settimeofday",
+        "stime",
+        "swapoff",
+        "swapon",
+        "umount",
+        "umount2",
+        "unshare",
+        "uselib",
+        "userfaultfd"
+      ],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1
+    }
+  ]
+}

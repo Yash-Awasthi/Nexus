@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Grafana datasource provisioning for Nexus local observability stack.
+# Mounted into the grafana container at /etc/grafana/provisioning/datasources/nexus.yaml
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: NEXUS_PROMETHEUS
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    uid: NEXUS_JAEGER
+    isDefault: false
+    editable: false

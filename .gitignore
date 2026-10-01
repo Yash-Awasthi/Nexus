@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Test / coverage
+coverage/
+.vitest/
+playwright-report/
+test-results/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Turbo
+.turbo/
+
+# Local runtime data stores (PersistentStore JSON files — dev state, not source)
+apps/api/data/stores/
+
+# Runtime data the API writes when NEXUS_DATA_DIR is unset (never source)
+apps/api/data/
+
+# Local runtime state under data/ (auth tokens, run ids — dev state, not source)
+data/.*
+data/bridge/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Vendored Python runtime (embedded interpreter, dev convenience only)
+apps/api/Python/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Misc
+*.log
+sbom.json
+thepast-conv.txt
+
+# Local resume notes (not shared)
+PROGRESS.md
+
+# Reference clones for porting (local only, never committed)
+REF/
+
+# Local Claude Code config & worktrees (not part of the project)
+.claude/
+
+# Local dev tooling (portable Redis etc.)
+.local/
+
+# Docusaurus build cache
+.docusaurus/
+
+# Local reference clones for inspiration — never commit these
+inspiration/
+
+# Local tooling marker, not project source.
+.freebuff/

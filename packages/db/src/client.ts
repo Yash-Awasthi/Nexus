@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: Apache-2.0
+import { neon } from "@neondatabase/serverless";
+import { type NeonHttpDatabase, drizzle } from "drizzle-orm/neon-http";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { Pool } from "pg";
+
+import { getEmbeddedDb, isEmbeddedUrl } from "./embedded.js";
+import * as schema from "./schema/index.js";
+
+/**
+ * Nexus DB client — Drizzle ORM.
+ *
+ * Auto-detects the connection type from DATABASE_URL:
+ *   - Neon cloud URLs (*.neon.tech / *.neon.host) → Neon HTTP driver
+ *   - pglite:// URLs (the desktop app) → embedded Postgres, no server
+ *   - All other URLs (local dev, CI service containers) → standard pg Pool
+ *
+ * The public type is always NeonHttpDatabase so callers never need to change.
+ *
+ * Usage:
+ *   import { db } from "@nexus/db";
+ *   const tasks = await db.select().from(runtimeTasks).where(...);
+ */
+
+function isNeonUrl(url: string): boolean {
+  return url.includes(".neon.tech") || url.includes(".neon.host");
+}
+
+function createClient(): NeonHttpDatabase<typeof schema> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL is required — set it in .env or Doppler");
+  }
+
+  if (isEmbeddedUrl(url)) {
+    // Same instance the API's pool factory uses: PGlite is single-writer, so
+    // a second one on the same directory would corrupt it.
+    return drizzlePglite(getEmbeddedDb(url) as never, {
+      schema,
+    }) as unknown as NeonHttpDatabase<typeof schema>;
+  }
+
+  if (isNeonUrl(url)) {
+    const sql = neon(url);
+    return drizzle(sql, { schema });
+  }
+
+  // Standard TCP Postgres — local dev containers, CI, self-hosted.
+  // Cast to NeonHttpDatabase: both adapters implement the same query interface
+  // and share identical method signatures for all operations we use.
+  const pool = new Pool({ connectionString: url });
+  return drizzlePg(pool, { schema }) as unknown as NeonHttpDatabase<typeof schema>;
+}
+
+export const db = createClient();
+export type NexusDB = typeof db;

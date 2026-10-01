@@ -1,0 +1,127 @@
+# SPDX-License-Identifier: Apache-2.0
+# Default values for the NEXUS Helm chart.
+
+global:
+  image:
+    registry: ghcr.io/yash-awasthi
+    pullPolicy: IfNotPresent
+  env:
+    REDIS_URL: "redis://nexus-redis:6379"
+    LOG_LEVEL: "info"
+
+# One tag for every component, e.g. --set image.tag=v1.4.0 (each component's own tag otherwise).
+image:
+  tag: ""
+
+# Secret settings, stored in the chart's Secret and given to every component, e.g.
+# --set env.DATABASE_URL=... Empty values are left out.
+env:
+  DATABASE_URL: ""          # Required
+  NEXUS_API_KEY: ""         # Required
+  NEXUS_JWT_SECRET: ""      # Required: signs sessions
+  NEXUS_SECRETS_KEY: ""     # Required: 64 hex chars, encrypts saved provider keys
+  NEXUS_AUDIT_KEY: ""       # Required: signs the audit chain
+  NEXUS_INGEST_API_KEY: ""  # Required by the ingest service
+  GROQ_API_KEY: ""          # Optional server-wide provider keys
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+
+# Use this existing Secret instead of creating one from `env`.
+existingSecret: ""
+
+api:
+  enabled: true
+  image:
+    repository: nexus-api
+    tag: "latest"
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+worker:
+  enabled: true
+  image:
+    repository: nexus-worker
+    tag: "latest"
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+ingest:
+  enabled: true
+  image:
+    repository: nexus-ingest
+    tag: "latest"
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: nexus.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: nexus-tls
+      hosts:
+        - nexus.example.com
+
+postgresql:
+  enabled: true    # Set false to use external DB
+  auth:
+    postgresPassword: "changeme"
+    database: nexus
+
+redis:
+  enabled: true    # Set false to use external Redis
+  architecture: standalone
+  auth:
+    enabled: false
+
+serviceAccount:
+  create: true
+  name: "nexus"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+networkPolicy:
+  enabled: true

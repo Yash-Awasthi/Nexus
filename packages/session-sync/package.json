@@ -1,0 +1,21 @@
+{
+  "name": "@nexus/session-sync",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
+  },
+  "devDependencies": {
+    "vitest": "*",
+    "typescript": "*"
+  }
+}

@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * SFT (Supervised Fine-Tuning) tagger routes — conversation tagging + dataset export.
+ *
+ * POST /sft/conversations          — add a conversation; returns tagged SftSample
+ * GET  /sft/conversations          — list all samples (with optional quality filter)
+ * GET  /sft/conversations/:id      — get a single sample by ID
+ * GET  /sft/export?format=<fmt>    — export dataset (jsonl | alpaca | sharegpt)
+ * GET  /sft/stats                  — count, quality distribution
+ *
+ * Tagging: RuleTagger (rule-based; zero ML calls). QualityScorer assigns 0–1 score.
+ * Store: in-process SftDataset singleton.
+ */
+
+import { FinetunePipeline, FinetuneExportError } from "@nexus/finetune-pipeline";
+import {
+  DatasetFilter,
+  SftDataset,
+  SftExporter,
+  type ExportFormat,
+  type TurnRole,
+} from "@nexus/sft-tagger";
+import type { FastifyInstance } from "fastify";
+
+import { requireAuth } from "../middleware/auth.js";
+
+const now = (): string => new Date().toISOString();
+
+// ── Singletons ────────────────────────────────────────────────────────────────
+
+// One dataset per account: the conversations in it are the submitter's own.
+const datasets = new Map<string, SftDataset>();
+function datasetFor(req: { nexusUserId?: string }): SftDataset {
+  const id = req.nexusUserId ?? "local";
+  let d = datasets.get(id);
+  if (!d) datasets.set(id, (d = new SftDataset()));
+  return d;
+}
+const filter = new DatasetFilter();
+const exporter = new SftExporter();
+
+const EXPORT_MIME: Record<ExportFormat, string> = {
+  jsonl: "application/x-ndjson",
+  alpaca: "application/json",
+  sharegpt: "application/json",
+};
+
+// ── Route plugin ──────────────────────────────────────────────────────────────
+
+export async function sftRoutes(app: FastifyInstance): Promise<void> {
+  /**
+   * POST /sft/conversations
+   *
+   * Add a conversation and get back an auto-tagged SftSample with quality score.
+   *
+   * Body:
+   *   turns  — [{ role: "user"|"assistant"|"system"|"tool", content: string }]
+   *   source — optional label (dataset name, URL, etc.)
+   */
+  app.post<{
+    Body: {
+      turns: { role: TurnRole; content: string; metadata?: Record<string, unknown> }[];
+      source?: string;
+    };
+  }>("/sft/conversations", { preHandler: requireAuth }, async (request, reply) => {
+    const { turns, source } = request.body;
+
+    if (!Array.isArray(turns) || turns.length === 0) {
+      return reply.code(400).send({ error: "turns must be a non-empty array" });
+    }
+
+    const sample = datasetFor(request).addConversation(turns, source);
+    return reply.code(201).send(sample);
+  });
+
+  /**
+   * GET /sft/conversations?minQuality=<n>&maxQuality=<n>&minTurns=<n>&source=<s>
+   *
+   * List all samples with optional quality / turn-count / source filters.
+   */
+  app.get<{
+    Querystring: {
+      minQuality?: string;
+      maxQuality?: string;
+      minTurns?: string;
+      maxTurns?: string;
+      source?: string;
+    };
+  }>("/sft/conversations", { preHandler: requireAuth }, async (request, reply) => {
+    const { minQuality, maxQuality, minTurns, maxTurns, source } = request.query;
+
+    const filtered = filter.filter(datasetFor(request).list(), {
+      minQualityScore: minQuality ? parseFloat(minQuality) : undefined,
+      maxQualityScore: maxQuality ? parseFloat(maxQuality) : undefined,
+      minTurns: minTurns ? parseInt(minTurns, 10) : undefined,
+      maxTurns: maxTurns ? parseInt(maxTurns, 10) : undefined,
+      source,
+    });
+
+    return reply.send({ samples: filtered, total: filtered.length });
+  });
+
+  /**
+   * GET /sft/conversations/:id
+   *
+   * Get a single SftSample by ID.
+   */
+  app.get<{ Params: { id: string } }>(
+    "/sft/conversations/:id",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      const sample = datasetFor(request).get(request.params.id);
+      if (!sample) return reply.code(404).send({ error: "Sample not found" });
+      return reply.send(sample);
+    },
+  );
+
+  /**
+   * GET /sft/export?format=jsonl|alpaca|sharegpt&minQuality=<n>
+   *
+   * Export the dataset in the specified format.
+   * Applies minQuality filter before export (default: 0 — include all).
+   */
+  app.get<{
+    Querystring: { format?: string; minQuality?: string };
+  }>("/sft/export", { preHandler: requireAuth }, async (request, reply) => {
+    const fmt = (request.query.format ?? "jsonl") as ExportFormat;
+    const validFormats: ExportFormat[] = ["jsonl", "alpaca", "sharegpt"];
+    if (!validFormats.includes(fmt)) {
+      return reply.code(400).send({ error: `format must be one of: ${validFormats.join(", ")}` });
+    }
+
+    const minQuality = request.query.minQuality ? parseFloat(request.query.minQuality) : 0;
+    const samples = filter.filter(datasetFor(request).list(), { minQualityScore: minQuality });
+    const output = exporter.export(samples, fmt);
+
+    return reply
+      .header("Content-Type", EXPORT_MIME[fmt])
+      .header(
+        "Content-Disposition",
+        `attachment; filename="sft-datasetFor(request).${fmt === "jsonl" ? "jsonl" : "json"}"`,
+      )
+      .send(output);
+  });
+
+  /**
+   * POST /sft/pipeline/export
+   *
+   * §15.3 dataset assembly → OpenAI JSONL export. Accepts corpus documents and/or
+   * raw conversations, runs them through the finetune-pipeline (tag → score →
+   * filter → OpenAI chat-completions JSONL), enforces the ≥10-example export
+   * precondition, and returns the JSONL as a download.
+   *
+   * Body:
+   *   documents     — [{ id, title, content, source?, topics? }] corpus docs
+   *   conversations — [[{ role, content }, …], …] raw turns
+   *   minQuality    — optional 0–1 quality gate (default 0.5)
+   *   systemPrompt  — optional system message (default "You are a helpful assistant.")
+   */
+  app.post<{
+    Body: {
+      documents?: {
+        id: string;
+        title: string;
+        content: string;
+        source?: string;
+        topics?: string[];
+      }[];
+      conversations?: { role: TurnRole; content: string }[][];
+      minQuality?: number;
+      systemPrompt?: string;
+    };
+  }>("/sft/pipeline/export", { preHandler: requireAuth }, async (request, reply) => {
+    const { documents = [], conversations = [], minQuality, systemPrompt } = request.body;
+    if (documents.length === 0 && conversations.length === 0) {
+      return reply.code(400).send({
+        error: "empty_input",
+        message:
+          "Provide at least one corpus document or conversation to assemble a datasetFor(request).",
+      });
+    }
+
+    const pipeline = new FinetunePipeline();
+    pipeline.addCorpusDocuments(documents);
+    pipeline.addConversations(conversations);
+    const { ready, counts } = pipeline.assemble({ minQuality: minQuality ?? 0.5 });
+
+    let jsonl: string;
+    try {
+      jsonl = pipeline.exportOpenAiJsonl(ready, { systemPrompt });
+    } catch (e) {
+      if (e instanceof FinetuneExportError) {
+        return reply.code(e.code === "EMPTY_DATASET" ? 404 : 422).send({
+          error: e.code === "EMPTY_DATASET" ? "no_data" : "insufficient_data",
+          message: e.message,
+          readyCount: e.readyCount,
+        });
+      }
+      throw e;
+    }
+
+    const lines = jsonl.split("\n").filter(Boolean).length;
+    return (
+      reply
+        .header("Content-Type", "application/x-ndjson")
+        .header(
+          "Content-Disposition",
+          `attachment; filename="nexus-sft-dataset-${now().slice(0, 10)}.jsonl"`,
+        )
+        // Metadata rides headers — the body is PURE JSONL so any ndjson consumer
+        // (and OpenAI's upload endpoint) can parse every line.
+        .header("X-Dataset-Count-Corpus", String(counts.corpus))
+        .header("X-Dataset-Count-Conversations", String(counts.conversations))
+        .header("X-Dataset-Lines", String(lines))
+        .send(jsonl)
+    );
+  });
+
+  /**
+   * GET /sft/stats
+   *
+   * Count samples + quality distribution (min, max, mean, p50).
+   */
+  app.get(
+    "/sft/stats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      const samples = datasetFor(request).list();
+      const count = samples.length;
+
+      let min = 1,
+        max = 0,
+        sum = 0;
+      const scores = samples.map((s) => s.qualityScore).sort((a, b) => a - b);
+
+      if (scores.length > 0) {
+        min = scores[0]!;
+        max = scores[scores.length - 1]!;
+        sum = scores.reduce((a, b) => a + b, 0);
+      }
+
+      const mean = count > 0 ? sum / count : 0;
+      const p50 = count > 0 ? (scores[Math.floor(count / 2)] ?? 0) : 0;
+
+      return reply.send({ count, quality: { min, max, mean, p50 } });
+    },
+  );
+}

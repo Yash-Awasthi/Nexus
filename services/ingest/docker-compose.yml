@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+# nexus-ingest local development stack
+version: "3.9"
+
+services:
+  ingest:
+    build:
+      context: ../..
+      dockerfile: services/ingest/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nexus:nexus@postgres:5432/nexus}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NEXUS_INGEST_API_KEY: ${NEXUS_INGEST_API_KEY:-dev-secret}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nexus
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

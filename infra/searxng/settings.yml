@@ -1,0 +1,86 @@
+# SearXNG settings for Nexus local development stack
+# https://docs.searxng.org/admin/settings/settings.html
+#
+# Override individual settings here; everything else inherits from
+# SearXNG's built-in defaults (use_default_settings: true).
+
+use_default_settings: true
+
+general:
+  # Instance title shown in the web UI
+  instance_name: "Nexus Search"
+  # Allow API access without browser (required for /search?format=json)
+  enable_metrics: false
+
+search:
+  # Accept JSON format responses — required for the Nexus adapter
+  formats:
+    - html
+    - json
+  safe_search: 0 # 0 = off, 1 = moderate, 2 = strict (override per-request)
+  autocomplete: "duckduckgo"
+  default_lang: "en-US"
+  ban_time_on_fail: 5 # seconds to ban engine after failure
+  max_ban_time_on_fail: 120
+
+server:
+  # Secret key — override via SEARXNG_SECRET env var in docker-compose
+  secret_key: "change-me-in-production-use-SEARXNG_SECRET_env"
+  bind_address: "0.0.0.0:8080"
+  # Allow cross-origin requests from the Nexus API
+  http_protocol_version: "1.1"
+  # Disable rate limiting for localhost clients
+  method: "POST"
+
+# Uncomment and configure proxies for outbound requests if needed:
+# outgoing:
+#   proxies:
+#     http: socks5://127.0.0.1:1080
+#     https: socks5://127.0.0.1:1080
+
+# Engine selection — enable a balanced set for general + code search
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: bi
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: false
+
+  - name: github
+    engine: github
+    shortcut: gh
+    categories: it
+    disabled: false
+
+  - name: stackoverflow
+    engine: stackexchange
+    shortcut: so
+    api_site: stackoverflow
+    categories: it
+    disabled: false
+
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    categories: science
+    disabled: false
+
+  - name: semantic scholar
+    engine: semantic_scholar
+    shortcut: ss
+    categories: science
+    disabled: false

@@ -1,0 +1,2005 @@
+// SPDX-License-Identifier: Apache-2.0
+import {
+  Search,
+  Code,
+  Plus,
+  Upload,
+  Download,
+  ChevronDown,
+  Copy,
+  Check,
+  FileJson,
+  FileText,
+  Loader2,
+  Trash2,
+  GitMerge,
+  Play,
+  CircleCheck,
+  CircleX,
+  Clock,
+  Sparkles,
+  Save,
+  RefreshCw,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Textarea } from "~/components/ui/textarea";
+import { apiFetch } from "~/lib/api";
+
+interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  language: "Python" | "TypeScript" | "JavaScript";
+  tags: string[];
+  code: string;
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+
+interface BackendSkill {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  language: string;
+  version: string;
+  parameters: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface MissionPhase {
+  phase: string;
+  iteration: number;
+  note?: string;
+  timestamp: string;
+}
+
+interface MissionReview {
+  score: number;
+  verdict: "accept" | "reject" | "unknown";
+  issues: string[];
+  suggestions: string[];
+  unparsed?: boolean;
+}
+
+interface CompressReport {
+  inputTokens: number;
+  outputTokens: number;
+  estimatedTokensSaved: number;
+  savedRatio: number;
+  keptSkills: { id: string; name: string; score: number }[];
+  droppedSkills: { id: string; name: string; score: number }[];
+  matchSource: "semantic" | "keyword";
+}
+
+interface CompressResponse {
+  composite: { name: string; description: string; code: string };
+  report: CompressReport & {
+    polished?: boolean;
+    polishTokens?: { inputTokens: number; outputTokens: number };
+    polishError?: string;
+    polishServedBy?: string;
+  };
+  skill?: BackendSkill;
+}
+
+interface MissionRecord {
+  id: string;
+  goal: string;
+  status: "running" | "completed" | "failed" | "aborted";
+  accepted: boolean;
+  iteration: number;
+  maxIterations: number;
+  phases: MissionPhase[];
+  actingSteps: number;
+  spawnCount: number;
+  lastReview?: MissionReview;
+  memoryFrom?: { missionId: string; outcome: string };
+  finalContent: string;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  error?: string;
+  skills?: { id: string; name: string }[];
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  started: "Started",
+  thinking: "Thinking",
+  acting: "Acting",
+  spawning: "Spawning",
+  reviewing: "Reviewing",
+  improving: "Improving",
+  completed: "Completed",
+  failed: "Failed",
+  aborted: "Aborted",
+};
+
+/** Live view of a skill-execution mission: phases, review verdict, output.
+ *  `onContinue` renders a "Continue with Memory" action on terminal runs — it
+ *  re-runs the mission with the prior run's execution memory attached. */
+function MissionProgress({
+  mission,
+  onReset,
+  onContinue,
+}: {
+  mission: MissionRecord;
+  onReset: () => void;
+  onContinue?: () => void;
+}) {
+  const running = mission.status === "running";
+  return (
+    <div className="space-y-4 py-2">
+      {/* Status header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {running ? (
+            <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+          ) : mission.status === "completed" && mission.accepted ? (
+            <CircleCheck className="size-4 text-success shrink-0" />
+          ) : mission.status === "failed" || mission.status === "aborted" ? (
+            <CircleX className="size-4 text-destructive shrink-0" />
+          ) : (
+            <Clock className="size-4 text-muted-foreground shrink-0" />
+          )}
+          <span className="text-sm font-medium capitalize">{mission.status}</span>
+          {mission.lastReview && (
+            <Badge
+              variant={
+                mission.lastReview.unparsed
+                  ? "secondary"
+                  : mission.lastReview.verdict === "accept"
+                    ? "default"
+                    : "destructive"
+              }
+              className="text-[10px]"
+            >
+              {mission.lastReview.unparsed
+                ? "review inconclusive — no structured verdict"
+                : `review ${mission.lastReview.score}/100 — ${mission.lastReview.verdict}`}
+            </Badge>
+          )}
+          {mission.memoryFrom && (
+            <Badge variant="secondary" className="text-[10px]">
+              continuing from {mission.memoryFrom.missionId.slice(-8)} —{" "}
+              {mission.memoryFrom.outcome}
+            </Badge>
+          )}
+        </div>
+        <span className="text-[10px] text-muted-foreground shrink-0">
+          iter {mission.iteration + 1}/{mission.maxIterations} · {mission.actingSteps} steps ·{" "}
+          {(mission.usage?.totalTokens ?? 0).toLocaleString()} tokens
+        </span>
+      </div>
+
+      {mission.skills && mission.skills.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {mission.skills.map((s) => (
+            <Badge key={s.id} variant="secondary" className="text-[10px]">
+              skill: {s.name}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Phase timeline */}
+      <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-md border p-3">
+        {mission.phases.map((p, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="text-muted-foreground shrink-0">
+              {new Date(p.timestamp).toLocaleTimeString()}
+            </span>
+            <span className="font-medium shrink-0">{PHASE_LABELS[p.phase] ?? p.phase}</span>
+            {p.note && <span className="text-muted-foreground truncate">{p.note}</span>}
+          </div>
+        ))}
+      </div>
+
+      {mission.error && (
+        <p className="text-xs text-destructive">
+          <CircleX className="inline size-3.5 mr-1" />
+          {mission.error}
+        </p>
+      )}
+
+      {/* Final output */}
+      {mission.finalContent && (
+        <div className="space-y-1.5">
+          <Label className="text-xs">Final output</Label>
+          <pre className="max-h-48 overflow-y-auto rounded-md bg-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
+            {mission.finalContent}
+          </pre>
+        </div>
+      )}
+
+      <DialogFooter>
+        {!running && onContinue && (
+          <Button onClick={onContinue} className="gap-2">
+            <RefreshCw className="size-3" />
+            Continue with Memory
+          </Button>
+        )}
+        {!running && (
+          <Button variant="outline" onClick={onReset} className="gap-2">
+            <Play className="size-3" />
+            Run Again
+          </Button>
+        )}
+        <Button variant="outline" onClick={onReset}>
+          Close
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function normalizeLanguage(lang: string): Skill["language"] {
+  const map: Record<string, Skill["language"]> = {
+    python: "Python",
+    typescript: "TypeScript",
+    javascript: "JavaScript",
+  };
+  return map[lang.toLowerCase()] ?? "Python";
+}
+
+function toSkill(b: BackendSkill): Skill {
+  return {
+    id: b.id,
+    name: b.name,
+    description: b.description,
+    language: normalizeLanguage(b.language),
+    tags: [],
+    code: b.code,
+  };
+}
+
+// Keep a handful of offline examples shown when the user has no skills yet
+const EXAMPLE_SKILLS: Skill[] = [
+  {
+    id: "sk_1",
+    name: "Web Scraper",
+    description: "Extract structured data from web pages using CSS selectors and XPath",
+    language: "Python",
+    tags: ["scraping", "data"],
+    code: `import requests
+from bs4 import BeautifulSoup
+from typing import Optional
+import time
+
+def scrape_page(url: str, selector: str, delay: float = 1.0) -> list[str]:
+    """
+    Extract text content from a web page using a CSS selector.
+
+    Args:
+        url: The URL to scrape
+        selector: CSS selector to target elements
+        delay: Seconds to wait between requests (rate limiting)
+
+    Returns:
+        List of text strings from matching elements
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; Scraper/1.0)"
+    }
+    resp = requests.get(url, headers=headers, timeout=10)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    elements = soup.select(selector)
+    results = [el.get_text(strip=True) for el in elements if el.get_text(strip=True)]
+
+    time.sleep(delay)
+    return results
+
+
+def scrape_links(url: str, base_url: Optional[str] = None) -> list[dict]:
+    """Extract all hyperlinks from a page with optional base URL resolution."""
+    resp = requests.get(url, timeout=10)
+    soup = BeautifulSoup(resp.text, "html.parser")
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if base_url and href.startswith("/"):
+            href = base_url.rstrip("/") + href
+        links.append({"text": a.get_text(strip=True), "href": href})
+    return links`,
+  },
+  {
+    id: "sk_2",
+    name: "JSON Transformer",
+    description: "Transform JSON data between different schemas using JMESPath expressions",
+    language: "TypeScript",
+    tags: ["data", "transform"],
+    code: `import jmespath from "jmespath";
+
+export interface TransformResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Transform data using a JMESPath expression.
+ * Returns a typed result with success/error discriminant.
+ */
+export function transform<T = unknown>(
+  data: unknown,
+  expression: string
+): TransformResult<T> {
+  try {
+    const result = jmespath.search(data, expression);
+    return { success: true, data: result as T };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
+/** Apply multiple transformations in sequence */
+export function pipeline<T = unknown>(
+  data: unknown,
+  expressions: string[]
+): TransformResult<T> {
+  let current: unknown = data;
+  for (const expr of expressions) {
+    const result = transform(current, expr);
+    if (!result.success) return result as TransformResult<T>;
+    current = result.data;
+  }
+  return { success: true, data: current as T };
+}
+
+/** Validate that all required keys exist in transformed output */
+export function validateKeys(data: unknown, required: string[]): string[] {
+  if (typeof data !== "object" || data === null) return required;
+  const missing = required.filter((key) => !(key in (data as object)));
+  return missing;
+}`,
+  },
+  {
+    id: "sk_3",
+    name: "PDF Parser",
+    description: "Extract text and metadata from PDF documents",
+    language: "Python",
+    tags: ["documents", "parsing"],
+    code: `import PyPDF2
+from pathlib import Path
+from dataclasses import dataclass
+
+@dataclass
+class PDFContent:
+    text: str
+    page_count: int
+    metadata: dict
+
+def extract_text(pdf_path: str) -> str:
+    reader = PyPDF2.PdfReader(pdf_path)
+    return '\\n'.join(page.extract_text() for page in reader.pages)`,
+  },
+  {
+    id: "sk_4",
+    name: "API Client Generator",
+    description: "Generate typed API client code from OpenAPI specifications",
+    language: "TypeScript",
+    tags: ["api", "codegen"],
+    code: `import { generateClient } from "./codegen";
+
+export async function generateFromSpec(specUrl: string) {
+  const spec = await fetch(specUrl).then((r) => r.json());
+  return generateClient(spec);
+}`,
+  },
+  {
+    id: "sk_5",
+    name: "SQL Query Builder",
+    description: "Build parameterized SQL queries with a fluent API",
+    language: "TypeScript",
+    tags: ["database", "sql"],
+    code: `type OrderDirection = "ASC" | "DESC";
+type JoinType = "INNER" | "LEFT" | "RIGHT" | "FULL";
+
+interface QueryState {
+  selects: string[];
+  table: string;
+  joins: string[];
+  conditions: string[];
+  groupBys: string[];
+  orderBys: string[];
+  limitVal?: number;
+  offsetVal?: number;
+}
+
+export class QueryBuilder {
+  private state: QueryState = {
+    selects: [],
+    table: "",
+    joins: [],
+    conditions: [],
+    groupBys: [],
+    orderBys: [],
+  };
+
+  select(...cols: string[]): this {
+    this.state.selects.push(...cols);
+    return this;
+  }
+
+  from(table: string): this {
+    this.state.table = table;
+    return this;
+  }
+
+  join(table: string, on: string, type: JoinType = "INNER"): this {
+    this.state.joins.push(\`\${type} JOIN \${table} ON \${on}\`);
+    return this;
+  }
+
+  where(condition: string): this {
+    this.state.conditions.push(condition);
+    return this;
+  }
+
+  groupBy(...cols: string[]): this {
+    this.state.groupBys.push(...cols);
+    return this;
+  }
+
+  orderBy(col: string, dir: OrderDirection = "ASC"): this {
+    this.state.orderBys.push(\`\${col} \${dir}\`);
+    return this;
+  }
+
+  limit(n: number): this {
+    this.state.limitVal = n;
+    return this;
+  }
+
+  offset(n: number): this {
+    this.state.offsetVal = n;
+    return this;
+  }
+
+  build(): string {
+    const parts: string[] = [];
+    const cols = this.state.selects.length ? this.state.selects.join(", ") : "*";
+    parts.push(\`SELECT \${cols} FROM \${this.state.table}\`);
+    if (this.state.joins.length) parts.push(this.state.joins.join(" "));
+    if (this.state.conditions.length) parts.push(\`WHERE \${this.state.conditions.join(" AND ")}\`);
+    if (this.state.groupBys.length) parts.push(\`GROUP BY \${this.state.groupBys.join(", ")}\`);
+    if (this.state.orderBys.length) parts.push(\`ORDER BY \${this.state.orderBys.join(", ")}\`);
+    if (this.state.limitVal != null) parts.push(\`LIMIT \${this.state.limitVal}\`);
+    if (this.state.offsetVal != null) parts.push(\`OFFSET \${this.state.offsetVal}\`);
+    return parts.join(" ");
+  }
+}`,
+  },
+  {
+    id: "sk_6",
+    name: "Image Analyzer",
+    description: "Analyze images using computer vision for object detection and classification",
+    language: "Python",
+    tags: ["vision", "ai"],
+    code: `from PIL import Image
+import torch
+from transformers import pipeline
+
+def analyze_image(image_path: str) -> dict:
+    classifier = pipeline("image-classification")
+    image = Image.open(image_path)
+    return classifier(image)`,
+  },
+  {
+    id: "sk_7",
+    name: "Rate Limiter",
+    description: "Token-bucket rate limiter for API request throttling with burst support",
+    language: "TypeScript",
+    tags: ["api", "performance", "throttle"],
+    code: `interface RateLimiterOptions {
+  /** Maximum tokens in the bucket */
+  capacity: number;
+  /** Tokens refilled per second */
+  refillRate: number;
+  /** Initial tokens (defaults to capacity) */
+  initialTokens?: number;
+}
+
+/**
+ * Token-bucket rate limiter.
+ * Allows burst traffic up to \`capacity\` then throttles to \`refillRate\` req/s.
+ */
+export class RateLimiter {
+  private tokens: number;
+  private lastRefill: number;
+  private readonly capacity: number;
+  private readonly refillRate: number;
+
+  constructor(options: RateLimiterOptions) {
+    this.capacity = options.capacity;
+    this.refillRate = options.refillRate;
+    this.tokens = options.initialTokens ?? options.capacity;
+    this.lastRefill = Date.now();
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsed = (now - this.lastRefill) / 1000;
+    this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillRate);
+    this.lastRefill = now;
+  }
+
+  /** Returns true and consumes a token if allowed, false otherwise */
+  tryConsume(tokens = 1): boolean {
+    this.refill();
+    if (this.tokens >= tokens) {
+      this.tokens -= tokens;
+      return true;
+    }
+    return false;
+  }
+
+  /** Returns ms to wait before the next request is allowed */
+  msUntilNext(tokens = 1): number {
+    this.refill();
+    if (this.tokens >= tokens) return 0;
+    return Math.ceil(((tokens - this.tokens) / this.refillRate) * 1000);
+  }
+
+  /** Wrap an async function with rate limiting */
+  async throttle<T>(fn: () => Promise<T>): Promise<T> {
+    const wait = this.msUntilNext();
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    this.tryConsume();
+    return fn();
+  }
+}`,
+  },
+  {
+    id: "sk_8",
+    name: "CSV Processor",
+    description:
+      "Parse, filter, transform, and export CSV data with streaming support for large files",
+    language: "Python",
+    tags: ["data", "csv", "etl"],
+    code: `import csv
+import io
+from typing import Callable, Iterator, Any
+from dataclasses import dataclass
+
+
+@dataclass
+class CSVStats:
+    row_count: int
+    column_count: int
+    columns: list[str]
+    null_counts: dict[str, int]
+
+
+def read_csv(path: str, encoding: str = "utf-8") -> list[dict[str, str]]:
+    """Read a CSV file into a list of dicts."""
+    with open(path, newline="", encoding=encoding) as f:
+        return list(csv.DictReader(f))
+
+
+def stream_csv(path: str, chunk_size: int = 1000) -> Iterator[list[dict]]:
+    """Stream a large CSV in chunks to avoid memory issues."""
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        chunk: list[dict] = []
+        for row in reader:
+            chunk.append(dict(row))
+            if len(chunk) >= chunk_size:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
+
+
+def filter_rows(
+    rows: list[dict],
+    predicate: Callable[[dict], bool],
+) -> list[dict]:
+    """Filter rows by a predicate function."""
+    return [row for row in rows if predicate(row)]
+
+
+def transform_column(
+    rows: list[dict],
+    column: str,
+    fn: Callable[[str], Any],
+) -> list[dict]:
+    """Apply a transformation function to a single column."""
+    return [{**row, column: fn(row[column])} for row in rows if column in row]
+
+
+def get_stats(rows: list[dict]) -> CSVStats:
+    """Compute basic statistics for the CSV dataset."""
+    if not rows:
+        return CSVStats(0, 0, [], {})
+    columns = list(rows[0].keys())
+    null_counts = {col: sum(1 for r in rows if not r.get(col)) for col in columns}
+    return CSVStats(
+        row_count=len(rows),
+        column_count=len(columns),
+        columns=columns,
+        null_counts=null_counts,
+    )
+
+
+def write_csv(rows: list[dict], path: str) -> None:
+    """Write a list of dicts to a CSV file."""
+    if not rows:
+        return
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def to_csv_string(rows: list[dict]) -> str:
+    """Serialize rows to a CSV string (useful for in-memory export)."""
+    if not rows:
+        return ""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=rows[0].keys())
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue()`,
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const languageColors: Record<Skill["language"], string> = {
+  Python: "text-primary border-primary/30 bg-primary/10",
+  TypeScript: "text-primary border-primary/30 bg-primary/10",
+  JavaScript: "text-warning border-warning/30 bg-warning/10",
+};
+
+interface AddSkillForm {
+  name: string;
+  description: string;
+  language: Skill["language"] | "";
+  tags: string;
+  code: string;
+}
+
+// ─── Code Viewer with line numbers and copy ───────────────────────────────────
+
+function CodeViewer({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const lines = code.split("\n");
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="rounded-md bg-muted border border-border overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted">
+        <span className="text-[10px] text-muted-foreground font-mono">{lines.length} lines</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-muted-foreground"
+          onClick={handleCopy}
+        >
+          {copied ? (
+            <>
+              <Check className="size-3 text-success" />
+              <span className="text-success">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="size-3" />
+              Copy
+            </>
+          )}
+        </Button>
+      </div>
+      <div className="overflow-auto max-h-96">
+        <table className="w-full text-xs font-mono leading-relaxed">
+          <tbody>
+            {lines.map((line, i) => (
+              <tr key={i} className="hover:bg-muted">
+                <td className="select-none text-right pr-3 pl-3 py-0 text-muted-foreground w-8 min-w-[2.5rem]">
+                  {i + 1}
+                </td>
+                <td className="pr-4 py-0 text-muted-foreground whitespace-pre">
+                  {line || "\u00a0"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Import Dialog (real file reading) ─────────────────────────────────────────
+
+function ImportDialog({
+  open,
+  onOpenChange,
+  onImport,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onImport: (skill: Skill) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const processFile = (file: File) => {
+    setFileName(file.name);
+    setImporting(true);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const content = ev.target?.result as string;
+        if (file.name.endsWith(".json")) {
+          const data = JSON.parse(content) as Partial<Skill>;
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: data.name || file.name.replace(/\.\w+$/, ""),
+            description: data.description || "Imported skill",
+            language: data.language || "Python",
+            tags: Array.isArray(data.tags) ? data.tags : ["imported"],
+            code: data.code || content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        } else if (file.name.endsWith(".yaml") || file.name.endsWith(".yml")) {
+          // Simple YAML key-value parsing
+          const lines = content.split("\n");
+          const parsed: Record<string, string> = {};
+          const codeLines: string[] = [];
+          let inCode = false;
+
+          for (const line of lines) {
+            if (inCode) {
+              if (line.startsWith("  ")) {
+                codeLines.push(line.slice(2));
+              } else if (line.trim() === "") {
+                codeLines.push("");
+              } else {
+                inCode = false;
+              }
+            }
+            const match = /^(\w+):\s*(.+)/.exec(line);
+            if (match) {
+              const key = match[1];
+              const val = match[2].replace(/^["']|["']$/g, "");
+              parsed[key] = val;
+            }
+            if (/^code:\s*\|/.exec(line)) {
+              inCode = true;
+            }
+          }
+
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: parsed.name || file.name.replace(/\.\w+$/, ""),
+            description: parsed.description || "Imported skill",
+            language: (parsed.language as Skill["language"]) || "Python",
+            tags: parsed.tags
+              ? parsed.tags
+                  .replace(/[[\]]/g, "")
+                  .split(",")
+                  .map((t) => t.trim().replace(/^["']|["']$/g, ""))
+                  .filter(Boolean)
+              : ["imported"],
+            code: codeLines.length > 0 ? codeLines.join("\n") : content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        } else {
+          // Plain text / code file - treat as code
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: file.name.replace(/\.\w+$/, ""),
+            description: "Imported from file",
+            language:
+              file.name.endsWith(".ts") || file.name.endsWith(".tsx")
+                ? "TypeScript"
+                : file.name.endsWith(".js") || file.name.endsWith(".jsx")
+                  ? "JavaScript"
+                  : "Python",
+            tags: ["imported"],
+            code: content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        }
+      } catch (err) {
+        setError(`Failed to parse file: ${err instanceof Error ? err.message : "Unknown error"}`);
+      }
+      setImporting(false);
+      setFileName(null);
+    };
+    reader.onerror = () => {
+      setError("Failed to read file");
+      setImporting(false);
+      setFileName(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="size-4" />
+            Import Skill
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-muted-foreground">
+            Import a skill from a JSON, YAML, or code file.
+          </p>
+
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept=".json,.yaml,.yml,.py,.ts,.tsx,.js,.jsx,.txt"
+            className="hidden"
+            id="skill-file-input"
+            onChange={handleFileInput}
+          />
+
+          {/* Drop zone */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+              dragging
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50 hover:bg-muted/30"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const file = e.dataTransfer.files[0];
+              if (file) processFile(file);
+            }}
+            onClick={() => {
+              document.getElementById("skill-file-input")?.click();
+            }}
+          >
+            {importing ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="size-8 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">Importing {fileName}...</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="size-8 text-muted-foreground" />
+                <p className="text-sm font-medium">Drop a file here or click to browse</p>
+                <p className="text-xs text-muted-foreground">
+                  Supports .json, .yaml, .py, .ts, .js files
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function SkillsPage() {
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addForm, setAddForm] = useState<AddSkillForm>({
+    name: "",
+    description: "",
+    language: "",
+    tags: "",
+    code: "",
+  });
+
+  // ── Skill compression (merge) ────────────────────────────────────────────
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeForm, setMergeForm] = useState({
+    name: "",
+    description: "",
+    deleteOriginals: true,
+    polish: false,
+  });
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
+
+  // ── Task compression (composite skill) ───────────────────────────────────
+  const [compressOpen, setCompressOpen] = useState(false);
+  const [compressTask, setCompressTask] = useState("");
+  const [compressLoading, setCompressLoading] = useState(false);
+  const [compressResult, setCompressResult] = useState<CompressResponse | null>(null);
+  const [compressForm, setCompressForm] = useState({ polish: false, save: false });
+  const [compressError, setCompressError] = useState<string | null>(null);
+
+  const handleCompressSkills = async (save: boolean) => {
+    const ids = [...mergeSelected];
+    if (ids.length === 0 || !compressTask.trim()) return;
+    setCompressLoading(true);
+    setCompressError(null);
+    try {
+      const res = await apiFetch<CompressResponse>("/api/skills/compress", {
+        method: "POST",
+        body: JSON.stringify({
+          ids,
+          task: compressTask.trim(),
+          polish: compressForm.polish,
+          save,
+        }),
+      });
+      setCompressResult(res);
+      if (save && res.skill) refreshSkills();
+    } catch (e) {
+      setCompressError(e instanceof Error ? e.message : "Failed to compress skills");
+    } finally {
+      setCompressLoading(false);
+    }
+  };
+
+  const toggleMergeSelect = (id: string) => {
+    setMergeSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const refreshSkills = () => {
+    apiFetch<{ skills: BackendSkill[] }>("/api/skills")
+      .then(({ skills: list }) => setSkills(list.length > 0 ? list.map(toSkill) : EXAMPLE_SKILLS))
+      .catch(() => setSkills(EXAMPLE_SKILLS));
+  };
+
+  const handleMergeSkills = async () => {
+    const ids = [...mergeSelected];
+    if (ids.length < 2) return;
+    setMergeLoading(true);
+    setMergeNotice(null);
+    try {
+      const res = await apiFetch<{
+        skill: BackendSkill;
+        report: {
+          estimatedTokensSaved: number;
+          inputTokens: number;
+          outputTokens: number;
+          polished: boolean;
+          polishError?: string;
+          polishServedBy?: string;
+        };
+      }>("/api/skills/merge", {
+        method: "POST",
+        body: JSON.stringify({
+          ids,
+          name: mergeForm.name || undefined,
+          description: mergeForm.description || undefined,
+          deleteOriginals: mergeForm.deleteOriginals,
+          polish: mergeForm.polish,
+        }),
+      });
+      setMergeNotice(
+        `Merged ${ids.length} skills into “${res.skill.name}” — ` +
+          `~${res.report.estimatedTokensSaved.toLocaleString()} tokens saved` +
+          (res.report.polished
+            ? ` (AI-polished${res.report.polishServedBy ? ` via ${res.report.polishServedBy}` : ""})`
+            : res.report.polishError
+              ? " (AI polish failed — deterministic merge kept)"
+              : "") +
+          ` (${res.report.inputTokens.toLocaleString()} → ${res.report.outputTokens.toLocaleString()})`,
+      );
+      setMergeSelected(new Set());
+      setMergeOpen(false);
+      setMergeForm({ name: "", description: "", deleteOriginals: true, polish: false });
+      refreshSkills();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to merge skills");
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
+  // ── Skill execution (run as a mission — skills execute end-to-end) ─────
+  const [runSkill, setRunSkill] = useState<Skill | null>(null);
+  /** Composite mode: run a task-compressed composite (ids + task) as a mission
+   *  without saving it — the mission rebuilds it server-side at start. */
+  const [runComposite, setRunComposite] = useState<{
+    ids: string[];
+    task: string;
+    name: string;
+  } | null>(null);
+  const [runGoal, setRunGoal] = useState("");
+  const [runLoading, setRunLoading] = useState(false);
+  const [runMission, setRunMission] = useState<MissionRecord | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runTerse, setRunTerse] = useState(true); // caveman-ponytail output style
+  const [runShell, setRunShell] = useState(false);
+
+  useEffect(() => {
+    // Poll the mission while it's live; stop when it reaches a terminal state.
+    if (
+      !runMission ||
+      runMission.status === "completed" ||
+      runMission.status === "failed" ||
+      runMission.status === "aborted"
+    ) {
+      return;
+    }
+    const t = setInterval(() => {
+      apiFetch<MissionRecord>(`/api/missions/${runMission.id}`)
+        .then(setRunMission)
+        .catch(() => {
+          /* transient poll failure — keep trying */
+        });
+    }, 2000);
+    return () => clearInterval(t);
+  }, [runMission?.id, runMission?.status]);
+
+  const handleRunSkill = async (overrides?: { continueFrom?: string; goal?: string }) => {
+    const composite = runComposite;
+    if (!runSkill && !composite && !overrides?.continueFrom) return;
+    setRunLoading(true);
+    setRunError(null);
+    setRunMission(null);
+    try {
+      const goal =
+        overrides?.goal?.trim() ||
+        runGoal.trim() ||
+        (composite
+          ? `Execute the composite skill "${composite.name}" end-to-end: run its code, verify the output, and report the result.`
+          : runSkill
+            ? `Execute skill "${runSkill.name}" end-to-end: run its code, verify the output, and report the result.`
+            : "");
+      // Named here so a shell approval, which the server binds to this id, matches on the retry.
+      const missionId = `mission-${crypto.randomUUID()}`;
+      const start = (approvalId?: string) =>
+        apiFetch<MissionRecord & { approvalId?: string }>("/api/missions", {
+          method: "POST",
+          body: JSON.stringify({
+            goal,
+            approvalId,
+            missionId,
+            shell: runShell,
+            ...(composite
+              ? { compress: { ids: composite.ids, task: composite.task } }
+              : runSkill
+                ? { skillIds: [runSkill.id] }
+                : {}),
+            ...(overrides?.continueFrom ? { continueFrom: overrides.continueFrom } : {}),
+            maxIterations: 3,
+            think: true,
+            outputStyle: runTerse ? "ponytail" : "normal",
+          }),
+        });
+      let record = await start();
+      if (record.approvalId) {
+        const what = runShell
+          ? "This runs the skill's code and lets the mission run shell commands on this machine for this one run."
+          : "This runs the skill's code on this machine.";
+        if (!window.confirm(`${what} Allow it once?`)) return;
+        await apiFetch(`/api/v1/exec/approvals/${record.approvalId}/approve`, { method: "POST" });
+        record = await start(record.approvalId);
+      }
+      setRunMission(record);
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : "Failed to start skill run");
+    } finally {
+      setRunLoading(false);
+    }
+  };
+
+  // ── Load skills from API ─────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const { skills: list } = await apiFetch<{ skills: BackendSkill[] }>("/api/skills");
+        if (!cancelled) setSkills(list.length > 0 ? list.map(toSkill) : EXAMPLE_SKILLS);
+      } catch {
+        // Fall back to examples on auth/network error
+        if (!cancelled) setSkills(EXAMPLE_SKILLS);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = skills.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.description.toLowerCase().includes(search.toLowerCase()) ||
+      s.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const handleAddSkill = async () => {
+    if (!addForm.name || !addForm.language) return;
+    setAddLoading(true);
+    try {
+      const created = await apiFetch<BackendSkill>("/api/skills", {
+        method: "POST",
+        body: JSON.stringify({
+          name: addForm.name,
+          description: addForm.description || "No description",
+          language: addForm.language.toLowerCase(),
+          code: addForm.code || "# No code provided",
+        }),
+      });
+      setSkills((prev) => [toSkill(created), ...prev]);
+      setAddOpen(false);
+      setAddForm({ name: "", description: "", language: "", tags: "", code: "" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create skill");
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleDeleteSkill = async (id: string) => {
+    if (!confirm("Delete this skill?")) return;
+    try {
+      await apiFetch(`/api/skills/${id}`, { method: "DELETE" });
+      setSkills((prev) => prev.filter((s) => s.id !== id));
+      if (selectedSkill?.id === id) setSelectedSkill(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete skill");
+    }
+  };
+
+  const handleImportSkill = async (skill: Skill) => {
+    try {
+      const created = await apiFetch<BackendSkill>("/api/skills", {
+        method: "POST",
+        body: JSON.stringify({
+          name: skill.name,
+          description: skill.description,
+          language: skill.language.toLowerCase(),
+          code: skill.code,
+        }),
+      });
+      setSkills((prev) => [toSkill(created), ...prev]);
+    } catch {
+      // If API fails, still show it locally
+      setSkills((prev) => [skill, ...prev]);
+    }
+  };
+
+  const handleExport = (skill: Skill, format: "json" | "yaml") => {
+    if (format === "json") {
+      const blob = new Blob([JSON.stringify(skill, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${skill.name.toLowerCase().replace(/\s+/g, "-")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // Simple YAML serialization
+      const yaml = [
+        `name: "${skill.name}"`,
+        `description: "${skill.description}"`,
+        `language: ${skill.language}`,
+        `tags: [${skill.tags.map((t) => `"${t}"`).join(", ")}]`,
+        `code: |`,
+        ...skill.code.split("\n").map((l) => `  ${l}`),
+      ].join("\n");
+      const blob = new Blob([yaml], { type: "text/yaml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${skill.name.toLowerCase().replace(/\s+/g, "-")}.yaml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {error}
+          <button onClick={() => setError(null)} className="font-bold">
+            ✕
+          </button>
+        </div>
+      )}
+      {mergeNotice && (
+        <div className="fixed top-14 right-4 z-50 bg-primary text-primary-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {mergeNotice}
+          <button onClick={() => setMergeNotice(null)} className="font-bold">
+            ✕
+          </button>
+        </div>
+      )}
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-2xl font-semibold">Skills</h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Code your agents can run — upload your own, merge several into one, or install from
+              the marketplace.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="size-4" />
+              Import
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={mergeSelected.size < 2}
+              title={
+                mergeSelected.size < 2
+                  ? "Select at least two skills to merge"
+                  : "Compress selected skills into one"
+              }
+              onClick={() => setMergeOpen(true)}
+            >
+              <GitMerge className="size-4" />
+              Merge ({mergeSelected.size})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={mergeSelected.size === 0}
+              title={
+                mergeSelected.size === 0
+                  ? "Select at least one skill"
+                  : "Compress the selected skills into one task-specific composite (token-optimized)"
+              }
+              onClick={() => {
+                setCompressOpen(true);
+                setCompressTask("");
+                setCompressResult(null);
+                setCompressError(null);
+              }}
+            >
+              <Sparkles className="size-4" />
+              Compress for Task ({mergeSelected.size})
+            </Button>
+            <Button size="sm" className="gap-2" onClick={() => setAddOpen(true)}>
+              <Plus className="size-4" />
+              Add Skill
+            </Button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search skills..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((skill) => (
+            <Card
+              key={skill.id}
+              className={`cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all ${
+                mergeSelected.has(skill.id) ? "ring-2 ring-primary/50 bg-primary/5" : ""
+              }`}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${skill.name} for compress/merge`}
+                      className="size-3.5 accent-primary shrink-0"
+                      checked={mergeSelected.has(skill.id)}
+                      onChange={() => toggleMergeSelect(skill.id)}
+                    />
+                    <CardTitle className="text-sm truncate">{skill.name}</CardTitle>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] shrink-0 ${languageColors[skill.language]}`}
+                  >
+                    {skill.language}
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs">{skill.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-1">
+                  {skill.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[10px]">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  {" "}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 gap-2 text-xs"
+                    onClick={() => setSelectedSkill(skill)}
+                  >
+                    <Code className="size-3" />
+                    View Code
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 gap-2 text-xs"
+                    title="Execute this skill end-to-end as a mission"
+                    onClick={() => {
+                      setRunSkill(skill);
+                      setRunGoal("");
+                      setRunMission(null);
+                      setRunError(null);
+                    }}
+                  >
+                    <Play className="size-3" />
+                    Run
+                  </Button>
+                  {/* Export dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 gap-1 text-xs"
+                        title="Export skill"
+                      >
+                        <Download className="size-3" />
+                        <ChevronDown className="size-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-xs gap-2"
+                        onClick={() => handleExport(skill, "json")}
+                      >
+                        <FileJson className="size-3.5" />
+                        Export as JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-xs gap-2"
+                        onClick={() => handleExport(skill, "yaml")}
+                      >
+                        <FileText className="size-3.5" />
+                        Export as YAML
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-xs gap-2 text-destructive focus:text-destructive"
+                        onClick={() => handleDeleteSkill(skill.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground text-sm">
+            No skills match your search.
+          </div>
+        )}
+      </div>
+
+      {/* View Code Dialog */}
+      <Dialog open={!!selectedSkill} onOpenChange={(open) => !open && setSelectedSkill(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Code className="size-4" />
+              {selectedSkill?.name}
+              {selectedSkill && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] ml-2 ${languageColors[selectedSkill.language]}`}
+                >
+                  {selectedSkill.language}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSkill && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{selectedSkill.description}</p>
+              <div className="flex flex-wrap gap-1 mb-1">
+                {selectedSkill.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px]">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+              <CodeViewer code={selectedSkill.code} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Run Skill Dialog — executes the skill end-to-end as a mission */}
+      <Dialog
+        open={!!runSkill || !!runComposite}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRunSkill(null);
+            setRunComposite(null);
+            setRunMission(null);
+            setRunError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Play className="size-4" />
+              {runComposite
+                ? `Run Mission: ${runComposite.name}`
+                : `Run Skill${runSkill ? `: ${runSkill.name}` : ""}`}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Executes the {runComposite ? "composite's" : "skill's"} code in the sandbox through
+              the mission harness — plan, run, inspect output, recover from failures, and verify.
+              You can watch it live below.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!runMission ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="rn-goal">Goal (optional)</Label>
+                <Textarea
+                  id="rn-goal"
+                  placeholder={`Execute ${runComposite ? `composite "${runComposite.name}"` : `skill "${runSkill?.name ?? ""}"`} end-to-end and verify its output`}
+                  className="min-h-[80px] text-xs leading-relaxed"
+                  value={runGoal}
+                  onChange={(e) => setRunGoal(e.target.value)}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-primary"
+                  checked={runTerse}
+                  onChange={(e) => setRunTerse(e.target.checked)}
+                />
+                Terse caveman-ponytail output (fewer output tokens)
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-primary"
+                  checked={runShell}
+                  onChange={(e) => setRunShell(e.target.checked)}
+                />
+                Allow shell commands for this mission (asks once before it starts)
+              </label>
+              {runError && (
+                <p className="text-xs text-destructive">
+                  <CircleX className="inline size-3.5 mr-1" />
+                  {runError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRunSkill(null);
+                    setRunComposite(null);
+                    setRunError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleRunSkill()}
+                  disabled={runLoading}
+                  className="gap-2"
+                >
+                  {runLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-4" />
+                      {runComposite ? "Run Mission" : "Run Skill"}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <MissionProgress
+              mission={runMission}
+              onReset={() => setRunMission(null)}
+              onContinue={() => {
+                if (runMission) {
+                  void handleRunSkill({ continueFrom: runMission.id, goal: runMission.goal });
+                }
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Compress for Task Dialog — one task-specific composite skill */}
+      <Dialog
+        open={compressOpen}
+        onOpenChange={(open) => {
+          if (!open && !compressLoading) {
+            setCompressOpen(false);
+            setCompressResult(null);
+            setCompressError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-4" />
+              Compress {mergeSelected.size} Skills for a Task
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Generates ONE temporary composite skill containing only the capabilities relevant to
+              your task — optimized for context-token reduction, not just file organization.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!compressResult ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="cp-task">What are you building?</Label>
+                <Textarea
+                  id="cp-task"
+                  placeholder="e.g. build a frontend landing page with a hero section and responsive grid — but not the payment logic"
+                  className="min-h-[90px] text-xs leading-relaxed"
+                  value={compressTask}
+                  onChange={(e) => setCompressTask(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={compressForm.polish}
+                    onChange={(e) => setCompressForm((f) => ({ ...f, polish: e.target.checked }))}
+                  />
+                  AI-polish the composite (uses LLM tokens)
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={compressForm.save}
+                    onChange={(e) => setCompressForm((f) => ({ ...f, save: e.target.checked }))}
+                  />
+                  Save as a skill (off = temporary, for the current context only)
+                </label>
+              </div>
+              {compressError && (
+                <p className="text-xs text-destructive">
+                  <CircleX className="inline size-3.5 mr-1" />
+                  {compressError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCompressOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleCompressSkills(false)}
+                  disabled={!compressTask.trim() || compressLoading}
+                  className="gap-2"
+                >
+                  {compressLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Compressing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-4" />
+                      Compress
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              {/* Token report */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-md border p-2 text-center">
+                  <div className="text-lg font-semibold">
+                    {compressResult.report.inputTokens.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens before</div>
+                </div>
+                <div className="rounded-md border p-2 text-center">
+                  <div className="text-lg font-semibold">
+                    {compressResult.report.outputTokens.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens after</div>
+                </div>
+                <div className="rounded-md border p-2 text-center border-primary/40 bg-primary/5">
+                  <div className="text-lg font-semibold text-primary">
+                    {compressResult.report.estimatedTokensSaved.toLocaleString()}
+                    <span className="text-xs ml-1">
+                      ({(compressResult.report.savedRatio * 100).toFixed(0)}%)
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens saved</div>
+                </div>
+              </div>
+
+              {/* Kept / dropped */}
+              <div className="flex flex-wrap gap-1">
+                <Badge variant="secondary" className="text-[10px]">
+                  matched by{" "}
+                  {compressResult.report.matchSource === "semantic"
+                    ? "semantic embeddings"
+                    : "keywords"}
+                </Badge>
+                {compressResult.report.keptSkills.map((s) => (
+                  <Badge key={s.id} variant="default" className="text-[10px]">
+                    kept: {s.name} ({s.score})
+                  </Badge>
+                ))}
+                {compressResult.report.droppedSkills.map((s) => (
+                  <Badge key={s.id} variant="outline" className="text-[10px] text-muted-foreground">
+                    dropped: {s.name}
+                  </Badge>
+                ))}
+              </div>
+              {compressResult.report.polished && (
+                <p className="text-xs text-muted-foreground">
+                  AI-polished
+                  {compressResult.report.polishServedBy
+                    ? ` via ${compressResult.report.polishServedBy}`
+                    : ""}
+                </p>
+              )}
+              {compressResult.report.polishError && (
+                <p className="text-xs text-muted-foreground">
+                  AI polish failed — deterministic composite kept:{" "}
+                  {compressResult.report.polishError}
+                </p>
+              )}
+
+              {/* Code preview */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">{compressResult.composite.name}</Label>
+                <pre className="max-h-48 overflow-y-auto rounded-md bg-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                  {compressResult.composite.code.slice(0, 3000)}
+                  {compressResult.composite.code.length > 3000 ? "\n…" : ""}
+                </pre>
+              </div>
+
+              <DialogFooter>
+                {!compressResult.skill && (
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleCompressSkills(true)}
+                    disabled={compressLoading}
+                    className="gap-2"
+                  >
+                    {compressLoading ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="size-4" />
+                        Save as Skill
+                      </>
+                    )}
+                  </Button>
+                )}
+                {compressResult.skill && (
+                  <p className="text-xs text-muted-foreground mr-auto">Saved as a skill ✓</p>
+                )}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    const kept = compressResult.report.keptSkills;
+                    if (kept.length === 0) return;
+                    setRunComposite({
+                      ids: kept.map((k) => k.id),
+                      task: compressTask.trim(),
+                      name: compressResult.composite.name,
+                    });
+                    setCompressOpen(false);
+                    setRunMission(null);
+                    setRunError(null);
+                    setRunGoal("");
+                  }}
+                >
+                  <Play className="size-4" />
+                  Run as Mission
+                </Button>
+                <Button onClick={() => setCompressOpen(false)}>Done</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Skills Dialog */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="size-4" />
+              Merge {mergeSelected.size} Skills
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Compress the selected skills into one. Shared imports are deduped and each source
+              becomes a section — you can optionally have the AI polish the combined body.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="mg-name">New skill name</Label>
+              <Input
+                id="mg-name"
+                placeholder={`Merged Skill (${mergeSelected.size})`}
+                value={mergeForm.name}
+                onChange={(e) => setMergeForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="mg-description">Description</Label>
+              <Input
+                id="mg-description"
+                placeholder="What does the merged skill do?"
+                value={mergeForm.description}
+                onChange={(e) => setMergeForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-primary"
+                checked={mergeForm.deleteOriginals}
+                onChange={(e) => setMergeForm((f) => ({ ...f, deleteOriginals: e.target.checked }))}
+              />
+              Remove originals after merging (recommended — this is what saves tokens)
+            </label>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-primary"
+                checked={mergeForm.polish}
+                onChange={(e) => setMergeForm((f) => ({ ...f, polish: e.target.checked }))}
+              />
+              AI-polish the merged code (uses LLM tokens)
+            </label>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMergeSkills} disabled={mergeLoading} className="gap-2">
+              {mergeLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Merging...
+                </>
+              ) : (
+                <>
+                  <GitMerge className="size-4" />
+                  Merge Skills
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Skill Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="size-4" />
+              Add Skill
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sk-name">Name</Label>
+              <Input
+                id="sk-name"
+                placeholder="My Skill"
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sk-description">Description</Label>
+              <Input
+                id="sk-description"
+                placeholder="What does this skill do?"
+                value={addForm.description}
+                onChange={(e) => setAddForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sk-language">Language</Label>
+              <Select
+                value={addForm.language}
+                onValueChange={(v) =>
+                  setAddForm((f) => ({ ...f, language: v as Skill["language"] }))
+                }
+              >
+                <SelectTrigger id="sk-language">
+                  <SelectValue placeholder="Select language..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Python">Python</SelectItem>
+                  <SelectItem value="TypeScript">TypeScript</SelectItem>
+                  <SelectItem value="JavaScript">JavaScript</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sk-tags">Tags</Label>
+              <Input
+                id="sk-tags"
+                placeholder="e.g. data, api, transform (comma-separated)"
+                value={addForm.tags}
+                onChange={(e) => setAddForm((f) => ({ ...f, tags: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sk-code">Code</Label>
+              <Textarea
+                id="sk-code"
+                placeholder={`def my_skill():\n    pass`}
+                className="min-h-[160px] font-mono text-xs leading-relaxed"
+                value={addForm.code}
+                onChange={(e) => setAddForm((f) => ({ ...f, code: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSkill}
+              disabled={!addForm.name || !addForm.language || addLoading}
+              className="gap-2"
+            >
+              {addLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="size-4" />
+                  Add Skill
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImportSkill} />
+    </div>
+  );
+}

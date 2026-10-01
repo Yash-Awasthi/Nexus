@@ -1,0 +1,95 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: nexus-alerts
+    folder: "Nexus Alerts"
+    interval: 1m
+    rules:
+      # ── Error rate > 5% of all gateway requests ───────────────────────────────
+      - uid: nexus-alert-error-rate
+        title: "High Error Rate (>5%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: NEXUS_PROMETHEUS
+            model:
+              expr: nexus_gateway_requests_total{status="error"}
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: NEXUS_PROMETHEUS
+            model:
+              expr: nexus_gateway_requests_total{status="all"}
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: ($A / $B) * 100 > 5
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Gateway error rate exceeds 5% of all requests"
+        labels:
+          severity: critical
+
+      # ── p99 latency > 5s ──────────────────────────────────────────────────────
+      - uid: nexus-alert-p99-latency
+        title: "High SLO p99 Latency (>5s)"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: NEXUS_PROMETHEUS
+            model:
+              expr: nexus_slo_p99_latency_ms > 5000
+              refId: A
+        noDataState: OK
+        execErrState: Alerting
+        for: 3m
+        annotations:
+          summary: "p99 request latency exceeds 5 seconds"
+        labels:
+          severity: warning
+
+      # ── Conductor dead-letter queue backlog > 20 ──────────────────────────────
+      - uid: nexus-alert-dlq-backlog
+        title: "Conductor DLQ Backlog (>20)"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: NEXUS_PROMETHEUS
+            model:
+              expr: nexus_conductor_queue_depth{queue="dead_letter"} > 20
+              refId: A
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Conductor dead-letter queue has more than 20 failed jobs"
+        labels:
+          severity: warning
+
+      # ── SLO availability drop below 99.9% ─────────────────────────────────────
+      - uid: nexus-alert-slo-availability
+        title: "SLO Availability Below 99.9%"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: NEXUS_PROMETHEUS
+            model:
+              expr: nexus_slo_availability < 0.999
+              refId: A
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "API availability has dropped below 99.9% SLO target"
+        labels:
+          severity: critical

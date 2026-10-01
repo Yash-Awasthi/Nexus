@@ -1,0 +1,1217 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * Model Gateway routes — backed by @nexus/llm-drivers DriverRegistry.
+ *
+ * POST /api/v1/gateway/messages  — Anthropic Messages-compatible proxy (15 providers)
+ *                                   stream:true → text/event-stream SSE (Anthropic format)
+ * GET  /api/v1/gateway/models    — list available model aliases + registered providers
+ *
+ * Provider selection precedence:
+ *   1. x-nexus-provider header  (explicit override)
+ *   2. Model alias table         (nexus/*, claude-*, gemini-*, etc.)
+ *   3. 400 if provider unknown or not configured
+ *
+ * Streaming pipeline (when stream:true):
+ *   driver.stream() → ThinkTagParser (strip <think>) → SSE text/event-stream → client
+ *   Errors wrapped by StreamRecoveryOrchestrator (continuation suffix + block close).
+ */
+
+import { estimateMaxCost, lookupApiKey, QuotaChecker } from "@nexus/billing";
+import {
+  PrunerChain,
+  SlidingWindowPruner,
+  NaiveTokenizer,
+  type Message as PrunerMessage,
+} from "@nexus/context-pruner";
+import { computeAutoTuneParams } from "@nexus/drift";
+import { KVGatewayLog } from "@nexus/gateway-log";
+import {
+  UltraplinianRunner,
+  type SpeedTier,
+  type UltraplinianMessage,
+  type SamplingParams as UltraplinianSamplingParams,
+} from "@nexus/gauntlet";
+import { globalHooks } from "@nexus/hooks";
+import { AccountPool, type AccountState } from "@nexus/llm-accounts";
+import { compressAuto } from "@nexus/llm-compress";
+import {
+  DriverRegistry,
+  AnthropicDriver,
+  GroqDriver,
+  GeminiDriver,
+  DeepSeekDriver,
+  MistralDriver,
+  OpenRouterDriver,
+  OllamaDriver,
+  LMStudioDriver,
+  LlamaCppDriver,
+  FireworksDriver,
+  NvidiaNimDriver,
+  CerebrasDriver,
+  KimiDriver,
+  CodestralDriver,
+  LocalRouterDriver,
+  VertexDriver,
+  type LlmRequestOptions,
+  type LlmRole,
+  type VertexConfig,
+} from "@nexus/llm-drivers";
+import { registryFromEnv } from "@nexus/llm-oauth";
+import { FixedEmbedder, MemoryManager, createBestEmbedder } from "@nexus/memory";
+import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
+import { createDefaultPipeline } from "@nexus/stm";
+import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
+import { ThinkTagParser } from "@nexus/think-parser";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
+import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
+import { createDefaultRegistry } from "@nexus/tool-registry";
+import type { ToolRegistry } from "@nexus/tool-registry";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+
+import { parseCompressHeader } from "../lib/agent-queue.js";
+import { costLogStore, scopeCostEntriesToUser, trackCost } from "../lib/cost-log.js";
+import { getMemoryStore } from "../lib/kv-memory-store.js";
+import { getLlmCacheStats } from "../lib/llm-cache-driver.js";
+import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
+import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
+import { listUserDrivers, listUserModels } from "../lib/provider-keys.js";
+import { getSharedKV } from "../lib/shared-kv.js";
+import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+
+import { getDefaultDriver, getFreeDriver } from "./api-bridge.js";
+
+/** What the caller has spent through Nexus so far, from the shared cost log. */
+const spentBy = (userId: string | undefined) =>
+  scopeCostEntriesToUser(costLogStore.entries, userId).reduce((s, e) => s + e.costUsd, 0);
+
+// ── BYOK spend-guard (§5) ─────────────────────────────────────────────────────
+// The gateway authenticates with the master key / a user JWT (requireAuth), not a
+// billing api-key. So the spend-cap is best-effort: only when the caller's Bearer
+// token resolves to an `api_keys` row (an nxk_ BYOK key) do we enforce its
+// monthly_cost_cap_usd pre-dispatch and persist the priced usage afterwards.
+// Master-key / JWT callers have no api_key row → guard is a no-op for them.
+const _quota = new QuotaChecker();
+const _tok = new NaiveTokenizer();
+
+/** Resolve the request's Bearer token to a BYOK api-key, or null. Never throws. */
+async function _resolveBillingKey(request: FastifyRequest) {
+  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
+  if (!m?.[1]) return null;
+  try {
+    return (await lookupApiKey(m[1])) ?? null;
+  } catch {
+    return null; // DB unreachable — skip the guard rather than fail the request
+  }
+}
+
+// ── Token budget (RPM limiting per identity) ──────────────────────────────────
+// GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
+// Identity = first 20 chars of Authorization token, or "anon".
+// KVTokenBudget: cross-pod safe when backed by Upstash/Redis (see shared-kv.ts).
+// Falls back to MemoryKVStore in dev — independent windows per pod, not global.
+
+const _RPM_LIMIT = parseInt(process.env.GATEWAY_RPM_LIMIT ?? "60", 10);
+const _tokenBudget = new KVTokenBudget(getSharedKV(), { limit: _RPM_LIMIT, windowMs: 60_000 });
+
+// ── GODMODE singletons ────────────────────────────────────────────────────────
+// AutoTune: sampling params picked from the detected context.
+// STM pipeline: hedge-reducer + directness-optimizer on every response.
+// Parseltongue: obfuscates trigger words when x-nexus-obfuscate header is set.
+// Memory: auto-ingests each assistant response for long-term recall.
+
+const _stmPipeline = createDefaultPipeline();
+
+const _memStore = getMemoryStore();
+const _memEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return new FixedEmbedder();
+  }
+})();
+const _gatewayMemory = new MemoryManager({ store: _memStore, embedder: _memEmbedder });
+
+async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const identity = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
+  try {
+    await _tokenBudget.consume({ identity, tokens: 1 });
+  } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      const retryAfterSec = Math.ceil((err.resetAt - Date.now()) / 1000);
+      reply
+        .code(429)
+        .header("Retry-After", String(retryAfterSec))
+        .send({
+          error: "rate_limit_exceeded",
+          message: `Gateway RPM limit (${_RPM_LIMIT}) reached. Retry in ${retryAfterSec}s.`,
+          resetAt: err.resetAt,
+          retryAfterSec,
+        });
+    }
+  }
+}
+
+// ── SSE stream timeout ────────────────────────────────────────────────────────
+// Default 30 s — override via STREAM_TIMEOUT_MS env var.
+// Prevents a slow or stalled provider from holding an SSE connection indefinitely.
+
+const STREAM_TIMEOUT_MS = parseInt(process.env.STREAM_TIMEOUT_MS ?? "30000", 10);
+
+// ── Context-window pre-flight pruner ─────────────────────────────────────────
+// Long threads can silently overflow the provider's context window, causing
+// a hard 400 error (Anthropic) or silent truncation (Groq/Gemini).
+// Prune aggressively BEFORE dispatching so every request fits the budget.
+//
+// Budget: GATEWAY_CONTEXT_BUDGET_TOKENS (default 32 000 — conservative for all
+// providers).  Each request reserves max_tokens for the completion; the rest is
+// available for the prompt.  SlidingWindowPruner keeps the system message plus
+// the most recent messages that fit.  Zero-cost when history is short (no-op).
+
+const GATEWAY_CONTEXT_BUDGET = parseInt(process.env.GATEWAY_CONTEXT_BUDGET_TOKENS ?? "32000", 10);
+
+const _gatewayPruner = new PrunerChain([new SlidingWindowPruner(new NaiveTokenizer())]);
+
+// ── Gateway-log (KV-backed, cross-pod safe) ───────────────────────────────────
+// Exported so admin.ts can expose /admin/traces without coupling to server state.
+// KVGatewayLog: entries TTL 7 days (604_800_000 ms); cross-pod when shared KV is Redis.
+export const gatewayLog = new KVGatewayLog(getSharedKV(), {
+  keyPrefix: "nexus",
+  entryTtlMs: 7 * 24 * 60 * 60 * 1000,
+});
+
+// ── Ultraplinian runner ────────────────────────────────────────────────────────
+// Activated when OPENROUTER_API_KEY is set; otherwise POST /gateway/race → 503.
+const _ultraRunner = process.env.OPENROUTER_API_KEY
+  ? new UltraplinianRunner({ apiKey: process.env.OPENROUTER_API_KEY })
+  : null;
+
+// ── Tool registry ──────────────────────────────────────────────────────────────
+// Pre-loaded with all built-in tools; Tavily web_search wired when key present.
+const _toolRegistry: ToolRegistry = createDefaultRegistry({
+  web_search: process.env.TAVILY_API_KEY
+    ? async (input) => {
+        const i = input as { query: string; maxResults?: number };
+        const resp = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: process.env.TAVILY_API_KEY,
+            query: i.query,
+            max_results: i.maxResults ?? 5,
+          }),
+        });
+        const data = (await resp.json()) as {
+          results?: { title: string; url: string; content: string }[];
+        };
+        return {
+          query: i.query,
+          results: (data.results ?? []).map((r) => ({
+            title: r.title,
+            url: r.url,
+            snippet: r.content,
+          })),
+        };
+      }
+    : undefined,
+});
+
+async function pruneGatewayMessages(
+  opts: LlmRequestOptions,
+  reserveTokens: number,
+): Promise<LlmRequestOptions> {
+  const budget = GATEWAY_CONTEXT_BUDGET - Math.max(0, reserveTokens);
+  if (budget <= 0) return opts;
+  const input: PrunerMessage[] = opts.messages.map((m) => ({
+    role: m.role as PrunerMessage["role"],
+    content: m.content,
+  }));
+  const result = await _gatewayPruner.prune(input, budget);
+  if (result.prunedCount === 0) return opts; // no change — return original
+  return {
+    ...opts,
+    messages: result.messages.map((m) => ({
+      role: m.role as LlmRole,
+      content: m.content,
+    })),
+  };
+}
+
+// ── Opt-in lossless body compression ──────────────────────────────────────────
+// The agent runtime compresses tool output by default; the raw proxy path must
+// not silently rewrite a user's prompt, so gateway compression is OPT-IN via
+// `x-nexus-compress: lossless` (same header as the agent path). Runs each message
+// through llm-compress's lossless auto filters (ansi-strip / trim / blank-collapse
+// / dedup) — safe transforms that never change meaning. Returns the (possibly)
+// rewritten opts plus the estimated token saving so the caller can surface it.
+function compressGatewayMessages(
+  opts: LlmRequestOptions,
+  enabled: boolean,
+): { opts: LlmRequestOptions; savedTokens: number } {
+  if (!enabled) return { opts, savedTokens: 0 };
+  let savedTokens = 0;
+  const messages = opts.messages.map((m) => {
+    if (!m.content) return m;
+    const res = compressAuto(m.content);
+    if (res.text.length >= m.content.length) return m; // no gain — keep original
+    savedTokens += res.originalTokens - res.compressedTokens;
+    return { ...m, content: res.text };
+  });
+  return { opts: savedTokens > 0 ? { ...opts, messages } : opts, savedTokens };
+}
+
+// ── Prompt cache (KV-backed, cross-pod safe) ───────────────────────────────────
+// Only caches non-streaming deterministic (temperature=0) requests.
+// TTL: PROMPT_CACHE_TTL_MS (default 1 h).
+// Cache hits are served with X-Nexus-Cache: HIT header, no LLM call made.
+
+const _promptCache = getPromptCache(getSharedKV());
+
+// ── SSE headers ───────────────────────────────────────────────────────────────
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no",
+} as const;
+
+// ── Model alias table ──────────────────────────────────────────────────────────
+
+export const DRIVER_ALIASES: Record<string, { provider: string; model: string }> = {
+  // Nexus smart-routing aliases
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 — the
+  // replacement (per Groq) is openai/gpt-oss-120b.
+  "nexus/fast": { provider: "groq", model: "openai/gpt-oss-120b" },
+  "nexus/smart": { provider: "groq", model: "openai/gpt-oss-120b" },
+  "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
+  // claude-3-5-sonnet-20241022 was retired by Anthropic on 2025-10-22.
+  "nexus/sonnet": { provider: "anthropic", model: "claude-sonnet-4-6" },
+  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-4-5" },
+  // The Gemini 1.5 series was shut down by Google; 3.6 Flash is GA and cheap.
+  "nexus/gemini": { provider: "gemini", model: "gemini-3.6-flash" },
+  "nexus/gemini-flash": { provider: "gemini", model: "gemini-3.5-flash-lite" },
+  "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
+  "nexus/mistral": { provider: "mistral", model: "mistral-small-latest" },
+  // anthropic/claude-3.5-sonnet 404s on OpenRouter since the model's retirement.
+  "nexus/router": { provider: "openrouter", model: "anthropic/claude-sonnet-4-6" },
+  "nexus/local": {
+    provider: "ollama",
+    model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+  },
+  // llama3.1-70b is deprecated on Cerebras (auto-upgraded to llama-3.3-70b).
+  "nexus/cerebras": { provider: "cerebras", model: "llama-3.3-70b" },
+  // moonshot-v1 family reached EOL 2026-08-31; kimi-k3 is current.
+  "nexus/kimi": { provider: "kimi", model: "kimi-k3" },
+  "nexus/code": { provider: "codestral", model: "codestral-latest" },
+  // llama-v3p1-70b-instruct deprecated Feb 2026; 3.3 is the current family.
+  "nexus/fireworks": {
+    provider: "fireworks",
+    model: "accounts/fireworks/models/llama-3.3-70b-instruct",
+  },
+  // meta/llama-3.1-70b-instruct was deprecated on NIM on 2026-08-25.
+  "nexus/nvidia": { provider: "nvidia_nim", model: "meta/llama-3.3-70b-instruct" },
+  // sidecar router — route to the local sidecar router (env LOCAL_ROUTER_*).
+  // "auto" lets the sidecar pick; override per-request by sending a real model id.
+  "nexus/omni": { provider: "local-router", model: process.env.LOCAL_ROUTER_MODEL ?? "auto" },
+};
+
+/** "provider/model" where the caller or server has that provider, e.g. a saved compatible endpoint. */
+function pinnedProvider(
+  model: string,
+  registry: DriverRegistry,
+): { provider: string; model: string } | null {
+  const slash = model.indexOf("/");
+  // "openai/gpt-oss-*" names a Groq-hosted model, not the OpenAI provider.
+  if (slash <= 0 || DRIVER_ALIASES[model] || model.startsWith("openai/gpt-oss")) return null;
+  const provider = model.slice(0, slash);
+  return registry.get(provider) ? { provider, model: model.slice(slash + 1) } : null;
+}
+
+/** Resolve model string → { provider, model }. Null if unrecognised. */
+function resolveAlias(model: string): { provider: string; model: string } | null {
+  if (DRIVER_ALIASES[model]) return DRIVER_ALIASES[model]!;
+  // Canonical Groq smart default since llama-3.3-70b-versatile was decommissioned.
+  if (model === "openai/gpt-oss-120b") return { provider: "groq", model };
+  if (model.startsWith("claude-")) return { provider: "anthropic", model };
+  if (model.startsWith("gemini-")) return { provider: "gemini", model };
+  if (model.startsWith("deepseek")) return { provider: "deepseek", model };
+  if (model.startsWith("mistral") || model.startsWith("open-mistral"))
+    return { provider: "mistral", model };
+  if (model.startsWith("accounts/fireworks")) return { provider: "fireworks", model };
+  if (model.startsWith("moonshot")) return { provider: "kimi", model };
+  if (model.startsWith("codestral")) return { provider: "codestral", model };
+  if (model.startsWith("llama") || model.startsWith("meta/")) return { provider: "groq", model };
+  // Bare Ollama model ids ("qwen2.5:7b", "llama3.2:3b", …) → local Ollama.
+  if (/^[\w.-]+:[\w.-]+$/.test(model)) return { provider: "ollama", model };
+  return null;
+}
+
+// ── Registry factory (reads env at call-time so tests can mutate process.env) ─
+
+function buildDriverRegistry(): DriverRegistry {
+  const reg = new DriverRegistry();
+
+  if (process.env.GROQ_API_KEY) {
+    reg.register(new GroqDriver({ apiKey: process.env.GROQ_API_KEY }));
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    reg.register(new AnthropicDriver({ apiKey: process.env.ANTHROPIC_API_KEY }));
+  }
+  if (process.env.GEMINI_API_KEY) {
+    reg.register(new GeminiDriver({ apiKey: process.env.GEMINI_API_KEY }));
+  }
+  if (process.env.DEEPSEEK_API_KEY) {
+    reg.register(new DeepSeekDriver({ apiKey: process.env.DEEPSEEK_API_KEY }));
+  }
+  if (process.env.MISTRAL_API_KEY) {
+    reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
+    reg.register(new CodestralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    reg.register(new OpenRouterDriver({ apiKey: process.env.OPENROUTER_API_KEY }));
+  }
+  if (process.env.FIREWORKS_API_KEY) {
+    reg.register(new FireworksDriver({ apiKey: process.env.FIREWORKS_API_KEY }));
+  }
+  if (process.env.NVIDIA_NIM_API_KEY) {
+    reg.register(new NvidiaNimDriver({ apiKey: process.env.NVIDIA_NIM_API_KEY }));
+  }
+  if (process.env.CEREBRAS_API_KEY) {
+    reg.register(new CerebrasDriver({ apiKey: process.env.CEREBRAS_API_KEY }));
+  }
+  if (process.env.KIMI_API_KEY) {
+    reg.register(new KimiDriver({ apiKey: process.env.KIMI_API_KEY }));
+  }
+  // Local / no-auth providers (always registered; no-op if unreachable)
+  reg.register(
+    new OllamaDriver({
+      baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
+    }),
+  );
+  if (process.env.LM_STUDIO_BASE_URL) {
+    reg.register(new LMStudioDriver({ baseUrl: process.env.LM_STUDIO_BASE_URL }));
+  }
+  if (process.env.LLAMA_CPP_BASE_URL) {
+    reg.register(new LlamaCppDriver({ baseUrl: process.env.LLAMA_CPP_BASE_URL }));
+  }
+  // sidecar router — sidecar fat-router. One OpenAI-compat endpoint inherits the
+  // sidecar's full catalog (96–237 providers) + its fallback/compression.
+  if (process.env.LOCAL_ROUTER_BASE_URL) {
+    reg.register(
+      new LocalRouterDriver({
+        apiKey: process.env.LOCAL_ROUTER_API_KEY ?? "",
+        baseUrl: process.env.LOCAL_ROUTER_BASE_URL,
+        model: process.env.LOCAL_ROUTER_MODEL,
+      }),
+    );
+  }
+
+  return reg;
+}
+
+// ── Account pool (§4.1) ────────────────────────────────────────────────────────
+// One AccountPool per app instance (constructed in gatewayRoutes below) so
+// cooldown/breaker state persists across requests within a process but resets
+// per test server. Two kinds of accounts:
+//   - "env:<provider>"   — one per statically-configured driver (API-key auth),
+//                          seeded lazily so cooldown/breaker gate the existing keys.
+//   - "oauth:vertex:<userId>" — a caller's linked Google OAuth account; picked
+//     the same way, then resolved to fresh Vertex credentials at dispatch time.
+// Accounts are registered lazily (only when missing) so `register()` never
+// resets an already-tracked account's failure/cooldown state.
+
+/** Seed one "sub" tier account per statically-configured driver, if not already tracked. */
+function seedEnvAccounts(pool: AccountPool, registry: DriverRegistry): void {
+  for (const providerName of registry.list()) {
+    const id = `env:${providerName}`;
+    if (!pool.get(id)) pool.register({ id, provider: providerName, tier: "sub" });
+  }
+}
+
+/**
+ * Resolve the caller's linked Google OAuth account to a fresh `VertexDriver`, or
+ * null when no google-vertex app is configured, the vault is unavailable, or the
+ * caller has no stored credentials.
+ */
+async function resolveVertexOAuthDriver(userId: string): Promise<VertexDriver | null> {
+  const authProvider = registryFromEnv().get("google-vertex");
+  if (!authProvider) return null;
+  const store = createOAuthTokenStore();
+  if (!store) return null;
+  const tokens = await store.resolveFresh(userId, authProvider);
+  if (!tokens) return null;
+  return new VertexDriver(authProvider.toDriverCredentials(tokens) as unknown as VertexConfig);
+}
+
+// ── Anthropic-format request/response types ───────────────────────────────────
+
+interface AnthropicContentPart {
+  type: "text";
+  text: string;
+}
+interface AnthropicMessage {
+  role: "user" | "assistant";
+  content: string | AnthropicContentPart[];
+}
+interface AnthropicRequest {
+  model: string;
+  messages: AnthropicMessage[];
+  system?: string;
+  max_tokens?: number;
+  temperature?: number;
+  stream?: boolean;
+  /**
+   * Optional per-request USD spend guard.
+   * If total gateway cost already exceeds this value, the request is
+   * rejected 402 before any LLM call is made.
+   */
+  max_spend_usd?: number;
+}
+
+function toDriverRequest(body: AnthropicRequest, resolvedModel: string): LlmRequestOptions {
+  return {
+    model: resolvedModel,
+    messages: body.messages.map((m) => ({
+      role: m.role as LlmRole,
+      content: typeof m.content === "string" ? m.content : m.content.map((p) => p.text).join(""),
+    })),
+    systemPrompt: body.system,
+    maxTokens: body.max_tokens,
+    temperature: body.temperature,
+  };
+}
+
+// ── Route plugin ──────────────────────────────────────────────────────────────
+
+export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
+  // One pool per app instance — cooldown/breaker state persists across requests
+  // for the life of this server (fresh per test via buildServer()).
+  const accountPool = new AccountPool();
+
+  /**
+   * POST /gateway/messages
+   *
+   * Drop-in replacement for POST https://api.anthropic.com/v1/messages.
+   * When stream:true → hijacks response and emits SSE in Anthropic format:
+   *   message_start → content_block_start → content_block_delta* →
+   *   content_block_stop → message_delta → message_stop → [DONE]
+   *
+   * ThinkTagParser strips <think>…</think> blocks from the delta stream so
+   * chain-of-thought tokens never reach the client.
+   * StreamRecoveryOrchestrator injects a continuation suffix on error.
+   */
+  app.post<{
+    Headers: { "x-nexus-provider"?: string };
+    Body: AnthropicRequest;
+  }>(
+    "/gateway/messages",
+    { preHandler: [requireAuthWithTier, _budgetPreHandler] },
+    async (request, reply) => {
+      // Identity for memory auto-ingest: JWT users and API-key callers (via the
+      // api_keys table) resolve here. Dev-bypass requests leave it undefined —
+      // those skip ingest so we never create more unowned rows (they'd be
+      // invisible to every user's scoped memory queries anyway).
+      const ingestUserId = request.nexusUserId;
+      if (typeof request.body?.model !== "string" || !Array.isArray(request.body.messages)) {
+        return reply.code(400).send({
+          type: "error",
+          error: { type: "invalid_request_error", message: "model and messages are required" },
+        });
+      }
+      const overrideProvider = request.headers["x-nexus-provider"];
+      const registry = buildDriverRegistry();
+      seedEnvAccounts(accountPool, registry);
+      // The caller's saved keys override the server's for the same provider.
+      const own = await listUserDrivers(request.nexusUserId).catch(() => []);
+      for (const d of own) registry.register(d.driver, d.id);
+
+      const alias =
+        pinnedProvider(request.body.model, registry) ?? resolveAlias(request.body.model);
+      // Unknown model with no provider → the caller's first saved provider, else
+      // local Ollama, so a keyless instance still answers instead of 400-ing.
+      const fallback = own[0];
+      const providerName = overrideProvider ?? alias?.provider ?? fallback?.id ?? "ollama";
+      let resolvedModel =
+        alias?.model ??
+        (overrideProvider
+          ? request.body.model
+          : (fallback?.driver.model ?? process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b"));
+
+      // A caller with a linked Google OAuth account gets a lazily-tracked pool
+      // account for "vertex" — registered once, then picked/health-gated like
+      // any other account (never re-registered, so breaker state survives).
+      if (providerName === "vertex" && request.nexusUserId) {
+        const oauthId = `oauth:vertex:${request.nexusUserId}`;
+        if (!accountPool.get(oauthId)) {
+          accountPool.register({ id: oauthId, provider: "vertex", tier: "sub" });
+        }
+      }
+
+      let driver = registry.get(providerName);
+      let account: AccountState | null = null;
+
+      const hasAccounts = accountPool.all().some((a) => a.provider === providerName);
+      if (hasAccounts) {
+        const picked = accountPool.pick(providerName);
+        if (!picked) {
+          return reply.code(503).send({
+            type: "error",
+            error: {
+              type: "provider_unavailable",
+              message: `All accounts for provider "${providerName}" are unhealthy (cooldown or circuit breaker open).`,
+            },
+          });
+        }
+        account = picked;
+        if (picked.id.startsWith("oauth:") && request.nexusUserId) {
+          const oauthDriver = await resolveVertexOAuthDriver(request.nexusUserId);
+          if (oauthDriver) driver = oauthDriver;
+        }
+      }
+
+      // Local fallback: if the requested provider has no configured driver
+      // (e.g. a cloud alias like nexus/fast with no GROQ_API_KEY), route to the
+      // always-registered local Ollama driver so chat works with zero keys.
+      if (!driver && providerName !== "ollama") {
+        const localDriver = registry.get("ollama");
+        if (localDriver) {
+          driver = localDriver;
+          resolvedModel = process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b";
+        }
+      }
+
+      if (!driver) {
+        return reply.code(400).send({
+          type: "error",
+          error: {
+            type: "provider_unavailable",
+            message: `Provider "${providerName}" is not configured. Set the corresponding API key env var.`,
+          },
+        });
+      }
+
+      // Prune message history to fit the context window before dispatching.
+      // No-op when the thread is short; drops oldest non-system messages when long.
+      let opts = await pruneGatewayMessages(
+        toDriverRequest(request.body, resolvedModel),
+        request.body.max_tokens ?? 4096,
+      );
+
+      // Opt-in lossless body compression (x-nexus-compress: lossless). Off by
+      // default so the proxy never silently rewrites a prompt.
+      const _compress = compressGatewayMessages(
+        opts,
+        parseCompressHeader(request.headers["x-nexus-compress"]) === "lossless",
+      );
+      opts = _compress.opts;
+      if (_compress.savedTokens > 0) {
+        reply.header("X-Nexus-Compress-Saved-Tokens", String(_compress.savedTokens));
+      }
+
+      // ── Parseltongue — obfuscate user messages when requested ─────────────
+      // Activated by header: x-nexus-obfuscate: true  OR feature flag.
+      if (request.headers["x-nexus-obfuscate"] === "true") {
+        const ptCfg = redteamDefaultConfig();
+        opts = {
+          ...opts,
+          messages: opts.messages.map((m) =>
+            m.role === "user"
+              ? { ...m, content: applyParseltongue(m.content, ptCfg).transformedText }
+              : m,
+          ),
+        };
+      }
+
+      // ── AutoTune — compute optimal sampling params pre-call ───────────────
+      // Detects the context type from the messages and blends its profile.
+      // temperature/top_p on the request body override the tuned values if set.
+      if (!request.body.temperature) {
+        try {
+          const allText = opts.messages.map((m) => m.content).join(" ");
+          const tuned = computeAutoTuneParams({
+            message: allText,
+            history: opts.messages.slice(-4).map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          });
+          opts = { ...opts, temperature: tuned.params.temperature, topP: tuned.params.top_p };
+        } catch {
+          /* non-fatal — proceed with defaults */
+        }
+      }
+
+      const _logStart = Date.now();
+      const _logIdent =
+        (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
+
+      // Hook: task.before — notify observers before dispatch
+      globalHooks
+        .emit("task.before", {
+          taskId: `gw-${_logStart}`,
+          taskType: "gateway.completion",
+          payload: { model: resolvedModel, provider: providerName },
+          attempt: 1,
+        })
+        .catch(() => {});
+
+      // ── USD spend cap (best-effort pre-call guard) ───────────────────────────
+      if (request.body.max_spend_usd !== undefined) {
+        try {
+          const totalUsd = spentBy(request.nexusUserId);
+          if (totalUsd >= request.body.max_spend_usd) {
+            return reply.code(402).send({
+              type: "error",
+              error: {
+                type: "spend_cap_exceeded",
+                message: `Gateway cumulative spend ($${totalUsd.toFixed(6)}) exceeds max_spend_usd ($${request.body.max_spend_usd}).`,
+                total_usd: totalUsd,
+                max_spend_usd: request.body.max_spend_usd,
+              },
+            });
+          }
+        } catch {
+          /* non-fatal — proceed if cost store unavailable */
+        }
+      }
+
+      // ── BYOK per-key spend cap (pre-dispatch ledger gate) ────────────────────
+      // No-op unless the Bearer token is an nxk_ api-key with a monthly USD cap.
+      const billingKey = await _resolveBillingKey(request);
+      if (billingKey) {
+        const inputTokens = _tok.count(opts.messages.map((mm) => mm.content).join("\n"));
+        const estUsd = estimateMaxCost(resolvedModel, inputTokens, {
+          assumedOutputTokens: request.body.max_tokens ?? 4096,
+        });
+        const verdict = await _quota.check(billingKey, estUsd);
+        if (!verdict.allowed) {
+          return reply.code(429).send({
+            type: "error",
+            error: {
+              type: "monthly_cost_cap_exceeded",
+              message: "Monthly BYOK spend cap reached for this key.",
+              monthly_cost_usd: verdict.monthlyCostUsd,
+              monthly_cost_cap_usd: verdict.monthlyCostCapUsd,
+            },
+          });
+        }
+      }
+
+      // ── Streaming branch ────────────────────────────────────────────────────
+      if (request.body.stream) {
+        reply.hijack();
+        const raw = reply.raw;
+        raw.writeHead(200, SSE_HEADERS);
+
+        const parser = new ThinkTagParser();
+        const orchestrator = new StreamRecoveryOrchestrator({ holdMs: 50 });
+        const msgId = `nexus-${Date.now()}`;
+        let lastText = "";
+
+        const writeEvent = (data: unknown): void => {
+          if (!raw.destroyed) {
+            raw.write(`data: ${JSON.stringify(data)}\n\n`);
+          }
+        };
+
+        // Send opening frames
+        writeEvent({
+          type: "message_start",
+          message: { id: msgId, type: "message", role: "assistant", model: resolvedModel },
+        });
+        writeEvent({
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "text", text: "" },
+        });
+
+        let streamTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+          // Race the provider stream against a hard timeout so a stalled upstream
+          // can't hold the SSE connection open forever.
+          const streamPromise = driver.stream(opts, async ({ delta, done, usage }) => {
+            if (done) {
+              // Flush any remaining buffered content from the parser
+              for (const chunk of parser.flush()) {
+                if (chunk.type === "TEXT" && chunk.text) {
+                  lastText += chunk.text;
+                  writeEvent({
+                    type: "content_block_delta",
+                    index: 0,
+                    delta: { type: "text_delta", text: chunk.text },
+                  });
+                }
+              }
+              writeEvent({ type: "content_block_stop", index: 0 });
+              writeEvent({
+                type: "message_delta",
+                delta: { stop_reason: "end_turn", stop_sequence: null },
+                usage: { output_tokens: usage?.outputTokens ?? 0 },
+              });
+              writeEvent({ type: "message_stop" });
+              if (!raw.destroyed) raw.write("data: [DONE]\n\n");
+              if (!raw.destroyed) raw.end();
+              gatewayLog
+                .append({
+                  timestamp: _logStart,
+                  model: resolvedModel,
+                  provider: providerName,
+                  status: "success",
+                  latencyMs: Date.now() - _logStart,
+                  usage: usage
+                    ? {
+                        promptTokens: usage.inputTokens ?? 0,
+                        completionTokens: usage.outputTokens ?? 0,
+                        totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+                      }
+                    : undefined,
+                  identity: _logIdent,
+                })
+                .catch(() => {});
+              trackCost(resolvedModel, usage, providerName);
+              if (billingKey) {
+                _quota
+                  .recordUsage(billingKey.id, request.url, {
+                    model: resolvedModel,
+                    usage: {
+                      inputTokens: usage?.inputTokens ?? 0,
+                      outputTokens: usage?.outputTokens ?? 0,
+                    },
+                  })
+                  .catch(() => {});
+              }
+              if (account) {
+                accountPool.recordSuccess(
+                  account.id,
+                  (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
+                );
+              }
+            } else {
+              // Feed through think-parser; only emit TEXT chunks to client
+              for (const chunk of parser.feed(delta)) {
+                if (chunk.type === "TEXT" && chunk.text) {
+                  lastText += chunk.text;
+                  writeEvent({
+                    type: "content_block_delta",
+                    index: 0,
+                    delta: { type: "text_delta", text: chunk.text },
+                  });
+                }
+                // THINKING chunks silently dropped — chain-of-thought stays server-side
+              }
+            }
+          });
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            streamTimeoutId = setTimeout(
+              () => reject(new Error(`Gateway stream timed out after ${STREAM_TIMEOUT_MS}ms`)),
+              STREAM_TIMEOUT_MS,
+            );
+          });
+
+          await Promise.race([streamPromise, timeoutPromise]);
+          clearTimeout(streamTimeoutId);
+        } catch (err: unknown) {
+          clearTimeout(streamTimeoutId);
+          const e = err as { message?: string; statusCode?: number };
+          if (account) accountPool.recordFailure(account.id, { status: e.statusCode });
+          // Inject continuation suffix so the client gets a graceful truncation notice
+          const { text: recoveredText } = orchestrator.handleError(lastText, "plain");
+          const suffix = recoveredText.slice(lastText.length);
+          if (suffix) {
+            writeEvent({
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "text_delta", text: suffix },
+            });
+          }
+          writeEvent({
+            type: "error",
+            error: { type: "stream_error", message: e.message ?? "Stream interrupted" },
+          });
+          if (!raw.destroyed) raw.write("data: [DONE]\n\n");
+          if (!raw.destroyed) raw.end();
+          gatewayLog
+            .append({
+              timestamp: _logStart,
+              model: resolvedModel,
+              provider: providerName,
+              status: "error",
+              latencyMs: Date.now() - _logStart,
+              errorMessage: (err as Error).message ?? "Stream interrupted",
+              identity: _logIdent,
+            })
+            .catch(() => {});
+        }
+
+        return; // hijacked — Fastify must not touch reply after this
+      }
+
+      // ── Non-streaming branch ────────────────────────────────────────────────
+
+      // ── Prompt cache check (deterministic requests only) ────────────────────
+      if (PromptCache.isEligible(request.body)) {
+        const cacheReq: CacheableRequest = {
+          model: resolvedModel,
+          messages: opts.messages as CacheableRequest["messages"],
+          system: request.body.system,
+          max_tokens: request.body.max_tokens,
+          temperature: request.body.temperature,
+        };
+        const cached = await _promptCache.get(cacheReq);
+        if (cached.hit && cached.response) {
+          reply.header("X-Nexus-Cache", "HIT");
+          reply.header("X-Nexus-Cache-Key", cached.cacheKey.split(":")[1]?.slice(0, 16) ?? "");
+          reply.header("Cache-Control", "private, max-age=3600");
+          return reply.code(200).send(cached.response);
+        }
+      }
+
+      try {
+        const response = await driver.complete(opts);
+
+        if (account) {
+          accountPool.recordSuccess(
+            account.id,
+            response.usage.inputTokens + response.usage.outputTokens,
+          );
+        }
+
+        const _latMs = Date.now() - _logStart;
+
+        gatewayLog
+          .append({
+            timestamp: _logStart,
+            model: resolvedModel,
+            provider: providerName,
+            status: "success",
+            latencyMs: _latMs,
+            usage: {
+              promptTokens: response.usage.inputTokens,
+              completionTokens: response.usage.outputTokens,
+              totalTokens: response.usage.totalTokens,
+            },
+            identity: _logIdent,
+          })
+          .catch(() => {});
+
+        trackCost(resolvedModel, response.usage, providerName);
+
+        // BYOK metering — persist the priced token breakdown (fire-and-forget).
+        if (billingKey) {
+          _quota
+            .recordUsage(billingKey.id, request.url, {
+              model: resolvedModel,
+              usage: {
+                inputTokens: response.usage.inputTokens,
+                outputTokens: response.usage.outputTokens,
+              },
+            })
+            .catch(() => {});
+        }
+
+        globalHooks
+          .emit("task.after", {
+            taskId: `gw-${_logStart}`,
+            taskType: "gateway.completion",
+            durationMs: _latMs,
+            result: { model: resolvedModel, tokens: response.usage.outputTokens },
+          })
+          .catch(() => {});
+
+        // ── STM post-processing (non-streaming) ──────────────────────────────
+        let finalContent = response.content;
+        try {
+          const stmResult = _stmPipeline.transform({ text: finalContent });
+          finalContent = stmResult.transformed;
+        } catch {
+          /* non-fatal */
+        }
+
+        const responseBody = {
+          id: response.id,
+          type: "message" as const,
+          role: "assistant" as const,
+          content: [{ type: "text" as const, text: finalContent }],
+          model: response.model,
+          stop_reason: response.finishReason ?? null,
+          usage: {
+            input_tokens: response.usage.inputTokens,
+            output_tokens: response.usage.outputTokens,
+          },
+        };
+
+        // ── Phase 3: Memory auto-ingest (fire-and-forget) ────────────────────
+        // Store each assistant response scoped to the authenticated user so it's
+        // searchable via /memory recall (entries without a userId are invisible
+        // to user-scoped queries, so ingest is skipped when identity is absent).
+        if (finalContent.length > 20 && ingestUserId) {
+          const lastUserMsg = opts.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+          _gatewayMemory
+            .remember(`Q: ${lastUserMsg.slice(0, 200)}\nA: ${finalContent.slice(0, 1000)}`, {
+              metadata: { category: "gateway", tags: [resolvedModel, providerName] },
+              userId: ingestUserId,
+            })
+            .catch(() => {});
+        }
+
+        // Cache deterministic responses for future identical requests
+        if (PromptCache.isEligible(request.body)) {
+          const cacheReq: CacheableRequest = {
+            model: resolvedModel,
+            messages: opts.messages as CacheableRequest["messages"],
+            system: request.body.system,
+            max_tokens: request.body.max_tokens,
+            temperature: request.body.temperature,
+          };
+          _promptCache.set(cacheReq, responseBody).catch(() => {});
+        }
+
+        reply.header("X-Nexus-Cache", "MISS");
+        reply.header("Cache-Control", "private, no-store");
+        return reply.code(200).send(responseBody);
+      } catch (err: unknown) {
+        const e = err as { code?: string; statusCode?: number; message?: string };
+        const statusCode = e.statusCode && e.statusCode >= 400 ? e.statusCode : 502;
+        if (account) accountPool.recordFailure(account.id, { status: e.statusCode });
+        gatewayLog
+          .append({
+            timestamp: _logStart,
+            model: resolvedModel,
+            provider: providerName,
+            status: "error",
+            latencyMs: Date.now() - _logStart,
+            errorMessage: e.message ?? "Upstream provider error",
+            identity: _logIdent,
+          })
+          .catch(() => {});
+        globalHooks
+          .emit("task.error", {
+            taskId: `gw-${_logStart}`,
+            taskType: "gateway.completion",
+            error: e.message ?? "Upstream provider error",
+            attempt: 1,
+            willRetry: false,
+          })
+          .catch(() => {});
+        return reply.code(statusCode).send({
+          type: "error",
+          error: {
+            type: e.code ?? "server_error",
+            message: e.message ?? "Upstream provider error",
+          },
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /gateway/models
+   *
+   * Returns the alias table with availability flags,
+   * plus the list of currently-configured providers.
+   */
+  /** GET /gateway/chain — the caller's failover chain, free chain and benches, and cache counts. */
+  app.get("/gateway/chain", { preHandler: requireAuth }, async (request, reply) =>
+    reply.send({
+      chain: getDefaultDriver()?.status() ?? [],
+      free:
+        getFreeDriver(await listUserModels(request.nexusUserId).catch(() => []))?.status() ?? [],
+      cache: await getLlmCacheStats(),
+    }),
+  );
+
+  app.get(
+    "/gateway/models",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      // The list includes the caller's own saved models, so no shared cache may keep it.
+      reply.header("Cache-Control", "private, max-age=60");
+      const registry = buildDriverRegistry();
+      const own = await listUserDrivers(request.nexusUserId).catch(() => []);
+      for (const d of own) registry.register(d.driver, d.id);
+      const named = new Map(
+        (await listUserModels(request.nexusUserId).catch(() => [])).map((r) => [
+          r.provider,
+          r.models,
+        ]),
+      );
+      const saved = own.flatMap(({ id, driver }) =>
+        (named.get(id)?.length ? named.get(id)! : [driver.model]).map((m) => ({
+          id: `${id}/${m}`,
+          provider: id,
+          backend_model: m,
+          available: true,
+        })),
+      );
+      const aliases = Object.entries(DRIVER_ALIASES).map(([alias, target]) => ({
+        id: alias,
+        provider: target.provider,
+        backend_model: target.model,
+        available: registry.has(target.provider),
+      }));
+      return reply.send({ models: [...saved, ...aliases], providers: registry.list() });
+    },
+  );
+
+  /**
+   * POST /gateway/race
+   *
+   * ULTRAPLINIAN — races N models in parallel (via OpenRouter) and returns the
+   * winner scored on substance/directness/completeness.
+   *
+   * Body:
+   *   tier      — "fast" | "standard" | "smart" | "power" | "ultra" (default: "fast")
+   *   messages  — chat messages [{ role, content }]
+   *   models    — override model list (bypasses tier)
+   *   params    — sampling params (temperature, max_tokens, …)
+   *   stream    — if true, returns text/event-stream with result + [DONE]
+   *
+   * Requires OPENROUTER_API_KEY; returns 503 if not configured.
+   */
+  app.post<{
+    Body: {
+      tier?: SpeedTier;
+      messages: UltraplinianMessage[];
+      models?: string[];
+      params?: UltraplinianSamplingParams;
+      stream?: boolean;
+    };
+  }>(
+    "/gateway/race",
+    {
+      preHandler: [
+        requireAuth,
+        makeTierGatePreHandler({
+          feature: "gauntlet",
+          getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]),
+        }),
+      ],
+    },
+    async (request, reply) => {
+      if (!_ultraRunner) {
+        return reply.code(503).send({
+          error: "gauntlet_unavailable",
+          message: "OPENROUTER_API_KEY is not configured",
+        });
+      }
+
+      const { tier = "fast", messages, models, params, stream = false } = request.body;
+
+      if (stream) {
+        reply.hijack();
+        const raw = reply.raw;
+        raw.writeHead(200, SSE_HEADERS);
+        const writeEvent = (d: unknown) => {
+          if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`);
+        };
+        try {
+          const result = await _ultraRunner.race({ tier, messages, models, params });
+          writeEvent({ type: "result", ...result });
+        } catch (err) {
+          writeEvent({ type: "error", message: err instanceof Error ? err.message : String(err) });
+        }
+        if (!raw.destroyed) {
+          raw.write("data: [DONE]\n\n");
+          raw.end();
+        }
+        return;
+      }
+
+      try {
+        const result = await _ultraRunner.race({ tier, messages, models, params });
+        return reply.send(result);
+      } catch (err) {
+        return reply.code(502).send({
+          error: "race_failed",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /gateway/tools
+   *
+   * List all registered tools in LLM function-calling schema format.
+   */
+  app.get(
+    "/gateway/tools",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      // Tool schema is static for the process lifetime; cache aggressively.
+      reply.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+      return reply.send({
+        tools: _toolRegistry.toLlmTools(),
+        total: _toolRegistry.size(),
+      });
+    },
+  );
+
+  /**
+   * POST /gateway/tools/invoke
+   *
+   * Invoke a registered tool by name.
+   * Body: { name: string, input: unknown }
+   *
+   * Returns ToolResult { tool, success, output?, error?, durationMs }.
+   */
+  app.post<{
+    Body: { name: string; input?: unknown };
+  }>("/gateway/tools/invoke", { preHandler: requireAuth }, async (request, reply) => {
+    const { name, input = {} } = request.body;
+    if (!name) return reply.code(400).send({ error: "name is required" });
+    const result = await _toolRegistry.invoke(name, input);
+    return reply.code(result.success ? 200 : 422).send(result);
+  });
+
+  /**
+   * GET /gateway/cost-report?limit=
+   *
+   * The caller's model spend: totals, and their most recent calls first.
+   */
+  app.get<{
+    Querystring: { limit?: string };
+  }>("/gateway/cost-report", { preHandler: requireAuth }, async (request, reply) => {
+    reply.header("Cache-Control", "private, no-store");
+    const limit = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
+
+    const mine = scopeCostEntriesToUser(costLogStore.entries, request.nexusUserId);
+    const totalUsd = mine.reduce((s, e) => s + e.costUsd, 0);
+    const totalTokens = mine.reduce((s, e) => s + e.inputTokens + e.outputTokens, 0);
+    return reply.send({
+      totalRuns: mine.length,
+      totalUsd: Math.round(totalUsd * 1_000_000) / 1_000_000,
+      totalTokens,
+      limit,
+      runs: mine
+        .slice(-limit)
+        .reverse()
+        .map((e) => ({
+          ts: e.ts,
+          model: e.model,
+          inputTokens: e.inputTokens,
+          outputTokens: e.outputTokens,
+          costUsd: e.costUsd,
+        })),
+    });
+  });
+}

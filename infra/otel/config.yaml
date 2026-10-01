@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# OpenTelemetry Collector configuration for Nexus local dev.
+# Used by docker compose --profile observability.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: development
+        action: upsert
+
+exporters:
+  # Log traces to stdout in dev
+  debug:
+    verbosity: detailed
+  # Traces to Jaeger (infra/docker/docker-compose.observability.yml)
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  # Prometheus metrics scrape endpoint; :8888 is the collector's own telemetry
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: nexus
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug, otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

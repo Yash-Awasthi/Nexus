@@ -1,0 +1,432 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * Nexus Drive — per-user sandboxed CLI + storage.
+ *
+ * API routes under /api/v1/drive:
+ *   GET  /drive/status      — workspace status + quota
+ *   POST /drive/exec        — execute command in sandbox
+ *   POST /drive/upload      — write file to workspace
+ *   GET  /drive/ls          — list workspace files
+ *   GET  /drive/read        — read workspace file
+ *   GET  /drive/export      — the workspace as .tar.gz, every .env left out
+ *   DELETE /drive/destroy   — tear down workspace
+ *
+ * Builds on @nexus/sandbox (Docker runner) and agent-tools (path-guarded fs ops).
+ * Phase 6 will upgrade to Firecracker microVMs; current implementation uses
+ * Docker containers with resource caps for multi-tenant isolation.
+ */
+
+import { spawn } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+
+import type { ExecAction } from "@nexus/exec-policy";
+import { globalFlags } from "@nexus/feature-flags";
+import {
+  buildSafeEnv,
+  createDockerRunner,
+  DRIVE_QUOTA_BYTES,
+  statDrive,
+  tarGzDirectory,
+  userDrivePath,
+  WORKSPACE_MOUNT,
+  type DockerSandboxConfig,
+} from "@nexus/sandbox";
+import type { FastifyInstance } from "fastify";
+
+import { guardExec } from "../lib/exec-guard.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const QUOTA_BYTES = DRIVE_QUOTA_BYTES;
+const QUOTA_WARN_PCT = 0.9; // warn at 90%
+const MAX_OUTPUT_BYTES = 64 * 1024;
+const CMD_TIMEOUT_MS = 30_000;
+
+const DEFAULT_DOCKER_CONFIG: DockerSandboxConfig = {
+  image: process.env.SANDBOX_SHELL_IMAGE ?? "node:20-alpine",
+  memoryMb: 128,
+  cpuPercent: 50,
+  pidsLimit: 64,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The UID:GID the sandbox writes as. The workspace bind mount is owned by the
+ * user the API runs as, so a container on the image's default UID would be
+ * unable to write to the very directory it was given.
+ */
+function hostUser(): string | undefined {
+  return typeof process.getuid === "function" && typeof process.getgid === "function"
+    ? `${process.getuid()}:${process.getgid()}`
+    : undefined;
+}
+
+/** `workDir` expressed inside the container, where the drive is {@link WORKSPACE_MOUNT}. */
+function containerWorkdir(driveDir: string, workDir: string): string {
+  const rel = path.relative(driveDir, workDir);
+  return rel ? path.posix.join(WORKSPACE_MOUNT, ...rel.split(path.sep)) : WORKSPACE_MOUNT;
+}
+
+async function ensureDriveDir(userId: string): Promise<string> {
+  const dir = userDrivePath(userId);
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+async function getDriveUsage(dir: string): Promise<number> {
+  return (await statDrive(dir)).bytes;
+}
+
+/** Fastify answers an error carrying `statusCode` with that status, so every route gets a 403. */
+function escapeError(message: string): Error {
+  return Object.assign(new Error(message), { statusCode: 403 });
+}
+
+/** Path-traversal guard + symlink resolution, ported from agent-tools. */
+export async function safeResolve(rootDir: string, p: string): Promise<string> {
+  const resolved = path.resolve(rootDir, p);
+  const rel = path.relative(rootDir, resolved);
+  if (rel !== "" && (rel.startsWith("..") || path.isAbsolute(rel))) {
+    throw escapeError(`path escapes drive: ${p}`);
+  }
+  try {
+    const real = await fs.realpath(resolved);
+    const realRel = path.relative(rootDir, real);
+    if (realRel !== "" && (realRel.startsWith("..") || path.isAbsolute(realRel))) {
+      throw escapeError(`symlink escapes drive: ${p} → ${real}`);
+    }
+    return real;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("escapes drive")) throw err;
+    return resolved;
+  }
+}
+
+function clip(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}\n…[truncated]` : s;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Route plugin
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function driveRoutes(app: FastifyInstance): Promise<void> {
+  // Per-user rate limiters for drive routes (defense against abuse / DoS).
+  const driveRL = makeUserRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "drive" });
+  // Tighter limit for command execution — far more expensive than fs ops.
+  const driveExecRL = makeUserRateLimitPreHandler({
+    limit: 10,
+    windowMs: 60_000,
+    keyPrefix: "drive-exec",
+  });
+
+  // ── Status + quota ──────────────────────────────────────────────────────────
+
+  app.get(
+    "/drive/status",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      const driveDir = await ensureDriveDir(userId);
+      const usage = await getDriveUsage(driveDir);
+      const pct = usage / QUOTA_BYTES;
+      const warning = pct >= QUOTA_WARN_PCT;
+
+      return reply.send({
+        root: driveDir,
+        quota: { used: usage, limit: QUOTA_BYTES, pct: Math.round(pct * 100) },
+        warning: warning
+          ? `Drive at ${Math.round(pct * 100)}% — nearing ${QUOTA_BYTES / 1024 / 1024}MB limit`
+          : null,
+        dockerAvailable: process.env.ALLOW_UNSANDBOXED_EXEC !== "true",
+      });
+    },
+  );
+
+  // ── Execute command ─────────────────────────────────────────────────────────
+
+  app.post<{ Body: { command?: string; cwd?: string; timeoutMs?: number; approvalId?: string } }>(
+    "/drive/exec",
+    { preHandler: [requireAuthWithTier, driveExecRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      if (!globalFlags.isEnabled("drive.exec")) {
+        return reply.code(403).send({
+          error: "drive_exec_disabled",
+          message: "Drive commands are turned off by an admin.",
+        });
+      }
+      const { command, cwd, timeoutMs } = request.body ?? {};
+      if (!command?.trim()) return reply.code(400).send({ error: "command is required" });
+
+      const driveDir = await ensureDriveDir(userId);
+
+      // ponytail: quota is checked before the command and swept after it, so an
+      // overrun is bounded by one command's writes rather than hard-failed
+      // mid-write. A real FS ceiling needs an XFS project quota or a loopback
+      // image, both of which need root — see ROADMAP §8.2.
+      const usedBefore = await getDriveUsage(driveDir);
+      if (usedBefore >= QUOTA_BYTES) {
+        return reply
+          .code(413)
+          .send({ error: "quota_exceeded", used: usedBefore, limit: QUOTA_BYTES });
+      }
+
+      const workDir = cwd ? await safeResolve(driveDir, cwd) : driveDir;
+      const safeEnv = buildSafeEnv();
+      const timeout = Math.min(timeoutMs ?? CMD_TIMEOUT_MS, 60_000);
+
+      // The Docker sandbox is the only supported path; leaving it takes an
+      // explicit flag naming what the alternative is, never a missing NODE_ENV.
+      const useDocker = process.env.ALLOW_UNSANDBOXED_EXEC !== "true";
+      // The container is the control for the sandbox surface; outside it this is a host shell.
+      const action: ExecAction = {
+        surface: useDocker ? "sandbox" : "pty",
+        command: "sh",
+        args: ["-c", command],
+        cwd: workDir,
+      };
+      if ((await guardExec(request, reply, action, request.body.approvalId)) === "handled") return;
+
+      if (useDocker) {
+        const runner = createDockerRunner({
+          ...DEFAULT_DOCKER_CONFIG,
+          workspacePath: driveDir,
+          workdir: containerWorkdir(driveDir, workDir),
+          runAsUser: hostUser(),
+        });
+        const result = await runner("/bin/sh", ["-c", command], {
+          timeoutMs: timeout,
+          env: safeEnv,
+        }).catch((err: Error) => ({
+          stdout: "",
+          stderr: err.message,
+          exitCode: null,
+          timedOut: false,
+        }));
+
+        const usedAfter = await getDriveUsage(driveDir);
+        return reply.send({
+          stdout: clip(result.stdout, MAX_OUTPUT_BYTES),
+          stderr: clip(result.stderr, MAX_OUTPUT_BYTES),
+          exitCode: result.exitCode,
+          timedOut: result.timedOut,
+          quota: { used: usedAfter, limit: QUOTA_BYTES, exceeded: usedAfter > QUOTA_BYTES },
+        });
+      }
+
+      // Fallback: direct subprocess with scrubbed env.
+      // SECURITY: this path runs the user-supplied command UNSANDBOXED on the
+      // host. It is only acceptable for local dev. In production, refuse rather
+      // than execute arbitrary shell on the host — the Docker sandbox is the
+      // only supported execution path there.
+      if (process.env.NODE_ENV === "production") {
+        return reply.code(503).send({ error: "sandbox_unavailable" });
+      }
+
+      const child = spawn("/bin/sh", ["-c", command], {
+        cwd: workDir,
+        env: safeEnv,
+      });
+
+      return new Promise((resolve) => {
+        let out = "";
+        let killed = false;
+        const timer = setTimeout(() => {
+          killed = true;
+          child.kill("SIGKILL");
+        }, timeout);
+        timer.unref();
+
+        child.stdout.on("data", (d: Buffer) => {
+          if (out.length < MAX_OUTPUT_BYTES) out += d.toString();
+        });
+        child.stderr.on("data", (d: Buffer) => {
+          if (out.length < MAX_OUTPUT_BYTES) out += d.toString();
+        });
+
+        child.on("close", (code) => {
+          clearTimeout(timer);
+          resolve(
+            reply.send({
+              stdout: clip(out, MAX_OUTPUT_BYTES),
+              stderr: "",
+              exitCode: code,
+              timedOut: killed,
+            }),
+          );
+        });
+
+        child.on("error", (err) => {
+          clearTimeout(timer);
+          resolve(reply.code(500).send({ error: err.message }));
+        });
+      });
+    },
+  );
+
+  // ── List files ──────────────────────────────────────────────────────────────
+
+  app.get<{ Querystring: { dir?: string } }>(
+    "/drive/ls",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      const driveDir = await ensureDriveDir(userId);
+      const listDir = request.query.dir ? await safeResolve(driveDir, request.query.dir) : driveDir;
+
+      try {
+        const entries = await fs.readdir(listDir, { withFileTypes: true });
+        const files = await Promise.all(
+          entries.map(async (e) => {
+            const full = path.join(listDir, e.name);
+            let size = 0;
+            let mtime = "";
+            try {
+              const stat = await fs.stat(full);
+              size = stat.size;
+              mtime = stat.mtime.toISOString();
+            } catch {
+              /* ignore */
+            }
+            return {
+              name: e.name,
+              type: e.isDirectory() ? "dir" : "file",
+              size,
+              mtime,
+            };
+          }),
+        );
+        return reply.send({ path: path.relative(driveDir, listDir) || "/", files });
+      } catch {
+        return reply.code(404).send({ error: "directory not found" });
+      }
+    },
+  );
+
+  // ── Read file ───────────────────────────────────────────────────────────────
+
+  app.get<{ Querystring: { path: string } }>(
+    "/drive/read",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      const filePath = request.query.path;
+      if (!filePath) return reply.code(400).send({ error: "path is required" });
+
+      const driveDir = await ensureDriveDir(userId);
+      try {
+        const resolved = await safeResolve(driveDir, filePath);
+        const content = await fs.readFile(resolved, "utf8");
+        return reply.send({ path: filePath, content: clip(content, MAX_OUTPUT_BYTES) });
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("escapes drive")) {
+          return reply.code(403).send({ error: e.message });
+        }
+        return reply.code(404).send({ error: "file not found" });
+      }
+    },
+  );
+
+  // ── Upload / write file ─────────────────────────────────────────────────────
+
+  app.post<{ Body: { path: string; content: string } }>(
+    "/drive/upload",
+    {
+      preHandler: [requireAuthWithTier, driveRL],
+      schema: {
+        body: {
+          type: "object",
+          required: ["path", "content"],
+          properties: { path: { type: "string" }, content: { type: "string" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      const { path: filePath, content } = request.body ?? {};
+      if (!filePath?.trim()) return reply.code(400).send({ error: "path is required" });
+      if (content === undefined) return reply.code(400).send({ error: "content is required" });
+
+      const driveDir = await ensureDriveDir(userId);
+      const resolved = await safeResolve(driveDir, filePath);
+      // An overwrite frees the old file's bytes, so only the difference counts.
+      const replaced = (await fs.stat(resolved).catch(() => null))?.size ?? 0;
+      const usage = (await getDriveUsage(driveDir)) - replaced;
+      const newSize = Buffer.byteLength(content, "utf8");
+
+      if (usage + newSize > QUOTA_BYTES) {
+        return reply.code(413).send({
+          error: "quota_exceeded",
+          used: usage,
+          limit: QUOTA_BYTES,
+          attempted: newSize,
+        });
+      }
+
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
+      await fs.writeFile(resolved, content, "utf8");
+      return reply.code(201).send({
+        path: filePath,
+        size: newSize,
+        quotaRemaining: QUOTA_BYTES - usage - newSize,
+      });
+    },
+  );
+
+  // ── Export ──────────────────────────────────────────────────────────────────
+  // The user's own keys stay out of every copy of the drive.
+
+  app.get(
+    "/drive/export",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+      const driveDir = userDrivePath(userId);
+      const st = await fs.stat(driveDir).catch(() => null);
+      if (!st?.isDirectory()) return reply.code(404).send({ error: "no_drive" });
+      return reply
+        .header("Content-Type", "application/gzip")
+        .header("Content-Disposition", 'attachment; filename="nexus-drive.tar.gz"')
+        .send(tarGzDirectory(driveDir, (name) => name === ".env"));
+    },
+  );
+
+  // ── Destroy workspace ───────────────────────────────────────────────────────
+
+  app.delete(
+    "/drive/destroy",
+    { preHandler: [requireAuthWithTier, driveRL] },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "auth_required" });
+
+      const driveDir = userDrivePath(userId);
+      try {
+        await fs.rm(driveDir, { recursive: true, force: true });
+        return reply.send({ message: "workspace destroyed" });
+      } catch {
+        return reply.send({ message: "workspace already clean" });
+      }
+    },
+  );
+}

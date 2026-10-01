@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.react-router/
+*.gen.ts
+*.gen.py
+pnpm-lock.yaml
+infra/helm/
+.docusaurus/
+REF/
+.claude/worktrees/
+
+# Local reference clones (inspiration material — never repo source)
+inspiration/
+
+# Runtime store files written by the app, not source.
+apps/api/data/stores/
+
+# openapi-typescript output, byte-compared against a fresh run by
+# `pnpm types:check` — reformatting it would fail that comparison.
+**/src/generated/
