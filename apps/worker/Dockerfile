@@ -69,4 +69,4 @@ ENV NODE_ENV=production
 STOPSIGNAL SIGTERM
 
 # Workspace packages point `main` at TypeScript source, as in the API image, so the tsx loader runs.
-CMD ["node", "--import", "tsx/esm", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]
