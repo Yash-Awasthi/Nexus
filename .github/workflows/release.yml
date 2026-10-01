@@ -56,11 +56,11 @@ jobs:
           - service: api
             context: .
             dockerfile: apps/api/Dockerfile
-            image: ghcr.io/yash-awasthi/nexus-api
+            image: ghcr.io/yash-awasthi/nexus/api
           - service: worker
             context: .
             dockerfile: apps/worker/Dockerfile
-            image: ghcr.io/yash-awasthi/nexus-worker
+            image: ghcr.io/yash-awasthi/nexus/worker
 
     steps:
       - uses: actions/checkout@v7
@@ -77,7 +77,7 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}

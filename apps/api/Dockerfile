@@ -4,7 +4,7 @@
 # Run:   docker run -p 3000:3000 --env-file .env nexus-api
 
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 
 # python3/make/g++ are needed to compile node-pty's native extension during
@@ -55,7 +55,7 @@ WORKDIR /app
 RUN pnpm --filter @nexus/api deploy --prod /deploy
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 
 # Non-root user for security
@@ -81,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 # @nexus/escalation-breaker, @nexus/pty) point `main` at TypeScript source, and
 # Node's built-in stripping rejects the parameter properties they use. The tsx
 # loader is what the dev stage above and the desktop child process already run.
-CMD ["node", "--import", "tsx/esm", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]

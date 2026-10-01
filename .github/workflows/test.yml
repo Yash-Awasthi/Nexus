@@ -21,10 +21,8 @@ jobs:
           node-version: "22"
           cache: pnpm
 
-      # Use --no-frozen-lockfile so the lockfile can auto-heal when workspace
-      # package.json files diverge from the checked-in lock (e.g. after manual
-      # package.json edits). Frozen mode is enforced in the build matrix.
-      - run: pnpm install --no-frozen-lockfile
+      # Verify the committed dependency graph; never auto-heal it in CI.
+      - run: pnpm install --frozen-lockfile
 
       # Build all packages so cross-package type imports resolve at test time.
       - run: pnpm build
@@ -78,7 +76,7 @@ jobs:
           node-version: "22"
           cache: pnpm
 
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
       # apps/api, apps/ui and apps/desktop each carry their own vitest config —
@@ -120,7 +118,7 @@ jobs:
         with:
           node-version: "22"
           cache: pnpm
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Enable pgvector extension
         run: PGPASSWORD=nexus psql -h localhost -U nexus -d nexus_e2e -c "CREATE EXTENSION IF NOT EXISTS vector;"
@@ -133,6 +131,23 @@ jobs:
         run: pnpm --filter @nexus/worker test -- --reporter=verbose tests/e2e/
         env:
           DATABASE_URL: postgresql://nexus:nexus@localhost:5432/nexus_e2e
+
+  browser:
+    name: Browser E2E (offline, isolated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/e2e-server.test.mjs scripts/e2e-offline.test.mjs scripts/unit-offline.test.mjs
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
 
   python:
     name: Python tests (nexus-ingest)

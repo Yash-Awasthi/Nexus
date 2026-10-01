@@ -217,6 +217,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     genReqId: () => `nexus-${Date.now().toString(16)}-${Math.random().toString(36).slice(2, 8)}`,
     // Behind a proxy every request comes from the proxy; per-IP limits need the client's address.
     trustProxy: parseTrustProxy(process.env.NEXUS_TRUST_PROXY),
+    // A plugin's first DB/KV call can exceed the 10s default on a cold, low-CPU free host
+    // (a fresh Postgres connection over TLS), which would abort startup. 60s absorbs that.
+    pluginTimeout: Number(process.env.NEXUS_PLUGIN_TIMEOUT_MS) || 60_000,
   });
 
   // ── Plugins ───────────────────────────────────────────────────────────────

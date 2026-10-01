@@ -52,6 +52,7 @@ import {
   OpenAIDriver,
   type LlmDriver,
   type LlmRole,
+  type LlmUsage,
 } from "@nexus/llm-drivers";
 import { FixedEmbedder, MemoryManager, createBestEmbedder, type IEmbedder } from "@nexus/memory";
 import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
@@ -412,6 +413,14 @@ const _costLog: readonly CostEntry[] = costLogStore.entries;
 
 const _trackCost = trackCost;
 
+/** Bill a call to the provider and model that answered it, which failover may have changed. */
+function _trackServed(
+  res: { model?: string; usage?: LlmUsage; provider?: string },
+  requested: string,
+) {
+  _trackCost(res.model || requested, res.usage, res.provider);
+}
+
 const NO_LLM_MESSAGE = "No LLM provider configured. Add a provider key in Settings.";
 
 /** One-line LLM call with automatic cost tracking. Returns content string. */
@@ -434,7 +443,7 @@ async function _llm(
   const driver = getDefaultDriver();
   if (!driver) throw Object.assign(new Error(NO_LLM_MESSAGE), { statusCode: 503 });
   const res = await driver.complete({ model, messages, maxTokens });
-  _trackCost(model, res.usage);
+  _trackServed(res, model);
   return res.content.trim();
 }
 
@@ -1485,7 +1494,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
                 },
               ],
             });
-            _trackCost(DEFAULT_MODEL, res.usage);
+            _trackServed(res, DEFAULT_MODEL);
             const text = res.content.trim();
             issueCount += text.split("\n").filter((l) => /^\s*[-*] /.test(l)).length;
             if (text.includes("```")) suggestionCount++;
@@ -2682,7 +2691,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         temperature: 0.2,
         maxTokens: 2048,
       });
-      _trackCost(DEFAULT_MODEL, res.usage);
+      _trackServed(res, DEFAULT_MODEL);
       const generatedCode = res.content
         .trim()
         .replace(/^```[a-z]*\n?/, "")
@@ -3670,7 +3679,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 512,
       });
-      _trackCost(DEFAULT_MODEL, res.usage);
+      _trackServed(res, DEFAULT_MODEL);
       return parseJsonResponse(res.content);
     } catch {
       return { scores: heuristicScores(text, names), reason: "Keyword heuristic." };
@@ -3792,7 +3801,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       ],
       maxTokens: 2048,
     });
-    _trackCost(DEFAULT_MODEL, res.usage);
+    _trackServed(res, DEFAULT_MODEL);
     let parsed: { score?: unknown; explanation?: unknown; claims?: unknown };
     try {
       parsed = parseJsonResponse(res.content);
@@ -3849,7 +3858,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 1024,
       });
-      _trackCost(DEFAULT_MODEL, res.usage);
+      _trackServed(res, DEFAULT_MODEL);
       try {
         const parsed = parseJsonResponse<{ score?: unknown; ungroundedClaims?: unknown }>(
           res.content,
@@ -3939,7 +3948,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       messages: [userMsg(prompt)],
       maxTokens: 256,
     });
-    _trackCost(DEFAULT_MODEL, draftRes.usage);
+    _trackServed(draftRes, DEFAULT_MODEL);
     const draftMs = Date.now() - t0;
     const t1 = Date.now();
     const verifyContent = await _llm(
@@ -3998,7 +4007,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       ],
       maxTokens: 512,
     });
-    _trackCost(DEFAULT_MODEL, res.usage);
+    _trackServed(res, DEFAULT_MODEL);
     try {
       const p = parseJsonResponse<{
         category?: unknown;
@@ -4183,7 +4192,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 256,
       });
-      _trackCost(DEFAULT_MODEL, res.usage);
+      _trackServed(res, DEFAULT_MODEL);
       try {
         const parsed = parseJsonResponse<{ index: number; confidence: unknown }>(res.content);
         const hit = answers[parsed.index];

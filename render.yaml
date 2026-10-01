@@ -1,38 +1,31 @@
 # SPDX-License-Identifier: Apache-2.0
-# Render Blueprint — NEXUS backend services (free tier)
+# Render Blueprint: one free web service serving the API and the web UI.
+# The API runs the worker loop in-process when no queue is configured.
 #
-# Frontend → Vercel (nexus-ui, vercel.json at repo root)
-# Database → Neon   (external PostgreSQL, free forever)
-# Redis    → Upstash (external Redis, free forever)
-#
-# Secrets — set via Render dashboard or API (sync: false keeps them out of git):
-#   DATABASE_URL  — Neon pooler connection string
-#   REDIS_URL     — Upstash Redis URL  (rediss://default:TOKEN@host:6379)
-#   NEXUS_API_KEY, NEXUS_JWT_SECRET — auto-generated (the API exits without the first)
+# Secrets (sync: false) are set in the Render dashboard:
+#   DATABASE_URL — Neon pooled connection string
+#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 #   NEXUS_SECRETS_KEY, NEXUS_AUDIT_KEY — 64 hex chars each: openssl rand -hex 32
-#   GROQ_API_KEY  — optional: enables Groq LLM provider
-#   TAVILY_API_KEY — optional: enables Tavily web search
 
 services:
-  # ── Nexus API ─────────────────────────────────────────────────────────────────
   - type: web
-    name: nexus-api
+    name: nexus
     runtime: docker
-    dockerfilePath: ./apps/api/Dockerfile
+    dockerfilePath: ./infra/web/Dockerfile
     dockerContext: .
     plan: free
     branch: main
     autoDeploy: true
     healthCheckPath: /health
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: "3001"
-      - key: DATABASE_URL
+      # The service's own https://<name>.onrender.com URL, known once it exists.
+      - key: OAUTH_REDIRECT_BASE
         sync: false
-      - key: REDIS_URL
+      - key: ALLOWED_ORIGINS
         sync: false
+      # Render's proxy is the only hop in front of the service.
+      - key: NEXUS_TRUST_PROXY
+        value: "1"
       - key: NEXUS_API_KEY
         generateValue: true
       - key: NEXUS_JWT_SECRET
@@ -41,30 +34,15 @@ services:
         sync: false
       - key: NEXUS_AUDIT_KEY
         sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: TAVILY_API_KEY
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-
-  # ── Nexus Worker ──────────────────────────────────────────────────────────────
-  - type: worker
-    name: nexus-worker
-    runtime: docker
-    dockerfilePath: ./apps/worker/Dockerfile
-    dockerContext: .
-    plan: free
-    branch: main
-    autoDeploy: true
-    envVars:
-      - key: NODE_ENV
-        value: production
       - key: DATABASE_URL
         sync: false
-      - key: REDIS_URL
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GROQ_API_KEY
         sync: false

@@ -4,6 +4,11 @@ build/
 coverage/
 .turbo/
 .react-router/
+.venv-readiness/
+.pytest_cache/
+test-results/
+playwright-report/
+.local/
 *.gen.ts
 *.gen.py
 pnpm-lock.yaml

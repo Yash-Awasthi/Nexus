@@ -2,85 +2,95 @@
 
 # NEXUS — Testing
 
-The suite is Vitest (unit/integration) + Playwright (e2e/a11y), with k6 for load. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the contribution
-workflow and the pre-commit gate.
+Install with Node >=22.12 and `pnpm install --frozen-lockfile`, then `pnpm build`.
+On Windows PowerShell, use `pnpm.cmd` if the PowerShell shim does not execute.
+See [LOCAL-READINESS.md](LOCAL-READINESS.md) for the latest local evidence and limitations.
 
-## Unit & integration (Vitest)
+## Unit and integration suites
 
-```bash
-pnpm test                          # Full suite (all packages, via Turbo)
-pnpm --filter @nexus/council test  # Single package (much faster)
-pnpm --filter @nexus/evals test    # Eval suite
-pnpm test:unit                     # Unit-only target
+CI runs these distinct owners; a root Vitest pass is not an API/UI/desktop pass:
+
+```sh
+pnpm exec vitest run --coverage
+pnpm --filter @nexus/api test
+pnpm --filter @nexus/ui test
+pnpm --filter @nexus/desktop test
 ```
 
-Integration tests that need a live database/Redis are env-guarded with
-`describe.runIf(...)` — bring infra up first:
+The root `vitest.config.ts` includes package tests, worker/CLI tests and UI
+colocated `app/**/*.test.ts`. It excludes `apps/api/tests/**`, `apps/ui/tests/**`,
+`apps/desktop/tests/**` and worker E2E tests. Each excluded app has its own config.
+The root schema tests need a placeholder `DATABASE_URL`, as in CI:
+`postgresql://test:test@127.0.0.1:1/nexus_ci`.
 
-```bash
-docker compose up -d postgres redis
+API setup mocks `pg`, points Ollama at a closed local port and uses fixed embeddings.
+Run API lib/route selections through the API config, for example:
+
+```sh
+pnpm --filter @nexus/api exec vitest run tests/lib
+pnpm --filter @nexus/api exec vitest run tests/routes/health.test.ts
 ```
 
-### Vitest config topology (where tests actually run)
+Some suites override mocks or require infrastructure: inspect their prerequisites
+before running them. The worker signal-pipeline CI job provisions PostgreSQL 16
+with pgvector, applies the schema in its disposable database, then runs:
 
-Two Vitest configs matter for `apps/api`:
-
-- **Root config** (`vitest.config.ts` at the repo root) runs the unit tier
-  (`packages/*` and `apps/*/tests/**`) but **excludes** `apps/api/tests/routes/**`
-  and `apps/api/tests/server.test.ts`. The api lib tier is:
-
-  ```bash
-  npx vitest run apps/api/tests/lib   # store/unit tests — hermetic, ~185 tests
-  ```
-
-- **`apps/api/vitest.config.ts`** includes `tests/**`, so route-level tests
-  (`tests/routes/*`) run under it — from `apps/api`:
-
-  ```bash
-  npx vitest run tests/routes/health.test.ts
-  ```
-
-  Route tests that build the full server (`buildServer()`) import every route
-  module, and a route module may construct a Postgres store at **module scope**
-  whenever `DATABASE_URL` is set (`tests/setup.ts` always sets one) — so they
-  need a reachable database. The health route tests are the exception: they mock
-  `@nexus/db` and `pg`, so `tests/routes/health.test.ts` is fully hermetic and
-  green without infra.
-
-## End-to-end & accessibility (Playwright)
-
-```bash
-pnpm test:e2e     # Playwright e2e (see playwright.config.ts)
-pnpm test:a11y    # Accessibility checks
+```sh
+pnpm --filter @nexus/worker test -- --reporter=verbose tests/e2e/
 ```
 
-## Load testing (k6)
+## Browser E2E
 
-```bash
-k6 run infra/k6/smoke-test.js   # Quick smoke test
-k6 run infra/k6/load-test.js    # Read, write and council scenarios up to 50 VUs
+```sh
+node --test scripts/e2e-server.test.mjs
+pnpm exec playwright install chromium
+pnpm test:e2e
+# Bounded smoke selection:
+pnpm test:e2e landing.spec.ts auth.spec.ts dashboard.spec.ts --global-timeout=120000
 ```
 
-## The full gate
+Build first. Playwright starts its own API on `127.0.0.1:3999` and refuses to reuse
+an existing server. `scripts/e2e-server.mjs` allocates new PGlite/storage directories
+under the OS temp directory and passes an allowlisted environment. It skips the
+checkout `.env`, inherits no provider keys or database URLs, and disables API
+outbound TCP/fetch using `scripts/e2e-offline.cjs`. `PLAYWRIGHT_BASE_URL` is not used.
+Temporary data is retained for local debugging; remove only directories belonging
+to your finished runs. The `browser` CI job runs this offline suite separately from
+the worker signal-pipeline job.
 
-Before opening a PR, run what CI runs:
+Model-dependent specs are skipped unless `E2E_MODELS` is set; do not set it for this
+offline harness. This suite does not verify paid providers or live model behavior.
+There is no root `test:unit` or `test:a11y` script. Browser tests include phone-width
+layout assertions, not a comprehensive accessibility audit.
 
-```bash
-pnpm typecheck && pnpm test && pnpm lint
+## Python ingest
+
+Use a dedicated virtual environment (Python >=3.11; CI uses 3.11):
+
+```sh
+cd services/ingest
+python -m venv .venv
+# Activate .venv/bin/activate (Unix) or .venv/Scripts/Activate.ps1 (Windows)
+python -m pip install -e '.[dev]'
+python -m pytest --tb=short -q
 ```
 
-## Running the API route tests (tests/routes)
+Tests mock DB, Redis and scraping. Avoid inherited service configuration or a local
+`.env` when testing; the readiness report records the explicit isolated invocation.
 
-The repo's root `vitest.config.ts` excludes `apps/api/tests/routes/**` and
-`apps/api/tests/server.test.ts` from the standard `pnpm test` run. Those files
-are **not** infra-free: they boot the real server and expect:
+## Complete CI gate
 
-- a Postgres role **`nexus_test`** (create it and point `DATABASE_URL` at it —
-  the suite's buildServer() path authenticates as that user), and
-- controlled outbound networking for the SSRF regression tests.
+```sh
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm check:headers
+pnpm openapi:check
+pnpm types:check
+```
 
-Without those they fail on `password authentication failed for user
-'nexus_test'` / connection timeouts, not on code assertions. Provision the role
-(or run the suite in CI with a test database) before treating route-test
-failures as regressions. The lib suites under `apps/api/tests/lib/**` are
-infra-free and are the local gate.
+Also run the separate test owners above. Coverage thresholds live in
+`vitest.config.ts`; do not replace coverage checks with a smoke selection.
+Load tests (`k6 run infra/k6/smoke-test.js` and `load-test.js`) require an explicitly
+provisioned disposable stack and are separate from the offline gate.

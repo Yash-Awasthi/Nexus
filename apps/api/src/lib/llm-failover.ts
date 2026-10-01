@@ -69,6 +69,8 @@ export interface ProviderStat {
 /** Failover responses surface the serving provider on every call. */
 export interface FailoverLlmResponse extends LlmResponse {
   servedBy: string;
+  /** The answering driver's provider; `servedBy` may name a saved connection instead. */
+  provider: string;
 }
 
 let _entries: FailoverProviderEntry[] = [];
@@ -268,7 +270,11 @@ export class FailoverDriver implements LlmDriver {
         const res = await cachedDriver(entry.driver).complete(entryOpts);
         noteOutcome(entry, model, entryOpts);
         record(entry.id, true);
-        const served: FailoverLlmResponse = { ...res, servedBy: entry.id };
+        const served: FailoverLlmResponse = {
+          ...res,
+          servedBy: entry.id,
+          provider: entry.driver.provider,
+        };
         return served;
       } catch (err) {
         noteOutcome(entry, model, entryOpts, err);
@@ -302,7 +308,11 @@ export class FailoverDriver implements LlmDriver {
         const res = await cachedDriver(entry.driver).stream(entryOpts, tracked);
         noteOutcome(entry, model, entryOpts);
         record(entry.id, true);
-        const served: FailoverLlmResponse = { ...res, servedBy: entry.id };
+        const served: FailoverLlmResponse = {
+          ...res,
+          servedBy: entry.id,
+          provider: entry.driver.provider,
+        };
         return served;
       } catch (err) {
         noteOutcome(entry, model, entryOpts, err);

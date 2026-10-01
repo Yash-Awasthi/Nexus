@@ -46,6 +46,8 @@ export interface CostEntry {
    * without one are pre-attribution or system-internal calls; personal
    * analytics never show them under a user's name. */
   userId?: string;
+  /** False when the model has no price row, so `costUsd` is 0 rather than a guess. */
+  pricingKnown?: false;
 }
 
 /**
@@ -355,17 +357,18 @@ export function trackCost(
   usage?: { inputTokens?: number; outputTokens?: number },
   provider?: string,
 ): void {
-  model ||= "unknown";
+  const key = priceKey(model || "unknown", provider);
+  const price: [number, number] | undefined = key.endsWith(":free") ? [0, 0] : MODEL_PRICES[key];
   const inp = usage?.inputTokens ?? 0;
   const out = usage?.outputTokens ?? 0;
-  const [pi, po] = priceOf(model, provider);
   const owner = getCacheUserId() ?? undefined;
   costLogStore.record({
     ts: new Date().toISOString(),
-    model,
+    model: key,
     inputTokens: inp,
     outputTokens: out,
-    costUsd: (inp * pi + out * po) / 1_000_000,
+    costUsd: price ? (inp * price[0] + out * price[1]) / 1_000_000 : 0,
+    ...(price ? {} : { pricingKnown: false as const }),
     ...(owner ? { userId: owner } : {}),
   });
 }

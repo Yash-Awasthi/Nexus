@@ -60,6 +60,7 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
       byModel,
       period: `${days} days`,
       requests: entries.length,
+      unpricedRequests: entries.filter((e) => e.pricingKnown === false).length,
     });
   });
 

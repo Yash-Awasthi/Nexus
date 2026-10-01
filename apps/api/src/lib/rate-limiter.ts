@@ -20,7 +20,6 @@ import { createHash } from "node:crypto";
 import { MemoryKVStore } from "@nexus/kv";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-
 import { getSharedKV } from "./shared-kv.js";
 
 interface RateLimitOptions {
