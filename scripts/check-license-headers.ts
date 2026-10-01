@@ -37,6 +37,7 @@ const IGNORE_DIRS = new Set([
   ".changeset",
   "vendor",
   ".venv",
+  ".venv-readiness", // isolated local test dependencies, not repository source
   "__pycache__",
   "Python", // vendored embedded CPython runtime (gitignored; not repo source)
   "coverage-html",

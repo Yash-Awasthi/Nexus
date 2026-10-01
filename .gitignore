@@ -38,6 +38,7 @@ __pycache__/
 *.py[cod]
 *.so
 .venv/
+.venv-readiness/
 venv/
 *.egg-info/
 .pytest_cache/

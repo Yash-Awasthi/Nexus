@@ -250,10 +250,16 @@ export async function workflowsRoutes(
                 userId,
                 target.provider ? [target.provider] : [],
               );
-              const driver =
-                (target.provider ? registry.get(target.provider) : undefined) ??
-                deps.getDefaultDriver();
-              if (!driver) throw new Error(`no driver for ${target.provider ?? "default"}`);
+              const driver = target.provider
+                ? registry.get(target.provider)
+                : deps.getDefaultDriver();
+              if (!driver) {
+                throw new Error(
+                  target.provider
+                    ? `No key for ${target.provider}. Add one under Settings → Provider keys.`
+                    : "No default model is available.",
+                );
+              }
               const res = await driver.complete({
                 model: target.model,
                 messages: [{ role: "user" as LlmRole, content: prompt }],

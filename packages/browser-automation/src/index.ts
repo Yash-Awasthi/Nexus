@@ -286,7 +286,7 @@ export interface BrowserActorOptions {
 export class BrowserActor {
   private page: BrowserPage | null = null;
   private snapshot: DomSnapshot | null = null;
-  private history: Array<{ action: ActorAction; result: ActionResult; timestamp: number }> = [];
+  private history: { action: ActorAction; result: ActionResult; timestamp: number }[] = [];
 
   constructor(
     private readonly driver: BrowserDriver,
@@ -304,7 +304,7 @@ export class BrowserActor {
   }
 
   /** Action history (chronological). */
-  getHistory(): Array<{ action: ActorAction; result: ActionResult; timestamp: number }> {
+  getHistory(): { action: ActorAction; result: ActionResult; timestamp: number }[] {
     return [...this.history];
   }
 

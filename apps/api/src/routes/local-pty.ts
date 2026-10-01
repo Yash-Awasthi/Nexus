@@ -197,21 +197,19 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
         if (!raw.destroyed) raw.write(`data: ${JSON.stringify(ev)}\n\n`);
       };
 
-      const offData = ptyManager.onData(id, (data) => sse({ type: "data", data }));
-      const offExit = ptyManager.onExit(id, (info) => {
-        sse({ type: "exit", ...info });
-        offData();
-        offExit();
-        if (!raw.destroyed) raw.end();
-      });
-      raw.on("close", () => {
-        offData();
-        offExit();
-      });
-      // Snapshot after subscribing, so output from before the attach is in the tail, not lost.
-      const now = ptyManager.list().find((s) => s.id === id) ?? session;
-      sse({ type: "attached", id, tail: now.tail });
-      if (now.exited) sse({ type: "exit", exitCode: now.exitCode, signal: now.signal });
+      const offs: (() => void)[] = [];
+      const unsubscribe = () => offs.splice(0).forEach((off) => off());
+      raw.on("close", unsubscribe);
+      sse({ type: "attached", id });
+      // onData replays the retained tail, and onExit fires immediately for an exited session.
+      offs.push(ptyManager.onData(id, (data) => sse({ type: "data", data })));
+      offs.push(
+        ptyManager.onExit(id, (info) => {
+          sse({ type: "exit", ...info });
+          unsubscribe();
+          if (!raw.destroyed) raw.end();
+        }),
+      );
     },
   );
 

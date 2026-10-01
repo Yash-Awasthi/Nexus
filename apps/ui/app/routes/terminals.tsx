@@ -80,10 +80,8 @@ function TerminalView({ session, onExit }: { session: Session; onExit: () => voi
           const msg = JSON.parse(ev.slice(6)) as {
             type: string;
             data?: string;
-            tail?: string;
             exitCode?: number;
           };
-          if (msg.type === "attached" && msg.tail) term.write(msg.tail);
           if (msg.type === "data" && msg.data) term.write(msg.data);
           if (msg.type === "exit") {
             term.write(
