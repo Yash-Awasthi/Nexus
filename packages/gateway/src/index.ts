@@ -524,9 +524,13 @@ export async function runFallbackChain<T>(
       }
     }
   }
-  throw Object.assign(new Error(`runFallbackChain: all ${chain.length} model(s) failed`), {
-    errors,
-  });
+  const reasons = errors.map(({ error }) =>
+    error instanceof Error ? error.message : String(error),
+  );
+  throw Object.assign(
+    new Error(`runFallbackChain: all ${chain.length} model(s) failed: ${reasons.join("; ")}`),
+    { errors },
+  );
 }
 
 // ── Cost callback registry ─────────────────────────────────────────────────────
