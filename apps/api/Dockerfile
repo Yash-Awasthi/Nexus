@@ -81,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 # @nexus/escalation-breaker, @nexus/pty) point `main` at TypeScript source, and
 # Node's built-in stripping rejects the parameter properties they use. The tsx
 # loader is what the dev stage above and the desktop child process already run.
-CMD ["node", "--import", "tsx/esm", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]
