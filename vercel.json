@@ -6,15 +6,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://nexus-api-production-f80f.up.railway.app/api/$1"
+      "destination": "https://nexus-iosc.onrender.com/api/$1"
     },
     {
       "source": "/health",
-      "destination": "https://nexus-api-production-f80f.up.railway.app/health"
+      "destination": "https://nexus-iosc.onrender.com/health"
     },
     {
       "source": "/health/(.*)",
-      "destination": "https://nexus-api-production-f80f.up.railway.app/health/$1"
+      "destination": "https://nexus-iosc.onrender.com/health/$1"
     },
     {
       "source": "/(.*)",
