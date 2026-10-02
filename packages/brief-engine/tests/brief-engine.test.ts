@@ -239,9 +239,7 @@ describe("BriefSigner", () => {
   });
 
   it("different secrets produce different signatures", () => {
-    const s1 = new BriefSigner("secret1", mockHmac);
-    // s2 expects sig computed with "secret2", so s1's URL will be invalid for s2
-    // But mockHmac ignores secret — let's use the real internal hmac behavior:
+    // mockHmac ignores the secret, so this uses the real HMAC.
     const s3 = new BriefSigner("secret1");
     const s4 = new BriefSigner("secret2");
     const url3 = s3.sign("https://nexus.local", "user1", "2024-01-01");
