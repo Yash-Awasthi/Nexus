@@ -8,7 +8,6 @@ Uses celery's ALWAYS_EAGER mode so tasks run synchronously in-process
 from __future__ import annotations
 
 import os
-import pytest
 
 # ── Eager mode — tasks run in-process synchronously ──────────────────────────
 

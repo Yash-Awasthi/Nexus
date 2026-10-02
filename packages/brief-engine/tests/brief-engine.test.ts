@@ -225,7 +225,6 @@ describe("BriefSigner", () => {
 
   it("verify returns valid: false when sig is tampered", () => {
     const signer = new BriefSigner("secret", mockHmac);
-    const url = signer.sign("https://nexus.local", "user1", "2024-01-01") + "TAMPERED";
     // the TAMPERED suffix modifies sig param value since it's last — reconstruct properly
     const u = new URL(signer.sign("https://nexus.local", "user1", "2024-01-01"));
     u.searchParams.set("sig", "wrong-sig");
@@ -241,8 +240,6 @@ describe("BriefSigner", () => {
 
   it("different secrets produce different signatures", () => {
     const s1 = new BriefSigner("secret1", mockHmac);
-    const s2 = new BriefSigner("secret2", mockHmac);
-    const url = s1.sign("https://nexus.local", "user1", "2024-01-01");
     // s2 expects sig computed with "secret2", so s1's URL will be invalid for s2
     // But mockHmac ignores secret — let's use the real internal hmac behavior:
     const s3 = new BriefSigner("secret1");

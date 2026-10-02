@@ -101,7 +101,7 @@ export default function AdminFeedback() {
         actions={
           <>
             <Button variant="ghost" size="icon-sm" onClick={loadStats} aria-label="Refresh">
-              <RefreshCw className={loading ? "animate-spin" : ""} />
+              <RefreshCw />
             </Button>
             <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
               {exporting ? <Loader2 className="animate-spin" /> : <Download />}

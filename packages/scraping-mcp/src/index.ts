@@ -40,10 +40,6 @@ export interface ToolCallResult {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function textResult(text: string): ToolCallResult {
-  return { content: [{ type: "text", text }], isError: false };
-}
-
 function jsonResult(data: unknown): ToolCallResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }], isError: false };
 }

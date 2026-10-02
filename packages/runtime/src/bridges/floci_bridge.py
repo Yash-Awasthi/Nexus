@@ -33,7 +33,6 @@ Dependencies
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import logging
 import os
@@ -60,7 +59,6 @@ AWS_REGION: str = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 # ---------------------------------------------------------------------------
 try:
     import boto3  # type: ignore[import]
-    from botocore.exceptions import ClientError  # type: ignore[import]
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False

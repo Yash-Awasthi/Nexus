@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  MockScrapingBackend,
-  SessionStore,
-  buildScrapingTools,
-  ScrapingMcpServer,
-} from "../src/index.js";
+import { describe, it, expect } from "vitest";
+import { MockScrapingBackend, SessionStore, ScrapingMcpServer } from "../src/index.js";
 
 // ── MockScrapingBackend ───────────────────────────────────────────────────────
 
