@@ -260,7 +260,9 @@ describe("agent runs", () => {
   });
 
   it("tells the next run what an interrupted attempt had already done", async () => {
-    let { org, work, rt } = await boot();
+    const first = await boot();
+    const { org } = first;
+    let { work, rt } = first;
     const c = org.createCompany("alice", { name: "Resume" });
     const a = org.createAgent("alice", c.id, { name: "A" });
     const t = work.createTask("alice", c.id, { title: "Migrate", assigneeAgentId: a.id });
@@ -278,7 +280,7 @@ describe("agent runs", () => {
     );
     await new Promise((res) => setTimeout(res, 100));
 
-    ({ org, work, rt } = await boot());
+    ({ work, rt } = await boot());
     const prompts: string[] = [];
     rt.registerAdapter("nexus", async (ctx) => {
       prompts.push(ctx.prompt.user);

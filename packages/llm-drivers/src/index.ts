@@ -1021,7 +1021,7 @@ export class GeminiDriver extends BaseDriver {
         const name = idToName.get(m.toolCallId ?? "") ?? "tool_result";
         // Gemini's functionResponse.response is a Struct — a bare string is
         // rejected with INVALID_ARGUMENT. Wrap non-object payloads.
-        let response: unknown = m.content;
+        let response: unknown;
         try {
           response = JSON.parse(m.content) as unknown;
         } catch {

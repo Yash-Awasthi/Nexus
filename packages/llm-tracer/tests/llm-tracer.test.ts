@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   Tracer,
   NoopTracer,
-  ActiveSpan,
   traceFlow,
   startLlmSpan,
   startToolSpan,
@@ -91,7 +90,7 @@ describe("Tracer", () => {
   it("end is idempotent — second call is no-op", () => {
     const active = tracer.startSpan("x");
     const s1 = active.end({ status: "ok" });
-    const s2 = active.end({ status: "error" });
+    active.end({ status: "error" });
     // second call returns same object without re-ending
     expect(tracer.spanCount()).toBe(1);
     expect(s1.status).toBe("ok");

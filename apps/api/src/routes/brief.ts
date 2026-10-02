@@ -166,8 +166,7 @@ export async function briefRoutes(app: FastifyInstance): Promise<void> {
       }),
     },
     async (request, reply) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { userId, date, sig, url } = request.query;
+      const { userId, date, url } = request.query;
 
       // Reconstruct the full URL to pass to signer.verify()
       const fullUrl =

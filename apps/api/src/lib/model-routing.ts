@@ -62,7 +62,7 @@ function meetsHardRequirements(m: ModelCapability, req: CapabilityRequirement): 
   return failed;
 }
 
-function costOf(m: ModelCapability): number | null {
+function costOf(m: ModelCapability): number {
   if (m.inputCostPer1M === null && m.outputCostPer1M === null) return 0; // free (local)
   return (m.inputCostPer1M ?? 0) + (m.outputCostPer1M ?? 0);
 }
@@ -81,7 +81,7 @@ function scoreAndNotes(
   if (tierExcess === 0) notes.push(`tier exactly ${m.reasoningTier}`);
   else notes.push(`tier ${m.reasoningTier} (${tierExcess > 0 ? "above" : "at"} minimum)`);
   notes.push(`context ${(m.contextWindow / 1000).toFixed(0)}k`);
-  if (cost !== null && cost > 0) notes.push(`$${cost.toFixed(2)}/1M combined`);
+  if (cost > 0) notes.push(`$${cost.toFixed(2)}/1M combined`);
   const score = req.preferCheapest
     ? [cost ?? 0, tierExcess, -m.contextWindow]
     : [tierExcess, cost ?? 0, -m.contextWindow];

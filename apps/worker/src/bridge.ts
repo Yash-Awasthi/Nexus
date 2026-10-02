@@ -97,8 +97,9 @@ function text(res: ServerResponse, code: number, body: string): void {
 function bearerToken(req: IncomingMessage): string | null {
   const h = req.headers.authorization;
   if (!h) return null;
-  const m = /^Bearer\s+(.+)$/i.exec(h);
-  return m?.[1] ?? null;
+  const sp = h.indexOf(" ");
+  if (sp < 0 || h.slice(0, sp).toLowerCase() !== "bearer") return null;
+  return h.slice(sp + 1).trim() || null;
 }
 
 /** True when the request carries a valid bridge token. */

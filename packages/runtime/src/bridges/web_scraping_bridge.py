@@ -138,6 +138,10 @@ def _extract_selectors(html: str, selectors: list[str]) -> dict[str, str]:
     return result
 
 
+async def _check_redirect_hop(request: Any) -> None:
+    _validate_fetch_url(str(request.url))
+
+
 async def _do_fetch(
     url: str,
     selectors: list[str],
@@ -174,6 +178,8 @@ async def _do_fetch(
             headers=headers,
             follow_redirects=True,
             timeout=timeout_sec,
+            # Redirect hops are new requests; each must pass the same check as the first.
+            event_hooks={"request": [_check_redirect_hop]},
         ) as client:
             resp = await client.get(safe_url)
 

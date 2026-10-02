@@ -1466,10 +1466,6 @@ describe("DocumentConnectorRegistry", () => {
 // NeonDocumentConnector
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeNeonFetch(rows: Record<string, unknown>[], ok = true): FetchFn {
-  return makeFetch([{ ok: true }, { ok, body: { rows } }, { ok, body: { rows } }]);
-}
-
 describe("NeonDocumentConnector — connect", () => {
   const cfg = {
     endpointUrl: "https://neon.example.com/sql",

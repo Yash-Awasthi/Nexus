@@ -169,9 +169,6 @@ class TestIngestEvents:
             captured.update(kwargs)
             return "evt-cap"
 
-        async def _job(**kwargs):
-            return "job-cap"
-
         with (
             patch("nexus_ingest.api.write_ingested_event", side_effect=_capture),
             patch("nexus_ingest.api.publish_event_job", new_callable=AsyncMock, return_value="j"),

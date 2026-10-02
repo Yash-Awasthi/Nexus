@@ -44,14 +44,6 @@ let dead = 0;
 let fixed = 0;
 let unfixable = 0;
 
-function statNoFollow(p) {
-  try {
-    return fs.lstatSync(p);
-  } catch {
-    return null;
-  }
-}
-
 function resolves(target, linkDir) {
   const abs = path.isAbsolute(target) ? target : path.join(linkDir, target);
   try {
@@ -114,7 +106,6 @@ function walk(dir, depth) {
       }
       // 2) rebuild by package name from the store
       if (newTarget === null) {
-        const rel = path.relative(NODE_MODULES, linkDir); // e.g. ".pnpm\vite@5/node_modules/@vitest" or "" for top-level
         const name = path.basename(p);
         const scope =
           path.basename(linkDir) === "@scope" || path.basename(linkDir).startsWith("@")

@@ -62,6 +62,9 @@ function _escapeRegExp(s: string): string {
 // Suppress unused warning — retained for callers that may need literal-string matching
 void _escapeRegExp;
 
+const MAX_PATTERN_CHARS = 200;
+const MAX_PATTERN_SUBJECT_CHARS = 10_000;
+
 /** Alert error. */
 export class AlertError extends Error {
   readonly code: AlertErrorCode;
@@ -622,9 +625,10 @@ export class AlertEngine {
     const haystack = condition.ignoreCase ? value.toLowerCase() : value;
     const needle = condition.ignoreCase ? condition.pattern.toLowerCase() : condition.pattern;
     if (condition.regex) {
+      // A user-written regex can backtrack catastrophically; bound both sides of the match.
+      if (condition.pattern.length > MAX_PATTERN_CHARS) return false;
       const flags = condition.ignoreCase ? "i" : "";
-      // Use pattern as-is: it IS the regex, do not escape it
-      return new RegExp(condition.pattern, flags).test(value);
+      return new RegExp(condition.pattern, flags).test(value.slice(0, MAX_PATTERN_SUBJECT_CHARS));
     }
     return haystack.includes(needle);
   }
