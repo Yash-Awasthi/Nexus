@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { GraphConsistencyError, GraphMutationError, RuntimeGraph } from "../src/runtime-graph.js";
 import type { IEventBus } from "../src/event-bus.js";

@@ -33,7 +33,6 @@
 - [ ] `pnpm test` passes
 - [ ] Changeset added (or `changeset: none` if not required)
 - [ ] SPDX header present on all new source files
-- [ ] DCO sign-off on all commits (`git commit -s`)
 - [ ] PR title follows Conventional Commits format
 - [ ] Docs updated if public API changed
 - [ ] ADR written if architectural decision was made

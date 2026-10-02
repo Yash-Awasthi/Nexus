@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   LLMRouterError,
   LLMRouter,
@@ -18,18 +18,6 @@ const REQ: LLMRequest = {
   model: "nexus/smart",
   messages: [{ role: "user", content: "hello" }],
 };
-
-function makeResponse(overrides: Partial<LLMResponse> = {}): LLMResponse {
-  return {
-    id: "r-1",
-    model: "test-model",
-    content: "ok",
-    usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-    provider: "test",
-    latencyMs: 50,
-    ...overrides,
-  };
-}
 
 function makeFetch(status: number, body: unknown): typeof fetch {
   return vi.fn().mockResolvedValue({

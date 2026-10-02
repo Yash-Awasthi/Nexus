@@ -777,7 +777,7 @@ export function compressStacked(
   for (const e of list) {
     const before = current;
     const beforeTokens = estimateTokens(before);
-    let next = before;
+    let next: typeof before;
     let note: string | undefined;
     try {
       next = e.apply(before, opts.ctx);
@@ -829,7 +829,7 @@ export async function compressStackedAsync(
   for (const e of list) {
     const before = current;
     const beforeTokens = estimateTokens(before);
-    let next = before;
+    let next: typeof before;
     let note: string | undefined;
     try {
       next = e.applyAsync ? await e.applyAsync(before, opts.ctx) : e.apply(before, opts.ctx);

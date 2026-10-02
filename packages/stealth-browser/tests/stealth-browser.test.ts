@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   MockBrowserPage,
   MockBrowserDriver,
@@ -177,7 +177,7 @@ describe("PagePool", () => {
     const driver = new MockBrowserDriver();
     const pool = new PagePool({ driver, maxSize: 5 });
     const p1 = await pool.acquire();
-    const p2 = await pool.acquire();
+    await pool.acquire();
     expect(pool.inUseCount).toBe(2);
     expect(pool.idleCount).toBe(0);
     pool.release(p1);

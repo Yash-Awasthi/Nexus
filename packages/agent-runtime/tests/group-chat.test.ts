@@ -4,7 +4,6 @@
 import { describe, expect, it } from "vitest";
 import {
   GroupChat,
-  GroupChatError,
   roundRobinPicker,
   llmSpeakerPicker,
   type ConversableAgent,

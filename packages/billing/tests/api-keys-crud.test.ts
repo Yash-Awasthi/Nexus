@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockInsertReturning,
-  mockInsertValues,
   mockInsert,
   mockSelectLimit,
   mockSelectWhere,

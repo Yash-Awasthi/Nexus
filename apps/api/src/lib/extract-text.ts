@@ -39,10 +39,27 @@ export async function extractText(type: string, bytes: Buffer): Promise<string> 
   if (isImageType(type)) return ocrImage(bytes);
   const raw = bytes.toString("utf8");
   if (type === "html") {
-    return raw
-      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
+    return stripScriptAndStyle(raw)
+      .replace(/<[^<>]*>/g, " ")
       .replace(/\s+/g, " ");
   }
   return raw;
+}
+
+// A lazy `<script[\s\S]*?<\/script>` regex is quadratic on unclosed tags in an upload.
+function stripScriptAndStyle(html: string): string {
+  const lower = html.toLowerCase();
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const script = lower.indexOf("<script", i);
+    const style = lower.indexOf("<style", i);
+    const start = script < 0 ? style : style < 0 ? script : Math.min(script, style);
+    if (start < 0) return out + html.slice(i);
+    const close = start === script ? "</script>" : "</style>";
+    const end = lower.indexOf(close, start);
+    out += html.slice(i, start) + " ";
+    if (end < 0) return out;
+    i = end + close.length;
+  }
 }
