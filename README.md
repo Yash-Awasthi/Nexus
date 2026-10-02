@@ -137,7 +137,7 @@ observability.
 - **Fastify API + React dashboard + BullMQ workers** in one pnpm/Turbo monorepo, with a versioned `/api/v1` surface and OpenAPI spec.
 - **Hardened auth** — HS256/RS256 JWTs (alg-pinned), exponential-backoff login throttling, per-session token revocation, and self-service GDPR erasure.
 - **Auditable & observable** — HMAC-SHA256-chained audit log, OpenTelemetry traces, health endpoints, Prometheus-ready metrics.
-- **Deploy anywhere** — Docker Compose for the full stack, Helm charts for Kubernetes, or single-service deploys (Fly/Railway/Vercel recipes included).
+- **Deploy anywhere** — Docker Compose for the full stack, Helm charts for Kubernetes, or single-service deploys (Render/Fly/Vercel recipes included).
 - **Tested** — hermetic unit suites, e2e assertions against the real HTTP surface, and CI (lint + typecheck + tests) on every push.
 
 ## Deployment modes
