@@ -1728,7 +1728,8 @@ export function extractEntities(input: string): string[] {
   for (const m of text.matchAll(/[@#][A-Za-z0-9_./-]+/g)) push(m[0]);
 
   // Path- / file-like and identifier tokens (a.b, a/b, snake_case, kebab-case)
-  for (const m of text.matchAll(/\b[A-Za-z0-9_]+(?:[./_-][A-Za-z0-9_]+)+\b/g)) push(m[0]);
+  // "_" is a separator only: in both classes it makes the match exponential.
+  for (const m of text.matchAll(/\b[A-Za-z0-9]+(?:[./_-][A-Za-z0-9]+)+\b/g)) push(m[0]);
 
   // CamelCase / PascalCase identifiers (at least one internal capital)
   for (const m of text.matchAll(/\b[A-Za-z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b/g)) push(m[0]);
