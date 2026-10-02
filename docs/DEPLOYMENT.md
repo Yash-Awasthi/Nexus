@@ -46,23 +46,18 @@ OAuth connectors (optional):
 > encrypted at rest and resolved server-side. `GROQ_API_KEY` is only the server-side
 > default for system/internal tasks (e.g. code-agent planning) — not per-user AI spend.
 
-> For a concrete, step-by-step rebuild of the live Railway + Vercel + Neon + Redis
-> Cloud + Browserbase stack (service order, smoke test, live service IDs), see
-> the free-tier rebuild section below.
-
-## Railway + Vercel (reference deployment)
+## Render (live deployment)
 
 ```
-API     → Railway  (apps/api,    Docker)
-worker  → Railway  (apps/worker, Docker)
-UI      → Vercel   (apps/ui, static SPA)
-DB      → Neon        (PostgreSQL + pgvector)
-KV      → Redis Cloud (BullMQ queue — in-memory fallback if REDIS_URL unset)
+API + UI → Render (one free web service, infra/web/Dockerfile, render.yaml)
+DB       → Neon   (PostgreSQL + pgvector)
 ```
 
-Set the environment variables above as Railway **shared variables** so both the API and
-worker services inherit them. The Vercel UI proxies `/api/*` to the Railway API via
-`vercel.json` rewrites — update the rewrite destination to your API's public URL.
+`render.yaml` is a Render Blueprint: the API serves the built UI and runs the worker
+loop in-process when `REDIS_URL` is unset. Set the `sync: false` variables in the
+Render dashboard; `OAUTH_REDIRECT_BASE` and `ALLOWED_ORIGINS` are the service's own
+`https://<name>.onrender.com` URL. Free instances sleep when idle, so the first
+request after a quiet spell takes about a minute.
 
 > The dashboard talks to two route layers: `/api/v1/*` are the real, DB-backed handlers
 > (auth, council, memory, connectors, billing, feature-flags, projects, image-gen, voice,
@@ -105,22 +100,14 @@ docker compose -f docker-compose.yml -f infra/docker/docker-compose.observabilit
 See [ROADMAP.md](../ROADMAP.md#14-production-multi-tenant-hardening) for production
 hardening — connection pooling, worker scaling, observability, and pgvector tuning at scale.
 
-## Free-tier cloud rebuild (Railway + Neon + Vercel)
+## Free-tier rebuild
 
-The whole stack deploys on free tiers: Vercel (static SPA + `/api` proxy) →
-Railway (Fastify API + BullMQ worker, Docker) → Neon (Postgres) + Redis Cloud
-(raw TCP — Upstash REST and Render's internal Redis both fail for BullMQ) →
-Browserbase (headless browser, optional). Deploy dependencies in order:
-**Neon** (migrate with `pnpm run db:migrate` from `packages/db`) → **Redis
-Cloud** (`redis://default:<password>@<host>:<port>`, eviction `noeviction`) →
-**Browserbase** (`BROWSER_CDP_URL=wss://connect.browserbase.com?apiKey=…`) →
-**Railway** (deploy from the repo; service `nexus-api` with
-`apps/api/Dockerfile`, service `nexus-worker` with `apps/worker/Dockerfile`,
-both reading the project's shared variables) → **Vercel** (import repo, the
-`vercel.json` rewrites `/api/*` to your Railway URL — edit it to point at your
-own deployment, not anyone else's).
+Deploy in order: **Neon** (migrate with `pnpm run db:migrate` from `packages/db`) →
+**Render** (New → Blueprint, pick this repo; `render.yaml` creates the `nexus` service).
+Redis Cloud (raw TCP, eviction `noeviction`) and Browserbase
+(`BROWSER_CDP_URL=wss://connect.browserbase.com?apiKey=…`) are optional.
 
-Required shared variables (exact names — the code reads `NEXUS_*`, not
+Required variables (exact names — the code reads `NEXUS_*`, not
 `JWT_SECRET`/`SCRYPT_SECRET`): `DATABASE_URL`, `REDIS_URL`, `NEXUS_API_KEY`,
 `NEXUS_JWT_SECRET`, `NEXUS_SECRETS_KEY`, `NEXUS_AUDIT_KEY`, `NODE_ENV=production`,
 plus the LLM keys you use (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
@@ -136,7 +123,7 @@ synchronously in the API without it).
 Deploy smoke test:
 
 ```bash
-B=https://<your-api>.up.railway.app
+B=https://<your-service>.onrender.com
 curl $B/health                                    # 200
 EM="t$(date +%s)@x.co"
 TOK=$(curl -s -X POST $B/api/v1/auth/register -H 'Content-Type: application/json' \
