@@ -3,28 +3,27 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Hoist DB mocks ─────────────────────────────────────────────────────────────
 
-const { mockSelect, mockInsert, mockUpdate, mockInsertReturning, mockInsertOnConflict } =
-  vi.hoisted(() => {
-    const mockInsertReturning = vi.fn().mockResolvedValue([]);
-    const mockInsertOnConflict = vi.fn().mockResolvedValue(undefined);
-    const mockInsertValues = vi.fn(() => ({
-      returning: mockInsertReturning,
-      onConflictDoNothing: mockInsertOnConflict,
-      onConflictDoUpdate: mockInsertOnConflict,
-    }));
-    const mockInsert = vi.fn(() => ({ values: mockInsertValues }));
+const { mockSelect, mockInsert, mockUpdate } = vi.hoisted(() => {
+  const mockInsertReturning = vi.fn().mockResolvedValue([]);
+  const mockInsertOnConflict = vi.fn().mockResolvedValue(undefined);
+  const mockInsertValues = vi.fn(() => ({
+    returning: mockInsertReturning,
+    onConflictDoNothing: mockInsertOnConflict,
+    onConflictDoUpdate: mockInsertOnConflict,
+  }));
+  const mockInsert = vi.fn(() => ({ values: mockInsertValues }));
 
-    const mockSelectLimit = vi.fn().mockResolvedValue([]);
-    const mockSelectWhere = vi.fn(() => ({ limit: mockSelectLimit }));
-    const mockSelectFrom = vi.fn(() => ({ where: mockSelectWhere }));
-    const mockSelect = vi.fn(() => ({ from: mockSelectFrom }));
+  const mockSelectLimit = vi.fn().mockResolvedValue([]);
+  const mockSelectWhere = vi.fn(() => ({ limit: mockSelectLimit }));
+  const mockSelectFrom = vi.fn(() => ({ where: mockSelectWhere }));
+  const mockSelect = vi.fn(() => ({ from: mockSelectFrom }));
 
-    const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
-    const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
-    const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
+  const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
+  const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
+  const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
 
-    return { mockSelect, mockInsert, mockUpdate, mockInsertReturning, mockInsertOnConflict };
-  });
+  return { mockSelect, mockInsert, mockUpdate, mockInsertReturning, mockInsertOnConflict };
+});
 
 vi.mock("@nexus/db", () => ({
   db: { select: mockSelect, insert: mockInsert, update: mockUpdate },

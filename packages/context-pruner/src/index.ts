@@ -28,7 +28,6 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { randomUUID } from "node:crypto";
 
 // ── Error ──────────────────────────────────────────────────────────────────────
 

@@ -7,7 +7,7 @@
  * real Postgres, no network. The fixture mirrors the trimmed models.dev
  * api.json shape already used by @nexus/provider-registry's tests.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import {
   MODELS_DEV_FIXTURE,

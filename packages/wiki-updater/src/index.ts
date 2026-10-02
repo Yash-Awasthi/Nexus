@@ -342,13 +342,6 @@ export interface PipelineContext {
   isNew?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; durationMs: number }> {
-  const t0 = Date.now();
-  const result = await fn();
-  return { result, durationMs: Date.now() - t0 };
-}
-
 // ── WikiUpdatePipeline ────────────────────────────────────────────────────────
 
 export interface PipelineOptions {

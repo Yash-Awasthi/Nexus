@@ -278,7 +278,7 @@ export class EscalationBreaker {
       if (input.sample) s.lastSample = input.sample;
 
       const ceiling: BreakerLevel = cfg.hardStop ? "stopped" : "constrained";
-      let target = s.level;
+      let target: BreakerLevel;
       if (trip.tripping) {
         target = LEVELS[Math.min(rank(s.level) + 1, rank(ceiling))]!;
       } else {

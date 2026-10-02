@@ -26,7 +26,6 @@ from enum import Enum
 from collections import Counter
 import time
 import hashlib
-import random
 
 
 class CouncilPhase(Enum):

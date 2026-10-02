@@ -464,7 +464,7 @@ function processPytest(lines: string[]): string {
   const paramTests = new Map<string, { passed: number; failed: string[] }>();
 
   for (const rawLine of lines) {
-    const line = rawLine.replace(/\s+$/, "");
+    const line = rawLine.trimEnd();
     const stripped = line.trim();
     // Skip collection + environment preamble.
     if (/^(collecting|collected)\s/.test(stripped)) continue;
@@ -682,7 +682,7 @@ function processJest(lines: string[]): string {
   let consecutiveBlanks = 0;
 
   for (const rawLine of lines) {
-    const line = rawLine.replace(/\s+$/, "");
+    const line = rawLine.trimEnd();
     const stripped = line.trim();
 
     if (/\bFAIL\b/.test(line) && !/^(Tests?|Test Suites?):/.test(stripped)) {
@@ -3299,12 +3299,7 @@ function tfPlanApply(lines: string[]): string {
       result.push(line);
       continue;
     }
-    if (
-      !stripped &&
-      !inResourceBlock &&
-      result.length > 0 &&
-      (result[result.length - 1] ?? "").trim()
-    ) {
+    if (!stripped && result.length > 0 && (result[result.length - 1] ?? "").trim()) {
       result.push(line);
     }
   }

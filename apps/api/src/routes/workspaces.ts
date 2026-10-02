@@ -37,6 +37,7 @@ import { requireAuthWithTier } from "../middleware/auth.js";
 
 function slugify(name: string): string {
   return name
+    .slice(0, 200)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")

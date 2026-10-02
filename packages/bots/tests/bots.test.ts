@@ -691,9 +691,7 @@ describe("SlackBotAdapter — triggerMode", () => {
 
   it("mention mode: handles message that mentions the bot", async () => {
     const slack = makeSlack({ triggerMode: "mention", botUserId: "U999" });
-    const result = await slack.handleEvent(
-      messagePayload({ event: undefined, text: "<@U999> help" }),
-    );
+    await slack.handleEvent(messagePayload({ event: undefined, text: "<@U999> help" }));
     // rebuild properly
     const payload = {
       type: "event_callback",
@@ -780,12 +778,6 @@ describe("SlackBotAdapter — allowedUserIds", () => {
     expect(r2.handled).toBe(false);
 
     // mention + correct user → passes both gates
-    const slack2 = makeSlack({
-      triggerMode: "mention",
-      botUserId: "U999",
-      allowedUserIds: ["U456"],
-      handler: echoHandler,
-    });
     // need to reset fetch
     const slack3 = new SlackBotAdapter({
       token: "xoxb-test",

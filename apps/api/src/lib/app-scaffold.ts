@@ -117,6 +117,7 @@ export async function pickDesign(
 export function appFolderName(ownerId: string, prompt: string): string {
   const slug =
     prompt
+      .slice(0, 200)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")

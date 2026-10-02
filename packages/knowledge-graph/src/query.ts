@@ -88,8 +88,14 @@ function parseValue(raw: string): string | number {
   return Number.isNaN(num) ? trimmed : num;
 }
 
+const MAX_QUERY_CHARS = 4000;
+
 /** Parse the supported Cypher subset. Throws KGError(QUERY_SYNTAX) otherwise. */
 export function parseCypher(query: string): CypherQuery {
+  // The clause regexes below backtrack polynomially, so input length is bounded first.
+  if (query.length > MAX_QUERY_CHARS) {
+    throw new KGError(`Query longer than ${MAX_QUERY_CHARS} characters`, "QUERY_SYNTAX");
+  }
   const q = query.trim().replace(/\s+/g, " ").replace(/;\s*$/, "");
   const match = MATCH_RE.exec(q);
   if (!match) {

@@ -1695,6 +1695,8 @@ export function normalizeEntity(entity: string): string {
   return entity.toLowerCase().trim();
 }
 
+const MAX_ENTITY_SOURCE_CHARS = 20_000;
+
 /**
  * Deterministic, dependency-free entity extractor for entity-linked retrieval.
  *
@@ -1707,7 +1709,10 @@ export function normalizeEntity(entity: string): string {
  * No LLM, no network — same input always yields the same ordered, de-duplicated
  * list, so it is safe in deterministic unit tests.
  */
-export function extractEntities(text: string): string[] {
+export function extractEntities(input: string): string[] {
+  // The token regexes below are polynomial on long runs; entities come from the head.
+  const text =
+    input.length > MAX_ENTITY_SOURCE_CHARS ? input.slice(0, MAX_ENTITY_SOURCE_CHARS) : input;
   const out: string[] = [];
   const seen = new Set<string>();
   const push = (raw: string): void => {
@@ -1723,7 +1728,8 @@ export function extractEntities(text: string): string[] {
   for (const m of text.matchAll(/[@#][A-Za-z0-9_./-]+/g)) push(m[0]);
 
   // Path- / file-like and identifier tokens (a.b, a/b, snake_case, kebab-case)
-  for (const m of text.matchAll(/\b[A-Za-z0-9_]+(?:[./_-][A-Za-z0-9_]+)+\b/g)) push(m[0]);
+  // "_" is a separator only: in both classes it makes the match exponential.
+  for (const m of text.matchAll(/\b[A-Za-z0-9]+(?:[./_-][A-Za-z0-9]+)+\b/g)) push(m[0]);
 
   // CamelCase / PascalCase identifiers (at least one internal capital)
   for (const m of text.matchAll(/\b[A-Za-z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b/g)) push(m[0]);

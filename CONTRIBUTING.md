@@ -17,7 +17,6 @@ Thank you for your interest in contributing. This guide covers everything you ne
 9. [Adding an adapter (plugin)](#adding-an-adapter-plugin)
 10. [Adding a CLI command](#adding-a-cli-command)
 11. [Governance extension](#governance-extension)
-12. [DCO sign-off](#dco-sign-off)
 
 ---
 
@@ -147,8 +146,6 @@ This repo uses [Conventional Commits](https://www.conventionalcommits.org/). `co
 <type>(<scope>): <description>
 
 [optional body]
-
-Signed-off-by: Your Name <your@email.com>
 ```
 
 | Type       | When to use                                             |
@@ -217,22 +214,3 @@ Commands are declared with `commander` in `apps/cli/src/index.ts`; their logic l
 ## Governance extension
 
 New policies/guardrails go in `packages/governance/src/`. Implement the relevant interface from `packages/governance/src/interfaces/`. Add unit tests with known-good and known-bad inputs.
-
----
-
-## DCO sign-off
-
-Every commit must be signed off:
-
-```bash
-git commit -s -m "feat(runtime): my change"
-# adds: Signed-off-by: Your Name <email>
-```
-
-To add DCO to all commits in your branch retroactively:
-
-```bash
-git rebase HEAD~N --signoff
-```
-
-The DCO check is enforced in CI via `dco.yml`.

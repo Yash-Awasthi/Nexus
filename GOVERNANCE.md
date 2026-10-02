@@ -28,7 +28,7 @@ Once NEXUS has ≥ 3 regular contributors (≥ 5 merged PRs each), the project w
 
 | Role        | Criteria                          | Responsibilities                              |
 | ----------- | --------------------------------- | --------------------------------------------- |
-| Contributor | Any merged PR                     | Follow CONTRIBUTING.md, DCO sign-off          |
+| Contributor | Any merged PR                     | Follow CONTRIBUTING.md                        |
 | Maintainer  | ≥ 10 merged PRs + BDFL nomination | Review PRs, triage issues, cut releases       |
 | BDFL        | Founder                           | Final architectural authority, release gating |
 
