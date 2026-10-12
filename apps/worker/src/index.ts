@@ -64,11 +64,11 @@ function parseRedisUrl(url: string): {
 }
 
 /**
- * Register BullMQ repeatable jobs so polling survives worker restarts and
- * runs on exactly one pod at a time (BullMQ's repeat lock ensures this).
+ * Register BullMQ job schedulers so polling survives worker restarts and
+ * runs on exactly one pod at a time.
  *
- * jobId is a stable key — BullMQ upserts by jobId so re-running bootstrap
- * after a restart is idempotent (no duplicate repeatable jobs accumulate).
+ * The scheduler id is a stable key — upsertJobScheduler replaces by id, so
+ * re-running bootstrap after a restart adds no duplicate schedules.
  *
  * Intervals:
  *   drive:reclaim — every 24 h (deletes drives idle past the 30-day window)
@@ -81,21 +81,21 @@ async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<v
   try {
     // §8.4 — drive lifecycle. Reclaim runs daily because the window it
     // enforces is 30 days; the sweep is hourly because it only reads.
-    await medium.add(
-      "drive.reclaim",
-      {},
-      { repeat: { every: 86_400_000 }, jobId: "nexus:repeat:drive:reclaim" },
+    await medium.upsertJobScheduler(
+      "nexus:repeat:drive:reclaim",
+      { every: 86_400_000 },
+      { name: "drive.reclaim", data: {} },
     );
-    await medium.add(
-      "drive.sweep",
-      {},
-      { repeat: { every: 3_600_000 }, jobId: "nexus:repeat:drive:sweep" },
+    await medium.upsertJobScheduler(
+      "nexus:repeat:drive:sweep",
+      { every: 3_600_000 },
+      { name: "drive.sweep", data: {} },
     );
     if (process.env.DRIVE_BACKUP_DIR || process.env.DRIVE_BACKUP_S3_BUCKET) {
-      await medium.add(
-        "drive.backup",
-        {},
-        { repeat: { every: 86_400_000 }, jobId: "nexus:repeat:drive:backup" },
+      await medium.upsertJobScheduler(
+        "nexus:repeat:drive:backup",
+        { every: 86_400_000 },
+        { name: "drive.backup", data: {} },
       );
     }
     console.log(
