@@ -18,7 +18,7 @@ import {
   type DockerSandboxConfig,
   type Runner,
   type RunnerResult,
-} from "./index.js";
+} from "./index.ts";
 
 /** Written last by the container; its presence means the staged copy is whole. */
 export const RUN_COMPLETE = ".nexus-run-complete";

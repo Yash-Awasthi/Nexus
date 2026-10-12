@@ -21,7 +21,7 @@ import {
   type ChunkStore,
   type Embedder,
   type Extractor,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

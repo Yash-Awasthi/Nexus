@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 const SECRET = "session-sync-owner-secret";
 let app: FastifyInstance;

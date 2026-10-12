@@ -17,9 +17,9 @@ import {
 } from "@nexus/lens";
 import type { FastifyInstance } from "fastify";
 
-import { evictOldestEntry } from "../lib/lru-utils.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { requireAuth } from "../middleware/auth.js";
+import { evictOldestEntry } from "../lib/lru-utils.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── In-memory store (survives request lifetime, not process restarts) ─────────
 

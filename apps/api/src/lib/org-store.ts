@@ -16,16 +16,17 @@
 
 import crypto from "node:crypto";
 
-import { listArchetypes } from "./archetype-store.js";
-import { PersistentStore } from "./persistent-store.js";
+import { listArchetypes } from "./archetype-store.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 export class OrgError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
     super(message);
+    this.status = status;
+    this.code = code;
   }
 }
 

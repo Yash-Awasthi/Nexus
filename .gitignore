@@ -84,3 +84,4 @@ inspiration/
 
 # Local tooling marker, not project source.
 .freebuff/
+*.tsbuildinfo

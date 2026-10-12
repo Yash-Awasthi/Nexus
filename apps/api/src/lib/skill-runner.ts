@@ -22,9 +22,9 @@ import type { ExecAction } from "@nexus/exec-policy";
 import { compressForTool, injectSystemPrompt, type InjectorName } from "@nexus/llm-compress";
 import { executeCode, type Runner, type SandboxLanguage } from "@nexus/sandbox";
 
-import { classifyAction } from "./exec-approvals.js";
-import type { ExecutionStatus } from "./session-graph.js";
-import { splitSkillCodeImports } from "./skill-imports.js";
+import { classifyAction } from "./exec-approvals.ts";
+import type { ExecutionStatus } from "./session-graph.ts";
+import { splitSkillCodeImports } from "./skill-imports.ts";
 
 /** Structural shape of a stored skill (matches StoredSkill in routes/skills.ts). */
 /** Output styles for mission agents — opt-in system-prompt injectors that cut

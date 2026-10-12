@@ -34,7 +34,7 @@ vi.mock("@nexus/db/schema", () => ({
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-import { DrizzleEventSource, DrizzleSignalSink } from "../../src/workers/drizzle-adapters.js";
+import { DrizzleEventSource, DrizzleSignalSink } from "../../src/workers/drizzle-adapters.ts";
 
 describe("DrizzleEventSource", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -131,7 +131,7 @@ describe("DrizzleSignalSink", () => {
 
 describe("SignalWorker integration", () => {
   it("starts and stops without throwing", async () => {
-    const { SignalWorker } = await import("../../src/workers/signal-worker.js");
+    const { SignalWorker } = await import("../../src/workers/signal-worker.ts");
     const worker = new SignalWorker();
     worker.start();
     worker.start(); // idempotent

@@ -3,10 +3,10 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { revokeGrants } from "../lib/org-cli-adapters.js";
-import { startDiscussion, type DiscussionOptions } from "../lib/org-discussion.js";
-import { agentRecord, reviewAgent } from "../lib/org-performance.js";
-import { modelScorecard, replayRun, replayTask } from "../lib/org-replay.js";
+import { revokeGrants } from "../lib/org-cli-adapters.ts";
+import { startDiscussion, type DiscussionOptions } from "../lib/org-discussion.ts";
+import { agentRecord, reviewAgent } from "../lib/org-performance.ts";
+import { modelScorecard, replayRun, replayTask } from "../lib/org-replay.ts";
 import {
   WAKE_SOURCES,
   cancelRun,
@@ -14,8 +14,8 @@ import {
   getRun,
   listRuns,
   type WakeSource,
-} from "../lib/org-runtime.js";
-import { OrgError, getAgent } from "../lib/org-store.js";
+} from "../lib/org-runtime.ts";
+import { OrgError, getAgent } from "../lib/org-store.ts";
 import {
   addComment,
   allowedTransitions,
@@ -39,9 +39,9 @@ import {
   type GoalInput,
   type TaskInput,
   type TaskStatus,
-} from "../lib/org-work.js";
+} from "../lib/org-work.ts";
 
-import { actorOf, orgReply, ownerOf, type Id } from "./org-http.js";
+import { actorOf, orgReply, ownerOf, type Id } from "./org-http.ts";
 
 export async function orgTaskRoutes(app: FastifyInstance): Promise<void> {
   // ── Goals ──────────────────────────────────────────────────────────────────

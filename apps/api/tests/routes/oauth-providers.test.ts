@@ -6,7 +6,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 delete process.env.GOOGLE_CLIENT_ID;
 process.env.GITHUB_CLIENT_ID = "gh-client";
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 beforeAll(async () => {

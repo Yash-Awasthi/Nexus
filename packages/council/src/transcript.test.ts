@@ -12,7 +12,7 @@ import {
   finalizeTranscript,
   transcriptToJson,
   type CouncilTranscript,
-} from "./index.js";
+} from "./index.ts";
 
 function base(): CouncilTranscript {
   return createTranscript({

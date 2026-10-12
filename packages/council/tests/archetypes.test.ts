@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { ARCHETYPES, SUMMONS, summonArchetypes, type TaskCategory } from "../src/archetypes.js";
+import { ARCHETYPES, SUMMONS, summonArchetypes, type TaskCategory } from "../src/archetypes.ts";
 
 describe("ARCHETYPES registry", () => {
   it("has 14 entries", () => {

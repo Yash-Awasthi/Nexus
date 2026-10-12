@@ -2305,11 +2305,12 @@ export interface StateDeleteResult {
   old_value?: unknown;
 }
 
-export enum StateEventType {
-  Created = "state:created",
-  Updated = "state:updated",
-  Deleted = "state:deleted",
-}
+export const StateEventType = {
+  Created: "state:created",
+  Updated: "state:updated",
+  Deleted: "state:deleted",
+} as const;
+export type StateEventType = (typeof StateEventType)[keyof typeof StateEventType];
 
 export interface StateEventData<TData = unknown> {
   type: "state";

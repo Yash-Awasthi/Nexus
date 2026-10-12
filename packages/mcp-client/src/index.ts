@@ -42,12 +42,13 @@ export type FetchFn = typeof fetch;
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 export class McpClientError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "McpClientError";
   }
 }
@@ -523,5 +524,5 @@ export class McpClient {
 }
 
 // MCP-over-HTTP server core (transport-agnostic JSON-RPC handler).
-export * from "./server.js";
-export * from "./proxy.js";
+export * from "./server.ts";
+export * from "./proxy.ts";

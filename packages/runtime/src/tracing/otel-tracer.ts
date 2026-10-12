@@ -26,7 +26,7 @@
 
 import { randomBytes } from "node:crypto";
 
-import type { ITraceSpan, ITraceRecorder } from "../interfaces/observability.interface.js";
+import type { ITraceSpan, ITraceRecorder } from "../interfaces/observability.interface.ts";
 
 // ─── W3C TraceContext ─────────────────────────────────────────────────────────
 

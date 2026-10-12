@@ -17,7 +17,7 @@ import {
   registerFromModelsDev,
   type ModelDefinition,
   type ModelsDevCatalogue,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function makeModel(
   id: string,

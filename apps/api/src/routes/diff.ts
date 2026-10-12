@@ -16,8 +16,8 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { getDiffRecord, listDiffRecords, saveDiffRecord } from "../lib/diff-history.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { getDiffRecord, listDiffRecords, saveDiffRecord } from "../lib/diff-history.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export async function diffRoutes(app: FastifyInstance): Promise<void> {
   app.post<{

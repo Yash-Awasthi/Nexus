@@ -38,13 +38,13 @@ import type { MemoryManager } from "@nexus/memory";
 import { decompositionRetrieve, type SourceRetrieverFn } from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
-import { extractText, isImageType } from "../lib/extract-text.js";
-import { createNotification } from "../lib/notifications-store.js";
-import { claimable, ownsRow } from "../lib/owner.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { fetchPublic, unsafeUrlReason } from "../lib/public-url.js";
-import { emitReaction } from "../lib/reactions.js";
-import { importSite } from "../lib/site-import.js";
+import { extractText, isImageType } from "../lib/extract-text.ts";
+import { createNotification } from "../lib/notifications-store.ts";
+import { claimable, ownsRow } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { fetchPublic, unsafeUrlReason } from "../lib/public-url.ts";
+import { emitReaction } from "../lib/reactions.ts";
+import { importSite } from "../lib/site-import.ts";
 
 const now = (): string => new Date().toISOString();
 

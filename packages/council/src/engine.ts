@@ -22,8 +22,8 @@ import {
   summonArchetypes,
   type Archetype,
   type TaskCategory,
-} from "./archetypes.js";
-import { GROQ_DEFAULT_MODEL } from "./groq-transport.js";
+} from "./archetypes.ts";
+import { GROQ_DEFAULT_MODEL } from "./groq-transport.ts";
 
 // ── LLM transport interface ───────────────────────────────────────────────────
 

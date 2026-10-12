@@ -29,9 +29,9 @@ import { workspaces, workspaceMembers, workspaceInvitations, users } from "@nexu
 import { eq, and, gt, isNull, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { sha256hex } from "../lib/crypto-utils.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
+import { sha256hex } from "../lib/crypto-utils.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

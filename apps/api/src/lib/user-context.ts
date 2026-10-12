@@ -16,7 +16,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { LlmDriver } from "@nexus/llm-drivers";
 
-import type { LlmStep } from "./request-traces.js";
+import type { LlmStep } from "./request-traces.ts";
 
 interface UserContext {
   userId: string | null;

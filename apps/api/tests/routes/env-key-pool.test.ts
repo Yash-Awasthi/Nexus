@@ -15,9 +15,9 @@ for (const k of Object.keys(process.env)) if (/_API_KEYS?$/.test(k)) delete proc
 process.env.GROQ_API_KEY = "gsk-one";
 process.env.GROQ_API_KEYS = "gsk-two, gsk-three,gsk-one";
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

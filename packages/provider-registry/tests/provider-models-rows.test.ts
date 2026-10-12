@@ -12,7 +12,7 @@ import {
   registerFromProviderModelRows,
   rowToModelDefinition,
   type ProviderModelRowLike,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function makeRow(overrides: Partial<ProviderModelRowLike> = {}): ProviderModelRowLike {
   return {

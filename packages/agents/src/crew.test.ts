@@ -2,8 +2,8 @@
 // Role-based Crew orchestration (crewAI/CAMEL parity) — focused tests for the
 // RoleAgent/Task/Crew module in @nexus/agents.
 import { describe, expect, it } from "vitest";
-import { RoleAgent, Crew, type CrewLlm, type CrewLlmMessage } from "./crew.js";
-import { AgentError } from "./index.js";
+import { RoleAgent, Crew, type CrewLlm, type CrewLlmMessage } from "./crew.ts";
+import { AgentError } from "./index.ts";
 
 // ── Scripted LLM double ──────────────────────────────────────────────────────
 

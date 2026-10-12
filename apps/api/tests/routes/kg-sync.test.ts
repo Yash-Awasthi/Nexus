@@ -12,7 +12,7 @@ const SECRET = "kg-sync-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 const savedDb = process.env.DATABASE_URL;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function as(userId: string) {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

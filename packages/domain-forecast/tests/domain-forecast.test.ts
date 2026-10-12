@@ -10,7 +10,7 @@ import {
   type ForecastDomain,
   type ForecastHorizon,
   type ForecastChunk,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

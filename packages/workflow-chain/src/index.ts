@@ -526,12 +526,15 @@ function getRetries(step: WorkflowStepType): number {
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 class SuspendError extends Error {
-  constructor(
-    public readonly stepId: string,
-    public readonly reason?: string,
-    public readonly suspendData?: unknown,
-  ) {
+  public readonly stepId: string;
+  public readonly reason?: string;
+  public readonly suspendData?: unknown;
+
+  constructor(stepId: string, reason?: string, suspendData?: unknown) {
     super(`Workflow suspended at step "${stepId}": ${reason ?? "no reason"}`);
+    this.stepId = stepId;
+    this.reason = reason;
+    this.suspendData = suspendData;
     this.name = "SuspendError";
   }
 }
@@ -546,4 +549,4 @@ export function createWorkflowChain<INPUT, RESULT = INPUT>(
 
 // Types are already exported inline above.
 
-export type { ActivityDefinition, ActivityRetryPolicy, WorkflowContext } from "./durable.js";
+export type { ActivityDefinition, ActivityRetryPolicy, WorkflowContext } from "./durable.ts";

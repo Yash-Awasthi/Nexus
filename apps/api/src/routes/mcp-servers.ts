@@ -26,8 +26,8 @@ import {
   encryptSecret,
   decryptSecret,
   SecretCryptoUnavailableError,
-} from "../lib/secret-crypto.js";
-import { requireAuthWithTier, requireUserId } from "../middleware/auth.js";
+} from "../lib/secret-crypto.ts";
+import { requireAuthWithTier, requireUserId } from "../middleware/auth.ts";
 
 const TRANSPORTS = ["http", "stdio", "websocket"] as const;
 type Transport = (typeof TRANSPORTS)[number];

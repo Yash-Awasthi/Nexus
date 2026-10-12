@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { ApprovalWorkflow } from "../src/approval-workflow.js";
-import type { IEventBus } from "../src/event-bus.js";
-import type { IApprovalRecord } from "../src/interfaces/governance.interface.js";
-import type { IEventStore } from "../src/interfaces/persistence.interface.js";
+import { ApprovalWorkflow } from "../src/approval-workflow.ts";
+import type { IEventBus } from "../src/event-bus.ts";
+import type { IApprovalRecord } from "../src/interfaces/governance.interface.ts";
+import type { IEventStore } from "../src/interfaces/persistence.interface.ts";
 
 function makeEventStore(seed: { event: string; payload: unknown }[] = []): IEventStore {
   const events = [...seed];

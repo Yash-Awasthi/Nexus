@@ -15,11 +15,11 @@ import crypto from "node:crypto";
 
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
-import { addPromptContributor } from "./org-protocol.js";
-import { onRunFinished, type Run } from "./org-runtime.js";
-import { OrgError, getCompany, nextSeq, onOrgLoad, registerCompanyScoped } from "./org-store.js";
-import { getTask, orgEvents } from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
+import { addPromptContributor } from "./org-protocol.ts";
+import { onRunFinished, type Run } from "./org-runtime.ts";
+import { OrgError, getCompany, nextSeq, onOrgLoad, registerCompanyScoped } from "./org-store.ts";
+import { getTask, orgEvents } from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 export type LessonKind = "outcome" | "feedback" | "note" | "decision";
 

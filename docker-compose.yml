@@ -86,7 +86,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: nexus-migrate
     restart: "no"
-    command: ["node", "--import", "tsx/esm", "dist/migrate.js"]
+    command: ["node", "src/migrate.ts"]
     environment:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
     depends_on:

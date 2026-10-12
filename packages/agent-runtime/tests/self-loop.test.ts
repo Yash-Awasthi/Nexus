@@ -12,7 +12,7 @@ import {
   ToolAgentRuntime,
   type LlmToolFn,
   type RuntimeMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 /** Scripted tool-aware LLM: turn 1 calls a tool, later turns answer. */
 function scriptedLlm(toolName: string, args: Record<string, unknown> = {}): LlmToolFn {

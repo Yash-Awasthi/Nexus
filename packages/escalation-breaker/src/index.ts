@@ -148,7 +148,11 @@ interface RunBreakerState {
 export class EscalationBreaker {
   private runs = new Map<string, RunBreakerState>();
 
-  constructor(private getConfig: () => BreakerConfig) {}
+  private getConfig: () => BreakerConfig;
+
+  constructor(getConfig: () => BreakerConfig) {
+    this.getConfig = getConfig;
+  }
 
   private cfg(): Required<
     Pick<

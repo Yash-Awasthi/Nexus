@@ -20,7 +20,7 @@ import {
   dateToMs,
   msToDate,
   createOAuthTokenStore,
-} from "../../src/lib/oauth-token-store.js";
+} from "../../src/lib/oauth-token-store.ts";
 
 /** Minimal drizzle-chain fake capturing the values written / rows returned. */
 function fakeDb(

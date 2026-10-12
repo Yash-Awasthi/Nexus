@@ -16,9 +16,9 @@ process.env.NEXUS_API_KEY = MASTER;
 process.env.DATABASE_URL = DB;
 delete process.env.NEXUS_DESKTOP;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");
 

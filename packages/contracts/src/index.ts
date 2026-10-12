@@ -5,9 +5,9 @@
  * Authoritative shared types for cross-package and cross-service communication.
  * Import from here, never from individual packages directly.
  */
-export * from "./scrape.js";
-export * from "./council.js";
+export * from "./scrape.ts";
+export * from "./council.ts";
 
 // Generated from the live route table (openapi.yaml). Regenerate with
 // `pnpm types:generate`; CI fails when the committed copy drifts.
-export type * from "./generated/openapi.js";
+export type * from "./generated/openapi.ts";

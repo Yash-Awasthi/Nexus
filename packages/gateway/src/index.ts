@@ -594,4 +594,4 @@ export class CostCallbackRegistry {
   }
 }
 
-export * from "./limit-learning.js";
+export * from "./limit-learning.ts";

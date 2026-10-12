@@ -10,7 +10,7 @@ const MASTER = "browser-sessions-master-key-0123456789";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_API_KEY = MASTER;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

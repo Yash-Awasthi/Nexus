@@ -12,9 +12,9 @@ process.env.NEXUS_JWT_SECRET = "auth-verify-email-secret";
 process.env.DATABASE_URL = DB;
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-auth-verify-"));
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { authUsersRoutes } = await import("../../src/routes/auth-users.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { authUsersRoutes } = await import("../../src/routes/auth-users.ts");
 
 let app: FastifyInstance;
 

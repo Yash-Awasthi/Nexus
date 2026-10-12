@@ -3,8 +3,8 @@
  * Provider registry — holds the live AuthProvider plugins and exposes the
  * catalog (including unsupported/skip-with-TODO entries) for UI + diagnostics.
  */
-import { DESCRIPTORS, GoogleVertexAuthProvider, MicrosoftEntraAuthProvider } from "./providers.js";
-import type { AuthProvider, ProviderDescriptor } from "./types.js";
+import { DESCRIPTORS, GoogleVertexAuthProvider, MicrosoftEntraAuthProvider } from "./providers.ts";
+import type { AuthProvider, ProviderDescriptor } from "./types.ts";
 
 export class AuthProviderRegistry {
   private readonly providers = new Map<string, AuthProvider>();

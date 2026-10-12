@@ -7,9 +7,9 @@
  * allowing recovery via health probes.
  */
 
-import type { IEventBus } from "./event-bus.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IMetricsCollector } from "./interfaces/observability.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IMetricsCollector } from "./interfaces/observability.interface.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -49,12 +49,13 @@ interface CircuitBreakerMetrics {
 // ─── Errors ──────────────────────────────────────────────────────────
 
 export class CircuitBreakerOpenError extends Error {
-  constructor(
-    message: string,
-    public readonly breakerName: string,
-    public readonly retryAfterMs: number,
-  ) {
+  public readonly breakerName: string;
+  public readonly retryAfterMs: number;
+
+  constructor(message: string, breakerName: string, retryAfterMs: number) {
     super(message);
+    this.breakerName = breakerName;
+    this.retryAfterMs = retryAfterMs;
     this.name = "CircuitBreakerOpenError";
   }
 }
@@ -73,12 +74,22 @@ export class CircuitBreaker {
   private halfOpenRequests = 0;
   private halfOpenSuccesses = 0;
 
+  private config: CircuitBreakerConfig;
+  private eventBus?: IEventBus;
+  private logger?: ILogger;
+  private metrics?: IMetricsCollector;
+
   constructor(
-    private config: CircuitBreakerConfig,
-    private eventBus?: IEventBus,
-    private logger?: ILogger,
-    private metrics?: IMetricsCollector,
-  ) {}
+    config: CircuitBreakerConfig,
+    eventBus?: IEventBus,
+    logger?: ILogger,
+    metrics?: IMetricsCollector,
+  ) {
+    this.config = config;
+    this.eventBus = eventBus;
+    this.logger = logger;
+    this.metrics = metrics;
+  }
 
   getState(): CircuitState {
     return this.state;
@@ -248,10 +259,13 @@ export class CircuitBreaker {
 // Wraps any adapter with circuit breaker protection (replaces fragile monkey-patching)
 
 export class CircuitBreakerAdapterWrapper {
-  constructor(
-    private breaker: CircuitBreaker,
-    private logger?: ILogger,
-  ) {}
+  private breaker: CircuitBreaker;
+  private logger?: ILogger;
+
+  constructor(breaker: CircuitBreaker, logger?: ILogger) {
+    this.breaker = breaker;
+    this.logger = logger;
+  }
 
   /**
    * Wrap an execute method through the circuit breaker.
@@ -301,15 +315,20 @@ export class CircuitBreakerAdapterWrapper {
 // ─── Health-Checking Circuit Breaker ─────────────────────────────────
 
 export class HealthAwareCircuitBreaker extends CircuitBreaker {
+  private healthCheck: () => Promise<boolean>;
+  private healthCheckIntervalMs: number;
+
   constructor(
     config: CircuitBreakerConfig,
-    private healthCheck: () => Promise<boolean>,
-    private healthCheckIntervalMs: number,
+    healthCheck: () => Promise<boolean>,
+    healthCheckIntervalMs: number,
     eventBus?: IEventBus,
     logger?: ILogger,
     metrics?: IMetricsCollector,
   ) {
     super(config, eventBus, logger, metrics);
+    this.healthCheck = healthCheck;
+    this.healthCheckIntervalMs = healthCheckIntervalMs;
     this.startHealthProbes();
   }
 

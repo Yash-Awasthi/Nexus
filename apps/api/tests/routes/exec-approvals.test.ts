@@ -24,7 +24,7 @@ delete process.env.NEXUS_EXEC_ALLOW;
 delete process.env.NEXUS_EXEC_DENY;
 delete process.env.NEXUS_EXEC_ROOTS;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 

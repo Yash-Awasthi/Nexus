@@ -21,7 +21,7 @@
 
 import { mulberry32 } from "@nexus/shared";
 
-import { extractFinalAnswer } from "./agreement.js";
+import { extractFinalAnswer } from "./agreement.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

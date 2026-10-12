@@ -30,9 +30,9 @@
  * direct pipeline with no new store dependency.
  */
 
-import type { IndexedEntity, IndexedRelation } from "./index-graphrag.js";
+import type { IndexedEntity, IndexedRelation } from "./index-graphrag.ts";
 
-import type { QueryRouter, CommunityReport } from "./index.js";
+import type { QueryRouter, CommunityReport } from "./index.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,13 +74,18 @@ export class LocalSearchEngine {
   private readonly degree = new Map<string, number>();
   private readonly reports: CommunityReport[];
 
+  private readonly router: QueryRouter;
+  private readonly modelAlias: string;
+
   constructor(
     entities: IndexedEntity[],
     relations: IndexedRelation[],
-    private readonly router: QueryRouter,
-    private readonly modelAlias: string,
+    router: QueryRouter,
+    modelAlias: string,
     reports: CommunityReport[] = [],
   ) {
+    this.router = router;
+    this.modelAlias = modelAlias;
     this.entities = entities;
     this.relations = relations;
     this.reports = reports;

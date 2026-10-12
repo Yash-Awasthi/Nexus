@@ -9,7 +9,7 @@ import {
   polishMergedSkill,
   type PolishDriver,
   type SkillSource,
-} from "../../src/lib/skill-merge.js";
+} from "../../src/lib/skill-merge.ts";
 
 const s1: SkillSource = {
   id: "a",

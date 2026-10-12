@@ -12,8 +12,8 @@ const SECRET = "missions-shell-test-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 delete process.env.NEXUS_EXEC_MODE;
 
-const { missionExec } = await import("../../src/routes/missions.js");
-const { buildServer } = await import("../../src/server.js");
+const { missionExec } = await import("../../src/routes/missions.ts");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

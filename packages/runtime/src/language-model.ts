@@ -18,7 +18,7 @@ import type {
   GenerateTextParams,
   StreamTextParams,
   GenerateObjectParams,
-} from "./interfaces/language-model.interface.js";
+} from "./interfaces/language-model.interface.ts";
 
 // ─── Shared HTTP helpers ──────────────────────────────────────────────────────
 

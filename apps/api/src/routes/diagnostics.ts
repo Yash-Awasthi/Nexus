@@ -35,9 +35,9 @@ import { db } from "@nexus/db";
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { getSharedKV } from "../lib/shared-kv.js";
+import { getSharedKV } from "../lib/shared-kv.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 // Capture process start time once at module load.
 const STARTED_AT = new Date();

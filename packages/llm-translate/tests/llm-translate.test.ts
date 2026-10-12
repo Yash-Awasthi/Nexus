@@ -7,7 +7,7 @@ import {
   normalizeStreamChunk,
   StreamTranslator,
   type CanonicalRequest,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // A request exercising the hard parts: system prompt, a tool definition, an
 // assistant tool call, and the tool result that follows it.

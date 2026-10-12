@@ -8,7 +8,7 @@ import {
   makeSafeLookup,
   type AllAddressResolver,
   type ResolvedAddress,
-} from "../src/security-utils.js";
+} from "../src/security-utils.ts";
 
 describe("isSafeUrl", () => {
   describe("allowed protocols", () => {

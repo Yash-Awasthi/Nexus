@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 const boot = () => bootOrg();
 
@@ -18,7 +18,7 @@ useOrgDataDir();
 
 describe("parseOutcome", () => {
   it("splits the deliverable from the control block", async () => {
-    const protocol = await import("../../src/lib/org-protocol.js");
+    const protocol = await import("../../src/lib/org-protocol.ts");
     const p = protocol.parseOutcome(
       reply("# Plan\nStep 1", { status: "done", summary: "wrote it" }),
     );
@@ -307,7 +307,7 @@ describe("agent runs", () => {
   it("hands work off from outside the org and waits for the deliverable", async () => {
     // The scheduler is what wakes an agent on assignment.
     const { org, work, rt } = await bootOrg(async () => ({
-      sched: await import("../../src/lib/org-scheduler.js"),
+      sched: await import("../../src/lib/org-scheduler.ts"),
     }));
     const c = org.createCompany("alice", { name: "Hand Co" });
     const a = org.createAgent("alice", c.id, { name: "Dev" });

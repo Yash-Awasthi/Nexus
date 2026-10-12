@@ -6,10 +6,10 @@
  * capability discovery, and results routing.
  */
 
-import type { IEventBus } from "./event-bus.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IEventStore } from "./interfaces/persistence.interface.js";
-import type { MemoryStore } from "./memory-store.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IEventStore } from "./interfaces/persistence.interface.ts";
+import type { MemoryStore } from "./memory-store.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -82,13 +82,20 @@ export class AgentBus implements IAgentBus {
   private logger?: ILogger;
   private readonly maxMessages: number;
 
+  private eventBus: IEventBus;
+  private eventStore?: IEventStore;
+  private memoryStore?: MemoryStore;
+
   constructor(
-    private eventBus: IEventBus,
-    private eventStore?: IEventStore,
-    private memoryStore?: MemoryStore,
+    eventBus: IEventBus,
+    eventStore?: IEventStore,
+    memoryStore?: MemoryStore,
     logger?: ILogger,
     options?: AgentBusOptions,
   ) {
+    this.eventBus = eventBus;
+    this.eventStore = eventStore;
+    this.memoryStore = memoryStore;
     this.logger = logger;
     this.maxMessages = options?.maxMessages ?? 1_000;
   }
@@ -297,7 +304,10 @@ export class AgentBus implements IAgentBus {
 // ─── Built-in Agent Handlers ─────────────────────────────────────────
 
 export class TaskDelegationAgent {
-  constructor(private bus: AgentBus) {
+  private bus: AgentBus;
+
+  constructor(bus: AgentBus) {
+    this.bus = bus;
     this.bus.registerHandler("task-delegator", this.handleMessage.bind(this));
   }
 

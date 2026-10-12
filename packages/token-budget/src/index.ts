@@ -29,29 +29,34 @@
 // ── Errors ─────────────────────────────────────────────────────────────────────
 
 export class BudgetError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "BudgetError";
   }
 }
 
 /** Budget exceeded error. */
 export class BudgetExceededError extends BudgetError {
-  constructor(
-    public readonly identity: string,
-    public readonly consumed: number,
-    public readonly limit: number,
-    public readonly resetAt: number,
-  ) {
+  public readonly identity: string;
+  public readonly consumed: number;
+  public readonly limit: number;
+  public readonly resetAt: number;
+
+  constructor(identity: string, consumed: number, limit: number, resetAt: number) {
     super(
       `Token budget exceeded for "${identity}": ${consumed}/${limit} tokens used. Resets at ${new Date(resetAt).toISOString()}.`,
       "BUDGET_EXCEEDED",
       { identity, consumed, limit, resetAt },
     );
+    this.identity = identity;
+    this.consumed = consumed;
+    this.limit = limit;
+    this.resetAt = resetAt;
     this.name = "BudgetExceededError";
   }
 }
@@ -125,10 +130,10 @@ export class MemoryTokenBudget implements TokenBudget {
   private readonly events = new Map<string, TokenEvent[]>();
   private readonly now: () => number;
 
-  constructor(
-    private readonly config: BudgetConfig,
-    opts: { now?: () => number } = {},
-  ) {
+  private readonly config: BudgetConfig;
+
+  constructor(config: BudgetConfig, opts: { now?: () => number } = {}) {
+    this.config = config;
     this.now = opts.now ?? (() => Date.now());
   }
 
@@ -212,11 +217,12 @@ interface KVBudgetRecord {
 export class KVTokenBudget implements TokenBudget {
   private readonly prefix: string;
 
-  constructor(
-    private readonly kv: KVStoreLike,
-    private readonly config: BudgetConfig,
-    opts: { keyPrefix?: string } = {},
-  ) {
+  private readonly kv: KVStoreLike;
+  private readonly config: BudgetConfig;
+
+  constructor(kv: KVStoreLike, config: BudgetConfig, opts: { keyPrefix?: string } = {}) {
+    this.kv = kv;
+    this.config = config;
     this.prefix = opts.keyPrefix ? `${opts.keyPrefix}:budget:` : "budget:";
   }
 
@@ -361,11 +367,14 @@ export class BudgetedLLMProvider implements LLMProvider {
   private readonly identityFn: (req: LLMRequest) => string;
   private readonly tokenCountMode: "prompt" | "completion" | "total";
 
-  constructor(
-    private readonly inner: LLMProvider,
-    private readonly budget: TokenBudget,
-    private readonly opts: BudgetedLLMProviderOptions = {},
-  ) {
+  private readonly inner: LLMProvider;
+  private readonly budget: TokenBudget;
+  private readonly opts: BudgetedLLMProviderOptions;
+
+  constructor(inner: LLMProvider, budget: TokenBudget, opts: BudgetedLLMProviderOptions = {}) {
+    this.inner = inner;
+    this.budget = budget;
+    this.opts = opts;
     this.name = `budgeted(${inner.name})`;
     this.models = inner.models;
     this.identityFn =

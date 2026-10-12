@@ -5,8 +5,8 @@
  * and the unknown-tool contract.
  */
 import { describe, expect, it } from "vitest";
-import { McpClient, McpProxyClient } from "./index.js";
-import type { McpToolDefinition, McpTransport } from "./index.js";
+import { McpClient, McpProxyClient } from "./index.ts";
+import type { McpToolDefinition, McpTransport } from "./index.ts";
 
 interface FakeServerOptions {
   failList?: boolean;

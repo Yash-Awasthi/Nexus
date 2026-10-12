@@ -3,8 +3,8 @@ import type {
   IPlanningEngine,
   ICognitiveTrace,
   ITaskSynthesisResult,
-} from "./interfaces/governance.interface.js";
-import type { ILanguageModel } from "./interfaces/language-model.interface.js";
+} from "./interfaces/governance.interface.ts";
+import type { ILanguageModel } from "./interfaces/language-model.interface.ts";
 
 // ─── Task template & blueprint types ─────────────────────────────────────────
 

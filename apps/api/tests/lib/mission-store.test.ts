@@ -8,8 +8,8 @@ import {
   getMission,
   listMissions,
   saveMission,
-} from "../../src/lib/mission-store.js";
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+} from "../../src/lib/mission-store.ts";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 
 function terminal(record: MissionRecord): MissionRecord {
   return { ...record, status: "completed", accepted: true, updatedAt: new Date().toISOString() };

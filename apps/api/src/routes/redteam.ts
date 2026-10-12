@@ -23,7 +23,7 @@ import {
 } from "@nexus/redteam";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 const TECHNIQUES: ObfuscationTechnique[] = [
   "leetspeak",

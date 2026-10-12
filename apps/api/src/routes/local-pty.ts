@@ -31,9 +31,9 @@ import type { ExecAction } from "@nexus/exec-policy";
 import { PtyManager } from "@nexus/pty";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import { loadApprovalStore } from "../lib/exec-approvals.js";
-import { guardExec } from "../lib/exec-guard.js";
-import { peerIsLoopback } from "../lib/rate-limiter.js";
+import { loadApprovalStore } from "../lib/exec-approvals.ts";
+import { guardExec } from "../lib/exec-guard.ts";
+import { peerIsLoopback } from "../lib/rate-limiter.ts";
 
 // ── Singleton ────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { compressCaveman, makeCavemanFilter } from "./caveman.js";
+import { compressCaveman, makeCavemanFilter } from "./caveman.ts";
 import {
   cavemanOutput,
   compressPreset,
@@ -9,7 +9,7 @@ import {
   injectSystemPrompt,
   ponytail,
   terseOutput,
-} from "./index.js";
+} from "./index.ts";
 
 describe("compressCaveman — filler removal", () => {
   it("removes filler words and condenses verbose phrases", () => {

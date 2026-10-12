@@ -42,7 +42,7 @@ import {
   retrieveBlock,
   ccrStoreSize,
   llmlinguaEngine,
-} from "../src/index.js";
+} from "../src/index.ts";
 import { decode as toonDecode } from "@toon-format/toon";
 
 // Heavy mode's optional deps are NOT installed. Mock them so the real

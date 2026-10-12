@@ -8,7 +8,7 @@ import {
   TelemetryExporter,
   HealthHistory,
   DiagnosticEnricher,
-} from "../src/observability-manager.js";
+} from "../src/observability-manager.ts";
 
 // ─── Histogram ────────────────────────────────────────────────────────────────
 

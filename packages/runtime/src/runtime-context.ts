@@ -22,44 +22,44 @@ import {
 } from "@nexus/memory";
 import { EnvironmentTelemetry, StructuredLogger } from "@nexus/telemetry";
 
-import { AgentBus, TaskDelegationAgent } from "./agent-bus.js";
-import { LocalAgentRegistry } from "./agent-registry.js";
-import { BrowserExecutionAdapter } from "./browser-adapter.js";
-import { HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "./circuit-breaker.js";
-import type { CircuitBreaker } from "./circuit-breaker.js";
-import { CodeAgentPool } from "./code-agent-pool.js";
-import { GHOSTSTACK_MCP_TOOLS } from "./conductor-mcp-bridge.js";
-import { YAMLConfigLoader } from "./config-loader.js";
-import { loadEnvFromRoot } from "./env-loader.js";
-import { LocalEventBus } from "./event-bus.js";
-import { FileQueueBackend } from "./file-queue-backend.js";
-import { FlociExecutionAdapter } from "./floci-adapter.js";
-import { resolveFlociEndpoint } from "./floci-client.js";
-import { EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
-import { createLanguageModel } from "./language-model.js";
-import { LocalInferenceAdapter } from "./local-inference-adapter.js";
-import { MemoryStore, TraceIndexer } from "./memory-store.js";
-import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "./observability-manager.js";
-import { ConductorOrchestrator } from "./orchestrator.js";
+import { AgentBus, TaskDelegationAgent } from "./agent-bus.ts";
+import { LocalAgentRegistry } from "./agent-registry.ts";
+import { BrowserExecutionAdapter } from "./browser-adapter.ts";
+import { HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "./circuit-breaker.ts";
+import type { CircuitBreaker } from "./circuit-breaker.ts";
+import { CodeAgentPool } from "./code-agent-pool.ts";
+import { GHOSTSTACK_MCP_TOOLS } from "./conductor-mcp-bridge.ts";
+import { YAMLConfigLoader } from "./config-loader.ts";
+import { loadEnvFromRoot } from "./env-loader.ts";
+import { LocalEventBus } from "./event-bus.ts";
+import { FileQueueBackend } from "./file-queue-backend.ts";
+import { FlociExecutionAdapter } from "./floci-adapter.ts";
+import { resolveFlociEndpoint } from "./floci-client.ts";
+import { EXTENDED_FLOCI_ACTIONS } from "./floci-extended.ts";
+import type { IQueueBackend } from "./interfaces/queue.interface.ts";
+import { createLanguageModel } from "./language-model.ts";
+import { LocalInferenceAdapter } from "./local-inference-adapter.ts";
+import { MemoryStore, TraceIndexer } from "./memory-store.ts";
+import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "./observability-manager.ts";
+import { ConductorOrchestrator } from "./orchestrator.ts";
 import {
   FileEventStore,
   FileRuntimePersistence,
   backupRuntimePersistence,
-} from "./persistence-manager.js";
-import { PlanningEngine } from "./planning-engine.js";
-import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "./runtime-compactor.js";
-import { RuntimeGraph } from "./runtime-graph.js";
-import { RuntimeInspector } from "./runtime-inspector.js";
-import { RuntimeManager } from "./runtime-manager.js";
-import type { RuntimeSandboxLayout } from "./runtime-sandbox.js";
-import { createRuntimeSandbox } from "./runtime-sandbox.js";
-import { ScrapingExecutionAdapter } from "./scraping-adapter.js";
-import { LocalServiceDiscovery, HealthMonitor } from "./service-discovery.js";
-import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "./spec-loader.js";
-import { TaskExecutor } from "./task-executor.js";
-import { TaskRouter } from "./task-router.js";
-import { WebSearchAdapter } from "./web-search-adapter.js";
+} from "./persistence-manager.ts";
+import { PlanningEngine } from "./planning-engine.ts";
+import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "./runtime-compactor.ts";
+import { RuntimeGraph } from "./runtime-graph.ts";
+import { RuntimeInspector } from "./runtime-inspector.ts";
+import { RuntimeManager } from "./runtime-manager.ts";
+import type { RuntimeSandboxLayout } from "./runtime-sandbox.ts";
+import { createRuntimeSandbox } from "./runtime-sandbox.ts";
+import { ScrapingExecutionAdapter } from "./scraping-adapter.ts";
+import { LocalServiceDiscovery, HealthMonitor } from "./service-discovery.ts";
+import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "./spec-loader.ts";
+import { TaskExecutor } from "./task-executor.ts";
+import { TaskRouter } from "./task-router.ts";
+import { WebSearchAdapter } from "./web-search-adapter.ts";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
@@ -69,7 +69,7 @@ import {
   DocumentProcessingTemplate,
   SpecToExecutionTemplate,
   GovernedEtlWorkflowTemplate,
-} from "./workflow-engine.js";
+} from "./workflow-engine.ts";
 
 export interface ConductorRuntimeContext {
   repoRoot: string;

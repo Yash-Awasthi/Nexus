@@ -5,8 +5,8 @@
  * end-to-end plan-then-execute loop through {@link Crew}.
  */
 import { describe, expect, it } from "vitest";
-import { Crew } from "./crew.js";
-import { parsePlan, planTasks, type PlanResult } from "./planner.js";
+import { Crew } from "./crew.ts";
+import { parsePlan, planTasks, type PlanResult } from "./planner.ts";
 
 const ROLES = [
   { name: "researcher", role: "Senior Research Analyst", goal: "find and verify facts" },

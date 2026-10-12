@@ -9,7 +9,7 @@
  * clean 502 rather than an unhandled error.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 const pinnedFetchMock = vi.fn();

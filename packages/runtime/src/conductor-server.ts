@@ -33,7 +33,11 @@ class ConductorHttpServer implements ConductorServer {
   private readonly startedAt = Date.now();
   ctx?: ConductorServer["ctx"];
 
-  constructor(readonly port: number) {}
+  readonly port: number;
+
+  constructor(port: number) {
+    this.port = port;
+  }
 
   get running(): boolean {
     return this._running;

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHash } from "node:crypto";
 
-import { detectCommunities, type CommunityOptions } from "./community.js";
-import { isDeleted, mergeEdge, mergeNode, tombstoneEdge, tombstoneNode } from "./merge.js";
-import { runCypher, type CypherResult } from "./query.js";
+import { detectCommunities, type CommunityOptions } from "./community.ts";
+import { isDeleted, mergeEdge, mergeNode, tombstoneEdge, tombstoneNode } from "./merge.ts";
+import { runCypher, type CypherResult } from "./query.ts";
 /**
  * @nexus/knowledge-graph — entity/relationship graph over agent memory.
  *
@@ -380,11 +380,19 @@ export interface RelatedResult {
  * ```
  */
 export class KnowledgeGraph {
+  private readonly store: KGStore;
+  private readonly defaultEntityExtractor: EntityExtractor;
+  private readonly defaultRelationshipExtractor: RelationshipExtractor;
+
   constructor(
-    private readonly store: KGStore,
-    private readonly defaultEntityExtractor: EntityExtractor = nullEntityExtractor,
-    private readonly defaultRelationshipExtractor: RelationshipExtractor = nullRelationshipExtractor,
-  ) {}
+    store: KGStore,
+    defaultEntityExtractor: EntityExtractor = nullEntityExtractor,
+    defaultRelationshipExtractor: RelationshipExtractor = nullRelationshipExtractor,
+  ) {
+    this.store = store;
+    this.defaultEntityExtractor = defaultEntityExtractor;
+    this.defaultRelationshipExtractor = defaultRelationshipExtractor;
+  }
 
   /**
    * Ingest a text document:
@@ -995,12 +1003,13 @@ function rowToEdge(row: NeonRow): KGEdge {
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 export class KGError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "KGError";
   }
 }
@@ -1679,6 +1688,6 @@ export async function graphSearch(
   };
 }
 
-export * from "./community.js";
-export * from "./merge.js";
-export * from "./query.js";
+export * from "./community.ts";
+export * from "./merge.ts";
+export * from "./query.ts";

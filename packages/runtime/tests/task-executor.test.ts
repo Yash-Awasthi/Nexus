@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it, vi } from "vitest";
 
-import { TaskExecutor } from "../src/task-executor.js";
-import type { IEventBus } from "../src/event-bus.js";
-import type { IQueueBackend, QueueJob } from "../src/interfaces/queue.interface.js";
-import type { IExecutionAdapter } from "../src/interfaces/execution.interface.js";
-import type { ILogger } from "../src/interfaces/logger.interface.js";
+import { TaskExecutor } from "../src/task-executor.ts";
+import type { IEventBus } from "../src/event-bus.ts";
+import type { IQueueBackend, QueueJob } from "../src/interfaces/queue.interface.ts";
+import type { IExecutionAdapter } from "../src/interfaces/execution.interface.ts";
+import type { ILogger } from "../src/interfaces/logger.interface.ts";
 import type {
   IMetricsCollector,
   ITraceRecorder,
   ITraceSpan,
-} from "../src/interfaces/observability.interface.js";
-import type { IRuntimePersistence } from "../src/interfaces/persistence.interface.js";
+} from "../src/interfaces/observability.interface.ts";
+import type { IRuntimePersistence } from "../src/interfaces/persistence.interface.ts";
 
 // ── Fakes ──────────────────────────────────────────────────────────────────────
 

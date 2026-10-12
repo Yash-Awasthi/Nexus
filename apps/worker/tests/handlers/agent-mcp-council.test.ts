@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   councilRuntimeToolsFromTransport,
   councilRuntimeTools,
-} from "../../src/handlers/agent-mcp.js";
+} from "../../src/handlers/agent-mcp.ts";
 import type { ILLMTransport } from "@nexus/council";
 
 /** DeliberativeCouncil-convention stub (convene → review → chairman verdict). */

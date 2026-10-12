@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { MemoryQueueBackend } from "../src/queue-backend.js";
-import type { QueueJob } from "../src/interfaces/queue.interface.js";
+import { MemoryQueueBackend } from "../src/queue-backend.ts";
+import type { QueueJob } from "../src/interfaces/queue.interface.ts";
 
 function job(
   id: string,

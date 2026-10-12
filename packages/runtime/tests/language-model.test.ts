@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { ChatMessage } from "../src/interfaces/language-model.interface.js";
-import { createLanguageModel } from "../src/language-model.js";
+import type { ChatMessage } from "../src/interfaces/language-model.interface.ts";
+import { createLanguageModel } from "../src/language-model.ts";
 
 interface RecordedRequest {
   opts: { hostname?: string; path?: string; headers?: Record<string, string> };

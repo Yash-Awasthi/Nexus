@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { COUNCIL_TEMPLATES } from "./archetypes.js";
-import { parsePortfolioRating, summarizeRatings } from "./engine.js";
+import { COUNCIL_TEMPLATES } from "./archetypes.ts";
+import { parsePortfolioRating, summarizeRatings } from "./engine.ts";
 
 describe("parsePortfolioRating", () => {
   it("reads the labelled rating line first", () => {

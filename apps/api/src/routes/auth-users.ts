@@ -32,21 +32,21 @@ import {
 import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
   assertLoginAllowed,
   loginThrottleKey,
   recordLoginFailure,
   recordLoginSuccess,
-} from "../lib/auth-hardening.js";
-import { sha256hex } from "../lib/crypto-utils.js";
-import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { emitReaction } from "../lib/reactions.js";
-import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/auth-hardening.ts";
+import { sha256hex } from "../lib/crypto-utils.ts";
+import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { emitReaction } from "../lib/reactions.ts";
+import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { totpMatches } from "./mfa.js";
+import { totpMatches } from "./mfa.ts";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,

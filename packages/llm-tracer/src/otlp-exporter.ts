@@ -21,7 +21,7 @@
  *   • ms epoch timestamps are converted to unix-nano (uint64, decimal string).
  */
 
-import type { Span, SpanKind, SpanStatus } from "./index.js";
+import type { Span, SpanKind, SpanStatus } from "./index.ts";
 
 // ── Deterministic id derivation ───────────────────────────────────────────────
 

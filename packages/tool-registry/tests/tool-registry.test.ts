@@ -15,7 +15,7 @@ import {
   type WebSearchOutput,
   type NotifyInput,
   type NotifyOutput,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

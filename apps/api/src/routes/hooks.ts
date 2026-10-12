@@ -14,7 +14,7 @@
 import { globalHooks, HOOK_EVENTS, type HookEvent } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 // ── Emit log ring buffer ──────────────────────────────────────────────────────
 

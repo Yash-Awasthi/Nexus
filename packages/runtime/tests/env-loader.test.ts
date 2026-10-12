@@ -5,7 +5,7 @@ import * as path from "path";
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { loadEnvFile, loadEnvFromRoot } from "../src/env-loader.js";
+import { loadEnvFile, loadEnvFromRoot } from "../src/env-loader.ts";
 
 let tmpDir: string;
 let envPath: string;

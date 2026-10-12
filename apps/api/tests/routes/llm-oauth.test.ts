@@ -21,7 +21,7 @@ import {
 import Fastify, { type FastifyInstance } from "fastify";
 import { beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
 
-import { makeLlmOauthRoutes } from "../../src/routes/llm-oauth.js";
+import { makeLlmOauthRoutes } from "../../src/routes/llm-oauth.ts";
 
 const JWT_SECRET = "test-oauth-secret";
 const USER_ID = "user-abc-123";

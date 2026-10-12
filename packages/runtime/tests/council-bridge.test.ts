@@ -9,8 +9,8 @@ import {
   type ICouncilResult,
   type CouncilSignal,
   type RoutedTask,
-} from "../src/council-bridge.js";
-import type { IEventBus } from "../src/event-bus.js";
+} from "../src/council-bridge.ts";
+import type { IEventBus } from "../src/event-bus.ts";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@
 import type { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 

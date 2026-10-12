@@ -24,8 +24,8 @@ import { encode as toonEncode } from "@toon-format/toon";
 
 // Caveman stage (lossy, opt-in): filler/phrase condensation with protected
 // spans and a minimum-savings gate — see caveman.ts for the full contract.
-import { makeCavemanFilter } from "./caveman.js";
-export { type CavemanOptions } from "./caveman.js";
+import { makeCavemanFilter } from "./caveman.ts";
+export { type CavemanOptions } from "./caveman.ts";
 
 // ── Structured-payload encoding ─────────────────────────────────────────────────
 // JSON is verbose: every key is requoted on every array element. TOON (Token-
@@ -1590,6 +1590,6 @@ export const llmlinguaEngine: CompressEngine = {
 };
 registerEngine(llmlinguaEngine);
 
-export * from "./token-saver.js";
+export * from "./token-saver.ts";
 
-export { SessionDedup } from "./session-dedup.js";
+export { SessionDedup } from "./session-dedup.ts";

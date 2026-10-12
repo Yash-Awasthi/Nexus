@@ -56,7 +56,7 @@ function auth(): { authorization: string } {
 
 let app: FastifyInstance;
 beforeAll(async () => {
-  const { pluginRunRoutes } = await import("../../src/routes/plugin-run.js");
+  const { pluginRunRoutes } = await import("../../src/routes/plugin-run.ts");
   app = Fastify();
   await app.register(pluginRunRoutes, {
     runnerFn: (inv: DenoInvocation) => {

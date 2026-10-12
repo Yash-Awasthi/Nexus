@@ -160,12 +160,13 @@ export class AdapterRegistry {
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 export class NexusAdapterError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "NexusAdapterError";
   }
 }
@@ -443,6 +444,6 @@ export class SocialBadBodyError extends Error {
 
 // ── Marketplace: distributable plugin manifests (§15.1) ───────────────────────
 
-export * from "./plugin-manifest.js";
-export * from "./plugin-registry.js";
-export * from "./sandbox.js";
+export * from "./plugin-manifest.ts";
+export * from "./plugin-registry.ts";
+export * from "./sandbox.ts";

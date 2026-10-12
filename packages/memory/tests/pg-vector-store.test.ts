@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { MemoryEntry } from "../src/index.js";
+import type { MemoryEntry } from "../src/index.ts";
 
 // ── Mock @neondatabase/serverless ─────────────────────────────────────────────
 const mockSqlFn = vi.fn();
@@ -27,7 +27,7 @@ vi.mock("pg", () => ({
 }));
 
 // Dynamic import after mock is set up
-const { PgVectorStore } = await import("../src/index.js");
+const { PgVectorStore } = await import("../src/index.ts");
 
 const NEON_URL = "postgresql://user@ep-cool-name.us-east-2.aws.neon.tech/nexus";
 

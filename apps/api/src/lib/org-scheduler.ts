@@ -21,10 +21,10 @@ import crypto from "node:crypto";
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 
-import { budgetOverview } from "./org-budget.js";
-import { wakeApprovedGrants } from "./org-cli-adapters.js";
-import { downline } from "./org-protocol.js";
-import { enqueueWake, reapStalled } from "./org-runtime.js";
+import { budgetOverview } from "./org-budget.ts";
+import { wakeApprovedGrants } from "./org-cli-adapters.ts";
+import { downline } from "./org-protocol.ts";
+import { enqueueWake, reapStalled } from "./org-runtime.ts";
 import {
   OrgError,
   allAgents,
@@ -39,7 +39,7 @@ import {
   onOrgLoad,
   registerCompanyScoped,
   type Agent,
-} from "./org-store.js";
+} from "./org-store.ts";
 import {
   createTask,
   getGoal,
@@ -51,9 +51,9 @@ import {
   type Actor,
   type Priority,
   type Task,
-} from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
-import { decryptSecret, encryptSecret, isSecretCryptoAvailable } from "./secret-crypto.js";
+} from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
+import { decryptSecret, encryptSecret, isSecretCryptoAvailable } from "./secret-crypto.ts";
 
 // ── Wake on events ───────────────────────────────────────────────────────────
 

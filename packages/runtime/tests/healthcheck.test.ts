@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { runHealthcheck } from "../src/healthcheck.js";
+import { runHealthcheck } from "../src/healthcheck.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();

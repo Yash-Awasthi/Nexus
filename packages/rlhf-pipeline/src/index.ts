@@ -194,7 +194,11 @@ export class FeedbackStore {
 // ── PipelineExporter ──────────────────────────────────────────────────────────
 
 export class PipelineExporter {
-  constructor(private store: FeedbackStore) {}
+  private store: FeedbackStore;
+
+  constructor(store: FeedbackStore) {
+    this.store = store;
+  }
 
   /**
    * Export preference pairs as JSONL (one JSON object per line).

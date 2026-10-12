@@ -11,15 +11,15 @@ import {
   pendingCount,
   reviewApproval,
   type Decision,
-} from "../lib/org-approvals.js";
+} from "../lib/org-approvals.ts";
 import {
   budgetOverview,
   deletePolicy,
   resolveIncident,
   upsertPolicy,
   type PolicyInput,
-} from "../lib/org-budget.js";
-import { addLesson, deleteLesson, listLessons, recall } from "../lib/org-memory.js";
+} from "../lib/org-budget.ts";
+import { addLesson, deleteLesson, listLessons, recall } from "../lib/org-memory.ts";
 import {
   createRoutine,
   deleteRoutine,
@@ -30,10 +30,10 @@ import {
   setRoutineWebhook,
   updateRoutine,
   type RoutineInput,
-} from "../lib/org-scheduler.js";
-import { getCompany } from "../lib/org-store.js";
+} from "../lib/org-scheduler.ts";
+import { getCompany } from "../lib/org-store.ts";
 
-import { orgReply, ownerOf, type Id } from "./org-http.js";
+import { orgReply, ownerOf, type Id } from "./org-http.ts";
 
 export async function orgGovernanceRoutes(app: FastifyInstance): Promise<void> {
   // ── Budgets ────────────────────────────────────────────────────────────────

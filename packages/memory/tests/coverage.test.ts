@@ -15,8 +15,8 @@ import {
   nullQueryExpander,
   hybridSearchWithExpansion,
   BM25Lexicon,
-} from "../src/index.js";
-import type { MemoryEntry, BM25Hit, IMemoryEntry } from "../src/index.js";
+} from "../src/index.ts";
+import type { MemoryEntry, BM25Hit, IMemoryEntry } from "../src/index.ts";
 
 const now = () => Math.floor(Date.now() / 1000);
 const entry = (

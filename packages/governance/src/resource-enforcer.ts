@@ -11,9 +11,9 @@
  * Integrates with existing FilesystemSandbox, path-boundary, and security-utils.
  */
 
-import type { IExecutionEnvironment } from "./interfaces/environment.interface.js";
-import { assertPathDescendsFrom } from "./path-boundary.js";
-import { isSafeUrl } from "./security-utils.js";
+import type { IExecutionEnvironment } from "./interfaces/environment.interface.ts";
+import { assertPathDescendsFrom } from "./path-boundary.ts";
+import { isSafeUrl } from "./security-utils.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 

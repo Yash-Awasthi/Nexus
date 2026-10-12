@@ -15,9 +15,9 @@ const DB = "pglite://:memory:governance-test";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { governanceRoutes } = await import("../../src/routes/governance.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { governanceRoutes } = await import("../../src/routes/governance.ts");
 
 let app: FastifyInstance;
 

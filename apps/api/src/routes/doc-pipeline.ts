@@ -26,8 +26,8 @@ import {
 import { createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
-import { extractText, ocrImage } from "../lib/extract-text.js";
-import { requireAuth } from "../middleware/auth.js";
+import { extractText, ocrImage } from "../lib/extract-text.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Embedder ──────────────────────────────────────────────────────────────────
 

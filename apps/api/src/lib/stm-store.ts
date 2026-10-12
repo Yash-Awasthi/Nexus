@@ -15,7 +15,7 @@
 
 import crypto from "node:crypto";
 
-import { PersistentStore } from "./persistent-store.js";
+import { PersistentStore } from "./persistent-store.ts";
 
 interface StmHistoryEntry {
   id: string;

@@ -6,8 +6,8 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 process.env.NEXUS_TRUST_PROXY = "loopback";
-const { buildServer } = await import("../../src/server.js");
-const { parseTrustProxy } = await import("../../src/lib/trust-proxy.js");
+const { buildServer } = await import("../../src/server.ts");
+const { parseTrustProxy } = await import("../../src/lib/trust-proxy.ts");
 
 it("reads hop counts, true/false and address lists", () => {
   expect(parseTrustProxy(undefined)).toBe(false);

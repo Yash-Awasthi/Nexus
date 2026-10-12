@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildServer } from "../src/server.js";
+import { buildServer } from "../src/server.ts";
 
 // Booting the server starts stores that expect a reachable database, Redis and
 // so on. The spec needs only the route table, so a background store that cannot

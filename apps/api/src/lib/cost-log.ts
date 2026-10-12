@@ -32,9 +32,9 @@
 
 import type { KVStore } from "@nexus/kv";
 
-import { MODEL_CATALOG } from "./model-discovery.js";
-import { getSharedKV, withTimeout } from "./shared-kv.js";
-import { getCacheUserId } from "./user-context.js";
+import { MODEL_CATALOG } from "./model-discovery.ts";
+import { getSharedKV, withTimeout } from "./shared-kv.ts";
+import { getCacheUserId } from "./user-context.ts";
 
 export interface CostEntry {
   ts: string;

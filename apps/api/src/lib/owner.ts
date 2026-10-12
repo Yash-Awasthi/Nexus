@@ -12,7 +12,7 @@
 
 import { eq, isNull, or, type AnyColumn, type SQL } from "drizzle-orm";
 
-import { PersistentStore } from "./persistent-store.js";
+import { PersistentStore } from "./persistent-store.ts";
 
 /** Owner bucket for callers that carry no identity. */
 export const ANON_OWNER = "__anon__";

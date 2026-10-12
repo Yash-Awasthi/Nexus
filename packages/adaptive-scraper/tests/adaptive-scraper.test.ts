@@ -9,7 +9,7 @@ import {
   ScrapeScheduler,
   SpiderCrawler,
   type ScrapeResult,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── MockEngine ────────────────────────────────────────────────────────────────
 

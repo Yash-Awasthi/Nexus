@@ -14,9 +14,9 @@ import crypto from "node:crypto";
 
 import { pinnedFetch } from "@nexus/runtime";
 
-import { createNotification } from "./notifications-store.js";
-import { PersistentStore } from "./persistent-store.js";
-import { unsafeUrlReason } from "./public-url.js";
+import { createNotification } from "./notifications-store.ts";
+import { PersistentStore } from "./persistent-store.ts";
+import { unsafeUrlReason } from "./public-url.ts";
 
 export interface ReactionRule {
   id: string;

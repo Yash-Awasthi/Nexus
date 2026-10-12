@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { cronMatches, nextCronRun, parseCron } from "../src/index.js";
+import { cronMatches, nextCronRun, parseCron } from "../src/index.ts";
 
 describe("cron", () => {
   it("rejects malformed expressions", () => {

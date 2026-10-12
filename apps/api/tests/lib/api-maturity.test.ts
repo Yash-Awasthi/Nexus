@@ -17,7 +17,7 @@ import {
   maturityForPath,
   MATURITY_DESCRIPTION,
   type Maturity,
-} from "../../src/lib/api-maturity.js";
+} from "../../src/lib/api-maturity.ts";
 
 const srcDir = path.resolve(__dirname, "../../src");
 const maturitySrc = fs.readFileSync(path.join(srcDir, "lib/api-maturity.ts"), "utf8");

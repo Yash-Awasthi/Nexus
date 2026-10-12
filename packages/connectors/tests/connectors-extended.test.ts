@@ -28,7 +28,7 @@ import {
   type FetchFn,
   type SyncedDocument,
   type ImapQueryFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // Default when responses run out: fail fast so infinite loops surface immediately
 function makeFetch(responses: Array<{ ok: boolean; status?: number; body?: unknown }>): FetchFn {

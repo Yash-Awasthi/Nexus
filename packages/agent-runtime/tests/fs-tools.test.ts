@@ -17,7 +17,7 @@ import {
   RuntimeToolSet,
   type CommandExecutor,
   type RuntimeTool,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // A throwaway workspace tree shared by the read tests.
 let root: string;

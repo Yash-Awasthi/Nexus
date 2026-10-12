@@ -28,7 +28,7 @@ import {
   parseCompressHeader,
   runAgentInProcess,
   type LaunchAgentInput,
-} from "../lib/agent-queue.js";
+} from "../lib/agent-queue.ts";
 import {
   appFolderName,
   codegenInstruction,
@@ -36,11 +36,11 @@ import {
   parseDesign,
   pickDesign,
   scaffoldApp,
-} from "../lib/app-scaffold.js";
-import { guardExec } from "../lib/exec-guard.js";
-import { ownerScope } from "../lib/owner.js";
-import { getUserDrivers } from "../lib/user-context.js";
-import { requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/app-scaffold.ts";
+import { guardExec } from "../lib/exec-guard.ts";
+import { ownerScope } from "../lib/owner.ts";
+import { getUserDrivers } from "../lib/user-context.ts";
+import { requireAuth, requireAuthWithTier } from "../middleware/auth.ts";
 
 /** Agent-run options that widen what a run can reach (files, processes, tools). */
 const RUN_SCOPE = [

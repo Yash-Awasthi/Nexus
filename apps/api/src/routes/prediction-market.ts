@@ -29,8 +29,8 @@ import {
 } from "@nexus/prediction-market";
 import type { FastifyInstance } from "fastify";
 
-import { buildUserDriverRegistry } from "../lib/provider-keys.js";
-import { requireAuth } from "../middleware/auth.js";
+import { buildUserDriverRegistry } from "../lib/provider-keys.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 interface ForecastMember {
   label?: string;

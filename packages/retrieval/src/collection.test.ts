@@ -7,7 +7,7 @@
 // a space char would bucket into a shared slot and break orthogonality).
 import { describe, expect, it } from "vitest";
 
-import { FixedRagtimeEmbedder, VectorCollection } from "./index.js";
+import { FixedRagtimeEmbedder, VectorCollection } from "./index.ts";
 
 function makeCollection() {
   return new VectorCollection({ embedder: new FixedRagtimeEmbedder() });

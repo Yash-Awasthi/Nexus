@@ -2,7 +2,7 @@
 /** The documented SDK: a council of drivers, each with a weight, voting on a question. */
 import { describe, expect, it } from "vitest";
 
-import { Council } from "../src/index.js";
+import { Council } from "../src/index.ts";
 
 const member = (reply: string) => ({
   provider: "fake",

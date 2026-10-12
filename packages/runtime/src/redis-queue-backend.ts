@@ -27,7 +27,7 @@
 import { Queue } from "bullmq";
 import type { ConnectionOptions } from "bullmq";
 
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,10 @@ export class RedisQueueBackend implements IQueueBackend {
   private readonly dlq: Queue;
   private readonly connection: ConnectionOptions;
 
-  constructor(private readonly options: RedisQueueBackendOptions) {
+  private readonly options: RedisQueueBackendOptions;
+
+  constructor(options: RedisQueueBackendOptions) {
+    this.options = options;
     this.connection = options.connection;
 
     const sharedOpts = { connection: this.connection };

@@ -7,7 +7,7 @@ import {
   platformGates,
   makeTierGatePreHandler,
   type Tier,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── TierGateRegistry ──────────────────────────────────────────────────────────
 

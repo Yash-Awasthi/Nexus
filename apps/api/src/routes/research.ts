@@ -26,19 +26,19 @@ import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus
 import { UNTRUSTED_NOTE } from "@nexus/shared";
 import type { FastifyInstance } from "fastify";
 
-import { screenForPrompt } from "../lib/injection-classifier.js";
-import { createNotification } from "../lib/notifications-store.js";
-import { emitReaction } from "../lib/reactions.js";
+import { screenForPrompt } from "../lib/injection-classifier.ts";
+import { createNotification } from "../lib/notifications-store.ts";
+import { emitReaction } from "../lib/reactions.ts";
 import {
   createResearchJob,
   getResearchJob,
   listResearchJobs,
   recordResearchMilestone,
   updateResearchJob,
-} from "../lib/research-jobs.js";
-import { appendGraphEvent } from "../lib/session-graph.js";
-import { withTimeout } from "../lib/shared-kv.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/research-jobs.ts";
+import { appendGraphEvent } from "../lib/session-graph.ts";
+import { withTimeout } from "../lib/shared-kv.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 /** Cap on a single research LLM call — a hung provider must never leave a job `running` forever. */
 const RESEARCH_LLM_TIMEOUT_MS = parseInt(process.env.RESEARCH_LLM_TIMEOUT_MS ?? "90000", 10);

@@ -29,7 +29,7 @@ function mockTextResponse(text: string, status = 200): Response {
 }
 
 describe("api client", () => {
-  let api: typeof import("../../src/lib/client.js").api;
+  let api: typeof import("../../src/lib/client.ts").api;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -38,7 +38,7 @@ describe("api client", () => {
     vi.stubEnv("NEXUS_API_URL", "http://localhost:3000");
     vi.stubEnv("NEXUS_API_KEY", "");
     // Re-import after resetting modules so module-level constants are re-evaluated
-    const mod = await import("../../src/lib/client.js");
+    const mod = await import("../../src/lib/client.ts");
     api = mod.api;
   });
 
@@ -144,7 +144,7 @@ describe("api client", () => {
     it("sends Bearer token when NEXUS_API_KEY is set", async () => {
       vi.resetModules();
       vi.stubEnv("NEXUS_API_KEY", "my-test-key");
-      const mod = await import("../../src/lib/client.js");
+      const mod = await import("../../src/lib/client.ts");
       const apiWithKey = mod.api;
 
       mockFetch.mockResolvedValue(mockResponse({}));

@@ -10,7 +10,7 @@ import {
   kernelCommand,
   type ReplExecutor,
   type ReplProcess,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // On Windows "python3" can be the install manager's alias, which installs a runtime into the cwd.
 const python = (process.platform === "win32" ? ["python"] : ["python3", "python"]).find(

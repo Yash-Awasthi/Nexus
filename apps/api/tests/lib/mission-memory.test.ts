@@ -18,8 +18,8 @@ import {
   outcomeSummary,
   summarizeSkillExecutions,
   summarizeToolTrace,
-} from "../../src/lib/mission-memory.js";
-import type { SessionGraph } from "../../src/lib/session-graph.js";
+} from "../../src/lib/mission-memory.ts";
+import type { SessionGraph } from "../../src/lib/session-graph.ts";
 
 const REJECTED: MissionRecord = {
   id: "mission-abc123",

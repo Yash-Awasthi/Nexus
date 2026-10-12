@@ -7,7 +7,7 @@ import {
   WorkspaceRunner,
   type NexusSettings,
   type Workspace,
-} from "../../src/handlers/workspace-manager.js";
+} from "../../src/handlers/workspace-manager.ts";
 
 // A long-lived command that blocks on EVERY platform (workspace-manager used to
 // spawn through /bin/sh, so `sleep 30` ENOENT'd on Windows before any process

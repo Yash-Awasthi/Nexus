@@ -13,7 +13,7 @@ import {
   applyBrowserAction,
   BrowserUrlBlockedError,
   type BrowserActionPage,
-} from "../../src/lib/browser-agent.js";
+} from "../../src/lib/browser-agent.ts";
 
 /** Records what an action asked the page to do. */
 function fakePage(): BrowserActionPage & { calls: string[] } {

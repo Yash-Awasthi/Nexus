@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { MCPRuntime } from "../src/mcp-adapter.js";
-import type { IMCPTask } from "../src/interfaces/mcp.interface.js";
-import type { IMCPTransport } from "../src/interfaces/mcp.interface.js";
-import { MCPServerRegistry } from "../src/mcp-registry.js";
+import { MCPRuntime } from "../src/mcp-adapter.ts";
+import type { IMCPTask } from "../src/interfaces/mcp.interface.ts";
+import type { IMCPTransport } from "../src/interfaces/mcp.interface.ts";
+import { MCPServerRegistry } from "../src/mcp-registry.ts";
 
 function task(overrides: Partial<IMCPTask> = {}): IMCPTask {
   return {

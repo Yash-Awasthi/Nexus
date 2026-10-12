@@ -23,7 +23,7 @@ import {
   type RunnerResult,
 } from "@nexus/sandbox";
 
-import { shellInvocation } from "../lib/shell.js";
+import { shellInvocation } from "../lib/shell.ts";
 
 interface CodingToolsOptions {
   /** Workspace root; all file ops are confined here. */

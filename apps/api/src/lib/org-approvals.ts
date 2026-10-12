@@ -19,7 +19,7 @@ import crypto from "node:crypto";
 
 import type { CouncilRequest, CouncilResponse } from "@nexus/contracts";
 
-import { createNotification } from "./notifications-store.js";
+import { createNotification } from "./notifications-store.ts";
 import {
   bookCompanySpend,
   companyHeadroomUsd,
@@ -27,8 +27,8 @@ import {
   onHardStop,
   resolveIncident,
   toUsd,
-} from "./org-budget.js";
-import { addDoneGate, enqueueWake, onApprovalRequested } from "./org-runtime.js";
+} from "./org-budget.ts";
+import { addDoneGate, enqueueWake, onApprovalRequested } from "./org-runtime.ts";
 import {
   OrgError,
   getCompany,
@@ -40,7 +40,7 @@ import {
   onOrgLoad,
   registerCompanyScoped,
   setAgentStatus,
-} from "./org-store.js";
+} from "./org-store.ts";
 import {
   addComment,
   getTask,
@@ -49,8 +49,8 @@ import {
   setTaskStatus,
   updateTask,
   type Actor,
-} from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
+} from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 export const APPROVAL_TYPES = ["hire_agent", "budget_override", "plan", "action"] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];

@@ -10,7 +10,7 @@ import {
   type LLMRequest,
   type LLMResponse,
   type LLMProvider,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

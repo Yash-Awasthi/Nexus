@@ -19,7 +19,7 @@ import {
   PluginManifestError,
   type LoadedPlugin,
   type PluginManifest,
-} from "./plugin-manifest.js";
+} from "./plugin-manifest.ts";
 
 /** Injectable fetch seam (tests mock this; production uses global fetch). */
 export type RegistryFetchFn = (
@@ -29,12 +29,17 @@ export type RegistryFetchFn = (
 
 /** Error raised by registry transport failures (network, HTTP, shape). */
 export class PluginRegistryError extends Error {
+  public readonly code: "NETWORK" | "HTTP" | "NOT_FOUND" | "CONFLICT" | "INVALID_RESPONSE";
+  public readonly status?: number;
+
   constructor(
     message: string,
-    public readonly code: "NETWORK" | "HTTP" | "NOT_FOUND" | "CONFLICT" | "INVALID_RESPONSE",
-    public readonly status?: number,
+    code: "NETWORK" | "HTTP" | "NOT_FOUND" | "CONFLICT" | "INVALID_RESPONSE",
+    status?: number,
   ) {
     super(message);
+    this.code = code;
+    this.status = status;
     this.name = "PluginRegistryError";
   }
 }

@@ -21,7 +21,7 @@
  * truncates the JSON.
  */
 
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 /** A candidate answer awaiting verification. */
 export interface CandidateAnswer {

@@ -23,8 +23,8 @@
 import { validatePluginManifest, type PluginManifest } from "@nexus/plugin-sdk";
 import type { FastifyInstance } from "fastify";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export interface RegistryRecord {
   manifest: PluginManifest;

@@ -6,10 +6,10 @@ import { workspaceMembers, workspaces } from "@nexus/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-import { scrub } from "../lib/org-portability.js";
-import { OrgError, companyOf } from "../lib/org-store.js";
-import type { Actor } from "../lib/org-work.js";
-import { ownerIdFor } from "../lib/owner.js";
+import { scrub } from "../lib/org-portability.ts";
+import { OrgError, companyOf } from "../lib/org-store.ts";
+import type { Actor } from "../lib/org-work.ts";
+import { ownerIdFor } from "../lib/owner.ts";
 
 /** Run a store call and map an OrgError onto its status; anything else is a 500. */
 export async function orgReply<T>(reply: FastifyReply, fn: () => T | Promise<T>, code = 200) {

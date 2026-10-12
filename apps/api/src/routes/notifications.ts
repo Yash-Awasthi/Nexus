@@ -28,11 +28,11 @@ import {
   listNotifications,
   markNotificationRead,
   userIdFor,
-} from "../lib/notifications-store.js";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/notifications-store.ts";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { openSseConnection } from "./sse.js";
+import { openSseConnection } from "./sse.ts";
 
 const AUTH = { preHandler: requireAuthWithTier };
 

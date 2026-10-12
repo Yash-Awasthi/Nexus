@@ -14,9 +14,9 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { priceOf } from "./cost-log.js";
-import { PersistentStore, dataDir } from "./persistent-store.js";
-import { getPgPool } from "./pg-pool.js";
+import { priceOf } from "./cost-log.ts";
+import { PersistentStore, dataDir } from "./persistent-store.ts";
+import { getPgPool } from "./pg-pool.ts";
 
 export interface LlmStep {
   provider: string;

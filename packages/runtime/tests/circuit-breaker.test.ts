@@ -6,7 +6,7 @@ import {
   CircuitBreakerOpenError,
   CircuitBreakerAdapterWrapper,
   type CircuitBreakerConfig,
-} from "../src/circuit-breaker.js";
+} from "../src/circuit-breaker.ts";
 
 function makeConfig(overrides: Partial<CircuitBreakerConfig> = {}): CircuitBreakerConfig {
   return {

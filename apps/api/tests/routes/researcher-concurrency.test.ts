@@ -29,7 +29,7 @@ vi.mock("@nexus/agents", () => ({
   },
 }));
 
-const { researchWithResults } = await import("../../src/routes/researcher.js");
+const { researchWithResults } = await import("../../src/routes/researcher.ts");
 
 describe("researchWithResults", () => {
   it("keeps each call's results to that call", async () => {

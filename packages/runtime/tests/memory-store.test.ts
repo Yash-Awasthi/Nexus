@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach } from "vitest";
 
-import { MemoryStore } from "../src/memory-store.js";
-import type { MemoryEntry } from "../src/memory-store.js";
+import { MemoryStore } from "../src/memory-store.ts";
+import type { MemoryEntry } from "../src/memory-store.ts";
 
 function makeEntry(
   overrides: Partial<Omit<MemoryEntry, "id" | "timestamp">> = {},

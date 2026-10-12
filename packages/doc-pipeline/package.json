@@ -5,28 +5,30 @@
   "description": "Document processing pipeline — extract, chunk, embed, store for PDF, HTML, text, and Markdown",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:",
     "@vitest/coverage-v8": "catalog:"
   },
   "dependencies": {
     "@nexus/plugin-sdk": "workspace:*"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

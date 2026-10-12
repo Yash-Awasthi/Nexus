@@ -11,7 +11,7 @@ import {
   statDrive,
   userDrivePath,
   userIdFromDrivePath,
-} from "../src/drive-fs.js";
+} from "../src/drive-fs.ts";
 
 let root: string;
 

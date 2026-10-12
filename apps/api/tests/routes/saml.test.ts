@@ -39,10 +39,10 @@ Object.assign(process.env, {
   NEXUS_SSO_ALLOWED_DOMAINS: "example.com",
 });
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { authUsersRoutes } = await import("../../src/routes/auth-users.js");
-const { samlRoutes } = await import("../../src/routes/saml.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { authUsersRoutes } = await import("../../src/routes/auth-users.ts");
+const { samlRoutes } = await import("../../src/routes/saml.ts");
 
 const BROWSER = "text/html,application/xhtml+xml,*/*;q=0.8";
 let app: FastifyInstance;

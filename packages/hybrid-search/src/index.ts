@@ -179,10 +179,13 @@ export function weightedAlphaFusion(
 // ── HybridSearchEngine ────────────────────────────────────────────────────────
 
 export class HybridSearchEngine {
-  constructor(
-    private readonly vector: VectorSearchAdapter,
-    private readonly bm25: BM25SearchAdapter,
-  ) {}
+  private readonly vector: VectorSearchAdapter;
+  private readonly bm25: BM25SearchAdapter;
+
+  constructor(vector: VectorSearchAdapter, bm25: BM25SearchAdapter) {
+    this.vector = vector;
+    this.bm25 = bm25;
+  }
 
   async search(opts: HybridSearchOptions): Promise<HybridSearchResult> {
     const { query, limit = 10, k = 60, vectorWeight = 0.5, bm25Weight = 0.5 } = opts;
@@ -293,5 +296,5 @@ export class InMemoryBM25 implements BM25SearchAdapter {
   }
 }
 
-export { createHybridSearchMcpServer } from "./mcp-server.js";
-export type { HybridSearchMcpServerOptions } from "./mcp-server.js";
+export { createHybridSearchMcpServer } from "./mcp-server.ts";
+export type { HybridSearchMcpServerOptions } from "./mcp-server.ts";

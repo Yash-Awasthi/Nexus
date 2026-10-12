@@ -14,7 +14,7 @@ import {
   runCypher,
   type KGEdge,
   type KGNode,
-} from "./index.js";
+} from "./index.ts";
 
 function seedStore(): InMemoryKGStore {
   const store = new InMemoryKGStore();

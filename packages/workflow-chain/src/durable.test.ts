@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { ActivityNotFoundError, DurableRuntime, type ActivityDefinition } from "./durable.js";
+import { ActivityNotFoundError, DurableRuntime, type ActivityDefinition } from "./durable.ts";
 
 describe("DurableRuntime activities", () => {
   it("runs a registered activity by name and returns its output", async () => {

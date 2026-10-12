@@ -9,7 +9,7 @@ const SECRET = "provider-keys-baseurl-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 delete process.env.NEXUS_DESKTOP;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

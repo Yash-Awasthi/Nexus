@@ -2,7 +2,7 @@
 /** Drivers built with no config read their provider's key from the environment, as the SDK docs show. */
 import { afterEach, expect, it } from "vitest";
 
-import { AnthropicDriver, GroqDriver, OpenAIDriver } from "../src/index.js";
+import { AnthropicDriver, GroqDriver, OpenAIDriver } from "../src/index.ts";
 
 const saved = { ...process.env };
 afterEach(() => {

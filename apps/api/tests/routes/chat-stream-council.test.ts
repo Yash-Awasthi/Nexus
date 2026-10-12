@@ -53,8 +53,8 @@ function scriptedDriver(provider: string): LlmDriver {
   } as unknown as LlmDriver;
 }
 
-vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/provider-keys.js")>()),
+vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
   buildUserDriverRegistry: async (_userId: string | undefined, providers: Iterable<string>) => {
     const registry = new DriverRegistry();
     for (const p of new Set(providers)) registry.register(scriptedDriver(p), p);
@@ -62,8 +62,8 @@ vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
   },
 }));
 
-vi.mock("../../src/routes/kb.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/routes/kb.js")>()),
+vi.mock("../../src/routes/kb.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/routes/kb.ts")>()),
   searchKb: async () => [
     {
       kbId: "ops",
@@ -74,7 +74,7 @@ vi.mock("../../src/routes/kb.js", async (importOriginal) => ({
   ],
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 

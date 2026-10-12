@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { RuntimeDiagnosticAPI } from "../src/diagnostic-api.js";
+import { RuntimeDiagnosticAPI } from "../src/diagnostic-api.ts";
 
 function stubInspector(overrides: Record<string, unknown> = {}) {
   const fn = (value: unknown) => vi.fn().mockResolvedValue(value);

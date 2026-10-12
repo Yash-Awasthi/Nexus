@@ -6,9 +6,9 @@
  * every protocol prompt the tools fire.
  */
 import { describe, expect, it } from "vitest";
-import { createCouncilMcpServer } from "./mcp-server.js";
-import type { Archetype } from "./archetypes.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import { createCouncilMcpServer } from "./mcp-server.ts";
+import type { Archetype } from "./archetypes.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 const PANEL: Archetype[] = [
   {

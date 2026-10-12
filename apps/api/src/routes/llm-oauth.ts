@@ -38,10 +38,10 @@ import {
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { getSharedKV } from "../lib/shared-kv.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { createOAuthTokenStore } from "../lib/oauth-token-store.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // IP-keyed limiter for the unauthenticated callback (no user yet — state is the cap).
 const callbackRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "llm-oauth" });

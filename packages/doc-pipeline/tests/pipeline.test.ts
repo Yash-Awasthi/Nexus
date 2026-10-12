@@ -4,7 +4,7 @@
 // variadic multi-sender ordering, run-input preflight, cycle rejection, and an
 // end-to-end composition over doc-pipeline's own chunking primitive.
 import { describe, it, expect } from "vitest";
-import { ComponentPipeline, chunkText, type PipelineComponent } from "../src/index.js";
+import { ComponentPipeline, chunkText, type PipelineComponent } from "../src/index.ts";
 
 /** Records execution order in a shared log. */
 function tracked(log: string[], name: string, comp: PipelineComponent): PipelineComponent {

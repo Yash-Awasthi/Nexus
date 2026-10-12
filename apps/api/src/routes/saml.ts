@@ -31,11 +31,11 @@ import { SAML, ValidateInResponseTo, type CacheProvider, type Profile } from "@n
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { issueAccessToken } from "../lib/issue-access-token.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { getSharedKV } from "../lib/shared-kv.js";
-import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
-import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.js";
+import { issueAccessToken } from "../lib/issue-access-token.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
+import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.ts";
 
 // 30 SAML initiations per 15 min per IP — prevents SSO redirect spam
 const samlLoginRateLimit = makeRateLimitPreHandler({

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { globalBus } from "@nexus/sse";
 
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import {
   createNotification,
   dismissAllNotifications,
@@ -11,7 +11,7 @@ import {
   getUnreadCount,
   listNotifications,
   markNotificationRead,
-} from "../../src/lib/notifications-store.js";
+} from "../../src/lib/notifications-store.ts";
 
 // No REDIS_URL / UPSTASH env in tests → getSharedKV() falls back to the
 // in-process MemoryKVStore. Clear it before every test so cases are isolated.

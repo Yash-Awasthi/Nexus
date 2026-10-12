@@ -28,7 +28,7 @@
  * ```
  */
 
-import type { McpToolDefinition, McpCallResult } from "./index.js";
+import type { McpToolDefinition, McpCallResult } from "./index.ts";
 
 export interface McpHttpRequest {
   method: string;

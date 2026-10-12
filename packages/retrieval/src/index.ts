@@ -97,7 +97,7 @@ import {
   whereDocumentMatches,
   type WhereClause,
   type WhereDocumentClause,
-} from "./where.js";
+} from "./where.ts";
 export {
   validateWhere,
   validateWhereDocument,
@@ -107,7 +107,7 @@ export {
   type WhereDocumentClause,
   type Scalar,
   type MetadataValue,
-} from "./where.js";
+} from "./where.ts";
 
 // ── Math helpers ──────────────────────────────────────────────────────────────
 // dot/magnitude/cosineSimilarity live in @nexus/shared/math (single home).
@@ -831,5 +831,5 @@ export async function decompositionRetrieve(
   };
 }
 
-export * from "./hnsw-index.js";
-export * from "./collection.js";
+export * from "./hnsw-index.ts";
+export * from "./collection.ts";

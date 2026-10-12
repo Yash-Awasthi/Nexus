@@ -159,7 +159,7 @@ async function resolveHost(): Promise<{ url: string; mode: RunMode; local?: Loca
   const dataDir = app.getPath("userData");
   const local = await startLocalApi(
     {
-      entry: join(__dirname, "..", "..", "api", "dist", "index.js"),
+      entry: join(__dirname, "..", "..", "api", "src", "index.ts"),
       spaDir: join(__dirname, "..", "..", "ui", "build", "client"),
       dataDir,
     },

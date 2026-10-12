@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach } from "vitest";
 import { MemoryKVStore } from "@nexus/kv";
-import { PromptCache, _resetPromptCache, getPromptCache } from "../../src/lib/prompt-cache.js";
+import { PromptCache, _resetPromptCache, getPromptCache } from "../../src/lib/prompt-cache.ts";
 
 function makeKV() {
   return new MemoryKVStore();

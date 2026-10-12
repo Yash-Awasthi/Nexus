@@ -9,7 +9,7 @@ import {
   type RecentTask,
   type ActiveSignal,
   type MemoryFact,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

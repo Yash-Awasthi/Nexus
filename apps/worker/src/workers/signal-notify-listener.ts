@@ -88,7 +88,10 @@ export class SignalNotifyListener {
   private running = false;
   private reconnectMs = 1_000;
 
-  constructor(private readonly connection: ConnectionOptions) {
+  private readonly connection: ConnectionOptions;
+
+  constructor(connection: ConnectionOptions) {
+    this.connection = connection;
     this.queue = new Queue(QUEUE_HIGH, { connection });
   }
 

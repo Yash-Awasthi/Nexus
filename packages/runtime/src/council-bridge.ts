@@ -19,8 +19,8 @@
 
 import { randomUUID } from "node:crypto";
 
-import type { IEventBus } from "./event-bus.js";
-import type { ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { ITraceRecorder } from "./interfaces/observability.interface.ts";
 
 // ─── Shared council types (mirrors @nexus/contracts shapes) ──────────────────
 

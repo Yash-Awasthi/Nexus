@@ -18,7 +18,7 @@
  *   measure realistic throughput, not just serial latency.
  */
 
-import { percentile } from "./slo-tracker.js";
+import { percentile } from "./slo-tracker.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

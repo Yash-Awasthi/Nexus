@@ -31,10 +31,10 @@ import {
 import { searchBrave, searchExa, searchSearxNG, searchSerper } from "@nexus/search-orchestrator";
 import type { FastifyInstance } from "fastify";
 
-import { evictOldestEntry } from "../lib/lru-utils.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { execScript, getPgPool, type PgLike } from "../lib/pg-pool.js";
-import { requireAuth } from "../middleware/auth.js";
+import { evictOldestEntry } from "../lib/lru-utils.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { execScript, getPgPool, type PgLike } from "../lib/pg-pool.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Search backend factory ────────────────────────────────────────────────────
 

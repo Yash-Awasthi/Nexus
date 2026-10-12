@@ -11,8 +11,8 @@ import { expect, it, vi } from "vitest";
 const SECRET = "connectors-enabled-restart-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_DATA_DIR = mkdtempSync(join(tmpdir(), "connectors-enabled-"));
-vi.mock("../../src/lib/pg-pool.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/pg-pool.js")>()),
+vi.mock("../../src/lib/pg-pool.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/pg-pool.ts")>()),
   getPgPool: () => null,
 }));
 
@@ -30,7 +30,7 @@ const auth = { authorization: `Bearer ${tokenFor(ALICE)}` };
 
 async function boot(): Promise<FastifyInstance> {
   vi.resetModules();
-  const { buildServer } = await import("../../src/server.js");
+  const { buildServer } = await import("../../src/server.ts");
   const app = await buildServer();
   await app.ready();
   return app;

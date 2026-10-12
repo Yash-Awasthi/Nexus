@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { getSharedKV } from "../../src/lib/shared-kv.js";
-import { maybeEmitWeeklyDigest, weekKey, type WeeklyStats } from "../../src/lib/weekly-digest.js";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
+import { maybeEmitWeeklyDigest, weekKey, type WeeklyStats } from "../../src/lib/weekly-digest.ts";
 
 const SOME_STATS: WeeklyStats = {
   requests: 12,

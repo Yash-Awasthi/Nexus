@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { judgeAgreement } from "./agreement.js";
-import { runCouncilDebate, type IStreamingTransport } from "./debate.js";
+import { judgeAgreement } from "./agreement.ts";
+import { runCouncilDebate, type IStreamingTransport } from "./debate.ts";
 
 const finals = [
   { label: "A", text: "Reasoning.\nFINAL: Yes, adopt the new framework." },

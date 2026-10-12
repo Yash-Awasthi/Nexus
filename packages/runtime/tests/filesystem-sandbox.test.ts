@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { FilesystemSandbox, SandboxConstraint } from "../src/filesystem-sandbox.js";
+import { FilesystemSandbox, SandboxConstraint } from "../src/filesystem-sandbox.ts";
 
 let sandboxDir: string;
 

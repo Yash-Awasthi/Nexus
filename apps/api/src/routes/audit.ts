@@ -11,7 +11,7 @@ import type { SQL } from "drizzle-orm";
 import { desc, gte, lte, and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 /**
  * The audit trail spans every account, so only the operator reads it: the

@@ -1,0 +1,266 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/adaptive-scraper"
+    },
+    {
+      "path": "packages/admin-gateway"
+    },
+    {
+      "path": "packages/agent-engine"
+    },
+    {
+      "path": "packages/agent-runtime"
+    },
+    {
+      "path": "packages/agents"
+    },
+    {
+      "path": "packages/alerts"
+    },
+    {
+      "path": "packages/auth"
+    },
+    {
+      "path": "packages/best-of-n"
+    },
+    {
+      "path": "packages/billing"
+    },
+    {
+      "path": "packages/bots"
+    },
+    {
+      "path": "packages/brief-engine"
+    },
+    {
+      "path": "packages/browser-automation"
+    },
+    {
+      "path": "packages/chat-analyst"
+    },
+    {
+      "path": "packages/code-repl"
+    },
+    {
+      "path": "packages/connectors"
+    },
+    {
+      "path": "packages/context-pack"
+    },
+    {
+      "path": "packages/context-pruner"
+    },
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/council"
+    },
+    {
+      "path": "packages/db"
+    },
+    {
+      "path": "packages/debate-engine"
+    },
+    {
+      "path": "packages/doc-pipeline"
+    },
+    {
+      "path": "packages/domain-forecast"
+    },
+    {
+      "path": "packages/drift"
+    },
+    {
+      "path": "packages/escalation-breaker"
+    },
+    {
+      "path": "packages/exec-policy"
+    },
+    {
+      "path": "packages/feature-flags"
+    },
+    {
+      "path": "packages/finetune-pipeline"
+    },
+    {
+      "path": "packages/gateway-log"
+    },
+    {
+      "path": "packages/gateway"
+    },
+    {
+      "path": "packages/gauntlet"
+    },
+    {
+      "path": "packages/geoip"
+    },
+    {
+      "path": "packages/governance"
+    },
+    {
+      "path": "packages/graphrag-query"
+    },
+    {
+      "path": "packages/hf-research"
+    },
+    {
+      "path": "packages/hooks"
+    },
+    {
+      "path": "packages/hybrid-search"
+    },
+    {
+      "path": "packages/i18n"
+    },
+    {
+      "path": "packages/knowledge-graph"
+    },
+    {
+      "path": "packages/kv"
+    },
+    {
+      "path": "packages/lens"
+    },
+    {
+      "path": "packages/llm-accounts"
+    },
+    {
+      "path": "packages/llm-cache"
+    },
+    {
+      "path": "packages/llm-compress"
+    },
+    {
+      "path": "packages/llm-drivers"
+    },
+    {
+      "path": "packages/llm-oauth"
+    },
+    {
+      "path": "packages/llm-router"
+    },
+    {
+      "path": "packages/llm-tracer"
+    },
+    {
+      "path": "packages/llm-translate"
+    },
+    {
+      "path": "packages/mail-ingest"
+    },
+    {
+      "path": "packages/mcp-client"
+    },
+    {
+      "path": "packages/mcp-openapi"
+    },
+    {
+      "path": "packages/memory"
+    },
+    {
+      "path": "packages/nlp-utils"
+    },
+    {
+      "path": "packages/pipeline-signal"
+    },
+    {
+      "path": "packages/plugin-sdk"
+    },
+    {
+      "path": "packages/posthog-analytics"
+    },
+    {
+      "path": "packages/prediction-market"
+    },
+    {
+      "path": "packages/provider-registry"
+    },
+    {
+      "path": "packages/pty"
+    },
+    {
+      "path": "packages/redteam"
+    },
+    {
+      "path": "packages/reranker"
+    },
+    {
+      "path": "packages/researcher"
+    },
+    {
+      "path": "packages/retrieval"
+    },
+    {
+      "path": "packages/rlhf-pipeline"
+    },
+    {
+      "path": "packages/runtime"
+    },
+    {
+      "path": "packages/sandbox"
+    },
+    {
+      "path": "packages/scenario-planner"
+    },
+    {
+      "path": "packages/scraping-mcp"
+    },
+    {
+      "path": "packages/sdk"
+    },
+    {
+      "path": "packages/search-orchestrator"
+    },
+    {
+      "path": "packages/session-sync"
+    },
+    {
+      "path": "packages/sft-tagger"
+    },
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/sse"
+    },
+    {
+      "path": "packages/stealth-browser"
+    },
+    {
+      "path": "packages/stm"
+    },
+    {
+      "path": "packages/stream-recovery"
+    },
+    {
+      "path": "packages/telemetry"
+    },
+    {
+      "path": "packages/think-parser"
+    },
+    {
+      "path": "packages/tier-gate"
+    },
+    {
+      "path": "packages/token-budget"
+    },
+    {
+      "path": "packages/tool-registry"
+    },
+    {
+      "path": "packages/trigger-engine"
+    },
+    {
+      "path": "packages/wiki-updater"
+    },
+    {
+      "path": "packages/wiki"
+    },
+    {
+      "path": "packages/workflow-chain"
+    }
+  ]
+}

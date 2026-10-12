@@ -5,15 +5,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 const boot = () =>
   bootOrg(async () => ({
-    budget: await import("../../src/lib/org-budget.js"),
-    inbox: await import("../../src/lib/org-inbox.js"),
-    notes: await import("../../src/lib/notifications-store.js"),
+    budget: await import("../../src/lib/org-budget.ts"),
+    inbox: await import("../../src/lib/org-inbox.ts"),
+    notes: await import("../../src/lib/notifications-store.ts"),
   }));
 
 const HOUR = 3600_000;

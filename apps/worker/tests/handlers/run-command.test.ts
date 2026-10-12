@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createCodingToolSet, shellNote } from "../../src/handlers/agent-tools.js";
+import { createCodingToolSet, shellNote } from "../../src/handlers/agent-tools.ts";
 
 function workspace(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), "run-command-"));

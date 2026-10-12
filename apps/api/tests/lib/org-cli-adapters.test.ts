@@ -11,7 +11,7 @@ import path from "node:path";
 
 import { describe, it, expect, vi } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir({
   NEXUS_EXEC_MODE: "ask",
@@ -24,8 +24,8 @@ useOrgDataDir({
 
 async function boot() {
   const b = await bootOrg(async () => ({
-    cli: await import("../../src/lib/org-cli-adapters.js"),
-    exec: await import("../../src/lib/exec-approvals.js"),
+    cli: await import("../../src/lib/org-cli-adapters.ts"),
+    exec: await import("../../src/lib/exec-approvals.ts"),
   }));
   await b.exec.loadApprovalStore();
   b.cli.registerExternalAdapters();

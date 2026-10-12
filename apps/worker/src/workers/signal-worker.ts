@@ -22,7 +22,7 @@
 
 import { SignalProcessor } from "@nexus/pipeline-signal";
 
-import { DrizzleEventSource, DrizzleSignalSink } from "./drizzle-adapters.js";
+import { DrizzleEventSource, DrizzleSignalSink } from "./drizzle-adapters.ts";
 
 const POLL_INTERVAL_MS = parseInt(process.env.SIGNAL_WORKER_INTERVAL_MS ?? "5000", 10);
 const BATCH_SIZE = parseInt(process.env.SIGNAL_WORKER_BATCH_SIZE ?? "10", 10);

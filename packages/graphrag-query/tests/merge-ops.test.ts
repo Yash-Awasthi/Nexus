@@ -6,8 +6,8 @@
 // duplicates (mentions max, descriptions join), drop self-loops. Inputs are
 // not mutated.
 import { describe, it, expect } from "vitest";
-import { mergeGraphEntities } from "../src/index.js";
-import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.js";
+import { mergeGraphEntities } from "../src/index.ts";
+import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.ts";
 
 const ent = (
   name: string,

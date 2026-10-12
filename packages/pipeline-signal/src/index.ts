@@ -6,9 +6,9 @@
  * can deliberate on. Runs as a polling worker or on-demand processor.
  */
 
-export type { ClassificationInput, ClassificationResult, ClassifierRule } from "./classifier.js";
+export type { ClassificationInput, ClassificationResult, ClassifierRule } from "./classifier.ts";
 
-export { SignalProcessor } from "./processor.js";
+export { SignalProcessor } from "./processor.ts";
 export type {
   RawEvent,
   IEventSource,
@@ -17,4 +17,4 @@ export type {
   ISignalEventBus,
   SignalProcessorConfig,
   ProcessBatchResult,
-} from "./processor.js";
+} from "./processor.ts";

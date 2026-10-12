@@ -13,7 +13,7 @@ const SECRET = "drive-export-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_DRIVE_ROOT = mkdtempSync(path.join(tmpdir(), "drive-export-"));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

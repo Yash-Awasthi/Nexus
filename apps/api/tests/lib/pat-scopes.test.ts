@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { isValidPatScope, patScopesAllow } from "../../src/lib/pat-scopes.js";
+import { isValidPatScope, patScopesAllow } from "../../src/lib/pat-scopes.ts";
 
 describe("patScopesAllow", () => {
   it("grants everything to '*', empty, or undefined scopes (back-compat)", () => {

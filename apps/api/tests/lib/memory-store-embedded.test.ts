@@ -11,13 +11,13 @@ function vec(hot: number): number[] {
   return Array.from({ length: 768 }, (_, i) => (i === hot ? 1 : 0));
 }
 
-let getMemoryStore: typeof import("../../src/lib/memory-store.js").getMemoryStore;
-let getPgPool: typeof import("../../src/lib/pg-pool.js").getPgPool;
-let closePgPools: typeof import("../../src/lib/pg-pool.js").closePgPools;
+let getMemoryStore: typeof import("../../src/lib/memory-store.ts").getMemoryStore;
+let getPgPool: typeof import("../../src/lib/pg-pool.ts").getPgPool;
+let closePgPools: typeof import("../../src/lib/pg-pool.ts").closePgPools;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = DB;
-  ({ getPgPool, closePgPools } = await import("../../src/lib/pg-pool.js"));
+  ({ getPgPool, closePgPools } = await import("../../src/lib/pg-pool.ts"));
   const pool = getPgPool(DB)!;
   await pool.query(`CREATE TABLE IF NOT EXISTS nexus_kv (
     collection TEXT NOT NULL, id TEXT NOT NULL, data JSONB NOT NULL, PRIMARY KEY (collection, id))`);
@@ -26,7 +26,7 @@ beforeAll(async () => {
     `INSERT INTO nexus_kv (collection, id, data) VALUES ('memory_entries', $1, $2)`,
     ["old", JSON.stringify(legacy)],
   );
-  ({ getMemoryStore } = await import("../../src/lib/memory-store.js"));
+  ({ getMemoryStore } = await import("../../src/lib/memory-store.ts"));
 }, 120_000);
 
 afterAll(async () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-export * from "./models.js";
-export * from "./errors.js";
-export * from "./stm.js";
-export * from "./math.js";
-export * from "./untrusted.js";
+export * from "./models.ts";
+export * from "./errors.ts";
+export * from "./stm.ts";
+export * from "./math.ts";
+export * from "./untrusted.ts";

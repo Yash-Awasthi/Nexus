@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IAgentRegistry } from "./agent-registry.js";
-import { TaskDependencyResolver } from "./dependency-resolver.js";
-import type { IEventBus } from "./event-bus.js";
-import type { ITaskDependencyResolver } from "./interfaces/execution.interface.js";
+import type { IAgentRegistry } from "./agent-registry.ts";
+import { TaskDependencyResolver } from "./dependency-resolver.ts";
+import type { IEventBus } from "./event-bus.ts";
+import type { ITaskDependencyResolver } from "./interfaces/execution.interface.ts";
 import type {
   IPlanningEngine,
   IGovernanceEngine,
   IApprovalWorkflow,
-} from "./interfaces/governance.interface.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
-import type { IEventStore } from "./interfaces/persistence.interface.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
-import { MemoryQueueBackend } from "./queue-backend.js";
-import type { IRuntimeManager } from "./runtime-manager.js";
-import type { TaskExecutor } from "./task-executor.js";
-import { buildQueuePayloadFromTask } from "./task-payload.js";
-import type { TaskRouter, Task } from "./task-router.js";
+} from "./interfaces/governance.interface.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.ts";
+import type { IEventStore } from "./interfaces/persistence.interface.ts";
+import type { IQueueBackend } from "./interfaces/queue.interface.ts";
+import { MemoryQueueBackend } from "./queue-backend.ts";
+import type { IRuntimeManager } from "./runtime-manager.ts";
+import type { TaskExecutor } from "./task-executor.ts";
+import { buildQueuePayloadFromTask } from "./task-payload.ts";
+import type { TaskRouter, Task } from "./task-router.ts";
 
 /** Minimal interface for optional diagnostic inspector injection. */
 type InspectorLike = { recordPlan?(plan: unknown): void };

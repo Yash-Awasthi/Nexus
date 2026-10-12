@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach } from "vitest";
-import { FeedbackStore, PipelineExporter } from "../src/index.js";
+import { FeedbackStore, PipelineExporter } from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

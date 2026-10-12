@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ConnectionMessageThrottle } from "../../src/lib/conn-throttle.js";
+import { ConnectionMessageThrottle } from "../../src/lib/conn-throttle.ts";
 
 // Minimal WebSocket stub — just an object identity.
 const fakeWs = () => ({ readyState: 1, send() {}, close() {} });

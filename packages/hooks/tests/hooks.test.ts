@@ -14,7 +14,7 @@ import {
   type HookStore,
   type StoredHandler,
   type HookHandler,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

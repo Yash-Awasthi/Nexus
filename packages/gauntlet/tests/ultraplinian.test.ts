@@ -10,7 +10,7 @@ import {
   ULTRAPLINIAN_MODELS,
   type UltraplinianMessage,
   type ModelResult,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── scoreResponse ─────────────────────────────────────────────────────────────
 

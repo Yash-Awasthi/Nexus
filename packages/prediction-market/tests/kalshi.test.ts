@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { KalshiHttpBackend } from "../src/index.js";
+import { KalshiHttpBackend } from "../src/index.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 

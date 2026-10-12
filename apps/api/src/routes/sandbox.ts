@@ -17,9 +17,9 @@ import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
 
-import { guardExec } from "../lib/exec-guard.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { runUntrustedJs } from "../lib/untrusted-js.js";
+import { guardExec } from "../lib/exec-guard.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { runUntrustedJs } from "../lib/untrusted-js.ts";
 
 /** In-process execution history for GET /sandbox/status/:id. */
 const _sandboxResults = new Map<

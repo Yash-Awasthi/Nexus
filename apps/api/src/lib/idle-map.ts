@@ -7,10 +7,13 @@ export class IdleMap<K, V> {
   private entries = new Map<K, { value: V; at: number }>();
   private lastSweep = 0;
 
-  constructor(
-    private readonly idleMs: number,
-    private readonly onEvict?: (value: V) => void,
-  ) {}
+  private readonly idleMs: number;
+  private readonly onEvict?: (value: V) => void;
+
+  constructor(idleMs: number, onEvict?: (value: V) => void) {
+    this.idleMs = idleMs;
+    this.onEvict = onEvict;
+  }
 
   get(key: K): V | undefined {
     const e = this.entries.get(key);

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import type { IConfigLoader } from "../src/config-loader.js";
-import { RuntimeManager } from "../src/runtime-manager.js";
+import type { IConfigLoader } from "../src/config-loader.ts";
+import { RuntimeManager } from "../src/runtime-manager.ts";
 
 function loader(services?: Record<string, unknown>): IConfigLoader {
   return {

@@ -20,8 +20,8 @@ import {
   graphRagRuntimeTools,
   hybridSearchRuntimeTools,
   transportFromLlm,
-} from "../../src/lib/deliberation-tools.js";
-import { runLocalAgent, type ToolTranscriptEvent } from "../../src/lib/local-agent.js";
+} from "../../src/lib/deliberation-tools.ts";
+import { runLocalAgent, type ToolTranscriptEvent } from "../../src/lib/local-agent.ts";
 import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
 
 const CORPUS = [

@@ -10,7 +10,7 @@ import type {
   IMetricsCollector,
   ITraceRecorder,
   ITraceSpan,
-} from "./interfaces/observability.interface.js";
+} from "./interfaces/observability.interface.ts";
 
 // ── MetricsCollector ─────────────────────────────────────────────────────────
 
@@ -90,10 +90,13 @@ export class TraceRecorder implements ITraceRecorder {
 // ── DiagnosticEnricher ────────────────────────────────────────────────────────
 
 export class DiagnosticEnricher {
-  constructor(
-    private readonly metrics: IMetricsCollector,
-    private readonly tracer: ITraceRecorder,
-  ) {}
+  private readonly metrics: IMetricsCollector;
+  private readonly tracer: ITraceRecorder;
+
+  constructor(metrics: IMetricsCollector, tracer: ITraceRecorder) {
+    this.metrics = metrics;
+    this.tracer = tracer;
+  }
 
   enrichDiagnostic(label: string, data: Record<string, unknown>): Record<string, unknown> {
     this.metrics.increment(`diagnostic.${label}`);

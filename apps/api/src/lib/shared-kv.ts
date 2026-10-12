@@ -17,10 +17,10 @@
  */
 
 import { MemoryKVStore, RedisKVStore, type KVStore, type RedisClientLike } from "@nexus/kv";
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 
-import { getSharedKVFromCF } from "./cf-adapter.js";
-import { getPgPool, isEmbeddedUrl, type PgLike } from "./pg-pool.js";
+import { getSharedKVFromCF } from "./cf-adapter.ts";
+import { getPgPool, isEmbeddedUrl, type PgLike } from "./pg-pool.ts";
 
 let _redisClient: RedisLike | null = null;
 
@@ -216,7 +216,11 @@ class UpstashKVStore implements KVStore {
 export class PgKVStore implements KVStore {
   private ready: Promise<unknown> | null = null;
 
-  constructor(private readonly pool: PgLike) {}
+  private readonly pool: PgLike;
+
+  constructor(pool: PgLike) {
+    this.pool = pool;
+  }
 
   private async q<R>(sql: string, values: unknown[] = []): Promise<R[]> {
     this.ready ??= this.pool.query(

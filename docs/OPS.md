@@ -132,7 +132,7 @@ Cost-log flush contract (operator-relevant):
   `gracefulShutdown` in `apps/api/src/index.ts` → `app.close()` → the
   `onClose` hook in `server.ts` calls `costLogStore.close()` (bounded to 2 s so
   a KV hang cannot stall process exit). A clean deploy loses ~zero; an unclean
-  kill (e.g. the `tsx watch` dev runner on Windows force-kills) stays within
+  kill (e.g. the `node --watch` dev runner on Windows force-kills) stays within
   the documented few-seconds window.
 - **Flush observability.** See the `costLog` block + `costlog_flush` probe in
   §1.

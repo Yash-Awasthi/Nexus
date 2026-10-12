@@ -6,15 +6,15 @@
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 describe("agent performance", () => {
   it("scores the record and keeps the council's verdict", async () => {
     const { perf, budget, rt, work, org } = await bootOrg(async () => ({
-      perf: await import("../../src/lib/org-performance.js"),
-      budget: await import("../../src/lib/org-budget.js"),
+      perf: await import("../../src/lib/org-performance.ts"),
+      budget: await import("../../src/lib/org-budget.ts"),
     }));
 
     const c = org.createCompany("alice", { name: "Perf Co" });

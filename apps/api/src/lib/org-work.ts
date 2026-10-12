@@ -31,8 +31,8 @@ import {
   onOrgLoad,
   registerCompanyScoped,
   type ActorType,
-} from "./org-store.js";
-import { PersistentStore } from "./persistent-store.js";
+} from "./org-store.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 const conflict = (message: string) => new OrgError(409, "conflict", message);
 

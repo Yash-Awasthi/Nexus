@@ -15,7 +15,7 @@ import {
   ruleMatches,
   type ExecAction,
   type PolicyConfig,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const ask: PolicyConfig = { mode: "ask" };
 

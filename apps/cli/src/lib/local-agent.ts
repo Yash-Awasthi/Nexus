@@ -32,7 +32,7 @@ import {
   councilRuntimeToolsFromLlm,
   debateRuntimeToolFromLlm,
   hybridSearchRuntimeTools,
-} from "./deliberation-tools.js";
+} from "./deliberation-tools.ts";
 
 const DEFAULT_MAX_OUTPUT = 64 * 1024;
 const DEFAULT_CMD_TIMEOUT = 30_000;

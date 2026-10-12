@@ -15,7 +15,7 @@ import {
   type LoadedPlugin,
   type DenoRunnerFn,
   type DenoInvocation,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const PLUGIN: LoadedPlugin = {
   manifest: {

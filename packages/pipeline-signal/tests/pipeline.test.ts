@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { SignalClassifier } from "../src/classifier.js";
+import { SignalClassifier } from "../src/classifier.ts";
 import {
   SignalProcessor,
   MemoryEventSource,
   MemorySignalSink,
   type RawEvent,
-} from "../src/processor.js";
+} from "../src/processor.ts";
 
 function makeEvent(overrides?: Partial<RawEvent>): RawEvent {
   return {

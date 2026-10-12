@@ -2,10 +2,10 @@
   "name": "@nexus/pty",
   "version": "0.1.0",
   "description": "Local pseudo-terminal sessions for agent CLIs (localhost-only)",
+  "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src/"
   },
   "dependencies": {

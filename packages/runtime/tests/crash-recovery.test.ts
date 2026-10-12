@@ -7,9 +7,9 @@ import {
   MemoryRecoveryStore,
   type TaskRecord,
   type CrashRecoveryConfig,
-} from "../src/crash-recovery.js";
-import type { IEventBus } from "../src/event-bus.js";
-import { MemoryQueueBackend } from "../src/queue-backend.js";
+} from "../src/crash-recovery.ts";
+import type { IEventBus } from "../src/event-bus.ts";
+import { MemoryQueueBackend } from "../src/queue-backend.ts";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 

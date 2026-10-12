@@ -10,7 +10,7 @@ import {
   type BrowserAgentDecision,
   type BrowserAgentPage,
   type BrowserAgentSession,
-} from "./agent.js";
+} from "./agent.ts";
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 

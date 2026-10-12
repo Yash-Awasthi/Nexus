@@ -7,7 +7,7 @@
  */
 import { trainRouters, type RoutingSample, type TrainedRouters } from "@nexus/llm-router";
 
-import { PersistentStore } from "./persistent-store.js";
+import { PersistentStore } from "./persistent-store.ts";
 
 export const MIN_ROUTING_QUESTIONS = 30;
 const MAX_SAMPLES = 3000;

@@ -10,8 +10,8 @@ process.env.NEXUS_JWT_SECRET = SECRET;
 delete process.env.NEXUS_EXEC_MODE;
 
 const calls = vi.hoisted(() => ({ n: 0 }));
-vi.mock("../../src/lib/skill-compress.js", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../../src/lib/skill-compress.js")>();
+vi.mock("../../src/lib/skill-compress.ts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/lib/skill-compress.ts")>();
   return {
     ...real,
     compressSkillsForTaskSemantic: (
@@ -26,7 +26,7 @@ vi.mock("../../src/lib/skill-compress.js", async (importOriginal) => {
   };
 });
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

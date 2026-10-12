@@ -61,7 +61,11 @@ export interface PgLike {
 class EmbeddedPool implements PgLike {
   private db: Promise<EmbeddedDb> | null = null;
 
-  constructor(private readonly url: string) {}
+  private readonly url: string;
+
+  constructor(url: string) {
+    this.url = url;
+  }
 
   private open(): NonNullable<typeof this.db> {
     this.db ??= import("@nexus/db/embedded").then(({ getEmbeddedDb }) => getEmbeddedDb(this.url));

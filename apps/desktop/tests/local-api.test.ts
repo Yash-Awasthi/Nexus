@@ -16,7 +16,7 @@ import {
 } from "../src/local-api";
 
 const PATHS: LocalApiPaths = {
-  entry: "/app/api/dist/index.js",
+  entry: "/app/api/src/index.ts",
   spaDir: "/app/ui/build/client",
   dataDir: "/home/u/.nexus",
 };
@@ -73,7 +73,7 @@ describe("startLocalApi", () => {
     });
 
     expect(api.url).toBe("http://127.0.0.1:41234");
-    expect(spawn).toHaveBeenCalledWith("/app/api/dist/index.js", expect.any(Object));
+    expect(spawn).toHaveBeenCalledWith("/app/api/src/index.ts", expect.any(Object));
     // The boot-time liveness server answers /health too; only the full server answers ready.
     expect(waitForHealth).toHaveBeenCalledWith("http://127.0.0.1:41234/health/ready");
   });

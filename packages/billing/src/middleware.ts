@@ -17,8 +17,8 @@
 import type { ApiKey } from "@nexus/db/schema";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-import { lookupApiKey } from "./api-keys.js";
-import { QuotaChecker } from "./quota.js";
+import { lookupApiKey } from "./api-keys.ts";
+import { QuotaChecker } from "./quota.ts";
 
 // Extend Fastify's request type so TypeScript knows about billingKey
 declare module "fastify" {

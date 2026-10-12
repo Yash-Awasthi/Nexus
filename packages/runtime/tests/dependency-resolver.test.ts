@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { TaskDependencyResolver } from "../src/dependency-resolver.js";
-import type { Task } from "../src/task-router.js";
+import { TaskDependencyResolver } from "../src/dependency-resolver.ts";
+import type { Task } from "../src/task-router.ts";
 
 function makeTask(id: string, dependencies: string[] = []): Task {
   return {

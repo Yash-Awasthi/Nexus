@@ -2,8 +2,8 @@
 import type { CouncilRequest } from "@nexus/contracts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { ILLMTransport, ILLMResponse } from "../src/engine.js";
-import { CouncilService, type OnResultFn } from "../src/council-service.js";
+import type { ILLMTransport, ILLMResponse } from "../src/engine.ts";
+import { CouncilService, type OnResultFn } from "../src/council-service.ts";
 
 // ── Mock transport ─────────────────────────────────────────────────────────────
 // Returns a deterministic YES vote that DeliberationEngine can parse.

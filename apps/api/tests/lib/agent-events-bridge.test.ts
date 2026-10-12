@@ -2,7 +2,7 @@
 import { globalBus, type SseEvent } from "@nexus/sse";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { handleAgentEventMessage } from "../../src/lib/agent-events-bridge.js";
+import { handleAgentEventMessage } from "../../src/lib/agent-events-bridge.ts";
 
 afterEach(() => globalBus.clearAll());
 

@@ -11,8 +11,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
-import { createPat } from "../../src/lib/pat-store.js";
+import { buildServer } from "../../src/server.ts";
+import { createPat } from "../../src/lib/pat-store.ts";
 
 const MASTER = "test-master-key";
 let app: FastifyInstance;

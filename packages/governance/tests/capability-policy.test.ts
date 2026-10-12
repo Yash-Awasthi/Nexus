@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { CapabilityPolicy, ExecutionEnvironment } from "../src/capability-policy.js";
-import type { IEnvironmentTelemetry } from "../src/interfaces/environment.interface.js";
+import { CapabilityPolicy, ExecutionEnvironment } from "../src/capability-policy.ts";
+import type { IEnvironmentTelemetry } from "../src/interfaces/environment.interface.ts";
 
 const TELEMETRY: IEnvironmentTelemetry = { successRate: 1, avgLatencyMs: 50, requestCount: 0 };
 

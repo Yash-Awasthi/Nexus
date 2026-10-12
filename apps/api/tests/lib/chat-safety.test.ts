@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { findPii, maskProfanity, redactPii } from "../../src/lib/chat-safety.js";
+import { findPii, maskProfanity, redactPii } from "../../src/lib/chat-safety.ts";
 
 describe("findPii / redactPii", () => {
   const msg =

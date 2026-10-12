@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Bring DATABASE_URL up to the current schema and exit: the deploy-time migrate step. */
-import { migrateEmbedded } from "./lib/migrate-embedded.js";
-import { closePgPools, getPgPool } from "./lib/pg-pool.js";
+import { migrateEmbedded } from "./lib/migrate-embedded.ts";
+import { closePgPools, getPgPool } from "./lib/pg-pool.ts";
 
 const pool = getPgPool();
 if (!pool) {

@@ -6,9 +6,9 @@
  * are all exercised without any real model.
  */
 import { describe, expect, it } from "vitest";
-import { parseVerdict, runMavVerification } from "./verify.js";
-import type { CandidateAnswer, VerifierVerdict } from "./verify.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import { parseVerdict, runMavVerification } from "./verify.ts";
+import type { CandidateAnswer, VerifierVerdict } from "./verify.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 const Q = "Is the ETL safe to run at midnight?";
 

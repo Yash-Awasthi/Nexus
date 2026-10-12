@@ -24,7 +24,7 @@ import crypto from "node:crypto";
 
 import { decide, policyFromEnv, type ExecAction, type PolicyDecision } from "@nexus/exec-policy";
 
-import { PersistentStore } from "./persistent-store.js";
+import { PersistentStore } from "./persistent-store.ts";
 
 export type ApprovalStatus = "pending" | "approved" | "denied" | "expired" | "spent";
 

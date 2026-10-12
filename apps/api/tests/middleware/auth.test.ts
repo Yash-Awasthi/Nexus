@@ -2,7 +2,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { describe, it, expect, afterEach } from "vitest";
 
-import { requireAuth } from "../../src/middleware/auth.js";
+import { requireAuth } from "../../src/middleware/auth.ts";
 
 function makeRequest(authHeader?: string): FastifyRequest {
   return {

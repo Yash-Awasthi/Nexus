@@ -19,7 +19,7 @@ vi.mock("@nexus/runtime", async (importOriginal) => ({
   }),
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

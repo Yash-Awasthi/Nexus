@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { ITaskDependencyResolver } from "./interfaces/execution.interface.js";
-import type { Task } from "./task-router.js";
+import type { ITaskDependencyResolver } from "./interfaces/execution.interface.ts";
+import type { Task } from "./task-router.ts";
 
 export class TaskDependencyResolver implements ITaskDependencyResolver {
   detectCycles(tasks: Task[]): boolean {

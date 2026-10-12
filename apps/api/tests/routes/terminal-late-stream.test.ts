@@ -18,7 +18,7 @@ vi.mock("@nexus/pty", () => ({
     }
   },
 }));
-const { localPtyRoutes } = await import("../../src/routes/local-pty.js");
+const { localPtyRoutes } = await import("../../src/routes/local-pty.ts");
 
 it("closes SSE cleanly when subscribing after the terminal has already exited", async () => {
   const app = Fastify();

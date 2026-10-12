@@ -8,7 +8,7 @@ import {
   DEFAULT_TRIGGERS,
   type ParseltongueConfig,
   type ObfuscationTechnique,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 describe("detectTriggers", () => {
   it("detects a trigger word in text", () => {

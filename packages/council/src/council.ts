@@ -6,7 +6,7 @@
  */
 import type { ModelVote } from "@nexus/contracts";
 
-import { parseConfidence, parseVote, tallyVotes, type VotingMode } from "./engine.js";
+import { parseConfidence, parseVote, tallyVotes, type VotingMode } from "./engine.ts";
 
 export interface CouncilMemberDriver {
   provider: string;
@@ -35,9 +35,11 @@ const VOTER_PROMPT =
   'lines: "Vote: YES" or "Vote: NO" (or ABSTAIN), and "Confidence: <0 to 1>".';
 
 export class Council {
-  constructor(
-    private readonly opts: { members: CouncilMember[]; mode?: VotingMode; systemPrompt?: string },
-  ) {}
+  private readonly opts: { members: CouncilMember[]; mode?: VotingMode; systemPrompt?: string };
+
+  constructor(opts: { members: CouncilMember[]; mode?: VotingMode; systemPrompt?: string }) {
+    this.opts = opts;
+  }
 
   async deliberate(question: string) {
     const votes: CouncilVote[] = await Promise.all(

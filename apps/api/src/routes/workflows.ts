@@ -22,10 +22,10 @@ import type { DriverRegistry, LlmDriver, LlmRole } from "@nexus/llm-drivers";
 import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 import type { FastifyInstance } from "fastify";
 
-import { handOff } from "../lib/org-work.js";
-import { ANON_OWNER, claimable, ownsRow } from "../lib/owner.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { emitReaction, provideReactionDeps } from "../lib/reactions.js";
+import { handOff } from "../lib/org-work.ts";
+import { ANON_OWNER, claimable, ownsRow } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { emitReaction, provideReactionDeps } from "../lib/reactions.ts";
 
 const now = (): string => new Date().toISOString();
 

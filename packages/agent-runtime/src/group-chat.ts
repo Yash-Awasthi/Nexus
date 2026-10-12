@@ -22,7 +22,7 @@
  * speaker always sees who said what without new wire types.
  */
 
-import type { LlmToolFn } from "./index.js";
+import type { LlmToolFn } from "./index.ts";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 

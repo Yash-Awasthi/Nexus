@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { ResourceEnforcer } from "../src/resource-enforcer.js";
-import type { ResourceCapability } from "../src/resource-enforcer.js";
+import { ResourceEnforcer } from "../src/resource-enforcer.ts";
+import type { ResourceCapability } from "../src/resource-enforcer.ts";
 
 function makeEnforcer(
   caps: ResourceCapability[] = [],

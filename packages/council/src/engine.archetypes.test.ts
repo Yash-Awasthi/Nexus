@@ -9,8 +9,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import type { Archetype } from "./archetypes.js";
-import { DeliberationEngine, type ILLMMessage, type ILLMResponse } from "./engine.js";
+import type { Archetype } from "./archetypes.ts";
+import { DeliberationEngine, type ILLMMessage, type ILLMResponse } from "./engine.ts";
 
 interface Call {
   system: string;

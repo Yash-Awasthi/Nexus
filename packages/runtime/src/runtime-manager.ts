@@ -8,7 +8,7 @@
  * service implementations.
  */
 
-import type { IConfigLoader } from "./config-loader.js";
+import type { IConfigLoader } from "./config-loader.ts";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
 

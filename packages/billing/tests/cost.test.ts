@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 import { ProviderRegistry } from "@nexus/provider-registry";
-import { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from "../src/cost.js";
+import { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from "../src/cost.ts";
 
 // Local registry so tests don't depend on the evolving global catalogue.
 function makeRegistry(): ProviderRegistry {

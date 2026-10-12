@@ -9,12 +9,12 @@ vi.mock("@nexus/telemetry", async (importOriginal) => ({
 }));
 
 const flushTraces = vi.fn(async () => {});
-vi.mock("../../src/lib/request-traces.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/request-traces.js")>()),
+vi.mock("../../src/lib/request-traces.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/request-traces.ts")>()),
   flushTraces,
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 it("stops tracing when the server closes", async () => {
   const app = await buildServer();

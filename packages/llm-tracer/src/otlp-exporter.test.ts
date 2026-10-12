@@ -6,7 +6,7 @@ import {
   type OtlpJsonPayload,
   spanToOtlpSpan,
   exportSpansOtlp,
-} from "./index.js";
+} from "./index.ts";
 
 const mkSpan = (over: Partial<Span> = {}): Span => ({
   context: { traceId: "trace-abc-1", spanId: "sp-1", parentSpanId: "sp-0" },

@@ -13,7 +13,7 @@
 
 import { globalBus } from "@nexus/sse";
 
-import { getSharedKV } from "./shared-kv.js";
+import { getSharedKV } from "./shared-kv.ts";
 
 export interface AppNotification {
   id: string;

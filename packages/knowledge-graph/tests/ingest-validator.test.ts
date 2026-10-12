@@ -8,7 +8,7 @@ import {
   strictTypeValidator,
   type Entity,
   type Relationship,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const entities: Entity[] = [
   { text: "Ada", type: "PERSON", confidence: 0.9 },

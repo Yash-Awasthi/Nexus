@@ -24,8 +24,8 @@
  * so this package still knows nothing about provider drivers.
  */
 
-import type { DebateMember, IStreamingTransport } from "./debate.js";
-import type { ILLMMessage } from "./engine.js";
+import type { DebateMember, IStreamingTransport } from "./debate.ts";
+import type { ILLMMessage } from "./engine.ts";
 
 export interface LedgerEntry {
   /** Monotonic, 1-based. A reader's watermark is a line number. */
@@ -41,7 +41,11 @@ export interface LedgerEntry {
 class Ledger {
   private readonly entries: LedgerEntry[] = [];
 
-  constructor(readonly topic: string) {}
+  readonly topic: string;
+
+  constructor(topic: string) {
+    this.topic = topic;
+  }
 
   get length(): number {
     return this.entries.length;

@@ -19,7 +19,7 @@ import {
   type AlertReadFileFn,
   type AlertWriteFileFn,
   type AlertCooldownStore,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

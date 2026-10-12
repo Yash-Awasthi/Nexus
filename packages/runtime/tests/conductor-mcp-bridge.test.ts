@@ -9,18 +9,18 @@ const mocks = vi.hoisted(() => ({
   runFederationE2e: vi.fn(),
 }));
 
-vi.mock("../src/floci-client.js", () => ({
+vi.mock("../src/floci-client.ts", () => ({
   resolveFlociEndpoint: mocks.resolveFlociEndpoint,
   probeFlociHealth: vi.fn(),
 }));
 
-vi.mock("../src/e2e-federation.js", () => ({
+vi.mock("../src/e2e-federation.ts", () => ({
   runFederationE2e: mocks.runFederationE2e,
 }));
 
-import { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "../src/conductor-mcp-bridge.js";
-import { WorkflowRegistry } from "../src/workflow-engine.js";
-import { RuntimeGraph } from "../src/runtime-graph.js";
+import { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "../src/conductor-mcp-bridge.ts";
+import { WorkflowRegistry } from "../src/workflow-engine.ts";
+import { RuntimeGraph } from "../src/runtime-graph.ts";
 
 let root: string;
 let workspacesDir: string;

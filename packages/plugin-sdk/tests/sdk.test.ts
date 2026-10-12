@@ -9,13 +9,13 @@ import {
   AdapterTimeoutError,
   requireEnv,
   withTimeout,
-} from "../src/index.js";
+} from "../src/index.ts";
 import {
   createMockContext,
   createMockLogger,
   createTestAdapter,
   createStubAdapter,
-} from "../src/testing.js";
+} from "../src/testing.ts";
 
 // ── defineAdapter ─────────────────────────────────────────────────────────────
 

@@ -21,18 +21,18 @@ import type {
 } from "@nexus/llm-drivers";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
-import { getProviderSnapshot, type FailoverDriver } from "../lib/llm-failover.js";
-import { listUserModels, userEndpoint } from "../lib/provider-keys.js";
-import { callerFetch } from "../lib/public-url.js";
-import { semanticLookup, semanticStore } from "../lib/semantic-cache.js";
-import { getUserDrivers } from "../lib/user-context.js";
+import { getProviderSnapshot, type FailoverDriver } from "../lib/llm-failover.ts";
+import { listUserModels, userEndpoint } from "../lib/provider-keys.ts";
+import { callerFetch } from "../lib/public-url.ts";
+import { semanticLookup, semanticStore } from "../lib/semantic-cache.ts";
+import { getUserDrivers } from "../lib/user-context.ts";
 
 import {
   getDefaultDriver,
   getFreeDriver,
   getPinnedDriver,
   PROVIDER_CATALOG_BASE,
-} from "./api-bridge.js";
+} from "./api-bridge.ts";
 
 type Part = { type?: string; text?: string };
 interface ChatMessage {

@@ -6,8 +6,8 @@ import * as path from "node:path";
 import {
   makeUserRateLimitPreHandler,
   makeRateLimitPreHandler,
-} from "../../src/lib/rate-limiter.js";
-import { safeResolve } from "../../src/routes/drive.js";
+} from "../../src/lib/rate-limiter.ts";
+import { safeResolve } from "../../src/routes/drive.ts";
 
 // Real path-traversal regression tests for the Nexus Drive guard. safeResolve
 // is the single chokepoint every /drive/* fs operation routes through, so a

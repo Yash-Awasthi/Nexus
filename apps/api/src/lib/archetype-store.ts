@@ -20,12 +20,12 @@ import crypto from "node:crypto";
 
 import { ARCHETYPES, summonArchetypes, type Archetype, type TaskCategory } from "@nexus/council";
 
-import { PersistentStore } from "./persistent-store.js";
+import { PersistentStore } from "./persistent-store.ts";
 
 /** Owner of the seeded built-in personas. Not a real user id. */
 const BUILTIN_OWNER = "__builtin__";
 
-export { ANON_OWNER } from "./owner.js";
+export { ANON_OWNER } from "./owner.ts";
 
 export interface ArchetypeRecord {
   id: string;

@@ -42,90 +42,90 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 
-import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-maturity.js";
-import { attachChannels } from "./lib/channels.js";
-import { costLogStore } from "./lib/cost-log.js";
-import { idle as idleOrgRuns } from "./lib/org-runtime.js";
-import { initPatStore } from "./lib/pat-store.js";
-import { asUser } from "./lib/provider-keys.js";
-import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
-import { flushTraces, recordTrace, type LlmStep } from "./lib/request-traces.js";
-import { sentryReporter } from "./lib/sentry-reporter.js";
-import { parseTrustProxy } from "./lib/trust-proxy.js";
-import { requireAuthWithTier, resolveIdentity } from "./middleware/auth.js";
-import { adminTracesRoutes } from "./routes/admin-traces.js";
-import { adminUsersRoutes } from "./routes/admin-users.js";
-import { adminRoutes } from "./routes/admin.js";
-import { agentsRoutes } from "./routes/agents.js";
-import { alertsRoutes } from "./routes/alerts.js";
-import { apiBridgeRoutes } from "./routes/api-bridge.js";
-import { auditRoutes } from "./routes/audit.js";
-import { authUsersRoutes } from "./routes/auth-users.js";
-import { billingRoutes } from "./routes/billing.js";
-import { botsRoutes } from "./routes/bots.js";
-import { briefRoutes } from "./routes/brief.js";
-import { channelRoutes } from "./routes/channels.js";
-import { chatAnalystRoutes } from "./routes/chat-analyst.js";
-import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
-import { connectorsRoutes } from "./routes/connectors.js";
-import { contextRoutes } from "./routes/context.js";
-import { conversationAnalysisRoutes } from "./routes/conversation-analysis.js";
-import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
-import { councilRoutes } from "./routes/council.js";
-import { diagnosticsRoutes } from "./routes/diagnostics.js";
-import { diffRoutes } from "./routes/diff.js";
-import { discussionRoutes } from "./routes/discussion.js";
-import { docPipelineRoutes } from "./routes/doc-pipeline.js";
-import { driveRoutes } from "./routes/drive.js";
-import { execApprovalRoutes } from "./routes/exec-approvals.js";
-import { featureFlagsRoutes } from "./routes/feature-flags.js";
-import { forecastRoutes } from "./routes/forecast.js";
-import { gatewayRoutes } from "./routes/gateway.js";
-import { geoipRoutes } from "./routes/geoip.js";
-import { governanceRoutes } from "./routes/governance.js";
-import { healthRoutes } from "./routes/health.js";
-import { hooksRoutes } from "./routes/hooks.js";
-import { i18nRoutes } from "./routes/i18n.js";
-import { ingestRoutes } from "./routes/ingest.js";
-import { libertasRoutes } from "./routes/libertas.js";
-import { llmOauthRoutes } from "./routes/llm-oauth.js";
-import { llmRoutes } from "./routes/llm.js";
-import { localPtyRoutes } from "./routes/local-pty.js";
-import { mailIngestRoutes } from "./routes/mail-ingest.js";
-import { mcpOpenApiRoutes } from "./routes/mcp-openapi.js";
-import { mcpServersRoutes } from "./routes/mcp-servers.js";
-import { mcpRoutes } from "./routes/mcp.js";
-import { memoryRoutes } from "./routes/memory.js";
-import { metricsRoutes } from "./routes/metrics.js";
-import { mfaRoutes } from "./routes/mfa.js";
-import { missionRoutes } from "./routes/missions.js";
-import { nlpRoutes } from "./routes/nlp.js";
-import { notificationsRoutes } from "./routes/notifications.js";
-import { oauthRoutes } from "./routes/oauth.js";
-import { oidcRoutes } from "./routes/oidc.js";
-import { openaiBatchRoutes } from "./routes/openai-batch.js";
-import { openaiRoutes } from "./routes/openai.js";
-import { orgHookRoutes, orgRoutes } from "./routes/org.js";
-import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
-import { pluginRunRoutes } from "./routes/plugin-run.js";
-import { predictionMarketRoutes } from "./routes/prediction-market.js";
-import { redteamRoutes } from "./routes/redteam.js";
-import { researcherRoutes } from "./routes/researcher.js";
-import { rlhfRoutes } from "./routes/rlhf.js";
-import { runtimeRoutes } from "./routes/runtime.js";
-import { samlRoutes } from "./routes/saml.js";
-import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
-import { scimRoutes } from "./routes/scim.js";
-import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
-import { secretRoutes } from "./routes/secrets.js";
-import { sessionSyncRoutes } from "./routes/session-sync.js";
-import { sftRoutes } from "./routes/sft.js";
-import { sseRoutes } from "./routes/sse.js";
-import { stmRoutes } from "./routes/stm.js";
-import { threadsRoutes } from "./routes/threads.js";
-import { userDataRoutes } from "./routes/user-data.js";
-import { wikiRoutes } from "./routes/wiki.js";
-import { workspacesRoutes } from "./routes/workspaces.js";
+import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-maturity.ts";
+import { attachChannels } from "./lib/channels.ts";
+import { costLogStore } from "./lib/cost-log.ts";
+import { idle as idleOrgRuns } from "./lib/org-runtime.ts";
+import { initPatStore } from "./lib/pat-store.ts";
+import { asUser } from "./lib/provider-keys.ts";
+import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.ts";
+import { flushTraces, recordTrace, type LlmStep } from "./lib/request-traces.ts";
+import { sentryReporter } from "./lib/sentry-reporter.ts";
+import { parseTrustProxy } from "./lib/trust-proxy.ts";
+import { requireAuthWithTier, resolveIdentity } from "./middleware/auth.ts";
+import { adminTracesRoutes } from "./routes/admin-traces.ts";
+import { adminUsersRoutes } from "./routes/admin-users.ts";
+import { adminRoutes } from "./routes/admin.ts";
+import { agentsRoutes } from "./routes/agents.ts";
+import { alertsRoutes } from "./routes/alerts.ts";
+import { apiBridgeRoutes } from "./routes/api-bridge.ts";
+import { auditRoutes } from "./routes/audit.ts";
+import { authUsersRoutes } from "./routes/auth-users.ts";
+import { billingRoutes } from "./routes/billing.ts";
+import { botsRoutes } from "./routes/bots.ts";
+import { briefRoutes } from "./routes/brief.ts";
+import { channelRoutes } from "./routes/channels.ts";
+import { chatAnalystRoutes } from "./routes/chat-analyst.ts";
+import { chatSuggestionsRoutes } from "./routes/chat-suggestions.ts";
+import { connectorsRoutes } from "./routes/connectors.ts";
+import { contextRoutes } from "./routes/context.ts";
+import { conversationAnalysisRoutes } from "./routes/conversation-analysis.ts";
+import { corpusBuilderRoutes } from "./routes/corpus-builder.ts";
+import { councilRoutes } from "./routes/council.ts";
+import { diagnosticsRoutes } from "./routes/diagnostics.ts";
+import { diffRoutes } from "./routes/diff.ts";
+import { discussionRoutes } from "./routes/discussion.ts";
+import { docPipelineRoutes } from "./routes/doc-pipeline.ts";
+import { driveRoutes } from "./routes/drive.ts";
+import { execApprovalRoutes } from "./routes/exec-approvals.ts";
+import { featureFlagsRoutes } from "./routes/feature-flags.ts";
+import { forecastRoutes } from "./routes/forecast.ts";
+import { gatewayRoutes } from "./routes/gateway.ts";
+import { geoipRoutes } from "./routes/geoip.ts";
+import { governanceRoutes } from "./routes/governance.ts";
+import { healthRoutes } from "./routes/health.ts";
+import { hooksRoutes } from "./routes/hooks.ts";
+import { i18nRoutes } from "./routes/i18n.ts";
+import { ingestRoutes } from "./routes/ingest.ts";
+import { libertasRoutes } from "./routes/libertas.ts";
+import { llmOauthRoutes } from "./routes/llm-oauth.ts";
+import { llmRoutes } from "./routes/llm.ts";
+import { localPtyRoutes } from "./routes/local-pty.ts";
+import { mailIngestRoutes } from "./routes/mail-ingest.ts";
+import { mcpOpenApiRoutes } from "./routes/mcp-openapi.ts";
+import { mcpServersRoutes } from "./routes/mcp-servers.ts";
+import { mcpRoutes } from "./routes/mcp.ts";
+import { memoryRoutes } from "./routes/memory.ts";
+import { metricsRoutes } from "./routes/metrics.ts";
+import { mfaRoutes } from "./routes/mfa.ts";
+import { missionRoutes } from "./routes/missions.ts";
+import { nlpRoutes } from "./routes/nlp.ts";
+import { notificationsRoutes } from "./routes/notifications.ts";
+import { oauthRoutes } from "./routes/oauth.ts";
+import { oidcRoutes } from "./routes/oidc.ts";
+import { openaiBatchRoutes } from "./routes/openai-batch.ts";
+import { openaiRoutes } from "./routes/openai.ts";
+import { orgHookRoutes, orgRoutes } from "./routes/org.ts";
+import { pluginRegistryRoutes } from "./routes/plugin-registry.ts";
+import { pluginRunRoutes } from "./routes/plugin-run.ts";
+import { predictionMarketRoutes } from "./routes/prediction-market.ts";
+import { redteamRoutes } from "./routes/redteam.ts";
+import { researcherRoutes } from "./routes/researcher.ts";
+import { rlhfRoutes } from "./routes/rlhf.ts";
+import { runtimeRoutes } from "./routes/runtime.ts";
+import { samlRoutes } from "./routes/saml.ts";
+import { scenarioPlannerRoutes } from "./routes/scenario-planner.ts";
+import { scimRoutes } from "./routes/scim.ts";
+import { scrapingMcpRoutes } from "./routes/scraping-mcp.ts";
+import { secretRoutes } from "./routes/secrets.ts";
+import { sessionSyncRoutes } from "./routes/session-sync.ts";
+import { sftRoutes } from "./routes/sft.ts";
+import { sseRoutes } from "./routes/sse.ts";
+import { stmRoutes } from "./routes/stm.ts";
+import { threadsRoutes } from "./routes/threads.ts";
+import { userDataRoutes } from "./routes/user-data.ts";
+import { wikiRoutes } from "./routes/wiki.ts";
+import { workspacesRoutes } from "./routes/workspaces.ts";
 
 // Resolve pino-pretty to an absolute path so pino's transport worker can load it
 // under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
@@ -353,7 +353,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     // SLO tracking: record every response for availability + error rate computation
     try {
-      const { sloTracker } = await import("./routes/metrics.js");
+      const { sloTracker } = await import("./routes/metrics.ts");
       sloTracker.record({
         success: reply.statusCode < 500,
         latencyMs: reply.elapsedTime ?? 0,
@@ -365,7 +365,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     // AlertEngine: fire "http.5xx" metric on every 5xx response
     if (reply.statusCode >= 500) {
       try {
-        const { alertEngine } = await import("./routes/alerts.js");
+        const { alertEngine } = await import("./routes/alerts.ts");
         alertEngine.evaluate("http.5xx", 1).catch(() => {});
       } catch {
         /* non-fatal */

@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { discoverModels, probeOllamaModels } from "../../src/lib/model-discovery.js";
+import { discoverModels, probeOllamaModels } from "../../src/lib/model-discovery.ts";
 
 function fakeFetch(models: string[], ok = true): typeof fetch {
   return (async () => {

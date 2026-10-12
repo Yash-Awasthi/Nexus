@@ -17,9 +17,9 @@ import {
   MODEL_PRICES,
   scopeCostEntriesToUser,
   type CostEntry,
-} from "../lib/cost-log.js";
+} from "../lib/cost-log.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 /** Same in-memory array every api-bridge read touches — never reassigned. */
 const _costLog: readonly CostEntry[] = costLogStore.entries;

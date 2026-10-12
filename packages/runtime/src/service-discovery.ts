@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IConfigLoader } from "./config-loader.js";
-import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
+import type { IConfigLoader } from "./config-loader.ts";
+import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.ts";
 import type {
   IServiceDiscovery,
   ServiceHeartbeat,
   IHealthMonitor,
-} from "./interfaces/discovery.interface.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
+} from "./interfaces/discovery.interface.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
 
 export class LocalServiceDiscovery implements IServiceDiscovery {
   private services = new Map<string, ServiceHeartbeat>();

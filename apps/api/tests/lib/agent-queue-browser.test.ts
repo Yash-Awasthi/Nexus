@@ -16,7 +16,7 @@ vi.mock("bullmq", () => ({
 }));
 process.env.REDIS_URL = "redis://127.0.0.1:6379";
 
-const { launchBrowserTask } = await import("../../src/lib/agent-queue.js");
+const { launchBrowserTask } = await import("../../src/lib/agent-queue.ts");
 
 it("queues a browser task rather than falling back to this process", async () => {
   expect(await launchBrowserTask("session-1")).toBe(true);

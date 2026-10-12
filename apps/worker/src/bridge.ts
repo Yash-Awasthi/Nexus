@@ -31,8 +31,8 @@ import { mkdirSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import * as path from "node:path";
 
-import { mcpToolsFromServers, type McpServerConfig } from "./handlers/agent-mcp.js";
-import { createCodingToolSet } from "./handlers/agent-tools.js";
+import { mcpToolsFromServers, type McpServerConfig } from "./handlers/agent-mcp.ts";
+import { createCodingToolSet } from "./handlers/agent-tools.ts";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -318,7 +318,7 @@ async function startBridgeServer(opts: {
   };
 }
 
-// ── Direct run: pnpm --filter @nexus/worker exec tsx src/bridge.ts ───────────
+// ── Direct run: node apps/worker/src/bridge.ts ───────────────────────────────
 async function main(): Promise<void> {
   let mcpServers: McpServerConfig[] = [];
   const rawMcp = process.env.NEXUS_BRIDGE_MCP_SERVERS;

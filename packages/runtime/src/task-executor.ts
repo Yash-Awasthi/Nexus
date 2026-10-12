@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IEventBus } from "./event-bus.js";
+import type { IEventBus } from "./event-bus.ts";
 import type {
   ITaskExecutor,
   IExecutionAdapter,
   IExecutionContext,
-} from "./interfaces/execution.interface.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
-import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
+} from "./interfaces/execution.interface.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.ts";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
+import type { IQueueBackend } from "./interfaces/queue.interface.ts";
 
 export class TaskExecutor implements ITaskExecutor {
   private queue: IQueueBackend;

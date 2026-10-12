@@ -5,10 +5,10 @@
  * to the same agent, goal and company; the task is never touched.
  */
 
-import { priceKey } from "./cost-log.js";
-import { callAllowance, estimateCallMicros, recordRunSpend } from "./org-budget.js";
-import { parseOutcome } from "./org-protocol.js";
-import { allRuns, getRun, listRuns, runAsOwner, stepsCostUsd } from "./org-runtime.js";
+import { priceKey } from "./cost-log.ts";
+import { callAllowance, estimateCallMicros, recordRunSpend } from "./org-budget.ts";
+import { parseOutcome } from "./org-protocol.ts";
+import { allRuns, getRun, listRuns, runAsOwner, stepsCostUsd } from "./org-runtime.ts";
 import {
   OrgError,
   getAgent,
@@ -20,10 +20,10 @@ import {
   onOrgLoad,
   registerCompanyScoped,
   updateAgent,
-} from "./org-store.js";
-import { getTask } from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
-import type { LlmStep } from "./request-traces.js";
+} from "./org-store.ts";
+import { getTask } from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
+import type { LlmStep } from "./request-traces.ts";
 
 const MAX_TOKENS = 2048;
 

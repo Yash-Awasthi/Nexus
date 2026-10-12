@@ -33,10 +33,10 @@ import type { Socket } from "net";
 import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse";
 import type { FastifyInstance } from "fastify";
 
-import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
-import { getPgPool } from "../lib/pg-pool.js";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.ts";
+import { getPgPool } from "../lib/pg-pool.ts";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 const PING_INTERVAL_MS = 20_000;
 

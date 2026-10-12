@@ -55,13 +55,13 @@ import {
 } from "@nexus/llm-drivers";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { IdleMap } from "./idle-map.js";
-import { cachedDriver } from "./llm-cache-driver.js";
-import { callerFetch, unsafeUrlReason } from "./public-url.js";
-import { pacedFetch } from "./rate-pace.js";
-import type { LlmStep } from "./request-traces.js";
-import { decryptSecret, encryptSecret } from "./secret-crypto.js";
-import { userContext, type UserDriver } from "./user-context.js";
+import { IdleMap } from "./idle-map.ts";
+import { cachedDriver } from "./llm-cache-driver.ts";
+import { callerFetch, unsafeUrlReason } from "./public-url.ts";
+import { pacedFetch } from "./rate-pace.ts";
+import type { LlmStep } from "./request-traces.ts";
+import { decryptSecret, encryptSecret } from "./secret-crypto.ts";
+import { userContext, type UserDriver } from "./user-context.ts";
 
 /** Providers we can construct an LLM driver for (openai included — the ChatGPT
  *  API is a plain OpenAI-compatible endpoint and its driver lives in

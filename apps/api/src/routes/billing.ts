@@ -18,7 +18,7 @@
 
 import type { FastifyInstance, FastifyReply } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── DB availability flag ──────────────────────────────────────────────────────
 

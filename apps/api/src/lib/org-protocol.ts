@@ -5,10 +5,10 @@
  * contract, so they change together.
  */
 
-import { screenForPrompt } from "./injection-classifier.js";
-import type { AdapterContext, Run } from "./org-runtime.js";
-import { listAgents, type Agent, type Company } from "./org-store.js";
-import { listComments, listTasks, taskContext, type Task, type TaskStatus } from "./org-work.js";
+import { screenForPrompt } from "./injection-classifier.ts";
+import type { AdapterContext, Run } from "./org-runtime.ts";
+import { listAgents, type Agent, type Company } from "./org-store.ts";
+import { listComments, listTasks, taskContext, type Task, type TaskStatus } from "./org-work.ts";
 
 /**
  * Extra prompt sections (memory recall, skills). Null adds nothing; `refuse`

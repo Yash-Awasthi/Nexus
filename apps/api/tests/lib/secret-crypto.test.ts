@@ -7,7 +7,7 @@ import {
   getSecretKey,
   isSecretCryptoAvailable,
   SecretCryptoUnavailableError,
-} from "../../src/lib/secret-crypto.js";
+} from "../../src/lib/secret-crypto.ts";
 
 const KEY = "a".repeat(64); // 32 bytes hex
 const ENV_VARS = [

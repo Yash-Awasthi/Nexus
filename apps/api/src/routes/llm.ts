@@ -32,11 +32,11 @@ import {
 } from "@nexus/llm-router";
 import type { FastifyInstance } from "fastify";
 
-import { discoverModels, type ReasoningTier } from "../lib/model-discovery.js";
-import { routeModel, type CapabilityRequirement } from "../lib/model-routing.js";
-import { ANON_OWNER } from "../lib/owner.js";
-import { learnedRouting } from "../lib/routing-data.js";
-import { requireAuth } from "../middleware/auth.js";
+import { discoverModels, type ReasoningTier } from "../lib/model-discovery.ts";
+import { routeModel, type CapabilityRequirement } from "../lib/model-routing.ts";
+import { ANON_OWNER } from "../lib/owner.ts";
+import { learnedRouting } from "../lib/routing-data.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Router factory ────────────────────────────────────────────────────────────
 

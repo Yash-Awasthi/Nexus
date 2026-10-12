@@ -14,7 +14,7 @@ import {
   type TaskUpdatePayload,
   type SignalPayload,
   type VerdictPayload,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── formatSseEvent ────────────────────────────────────────────────────────────
 

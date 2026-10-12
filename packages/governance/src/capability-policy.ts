@@ -3,14 +3,18 @@ import type {
   ICapabilityPolicy,
   IExecutionEnvironment,
   IEnvironmentTelemetry,
-} from "./interfaces/environment.interface.js";
+} from "./interfaces/environment.interface.ts";
 
 export class ExecutionEnvironment implements IExecutionEnvironment {
-  constructor(
-    public name: string,
-    public capabilities: string[],
-    public telemetry: IEnvironmentTelemetry,
-  ) {}
+  public name: string;
+  public capabilities: string[];
+  public telemetry: IEnvironmentTelemetry;
+
+  constructor(name: string, capabilities: string[], telemetry: IEnvironmentTelemetry) {
+    this.name = name;
+    this.capabilities = capabilities;
+    this.telemetry = telemetry;
+  }
 }
 
 export class CapabilityPolicy implements ICapabilityPolicy {

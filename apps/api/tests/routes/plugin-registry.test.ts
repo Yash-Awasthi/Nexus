@@ -6,7 +6,7 @@
  * id+version.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 vi.mock("@nexus/db", () => ({ db: { execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]) } }));

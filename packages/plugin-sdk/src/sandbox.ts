@@ -23,17 +23,19 @@
 import { execFile } from "node:child_process";
 import { dirname } from "node:path";
 
-import type { LoadedPlugin } from "./plugin-manifest.js";
+import type { LoadedPlugin } from "./plugin-manifest.ts";
 
-import type { AdapterCapability } from "./index.js";
+import type { AdapterCapability } from "./index.ts";
 
 /** Error raised when a plugin attempts a capability it was not granted. */
 export class CapabilityDeniedError extends Error {
-  constructor(
-    public readonly capability: AdapterCapability,
-    public readonly pluginId: string,
-  ) {
+  public readonly capability: AdapterCapability;
+  public readonly pluginId: string;
+
+  constructor(capability: AdapterCapability, pluginId: string) {
     super(`Plugin "${pluginId}" attempted ungranted capability "${capability}" — denied.`);
+    this.capability = capability;
+    this.pluginId = pluginId;
     this.name = "CapabilityDeniedError";
   }
 }
@@ -44,11 +46,11 @@ export class CapabilityDeniedError extends Error {
  * attempted a denied capability — the host simply cannot execute the plugin.
  */
 export class SandboxUnavailableError extends Error {
-  constructor(
-    message: string,
-    public readonly detail?: Record<string, unknown>,
-  ) {
+  public readonly detail?: Record<string, unknown>;
+
+  constructor(message: string, detail?: Record<string, unknown>) {
     super(message);
+    this.detail = detail;
     this.name = "SandboxUnavailableError";
   }
 }

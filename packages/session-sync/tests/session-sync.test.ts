@@ -7,7 +7,7 @@ import {
   SyncManager,
   type SyncSession,
   type SyncOperation,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── VectorClock ───────────────────────────────────────────────────────────────
 

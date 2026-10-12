@@ -3,7 +3,7 @@ import type {
   IMCPServerRegistry,
   IMCPServerInfo,
   IMCPTransport,
-} from "./interfaces/mcp.interface.js";
+} from "./interfaces/mcp.interface.ts";
 
 export class MCPServerRegistry implements IMCPServerRegistry {
   private servers = new Map<string, { info: IMCPServerInfo; transport: IMCPTransport }>();

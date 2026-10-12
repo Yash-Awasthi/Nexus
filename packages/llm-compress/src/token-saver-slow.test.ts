@@ -2,7 +2,7 @@
 /** Tool output can hold one very long line; no processor may go superlinear on it. */
 import { expect, it } from "vitest";
 
-import { defaultOutputProcessors } from "./token-saver.js";
+import { defaultOutputProcessors } from "./token-saver.ts";
 
 const COMMANDS = [
   "pytest",

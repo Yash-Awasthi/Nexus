@@ -3,19 +3,19 @@
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", async (importOriginal) => {
+vi.mock("../../src/middleware/auth.ts", async (importOriginal) => {
   const who = async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   };
   return {
-    ...(await importOriginal<typeof import("../../src/middleware/auth.js")>()),
+    ...(await importOriginal<typeof import("../../src/middleware/auth.ts")>()),
     requireAuth: who,
     requireAuthWithTier: who,
   };
 });
 
-const { sftRoutes } = await import("../../src/routes/sft.js");
-const { corpusBuilderRoutes } = await import("../../src/routes/corpus-builder.js");
+const { sftRoutes } = await import("../../src/routes/sft.ts");
+const { corpusBuilderRoutes } = await import("../../src/routes/corpus-builder.ts");
 
 async function appWith(routes: (app: ReturnType<typeof Fastify>) => Promise<void>) {
   const app = Fastify();

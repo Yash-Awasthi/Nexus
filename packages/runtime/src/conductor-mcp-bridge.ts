@@ -2,16 +2,16 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { runFederationE2e } from "./e2e-federation.js";
-import type { FlociExecutionAdapter } from "./floci-adapter.js";
-import { resolveFlociEndpoint } from "./floci-client.js";
-import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
-import type { IMCPTransport } from "./interfaces/mcp.interface.js";
-import { MCPRuntime } from "./mcp-adapter.js";
-import { MCPServerRegistry } from "./mcp-registry.js";
-import type { ConductorRuntimeContext } from "./runtime-context.js";
-import { resolveSandboxPath } from "./runtime-sandbox.js";
-import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
+import { runFederationE2e } from "./e2e-federation.ts";
+import type { FlociExecutionAdapter } from "./floci-adapter.ts";
+import { resolveFlociEndpoint } from "./floci-client.ts";
+import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.ts";
+import type { IMCPTransport } from "./interfaces/mcp.interface.ts";
+import { MCPRuntime } from "./mcp-adapter.ts";
+import { MCPServerRegistry } from "./mcp-registry.ts";
+import type { ConductorRuntimeContext } from "./runtime-context.ts";
+import { resolveSandboxPath } from "./runtime-sandbox.ts";
+import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.ts";
 
 /**
  * In-process MCP transport exposing Conductor orchestrator capabilities.
@@ -19,7 +19,11 @@ import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js
 class ConductorMcpBridge implements IMCPTransport {
   private connected = false;
 
-  constructor(private readonly ctx: ConductorRuntimeContext) {}
+  private readonly ctx: ConductorRuntimeContext;
+
+  constructor(ctx: ConductorRuntimeContext) {
+    this.ctx = ctx;
+  }
 
   async connect(): Promise<void> {
     this.connected = true;

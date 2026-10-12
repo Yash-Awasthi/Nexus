@@ -2,7 +2,7 @@
 /** JSON-RPC batch invocation on the MCP server. */
 import { describe, expect, it } from "vitest";
 
-import { McpHttpServer } from "../src/index.js";
+import { McpHttpServer } from "../src/index.ts";
 
 const server = new McpHttpServer({
   name: "t",

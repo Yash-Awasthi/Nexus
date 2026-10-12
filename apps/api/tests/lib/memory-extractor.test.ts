@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it } from "vitest";
-import { extractMissionInsights, sanitizeInsights } from "../../src/lib/memory-extractor.js";
+import { extractMissionInsights, sanitizeInsights } from "../../src/lib/memory-extractor.ts";
 
 /** Ollama /api/chat-shaped responder over a scripted content body. */
 function ollama(content: string, ok = true) {

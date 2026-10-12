@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { YAMLConfigLoader } from "../src/config-loader.js";
+import { YAMLConfigLoader } from "../src/config-loader.ts";
 
 let dir: string;
 let paths: Record<string, string>;

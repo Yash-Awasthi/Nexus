@@ -5,8 +5,8 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 
-import { closePgPools, getPgPool } from "../../src/lib/pg-pool.js";
-import { PgKVStore } from "../../src/lib/shared-kv.js";
+import { closePgPools, getPgPool } from "../../src/lib/pg-pool.ts";
+import { PgKVStore } from "../../src/lib/shared-kv.ts";
 
 const kv = new PgKVStore(getPgPool("pglite://:memory:pg-kv-test")!);
 

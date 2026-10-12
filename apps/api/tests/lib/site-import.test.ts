@@ -2,7 +2,7 @@
 import { AdaptiveScraper, RobotsChecker, type ScrapeResult } from "@nexus/adaptive-scraper";
 import { describe, expect, it } from "vitest";
 
-import { importSite, sameSiteLinks } from "../../src/lib/site-import.js";
+import { importSite, sameSiteLinks } from "../../src/lib/site-import.ts";
 
 const body = (words: string) => `${words} `.repeat(60);
 const SITE: Record<string, string> = {

@@ -14,8 +14,8 @@
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { isValidPatScope } from "../lib/pat-scopes.js";
-import { createPat, listPats, revokePat } from "../lib/pat-store.js";
+import { isValidPatScope } from "../lib/pat-scopes.ts";
+import { createPat, listPats, revokePat } from "../lib/pat-store.ts";
 
 /** Owner for the request's PATs: the authenticated user, or "dev" in bypass mode. */
 function patOwner(request: FastifyRequest): string {

@@ -5,17 +5,11 @@
   "description": "API key management, quota enforcement, and Stripe webhook handler",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,7 +17,6 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:",
     "@types/node": "catalog:",
     "fastify": "^5.11.2"

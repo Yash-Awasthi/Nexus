@@ -18,11 +18,11 @@ import { authenticate, AuthError, verifyJwtRS256 } from "@nexus/auth";
 import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-import { sessionRevocations } from "../lib/auth-hardening.js";
-import { sha256hex } from "../lib/crypto-utils.js";
-import { patScopesAllow } from "../lib/pat-scopes.js";
-import { verifyPat } from "../lib/pat-store.js";
-import { getPgPool } from "../lib/pg-pool.js";
+import { sessionRevocations } from "../lib/auth-hardening.ts";
+import { sha256hex } from "../lib/crypto-utils.ts";
+import { patScopesAllow } from "../lib/pat-scopes.ts";
+import { verifyPat } from "../lib/pat-store.ts";
+import { getPgPool } from "../lib/pg-pool.ts";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 

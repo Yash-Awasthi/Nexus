@@ -13,8 +13,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { runDueWorkflows } from "../../src/routes/workflows.js";
-import { buildServer } from "../../src/server.js";
+import { runDueWorkflows } from "../../src/routes/workflows.ts";
+import { buildServer } from "../../src/server.ts";
 
 let app: FastifyInstance;
 

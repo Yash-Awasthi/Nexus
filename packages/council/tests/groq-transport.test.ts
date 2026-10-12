@@ -15,7 +15,7 @@ vi.mock("groq-sdk", () => {
 });
 
 import Groq from "groq-sdk";
-import { GroqTransport } from "../src/groq-transport.js";
+import { GroqTransport } from "../src/groq-transport.ts";
 
 // ── GroqTransport ──────────────────────────────────────────────────────────────
 

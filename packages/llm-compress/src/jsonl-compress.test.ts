@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { jsonlCompress, ENGINES } from "./index.js";
+import { jsonlCompress, ENGINES } from "./index.ts";
 
 const row = (id: string): string => `{"id":"${id}","name":"pkg ${id}","status":"ok"}`;
 const fenced =

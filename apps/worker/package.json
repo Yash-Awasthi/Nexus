@@ -10,9 +10,7 @@
     "./ingest-handler": "./src/handlers/ingest-handler.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "dev": "node --watch src/index.ts",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,7 +20,6 @@
     "@types/node": "catalog:",
     "@types/pg": "^8.20.4",
     "@vitest/coverage-v8": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
@@ -49,7 +46,6 @@
     "bullmq": "^5.81.3",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.1",
-    "pg": "^8.22.0",
-    "tsx": "^4.23.10"
+    "pg": "^8.22.0"
   }
 }

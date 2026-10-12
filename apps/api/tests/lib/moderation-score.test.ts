@@ -5,7 +5,7 @@
  */
 import { expect, it } from "vitest";
 
-import { heuristicScores, openaiScores } from "../../src/lib/moderation-score.js";
+import { heuristicScores, openaiScores } from "../../src/lib/moderation-score.ts";
 
 const CATS = ["hate", "violence", "sexual", "self_harm", "harassment", "spam"];
 

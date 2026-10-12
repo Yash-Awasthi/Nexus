@@ -25,7 +25,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { SignalClassifier, type ClassificationInput } from "./classifier.js";
+import { SignalClassifier, type ClassificationInput } from "./classifier.ts";
 
 // ── Storage adapter interfaces ────────────────────────────────────────────────
 

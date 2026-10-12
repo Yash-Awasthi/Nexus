@@ -21,7 +21,7 @@ vi.mock("@nexus/db", () => ({
 }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), sql: vi.fn() }));
 
-import { handleIngestJob, type IngestJobPayload } from "../../src/handlers/ingest-handler.js";
+import { handleIngestJob, type IngestJobPayload } from "../../src/handlers/ingest-handler.ts";
 
 describe("handleIngestJob — classifyEvent routing", () => {
   beforeEach(() => {

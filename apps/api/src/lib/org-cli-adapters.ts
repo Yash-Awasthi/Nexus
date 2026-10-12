@@ -30,26 +30,26 @@ import type { ExecAction } from "@nexus/exec-policy";
 import { pinnedFetch } from "@nexus/runtime";
 import spawn from "cross-spawn";
 
-import { priceKey } from "./cost-log.js";
+import { priceKey } from "./cost-log.ts";
 import {
   classifyAction,
   listApprovals,
   redeemApproval,
   requestApproval,
-} from "./exec-approvals.js";
-import { createNotification } from "./notifications-store.js";
-import { addPromptContributor } from "./org-protocol.js";
+} from "./exec-approvals.ts";
+import { createNotification } from "./notifications-store.ts";
+import { addPromptContributor } from "./org-protocol.ts";
 import {
   enqueueWake,
   registerAdapter,
   type Adapter,
   type AdapterContext,
   type AdapterResult,
-} from "./org-runtime.js";
-import { onOrgLoad, registerCompanyScoped, type AdapterType } from "./org-store.js";
-import { PersistentStore, dataDir } from "./persistent-store.js";
-import { resolveSecret } from "./secret-store.js";
-import { executeSkillsOnce, skillExecAction, type SkillRecord } from "./skill-runner.js";
+} from "./org-runtime.ts";
+import { onOrgLoad, registerCompanyScoped, type AdapterType } from "./org-store.ts";
+import { PersistentStore, dataDir } from "./persistent-store.ts";
+import { resolveSecret } from "./secret-store.ts";
+import { executeSkillsOnce, skillExecAction, type SkillRecord } from "./skill-runner.ts";
 
 // ── Grants ───────────────────────────────────────────────────────────────────
 

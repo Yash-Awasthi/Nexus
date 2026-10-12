@@ -84,9 +84,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build @nexus/db
-        run: pnpm --filter @nexus/db build
-
       - name: Run migrations (dry-run preview)
         if: ${{ github.event.inputs.dry_run == 'true' }}
         env:

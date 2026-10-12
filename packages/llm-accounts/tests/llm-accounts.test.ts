@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { AccountPool, type AccountConfig, type PoolOptions } from "../src/index.js";
+import { AccountPool, type AccountConfig, type PoolOptions } from "../src/index.ts";
 
 // Deterministic clock + RNG so routing and backoff are fully reproducible.
 function fixedPool(accounts: AccountConfig[], overrides: Partial<PoolOptions> = {}) {

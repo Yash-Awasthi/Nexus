@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { parseSseBuffer } from "../../src/lib/sse-stream.js";
+import { parseSseBuffer } from "../../src/lib/sse-stream.ts";
 
 describe("parseSseBuffer", () => {
   it("parses a complete event/data/id frame", () => {

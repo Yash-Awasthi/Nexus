@@ -21,13 +21,13 @@ const splitter = {
   },
 } as unknown as LlmDriver;
 
-vi.mock("../../src/lib/user-context.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/user-context.js")>()),
+vi.mock("../../src/lib/user-context.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/user-context.ts")>()),
   getUserDrivers: () => [{ id: "scripted", driver: splitter }],
 }));
 
 const savedDb = process.env.DATABASE_URL;
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 let kbId = "";

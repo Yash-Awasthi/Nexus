@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { llmDriverToToolFn, type LlmToolDriver } from "../src/index.js";
+import { llmDriverToToolFn, type LlmToolDriver } from "../src/index.ts";
 
 function driverFailing(errors: unknown[], streamFirst = false) {
   let calls = 0;

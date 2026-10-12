@@ -2,7 +2,7 @@
 /** Docker CMD entry: starts the conductor server when run directly. */
 import { fileURLToPath } from "node:url";
 
-import { startHttpServer } from "./conductor-server.js";
+import { startHttpServer } from "./conductor-server.ts";
 
 // ESM entry-point guard — replaces the CJS `require.main === module` pattern.
 // Runs only when this file is invoked directly (node runtime-server.js).

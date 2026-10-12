@@ -38,8 +38,8 @@ import {
   type StreamHandler,
 } from "@nexus/llm-drivers";
 
-import { cachedDriver } from "./llm-cache-driver.js";
-import { getCacheUserId } from "./user-context.js";
+import { cachedDriver } from "./llm-cache-driver.ts";
+import { getCacheUserId } from "./user-context.ts";
 
 export interface FailoverProviderEntry {
   /** Registry key, e.g. "groq" (also used as the servedBy id). */
@@ -237,7 +237,10 @@ export class FailoverDriver implements LlmDriver {
   readonly provider = "failover";
   readonly model: string;
 
-  constructor(private readonly entries: FailoverProviderEntry[]) {
+  private readonly entries: FailoverProviderEntry[];
+
+  constructor(entries: FailoverProviderEntry[]) {
+    this.entries = entries;
     this.model = entries[0]?.driver.model ?? "";
   }
 

@@ -15,7 +15,7 @@ import {
   recordToolTranscript,
   toolTranscriptEvent,
   type CouncilRunInput,
-} from "./run-transcript.js";
+} from "./run-transcript.ts";
 import type { CouncilRequest, ProposalResult, ModelVote } from "@nexus/contracts";
 
 const request: CouncilRequest = {

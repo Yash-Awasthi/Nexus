@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
 }));
 
-vi.mock("../src/bridge-manager.js", () => ({
+vi.mock("../src/bridge-manager.ts", () => ({
   getBridgeManager: () => ({ url: mocks.url }),
   BridgeManager: { post: mocks.post },
 }));
 
-import type { IExecutionContext } from "../src/interfaces/execution.interface.js";
-import { LocalInferenceAdapter, LocalLanguageModel } from "../src/local-inference-adapter.js";
+import type { IExecutionContext } from "../src/interfaces/execution.interface.ts";
+import { LocalInferenceAdapter, LocalLanguageModel } from "../src/local-inference-adapter.ts";
 
 const ctx = {
   taskId: "li-1",

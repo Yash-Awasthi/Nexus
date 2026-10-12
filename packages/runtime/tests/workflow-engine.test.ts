@@ -4,13 +4,13 @@ import { describe, it, expect, vi } from "vitest";
 import type {
   IWorkflowTemplate,
   IWorkflowDefinition,
-} from "../src/interfaces/workflow.interface.js";
-import type { Task } from "../src/task-router.js";
+} from "../src/interfaces/workflow.interface.ts";
+import type { Task } from "../src/task-router.ts";
 import {
   WorkflowConstraint,
   WorkflowApprovalPolicy,
   WorkflowRegistry,
-} from "../src/workflow-engine.js";
+} from "../src/workflow-engine.ts";
 
 function makeTask(id: string, priority = "medium"): Task {
   return { id, title: "T", description: "", priority, status: "pending", dependencies: [] };

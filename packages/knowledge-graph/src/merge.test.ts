@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { InMemoryKGStore, type KGEdge, type KGNode } from "./index.js";
+import { InMemoryKGStore, type KGEdge, type KGNode } from "./index.ts";
 import {
   isDeleted,
   mergeEdge,
@@ -16,7 +16,7 @@ import {
   tombstoneEdge,
   tombstoneNode,
   type KGSnapshot,
-} from "./merge.js";
+} from "./merge.ts";
 
 function node(over: Partial<KGNode> = {}): KGNode {
   return {

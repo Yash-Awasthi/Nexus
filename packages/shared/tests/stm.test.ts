@@ -10,7 +10,7 @@ import {
   ALL_STM_MODULES,
   COUNCIL_STM_PRESET,
   type STMModule,
-} from "../src/stm.js";
+} from "../src/stm.ts";
 
 // ── applySTMs ─────────────────────────────────────────────────────────────────
 

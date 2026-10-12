@@ -6,7 +6,7 @@ import {
   NullReranker,
   rerankPipeline,
   type RankedDocument,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function doc(id: string, text: string, score = 0.5): RankedDocument {
   return { id, text, score };

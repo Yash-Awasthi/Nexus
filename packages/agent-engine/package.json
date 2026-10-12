@@ -9,7 +9,6 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
   },
   "dependencies": {
@@ -17,7 +16,6 @@
     "@nexus/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

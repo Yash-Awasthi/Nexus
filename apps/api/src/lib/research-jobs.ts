@@ -16,9 +16,9 @@
  *   research:item:{userId}:{id} → serialized ResearchJob
  */
 
-import { userIdFor } from "./notifications-store.js";
-import { getSharedKV } from "./shared-kv.js";
-import { withKeyLock } from "./with-key-lock.js";
+import { userIdFor } from "./notifications-store.ts";
+import { getSharedKV } from "./shared-kv.ts";
+import { withKeyLock } from "./with-key-lock.ts";
 
 interface ResearchSource {
   url: string;

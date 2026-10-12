@@ -43,7 +43,7 @@
  * keeps one small row per deleted fact.
  */
 
-import type { KGEdge, KGNode } from "./index.js";
+import type { KGEdge, KGNode } from "./index.ts";
 
 /**
  * Pick between two values seen at different times. Falls back to comparing the

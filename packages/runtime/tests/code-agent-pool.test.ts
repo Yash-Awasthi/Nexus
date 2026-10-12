@@ -4,9 +4,9 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import type { ILanguageModel, ChatMessage } from "../src/interfaces/language-model.interface.js";
-import type { IExecutionContext } from "../src/interfaces/execution.interface.js";
-import { CodeAgentPool } from "../src/code-agent-pool.js";
+import type { ILanguageModel, ChatMessage } from "../src/interfaces/language-model.interface.ts";
+import type { IExecutionContext } from "../src/interfaces/execution.interface.ts";
+import { CodeAgentPool } from "../src/code-agent-pool.ts";
 
 // ─── Mock node:https (ResearcherAgent → WebSearchEngine → Tavily) ────────────
 

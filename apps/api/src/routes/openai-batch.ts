@@ -24,10 +24,10 @@ import multipart from "@fastify/multipart";
 import { s3Bucket, s3ConfigFromEnv } from "@nexus/sandbox";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import { issueAccessToken } from "../lib/issue-access-token.js";
-import { patScopesAllow } from "../lib/pat-scopes.js";
-import { verifyPat } from "../lib/pat-store.js";
-import { PersistentStore, dataDir } from "../lib/persistent-store.js";
+import { issueAccessToken } from "../lib/issue-access-token.ts";
+import { patScopesAllow } from "../lib/pat-scopes.ts";
+import { verifyPat } from "../lib/pat-store.ts";
+import { PersistentStore, dataDir } from "../lib/persistent-store.ts";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_LINES = 1000;

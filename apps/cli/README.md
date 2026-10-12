@@ -8,8 +8,7 @@ Developer CLI for interacting with a running NEXUS instance. Built with `command
 
 ```bash
 # From a running dev environment
-pnpm --filter apps/cli build
-node apps/cli/dist/index.js --help
+node apps/cli/src/index.ts --help
 
 # Or link globally
 cd apps/cli && npm link

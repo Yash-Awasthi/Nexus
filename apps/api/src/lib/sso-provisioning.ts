@@ -22,12 +22,13 @@
 
 /** Refusal carrying the status the route should answer with. */
 export class SsoPolicyError extends Error {
-  constructor(
-    readonly statusCode: number,
-    readonly code: string,
-    message: string,
-  ) {
+  readonly statusCode: number;
+  readonly code: string;
+
+  constructor(statusCode: number, code: string, message: string) {
     super(message);
+    this.statusCode = statusCode;
+    this.code = code;
     this.name = "SsoPolicyError";
   }
 }

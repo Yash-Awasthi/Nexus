@@ -735,6 +735,6 @@ export class FileExplorerAgent {
 }
 
 // Role-based crew orchestration (crewAI/CAMEL parity).
-export * from "./crew.js";
+export * from "./crew.ts";
 // Goal → task-plan decomposition (semantic-kernel/CAMEL planner parity).
-export * from "./planner.js";
+export * from "./planner.ts";

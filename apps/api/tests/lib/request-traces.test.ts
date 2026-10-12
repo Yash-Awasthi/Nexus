@@ -9,14 +9,14 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-type Traces = typeof import("../../src/lib/request-traces.js");
+type Traces = typeof import("../../src/lib/request-traces.ts");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-traces-"));
 const prev = { db: process.env.DATABASE_URL, dir: process.env.NEXUS_DATA_DIR };
 
 async function boot(): Promise<Traces> {
   vi.resetModules();
-  return (await import("../../src/lib/request-traces.js")) as Traces;
+  return (await import("../../src/lib/request-traces.ts")) as Traces;
 }
 
 function record(t: Traces, n: number): void {
@@ -81,7 +81,7 @@ describe("request traces", () => {
     const t = await boot();
     record(t, 1005);
     await t.flushTraces();
-    const { getPgPool } = await import("../../src/lib/pg-pool.js");
+    const { getPgPool } = await import("../../src/lib/pg-pool.ts");
     const { rows } = await getPgPool()!.query<{ n: string }>(
       "SELECT count(*) AS n FROM nexus_kv WHERE collection = 'request_traces'",
     );

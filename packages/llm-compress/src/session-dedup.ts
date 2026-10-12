@@ -11,8 +11,12 @@ const tokens = (text: string) => Math.ceil(text.length / 4);
 export class SessionDedup {
   private readonly firstSeen = new Map<string, string>();
 
+  private readonly minChars: number;
+
   /** `minChars`: outputs shorter than this cost less than the pointer is worth. */
-  constructor(private readonly minChars = 400) {}
+  constructor(minChars = 400) {
+    this.minChars = minChars;
+  }
 
   /**
    * `label` names this output for later pointers. `stillPresent(label, text)` says whether the

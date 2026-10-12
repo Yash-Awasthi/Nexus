@@ -29,7 +29,7 @@
  * role that was never configured.
  */
 
-import { AgentError } from "./index.js";
+import { AgentError } from "./index.ts";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -103,7 +103,11 @@ export interface CrewResult {
 
 /** One persona'd role; `run` answers a single prompt as that role. */
 export class RoleAgent {
-  constructor(readonly config: RoleAgentConfig) {}
+  readonly config: RoleAgentConfig;
+
+  constructor(config: RoleAgentConfig) {
+    this.config = config;
+  }
 
   /** Assemble the system persona from role / goal / backstory. */
   systemPrompt(): string {

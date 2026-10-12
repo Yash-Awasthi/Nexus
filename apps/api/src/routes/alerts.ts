@@ -28,9 +28,9 @@ import {
 import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
-import { getSharedKV } from "../lib/shared-kv.js";
+import { getSharedKV } from "../lib/shared-kv.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 // ── Cross-pod alert fan-out via shared KVStore ────────────────────────────────
 // When the AlertEngine fires on pod A, it publishes an alert event to the KVStore.

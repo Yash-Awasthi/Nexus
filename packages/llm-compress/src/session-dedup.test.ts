@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { SessionDedup } from "./session-dedup.js";
+import { SessionDedup } from "./session-dedup.ts";
 
 describe("SessionDedup", () => {
   const big = "line of file content\n".repeat(50);

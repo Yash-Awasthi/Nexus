@@ -14,9 +14,9 @@
 
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
 
-import type { Archetype } from "./archetypes.js";
-import { DeliberationEngine, type ILLMTransport } from "./engine.js";
-import { GroqTransport } from "./groq-transport.js";
+import type { Archetype } from "./archetypes.ts";
+import { DeliberationEngine, type ILLMTransport } from "./engine.ts";
+import { GroqTransport } from "./groq-transport.ts";
 
 // ── Persistence callback shape ────────────────────────────────────────────────
 

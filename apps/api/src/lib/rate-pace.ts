@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 
 import { rateLimitWaitMs } from "@nexus/gateway";
 
-import { IdleMap } from "./idle-map.js";
+import { IdleMap } from "./idle-map.ts";
 
 // Keyed per host and API key, so one account's spent quota never holds back another's.
 const _until = new IdleMap<string, number>(24 * 60 * 60 * 1000);

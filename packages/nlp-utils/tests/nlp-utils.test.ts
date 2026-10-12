@@ -23,7 +23,7 @@ import {
   type NlpLlmClient,
   type Entity,
   type TextChunk,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

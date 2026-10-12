@@ -19,7 +19,7 @@ import {
 } from "@nexus/knowledge-graph";
 import type { FastifyInstance } from "fastify";
 
-import { getKGStore } from "../lib/knowledge-graph-store.js";
+import { getKGStore } from "../lib/knowledge-graph-store.ts";
 
 const SEARCH_TYPES: KGSearchType[] = [
   "ENTITIES",

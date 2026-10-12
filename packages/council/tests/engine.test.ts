@@ -2,7 +2,7 @@
 import type { CouncilRequest, ModelVote } from "@nexus/contracts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { DeliberationEngine, type ILLMTransport, type ILLMResponse } from "../src/engine.js";
+import { DeliberationEngine, type ILLMTransport, type ILLMResponse } from "../src/engine.ts";
 
 // ── Mock transport factory ─────────────────────────────────────────────────
 

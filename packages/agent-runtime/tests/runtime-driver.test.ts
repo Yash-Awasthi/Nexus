@@ -2,7 +2,7 @@
 /** The documented SDK form: an AgentRuntime built on a driver, run on a task. */
 import { expect, it } from "vitest";
 
-import { AgentRuntime } from "../src/index.js";
+import { AgentRuntime } from "../src/index.ts";
 
 it("runs a task on a driver", async () => {
   const seen: { system?: string; user: string }[] = [];

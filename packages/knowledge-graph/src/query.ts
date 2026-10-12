@@ -25,7 +25,7 @@
  * rows as objects keyed by alias (defaults to the expression text).
  */
 
-import { KGError, type KGNode, type KGStore } from "./index.js";
+import { KGError, type KGNode, type KGStore } from "./index.ts";
 
 // ── Parsed query ─────────────────────────────────────────────────────────────
 

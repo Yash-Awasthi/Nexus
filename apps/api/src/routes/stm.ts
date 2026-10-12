@@ -11,9 +11,9 @@
 import { createDefaultPipeline } from "@nexus/stm";
 import type { FastifyInstance } from "fastify";
 
-import { driftReport } from "../lib/answer-drift.js";
-import { ANON_OWNER } from "../lib/owner.js";
-import { requireAuth } from "../middleware/auth.js";
+import { driftReport } from "../lib/answer-drift.ts";
+import { ANON_OWNER } from "../lib/owner.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // Singleton pipeline (HedgeReducer + DirectnessOptimizer + TruncationGuard)
 const pipeline = createDefaultPipeline();

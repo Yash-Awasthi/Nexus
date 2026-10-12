@@ -7,7 +7,7 @@ import {
   whereDocumentMatches,
   InMemoryRagtimeStore,
   type MemoryFilter,
-} from "./index.js";
+} from "./index.ts";
 
 describe("whereMatches — comparison operators", () => {
   const md = { status: "active", score: 0.75, rank: 2, tags: ["a", "b"], enabled: true };

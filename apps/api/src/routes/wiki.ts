@@ -22,8 +22,8 @@ import { WikiCommentStore, WikiDraftStore, WikiAcl, WikiSearch, WikiNotifier } f
 import { WikiStore, WikiUpdatePipeline, PgWikiStore } from "@nexus/wiki-updater";
 import type { FastifyInstance } from "fastify";
 
-import { isNeonCompatibleUrl } from "../lib/pg-pool.js";
-import { requireAuth } from "../middleware/auth.js";
+import { isNeonCompatibleUrl } from "../lib/pg-pool.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 

@@ -12,11 +12,11 @@ const DB = "pglite://:memory:provider-keys-compatible";
 process.env.DATABASE_URL = DB;
 process.env.NEXUS_SECRETS_KEY = "ab".repeat(32);
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildUserDriverRegistry, compatibleEndpointError } =
-  await import("../../src/lib/provider-keys.js");
-const { encryptSecret } = await import("../../src/lib/secret-crypto.js");
+  await import("../../src/lib/provider-keys.ts");
+const { encryptSecret } = await import("../../src/lib/secret-crypto.ts");
 const { db } = await import("@nexus/db");
 const { userProviderCredentials } = await import("@nexus/db/schema");
 

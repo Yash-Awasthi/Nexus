@@ -2,7 +2,7 @@
 /** An image goes through the OCR stage; its recognised text is chunked like any other document. */
 import { describe, expect, it } from "vitest";
 
-import { runDocPipeline } from "../src/index.js";
+import { runDocPipeline } from "../src/index.ts";
 
 describe("OCR stage", () => {
   it("recognises an image's text before chunking", async () => {

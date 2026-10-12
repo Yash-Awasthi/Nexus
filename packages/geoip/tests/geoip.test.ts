@@ -12,7 +12,7 @@ import {
   PeriodicCacheRefresher,
   type RawMmdbRecord,
   type GeoIpRecord,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

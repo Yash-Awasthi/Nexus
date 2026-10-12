@@ -27,9 +27,9 @@
 
 import { randomUUID } from "node:crypto";
 
-import type { IEventBus } from "./event-bus.js";
-import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.ts";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.ts";
 
 // ─── Recovery store interface ─────────────────────────────────────────────────
 

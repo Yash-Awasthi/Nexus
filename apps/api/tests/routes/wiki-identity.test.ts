@@ -3,14 +3,14 @@
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", () => ({
+vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   },
 }));
 delete process.env.DATABASE_URL;
 
-const { wikiRoutes } = await import("../../src/routes/wiki.js");
+const { wikiRoutes } = await import("../../src/routes/wiki.ts");
 
 it("ties drafts, comments and grants to the caller", async () => {
   const app = Fastify();

@@ -16,11 +16,11 @@ import { McpHttpServer } from "@nexus/mcp-client";
 import { openApiToMcp, type OpenApiSpec } from "@nexus/mcp-openapi";
 import type { FastifyInstance } from "fastify";
 
-import { ownsRow } from "../lib/owner.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { callerFetch, fetchPublic, unsafeUrlReason } from "../lib/public-url.js";
-import { decryptSecret, encryptSecret } from "../lib/secret-crypto.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { ownsRow } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { callerFetch, fetchPublic, unsafeUrlReason } from "../lib/public-url.ts";
+import { decryptSecret, encryptSecret } from "../lib/secret-crypto.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 interface SavedSpec {
   id: string;

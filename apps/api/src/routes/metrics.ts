@@ -32,10 +32,10 @@ import { DRIVE_QUOTA_BYTES, listDrives, statDrive } from "@nexus/sandbox";
 import { metricsToPrometheus, formatMetricLine, SloTracker } from "@nexus/telemetry";
 import type { FastifyInstance } from "fastify";
 
-import { costLogStore } from "../lib/cost-log.js";
-import { requireAuth } from "../middleware/auth.js";
+import { costLogStore } from "../lib/cost-log.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
-import { gatewayLog } from "./gateway.js";
+import { gatewayLog } from "./gateway.ts";
 
 // ── SLO tracker singleton (records HTTP 2xx vs 5xx) ──────────────────────────
 // Available for other routes to call sloTracker.record() on each response.

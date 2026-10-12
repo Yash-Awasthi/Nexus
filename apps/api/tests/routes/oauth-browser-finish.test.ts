@@ -18,10 +18,10 @@ process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-oauth-
 process.env.GITHUB_CLIENT_ID = "gh-client";
 process.env.GITHUB_CLIENT_SECRET = "gh-secret";
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { authUsersRoutes } = await import("../../src/routes/auth-users.js");
-const { oauthRoutes } = await import("../../src/routes/oauth.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { authUsersRoutes } = await import("../../src/routes/auth-users.ts");
+const { oauthRoutes } = await import("../../src/routes/oauth.ts");
 
 const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 let app: FastifyInstance;

@@ -21,7 +21,7 @@ import {
 } from "@nexus/geoip";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── HttpGeoIpReader — wraps ip-api.com into MmdbReader interface ──────────────
 

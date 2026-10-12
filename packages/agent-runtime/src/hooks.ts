@@ -25,7 +25,7 @@
  * misspelled events fail loudly instead of silently never firing.
  */
 
-import type { RuntimeUsage, ToolResult, ToolStepRecord } from "./index.js";
+import type { RuntimeUsage, ToolResult, ToolStepRecord } from "./index.ts";
 
 // ── Events & decisions ───────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ import type { SQL } from "drizzle-orm";
 import { eq, and, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuthWithTier, requireUserId } from "../middleware/auth.js";
+import { requireAuthWithTier, requireUserId } from "../middleware/auth.ts";
 
 export async function governanceRoutes(app: FastifyInstance): Promise<void> {
   // GET /governance/approvals?status=pending

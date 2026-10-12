@@ -10,7 +10,7 @@ import {
   type KVStore,
   type PubSubHandler,
   type RedisClientLike,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -10,9 +10,9 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { getTrace, listTraces } from "../lib/request-traces.js";
+import { getTrace, listTraces } from "../lib/request-traces.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 export async function adminTracesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { page?: string; limit?: string; type?: string } }>(

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { ARCHETYPES } from "./archetypes.js";
+import { ARCHETYPES } from "./archetypes.ts";
 import {
   DeliberativeCouncil,
   anonymizePositions,
   parseCouncilVerdict,
   parseReview,
-} from "./deliberative.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+} from "./deliberative.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 /** Deterministic transport: phases are recognised from the user prompt. */
 function fakeTransport(): ILLMTransport {

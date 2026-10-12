@@ -5,13 +5,13 @@
  * as one notification a day. Built from stored state alone, with no model call.
  */
 
-import { createNotification } from "./notifications-store.js";
-import { listApprovals } from "./org-approvals.js";
-import { budgetOverview } from "./org-budget.js";
-import { onTick } from "./org-scheduler.js";
-import { allCompanies, listAgents, listCompanies, onOrgLoad } from "./org-store.js";
-import { listTasks } from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
+import { createNotification } from "./notifications-store.ts";
+import { listApprovals } from "./org-approvals.ts";
+import { budgetOverview } from "./org-budget.ts";
+import { onTick } from "./org-scheduler.ts";
+import { allCompanies, listAgents, listCompanies, onOrgLoad } from "./org-store.ts";
+import { listTasks } from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 const REVIEW_STALE_MS = 3600_000;
 // A day unless the deployment says otherwise; end-to-end checks set 0 to see a fresh approval.

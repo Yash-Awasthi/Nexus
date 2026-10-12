@@ -11,7 +11,7 @@ import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm-drive
 import { extractEntities, extractRelationships } from "@nexus/nlp-utils";
 import { describe, it, expect } from "vitest";
 
-import { getKG, nlpClientFromDriver } from "../../src/lib/knowledge-graph-store.js";
+import { getKG, nlpClientFromDriver } from "../../src/lib/knowledge-graph-store.ts";
 
 const ENTITIES = JSON.stringify([
   { text: "Alice", type: "PERSON", confidence: 0.9 },

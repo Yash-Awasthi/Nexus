@@ -28,13 +28,13 @@ import { pinnedFetch } from "@nexus/runtime";
 import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
-import { issueAccessToken } from "../lib/issue-access-token.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { getSharedKV } from "../lib/shared-kv.js";
-import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
-import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.js";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
+import { sha256hex as _sha256hex } from "../lib/crypto-utils.ts";
+import { issueAccessToken } from "../lib/issue-access-token.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
+import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.ts";
 
 // 20 OIDC callback attempts per 15 minutes per IP — prevents code replay attacks
 const oidcRateLimit = makeRateLimitPreHandler({

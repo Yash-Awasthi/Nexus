@@ -7,7 +7,7 @@ import {
   InMemoryEmaStore,
   CONTEXT_LABELS,
   type ContextType,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 describe("detectContext", () => {
   it("detects code context from code-related keywords", () => {

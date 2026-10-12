@@ -2,7 +2,7 @@
 /** PgVectorStore can run on any Postgres client: its tagged-template SQL becomes a numbered query. */
 import { expect, it } from "vitest";
 
-import { sqlFromQuery } from "../src/index.js";
+import { sqlFromQuery } from "../src/index.ts";
 
 it("turns a tagged template into numbered parameters and returns the rows", async () => {
   const seen: { text: string; params: unknown[] }[] = [];

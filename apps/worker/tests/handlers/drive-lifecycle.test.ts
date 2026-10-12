@@ -11,7 +11,7 @@ import {
   handleDriveBackupJob,
   handleDriveReclaimJob,
   handleDriveSweepJob,
-} from "../../src/handlers/drive-lifecycle.js";
+} from "../../src/handlers/drive-lifecycle.ts";
 
 let root: string;
 

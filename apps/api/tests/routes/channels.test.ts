@@ -15,8 +15,8 @@ import WebSocket from "ws";
 const SECRET = "channels-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 
-vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/provider-keys.js")>()),
+vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
   buildUserDriverRegistry: async (_u: string | undefined, providers: Iterable<string>) => {
     const registry = new DriverRegistry();
     const reply = async (o: LlmRequestOptions, h: StreamHandler) => {
@@ -38,7 +38,7 @@ vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
   },
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 const headers = (() => {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

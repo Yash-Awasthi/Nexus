@@ -20,7 +20,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { sha256hex } from "../../src/lib/crypto-utils.js";
+import { sha256hex } from "../../src/lib/crypto-utils.ts";
 
 // ── Hoist DB mocks (house pattern: packages/billing/tests) ───────────────────
 
@@ -103,7 +103,7 @@ import {
   listPats,
   revokePat,
   verifyPat,
-} from "../../src/lib/pat-store.js";
+} from "../../src/lib/pat-store.ts";
 
 function seedRow(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   const id = String(Math.random());
@@ -325,7 +325,7 @@ describe("DB cooldown/retry (audit round 6)", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
     vi.resetModules();
-    const fresh = await import("../../src/lib/pat-store.js");
+    const fresh = await import("../../src/lib/pat-store.ts");
 
     mockSelectLimit.mockRejectedValueOnce(new Error("db down"));
     await fresh.createPat({ ownerId: "u1", name: "outage-token" });
@@ -344,7 +344,7 @@ describe("DB cooldown/retry (audit round 6)", () => {
     // failure — the static import above may already be latched "db".
     vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
     vi.resetModules();
-    const fresh = await import("../../src/lib/pat-store.js");
+    const fresh = await import("../../src/lib/pat-store.ts");
 
     // First probe fails → memory mode + cooldown starts.
     mockSelectLimit.mockRejectedValueOnce(new Error("db down"));
@@ -366,7 +366,7 @@ describe("restart tripwire (rider D, round 7)", () => {
   it("a DB-backed token verifies after a simulated restart; a revoked one doesn't", async () => {
     vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
     vi.resetModules();
-    const proc1 = await import("../../src/lib/pat-store.js");
+    const proc1 = await import("../../src/lib/pat-store.ts");
     const { entry, raw } = await proc1.createPat({ ownerId: "u1", name: "survives" });
     // Rebuild the row exactly as the mocked INSERT recorded it in the DB.
     const v = mockInsertValues.mock.calls[0]![0] as Record<string, unknown>;
@@ -387,7 +387,7 @@ describe("restart tripwire (rider D, round 7)", () => {
 
     // "Restart" 1: fresh module (empty cache), DB still holds the row.
     vi.resetModules();
-    const proc2 = await import("../../src/lib/pat-store.js");
+    const proc2 = await import("../../src/lib/pat-store.ts");
     (mockSelectWhere as unknown as { rows: unknown[] }).rows = [row];
     await proc2.initPatStore();
     expect(await proc2.verifyPat(raw)).not.toBeNull();
@@ -395,7 +395,7 @@ describe("restart tripwire (rider D, round 7)", () => {
     // Revoke in "process 2" (hard delete) → "restart" 2 → row gone → dead.
     await proc2.revokePat(entry.id, "u1");
     vi.resetModules();
-    const proc3 = await import("../../src/lib/pat-store.js");
+    const proc3 = await import("../../src/lib/pat-store.ts");
     (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
     await proc3.initPatStore();
     expect(await proc3.verifyPat(raw)).toBeNull();

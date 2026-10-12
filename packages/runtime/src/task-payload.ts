@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { Task } from "./task-router.js";
+import type { Task } from "./task-router.ts";
 
 interface QueueJobPayload {
   type: string;

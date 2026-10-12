@@ -35,7 +35,7 @@ import {
   users,
   userProviderCredentials,
   workspaceMembers,
-} from "./schema/index.js";
+} from "./schema/index.ts";
 
 /** One user-scoped table and the column that carries the owning user id. */
 export interface UserScopedTable {

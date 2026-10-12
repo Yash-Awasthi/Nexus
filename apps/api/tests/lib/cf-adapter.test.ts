@@ -8,7 +8,7 @@ import {
   isCFRuntime,
   buildCFCacheKey,
   type CFKVNamespaceLike,
-} from "../../src/lib/cf-adapter.js";
+} from "../../src/lib/cf-adapter.ts";
 
 // ── Minimal in-memory CF KV Namespace mock ─────────────────────────────────────
 

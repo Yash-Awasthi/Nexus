@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { TaskRouter, type Task } from "../src/task-router.js";
+import { TaskRouter, type Task } from "../src/task-router.ts";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {

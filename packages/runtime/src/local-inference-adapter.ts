@@ -11,15 +11,15 @@
  * Requires the local-inference Python bridge to be running (port 7703).
  */
 
-import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
-import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import { getBridgeManager, BridgeManager } from "./bridge-manager.ts";
+import type { IExecutionContext } from "./interfaces/execution.interface.ts";
 import type {
   ILanguageModel,
   TextChunk,
   GenerateTextParams,
   StreamTextParams,
   GenerateObjectParams,
-} from "./interfaces/language-model.interface.js";
+} from "./interfaces/language-model.interface.ts";
 
 // ─── Default model — small, fast, runs on 4GB VRAM ───────────────────────────
 const DEFAULT_MODEL = "meta-llama/Llama-3.2-3B-Instruct";

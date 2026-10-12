@@ -8,7 +8,7 @@ import {
   type McpToolClient,
   type McpToolInfo,
   type McpToolResult,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // A fake MCP client that records calls and makes no outbound requests.
 function fakeClient(

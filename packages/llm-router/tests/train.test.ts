@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { hashEmbed, trainRouters, type RoutingSample } from "../src/index.js";
+import { hashEmbed, trainRouters, type RoutingSample } from "../src/index.ts";
 
 const CODE = [
   "fix this typescript compile error in my function",

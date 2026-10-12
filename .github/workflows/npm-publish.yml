@@ -54,7 +54,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: pnpm build --filter="./packages/*" --filter="./apps/cli"
+        run: pnpm build
 
       - name: Run tests
         run: pnpm test --filter="./packages/*"

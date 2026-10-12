@@ -9,7 +9,7 @@ vi.mock("@nexus/stealth-browser", async (importOriginal) => ({
   isPatchrightAvailable: async () => false,
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 beforeAll(async () => {

@@ -6,7 +6,7 @@ import {
   AdminGatewayError,
   type RouteEntry,
   type AliasStats,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── GatewayAdminService — routes ──────────────────────────────────────────────
 

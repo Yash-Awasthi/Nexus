@@ -12,7 +12,7 @@ const SECRET = "drive-routes-test-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_DRIVE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-drive-routes-"));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 const { DRIVE_QUOTA_BYTES, userDrivePath } = await import("@nexus/sandbox");
 
 function tokenFor(userId: string): string {

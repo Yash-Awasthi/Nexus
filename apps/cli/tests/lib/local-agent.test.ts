@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { LlmToolFn } from "@nexus/agent-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildLocalCodingTools, makeLocalLlm, runLocalAgent } from "../../src/lib/local-agent.js";
+import { buildLocalCodingTools, makeLocalLlm, runLocalAgent } from "../../src/lib/local-agent.ts";
 
 let dir: string;
 

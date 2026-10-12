@@ -15,8 +15,8 @@ import {
   summarizeArgs,
   summarizeResult,
   type GraphSink,
-} from "../../src/lib/mission-graph.js";
-import type { GraphEvent } from "../../src/lib/session-graph.js";
+} from "../../src/lib/mission-graph.ts";
+import type { GraphEvent } from "../../src/lib/session-graph.ts";
 
 function collectingSink(): { sink: GraphSink; events: GraphEvent[] } {
   const events: GraphEvent[] = [];

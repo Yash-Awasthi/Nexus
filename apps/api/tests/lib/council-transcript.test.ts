@@ -10,7 +10,7 @@ import {
   buildCouncilRunTranscript,
   emitCouncilTranscript,
   type CouncilRunInput,
-} from "../../src/lib/council-transcript.js";
+} from "../../src/lib/council-transcript.ts";
 import type { CouncilRequest, ProposalResult, ModelVote } from "@nexus/contracts";
 
 const request: CouncilRequest = {

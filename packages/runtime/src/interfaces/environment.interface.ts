@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IExecutionAdapter } from "./execution.interface.js";
+import type { IExecutionAdapter } from "./execution.interface.ts";
 
 /**
  * The one browser action vocabulary. Both executors speak it: the declarative

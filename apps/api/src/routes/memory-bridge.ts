@@ -18,7 +18,7 @@
 import type { MemoryManager } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 /** Bridge-owned memory manager handed in at registration (no circular import). */
 interface MemoryBridgeRoutesDeps {

@@ -17,7 +17,7 @@
 import { AzureOpenAIDriver, VertexDriver, type LlmDriver } from "@nexus/llm-drivers";
 import { registryFromEnv, type OAuthTokens } from "@nexus/llm-oauth";
 
-import { createOAuthTokenStore } from "./oauth-token-store.js";
+import { createOAuthTokenStore } from "./oauth-token-store.ts";
 
 /** Driver-provider id (chat member `provider`) → llm-oauth provider id that can
  *  supply credentials for it. Extend as more OAuth providers ship. */

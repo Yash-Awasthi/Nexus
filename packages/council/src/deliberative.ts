@@ -26,18 +26,18 @@
 
 import { mulberry32 } from "@nexus/shared";
 
-import type { Archetype } from "./archetypes.js";
-import { summonArchetypes } from "./archetypes.js";
+import type { Archetype } from "./archetypes.ts";
+import { summonArchetypes } from "./archetypes.ts";
 import {
   parseBordaRanking,
   tallyBorda,
   formatBordaStandings,
   type BordaResult,
   type BordaRanking,
-} from "./borda.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+} from "./borda.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
-export type { BordaResult, BordaRanking, BordaTally } from "./borda.js";
+export type { BordaResult, BordaRanking, BordaTally } from "./borda.ts";
 
 // ── Core types ───────────────────────────────────────────────────────────────
 

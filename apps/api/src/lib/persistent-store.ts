@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { getPgPool } from "./pg-pool.js";
+import { getPgPool } from "./pg-pool.ts";
 
 /** NEXUS_DATA_DIR, else ./data (./data/stores for the JSON-backed stores, where they always lived). */
 export function dataDir(sub?: "stores"): string {
@@ -53,7 +53,11 @@ function _ensureTable(): Promise<void> {
 export class PersistentStore<T> {
   private _mem = new Map<string, T>();
 
-  constructor(private _name: string) {}
+  private _name: string;
+
+  constructor(_name: string) {
+    this._name = _name;
+  }
 
   /** Load from backing store. Call once at server startup. */
   async load(): Promise<void> {

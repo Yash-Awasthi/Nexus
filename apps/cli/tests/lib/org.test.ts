@@ -7,7 +7,7 @@ import {
   inboxRequest,
   pickCompany,
   type CompanyRow,
-} from "../../src/lib/org.js";
+} from "../../src/lib/org.ts";
 
 const row = (id: string, name: string): CompanyRow => ({
   id,

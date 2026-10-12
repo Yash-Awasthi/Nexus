@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // @nexus/telemetry — observability, SLO tracking, perf benchmarking, DR
 
-export * from "./health-aggregator.js";
-export * from "./slo-tracker.js";
-export * from "./perf-benchmark.js";
-export * from "./disaster-recovery.js";
-export * from "./logger.js";
-export * from "./observability-manager.js";
-export * from "./prometheus-format.js";
-export * from "./environment-telemetry.js";
-export * from "./llm-observability.js";
-export * from "./otel.js";
+export * from "./health-aggregator.ts";
+export * from "./slo-tracker.ts";
+export * from "./perf-benchmark.ts";
+export * from "./disaster-recovery.ts";
+export * from "./logger.ts";
+export * from "./observability-manager.ts";
+export * from "./prometheus-format.ts";
+export * from "./environment-telemetry.ts";
+export * from "./llm-observability.ts";
+export * from "./otel.ts";

@@ -11,7 +11,7 @@
  *   • TypedNexusClient   — every endpoint the API serves, typed from the spec
  */
 
-export * from "./typed.js";
+export * from "./typed.ts";
 
 import { randomUUID } from "node:crypto";
 
@@ -70,13 +70,19 @@ export interface SessionInfo {
 // ── NexusError ─────────────────────────────────────────────────────────────────
 
 export class NexusError extends Error {
+  public readonly code:
+    "AUTH_ERROR" | "RATE_LIMIT" | "NOT_FOUND" | "TIMEOUT" | "INVALID_REQUEST" | "SERVER_ERROR";
+  public readonly statusCode?: number;
+
   constructor(
-    public readonly code:
+    code:
       "AUTH_ERROR" | "RATE_LIMIT" | "NOT_FOUND" | "TIMEOUT" | "INVALID_REQUEST" | "SERVER_ERROR",
     message: string,
-    public readonly statusCode?: number,
+    statusCode?: number,
   ) {
     super(message);
+    this.code = code;
+    this.statusCode = statusCode;
     this.name = "NexusError";
   }
 }
@@ -221,10 +227,12 @@ export class ChatSession {
   private _messages: NexusMessage[] = [];
   readonly sessionId: string;
 
-  constructor(
-    private client: NexusClient,
-    public model: string,
-  ) {
+  private client: NexusClient;
+  public model: string;
+
+  constructor(client: NexusClient, model: string) {
+    this.client = client;
+    this.model = model;
     this.sessionId = `session-${randomUUID()}`;
   }
 

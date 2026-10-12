@@ -4266,8 +4266,11 @@ class HttpPingConnector extends BaseConnector {
   readonly id: string;
   readonly name: string;
 
-  constructor(private readonly spec: PingSpec) {
+  private readonly spec: PingSpec;
+
+  constructor(spec: PingSpec) {
     super();
+    this.spec = spec;
     this.id = spec.id;
     this.name = spec.name;
   }

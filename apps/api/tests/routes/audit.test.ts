@@ -17,9 +17,9 @@ process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_API_KEY = MASTER;
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { auditRoutes } = await import("../../src/routes/audit.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { auditRoutes } = await import("../../src/routes/audit.ts");
 
 let app: FastifyInstance;
 

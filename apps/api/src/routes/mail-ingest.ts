@@ -28,7 +28,7 @@ import {
 } from "@nexus/mail-ingest";
 import type { FastifyInstance } from "fastify";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 // ── IMAP client factory ───────────────────────────────────────────────────────
 

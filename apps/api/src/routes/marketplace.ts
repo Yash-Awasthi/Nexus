@@ -31,10 +31,10 @@ import {
   listArchetypes,
   loadArchetypeStore,
   type ArchetypeInput,
-} from "../lib/archetype-store.js";
-import { PersistentStore } from "../lib/persistent-store.js";
+} from "../lib/archetype-store.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
 
-import { pluginRegistryStore, registryKeyOf, type RegistryRecord } from "./plugin-registry.js";
+import { pluginRegistryStore, registryKeyOf, type RegistryRecord } from "./plugin-registry.ts";
 
 /** UI-only extras for one marketplace item (registry owns the rest). */
 interface MpUiItem {

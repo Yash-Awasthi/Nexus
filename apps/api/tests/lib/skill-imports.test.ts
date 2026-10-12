@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { IMPORT_RE, splitSkillCodeImports } from "../../src/lib/skill-imports.js";
+import { IMPORT_RE, splitSkillCodeImports } from "../../src/lib/skill-imports.ts";
 
 const collect = (codes: string[]) => {
   const imports: string[] = [];

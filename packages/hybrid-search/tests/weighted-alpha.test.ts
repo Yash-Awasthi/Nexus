@@ -11,7 +11,7 @@ import {
   type HybridSearchResult,
   type SearchHit,
   type VectorSearchAdapter,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const hit = (id: string, score: number, text = ""): SearchHit => ({ id, score, text });
 

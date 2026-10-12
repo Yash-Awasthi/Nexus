@@ -21,7 +21,7 @@ workspace` + symlink guards from `agent-tools.ts`). It cannot touch anything
 cd apps/worker
 NEXUS_BRIDGE_TOKEN=$(openssl rand -hex 32) \
 NEXUS_BRIDGE_ROOT="$(pwd)/data/bridge" \
-pnpm exec tsx src/bridge.ts
+node src/bridge.ts
 ```
 
 ```bash

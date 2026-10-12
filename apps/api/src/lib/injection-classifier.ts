@@ -7,7 +7,7 @@
 import type { NlpLlmClient } from "@nexus/nlp-utils";
 import { screenUntrustedAll, type InjectionClassifier } from "@nexus/shared";
 
-import { namedModelClient } from "./knowledge-graph-store.js";
+import { namedModelClient } from "./knowledge-graph-store.ts";
 
 const PROMPT =
   "You are a security filter. The numbered lines below come from web pages, documents or " +

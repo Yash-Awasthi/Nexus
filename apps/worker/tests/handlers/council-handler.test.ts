@@ -31,7 +31,7 @@ vi.mock("@nexus/db/schema", () => ({
   councilTranscripts: {},
 }));
 
-import { handleCouncilJob, type CouncilJobPayload } from "../../src/handlers/council-handler.js";
+import { handleCouncilJob, type CouncilJobPayload } from "../../src/handlers/council-handler.ts";
 
 describe("handleCouncilJob", () => {
   beforeEach(() => {

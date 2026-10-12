@@ -7,7 +7,7 @@ import {
   FixedRagtimeEmbedder,
   cosineSimilarity,
   type MemoryEntry,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── cosineSimilarity ──────────────────────────────────────────────────────────
 // Clamps result to [0, 1]: Math.max(0, Math.min(1, dot / (|a|*|b|)))

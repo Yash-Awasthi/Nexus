@@ -9,7 +9,7 @@ import {
   DockerReplExecutor,
   buildDockerRunArgs,
   type ReplLanguage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── JupyterMode ───────────────────────────────────────────────────────────────
 

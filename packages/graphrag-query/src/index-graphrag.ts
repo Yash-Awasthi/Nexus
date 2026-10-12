@@ -22,7 +22,7 @@
  * pipeline is deterministic and testable without a live model.
  */
 
-import type { CommunityReport } from "./index.js";
+import type { CommunityReport } from "./index.ts";
 
 // ── Extraction types ──────────────────────────────────────────────────────────
 

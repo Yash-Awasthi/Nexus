@@ -5,8 +5,8 @@
  * WHICH framing reached the prompt, and anonymization, not model text.
  */
 import { describe, expect, it } from "vitest";
-import { runCritique, type CritiqueTarget } from "./critique.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import { runCritique, type CritiqueTarget } from "./critique.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 const Q = "Should we shard the event store now?";
 

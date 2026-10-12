@@ -4,7 +4,7 @@ import {
   ConversationAnalyzer,
   analyzeConversation,
   type ConversationMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import {
   ResearchApiRouter,
   type CorpusSample,
   type BatchFilter,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function makeSample(
   tag: CorpusSample["tag"] = "preferred",

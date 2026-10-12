@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { runUntrustedJs } from "../../src/lib/untrusted-js.js";
+import { runUntrustedJs } from "../../src/lib/untrusted-js.ts";
 
 describe("runUntrustedJs", () => {
   it("returns console output and the completion value", async () => {

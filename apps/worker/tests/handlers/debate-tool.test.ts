@@ -5,7 +5,7 @@
 // (stops before the budget once positions stabilise), and the executor error
 // path. Offline: scripted transports drive every round.
 import { describe, it, expect } from "vitest";
-import { debateRuntimeTool, type DebateAgentTransport } from "../../src/handlers/agent-mcp.js";
+import { debateRuntimeTool, type DebateAgentTransport } from "../../src/handlers/agent-mcp.ts";
 
 /** Transport that plays back per-agent scripts indexed by round number. */
 function scriptedTransport(scripts: Record<string, string[]>): {

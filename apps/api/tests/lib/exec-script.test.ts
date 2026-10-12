@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 
-import { closePgPools, execScript, getPgPool } from "../../src/lib/pg-pool.js";
+import { closePgPools, execScript, getPgPool } from "../../src/lib/pg-pool.ts";
 
 const DB = "pglite://:memory:exec-script-test";
 

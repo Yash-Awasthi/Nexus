@@ -3,9 +3,9 @@
  * Scheduled triggers: a five-field cron or an interval, fired at most once per minute. The
  * caller runs `isDue` on each tick and records `minuteKey(at)` when it fires.
  */
-import { cronMatches } from "./cron.js";
+import { cronMatches } from "./cron.ts";
 
-export { cronMatches, nextCronRun, parseCron } from "./cron.js";
+export { cronMatches, nextCronRun, parseCron } from "./cron.ts";
 
 /** The minute a tick falls in, as stored in `lastFiredMinute`. */
 export function minuteKey(at: Date): string {

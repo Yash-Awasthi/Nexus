@@ -6,14 +6,14 @@
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 describe("org overview", () => {
   it("summarises needs, work and spend for one company and the portfolio", async () => {
     const { overview, rt, work, org } = await bootOrg(async () => ({
-      overview: await import("../../src/lib/org-overview.js"),
+      overview: await import("../../src/lib/org-overview.ts"),
     }));
 
     const c = org.createCompany("alice", { name: "Look Co", requireHireApproval: true });

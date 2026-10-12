@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it, vi } from "vitest";
 
-import { handleSelfErasure, type ErasureFn } from "../../src/lib/gdpr-erasure.js";
+import { handleSelfErasure, type ErasureFn } from "../../src/lib/gdpr-erasure.ts";
 
 const fakeLogger = () => ({ info: vi.fn() });
 

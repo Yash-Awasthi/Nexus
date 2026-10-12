@@ -10,7 +10,7 @@ import {
   StreamRecoveryOrchestrator,
   DEFAULT_RETRY_STRATEGY,
   DEFAULT_CONTINUATION_SUFFIXES,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── HoldbackBuffer ─────────────────────────────────────────────────────────
 

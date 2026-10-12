@@ -8,13 +8,13 @@ import { MemoryKVStore } from "@nexus/kv";
 const _mockKV = new MemoryKVStore();
 const kv = { current: _mockKV };
 
-vi.mock("../../src/lib/shared-kv.js", () => ({
+vi.mock("../../src/lib/shared-kv.ts", () => ({
   getSharedKV: () => kv.current,
 }));
 
 // Import AFTER mock is registered
 const { makeRateLimitPreHandler, makeUserRateLimitPreHandler } =
-  await import("../../src/lib/rate-limiter.js");
+  await import("../../src/lib/rate-limiter.ts");
 
 function makeUserRequest(opts: {
   ip?: string;

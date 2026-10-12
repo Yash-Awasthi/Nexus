@@ -18,8 +18,8 @@
 import { DrizzleSyncStore, SyncManager, SyncStore, type OpType } from "@nexus/session-sync";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { isNeonCompatibleUrl } from "../lib/pg-pool.js";
-import { requireAuth } from "../middleware/auth.js";
+import { isNeonCompatibleUrl } from "../lib/pg-pool.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton SyncManager ─────────────────────────────────────────────────────
 

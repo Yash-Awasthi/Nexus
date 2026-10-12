@@ -2,8 +2,8 @@
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-import type { IApprovalRecord } from "./interfaces/governance.interface.js";
-import { createRuntimeContext, startRuntime } from "./runtime-context.js";
+import type { IApprovalRecord } from "./interfaces/governance.interface.ts";
+import { createRuntimeContext, startRuntime } from "./runtime-context.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

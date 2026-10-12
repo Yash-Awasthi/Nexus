@@ -8,8 +8,8 @@
 import { describe, expect, it } from "vitest";
 import { BM25Reranker } from "@nexus/reranker";
 
-import { createHybridSearchMcpServer } from "../src/mcp-server.js";
-import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "../src/index.js";
+import { createHybridSearchMcpServer } from "../src/mcp-server.ts";
+import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "../src/index.ts";
 
 /** Deterministic lexical dense leg: overlap of query tokens with doc tokens. */
 function makeDense(

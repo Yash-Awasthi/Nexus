@@ -10,7 +10,7 @@ import {
   CACHE_TIERS,
   type Market,
   type CacheTierLevel,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── CACHE_TIERS ───────────────────────────────────────────────────────────────
 

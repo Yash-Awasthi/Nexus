@@ -5,30 +5,33 @@
   "description": "Adapter plugin SDK: defineAdapter, capability types, testing utilities",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./testing": {
-      "import": "./dist/testing.js",
-      "types": "./dist/testing.d.ts"
-    }
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ tests/",
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:",
     "@vitest/coverage-v8": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      },
+      "./testing": {
+        "import": "./dist/testing.js",
+        "types": "./dist/testing.d.ts"
+      }
+    }
   }
 }

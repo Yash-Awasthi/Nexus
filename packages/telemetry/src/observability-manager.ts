@@ -3,7 +3,7 @@ import type {
   IMetricsCollector,
   ITraceRecorder,
   ITraceSpan,
-} from "./interfaces/observability.interface.js";
+} from "./interfaces/observability.interface.ts";
 
 // ─── Span tree node for getSpanTree() ────────────────────────────────
 export interface SpanTreeNode extends ITraceSpan {
@@ -20,11 +20,10 @@ export class Histogram {
   private minVal = Infinity;
   private maxVal = -Infinity;
 
-  constructor(
-    private readonly bucketDefs: number[] = [
-      1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-    ],
-  ) {
+  private readonly bucketDefs: number[];
+
+  constructor(bucketDefs: number[] = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]) {
+    this.bucketDefs = bucketDefs;
     for (const b of bucketDefs) {
       this.buckets.set(b, 0);
     }
@@ -249,7 +248,10 @@ export class TraceRecorder implements ITraceRecorder {
 export class TelemetryExporter {
   private exportQueue: { timestamp: Date; type: string; payload: unknown }[] = [];
 
-  constructor(private exportIntervalMs = 60000) {
+  private exportIntervalMs: number;
+
+  constructor(exportIntervalMs = 60000) {
+    this.exportIntervalMs = exportIntervalMs;
     if (exportIntervalMs > 0) {
       const timer = setInterval(() => this.flush(), exportIntervalMs);
       timer.unref();
@@ -344,11 +346,12 @@ export class HealthHistory {
 export class DiagnosticEnricher {
   private healthHistory: HealthHistory;
 
-  constructor(
-    private metrics: MetricsCollector,
-    private tracer: TraceRecorder,
-    healthHistory?: HealthHistory,
-  ) {
+  private metrics: MetricsCollector;
+  private tracer: TraceRecorder;
+
+  constructor(metrics: MetricsCollector, tracer: TraceRecorder, healthHistory?: HealthHistory) {
+    this.metrics = metrics;
+    this.tracer = tracer;
     this.healthHistory = healthHistory ?? new HealthHistory();
   }
 

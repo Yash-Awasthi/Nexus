@@ -6,9 +6,9 @@
 import { LlmError, type LlmDriver, type LlmRequestOptions } from "@nexus/llm-drivers";
 import { describe, expect, it } from "vitest";
 
-import { resetFailover } from "../../src/lib/llm-failover.js";
-import { userContext } from "../../src/lib/user-context.js";
-import { getDefaultDriver } from "../../src/routes/api-bridge.js";
+import { resetFailover } from "../../src/lib/llm-failover.ts";
+import { userContext } from "../../src/lib/user-context.ts";
+import { getDefaultDriver } from "../../src/routes/api-bridge.ts";
 
 function connection(spent: string[]): LlmDriver & { asked: string[] } {
   const asked: string[] = [];

@@ -10,7 +10,7 @@ import {
   parseWorkflowSpec,
   specToWorkflowDefinition,
   type WorkflowSpecFile,
-} from "../src/spec-loader.js";
+} from "../src/spec-loader.ts";
 
 const VALID_SPEC: WorkflowSpecFile = {
   spec_version: "1.0",

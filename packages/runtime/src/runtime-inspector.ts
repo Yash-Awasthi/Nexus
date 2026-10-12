@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus.js";
-import type { CircuitBreaker } from "./circuit-breaker.js";
-import type { IServiceDiscovery } from "./interfaces/discovery.interface.js";
+import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus.ts";
+import type { CircuitBreaker } from "./circuit-breaker.ts";
+import type { IServiceDiscovery } from "./interfaces/discovery.interface.ts";
 import type {
   IEnvironmentTelemetry,
   IFilesystemSandbox,
   IExecutionEnvironment,
-} from "./interfaces/environment.interface.js";
+} from "./interfaces/environment.interface.ts";
 import type {
   IGovernanceEngine,
   IApprovalWorkflow,
   ICognitiveTrace,
-} from "./interfaces/governance.interface.js";
-import type { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.js";
+} from "./interfaces/governance.interface.ts";
+import type { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.ts";
 import type {
   IRuntimeInspector,
   ITaskSnapshot,
   IQueueSnapshot,
   IEventSnapshot,
   IMetricsCollector,
-} from "./interfaces/observability.interface.js";
-import type { IEventStore } from "./interfaces/persistence.interface.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
-import type { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.js";
-import type { IMemoryStore } from "./memory-store.js";
+} from "./interfaces/observability.interface.ts";
+import type { IEventStore } from "./interfaces/persistence.interface.ts";
+import type { IQueueBackend } from "./interfaces/queue.interface.ts";
+import type { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.ts";
+import type { IMemoryStore } from "./memory-store.ts";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.

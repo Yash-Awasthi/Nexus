@@ -4,9 +4,9 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import type { QueueJob } from "../src/interfaces/queue.interface.js";
-import { MetricsCollector } from "../src/observability-manager.js";
-import { FileQueueBackend } from "../src/file-queue-backend.js";
+import type { QueueJob } from "../src/interfaces/queue.interface.ts";
+import { MetricsCollector } from "../src/observability-manager.ts";
+import { FileQueueBackend } from "../src/file-queue-backend.ts";
 
 let dir: string;
 

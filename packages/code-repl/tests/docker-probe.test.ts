@@ -9,7 +9,7 @@ vi.mock("node:child_process", async (orig) => ({
   },
 }));
 
-const { isDockerAvailable } = await import("../src/index.js");
+const { isDockerAvailable } = await import("../src/index.ts");
 
 it("resolves false when spawn throws", async () => {
   await expect(isDockerAvailable()).resolves.toBe(false);

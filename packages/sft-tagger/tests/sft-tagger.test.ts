@@ -8,7 +8,7 @@ import {
   SftExporter,
   type ConversationTurn,
   type TurnTag,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── RuleTagger ────────────────────────────────────────────────────────────────
 

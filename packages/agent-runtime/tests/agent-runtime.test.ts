@@ -17,7 +17,7 @@ import {
   CACHE_POLICIES,
   type LlmToolFn,
   type RuntimeMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── CacheControl ──────────────────────────────────────────────────────────────
 

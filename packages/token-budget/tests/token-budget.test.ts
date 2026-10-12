@@ -11,7 +11,7 @@ import {
   type LLMResponse,
   type LLMProvider,
   type KVStoreLike,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

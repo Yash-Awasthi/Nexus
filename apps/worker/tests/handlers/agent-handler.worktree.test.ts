@@ -33,7 +33,7 @@ vi.mock("@nexus/llm-drivers", () => {
   return { AnthropicDriver: FakeDriver, GroqDriver: FakeDriver, OpenRouterDriver: FakeDriver };
 });
 
-import { handleAgentRunJob } from "../../src/handlers/agent-handler.js";
+import { handleAgentRunJob } from "../../src/handlers/agent-handler.ts";
 
 const execFileAsync = promisify(execFile);
 const git = (cwd: string, args: string[]): Promise<unknown> => execFileAsync("git", args, { cwd });

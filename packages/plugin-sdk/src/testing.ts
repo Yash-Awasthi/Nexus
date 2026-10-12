@@ -5,7 +5,7 @@
  * Helpers for unit-testing adapters without spinning up real infrastructure.
  */
 
-import type { IExecutionContext, ILogger, IExecutionAdapter } from "./index.js";
+import type { IExecutionContext, ILogger, IExecutionAdapter } from "./index.ts";
 
 // ── Mock logger ───────────────────────────────────────────────────────────────
 

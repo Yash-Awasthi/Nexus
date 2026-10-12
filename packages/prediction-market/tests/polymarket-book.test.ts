@@ -7,7 +7,7 @@ import {
   bookMidpoint,
   bookSpread,
   fetchPolymarketBook,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 

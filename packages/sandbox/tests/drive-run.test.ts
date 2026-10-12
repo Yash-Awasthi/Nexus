@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildDockerArgs, RUN_COMPLETE, runOnDrive, type Runner } from "../src/index.js";
+import { buildDockerArgs, RUN_COMPLETE, runOnDrive, type Runner } from "../src/index.ts";
 
 function drive(): { root: string; dir: string } {
   const root = mkdtempSync(join(tmpdir(), "drive-run-"));

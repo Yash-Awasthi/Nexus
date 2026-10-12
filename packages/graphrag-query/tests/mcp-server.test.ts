@@ -7,9 +7,9 @@
 // the map-reduce over community reports, and the error paths hold.
 import { describe, expect, it } from "vitest";
 
-import { createGraphRagMcpServer } from "../src/mcp-server.js";
-import type { QueryRouter } from "../src/index.js";
-import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.js";
+import { createGraphRagMcpServer } from "../src/mcp-server.ts";
+import type { QueryRouter } from "../src/index.ts";
+import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.ts";
 
 /** Scripted router cycling through canned completions. */
 function stubRouter(contents: string[]): { router: QueryRouter; calls: number } {

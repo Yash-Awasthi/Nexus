@@ -16,7 +16,7 @@ import type { ApiKey } from "@nexus/db/schema";
 import { usageEvents } from "@nexus/db/schema";
 import { sql } from "drizzle-orm";
 
-import { BillingLedger, QuotaExceededError, computeCost, type TokenUsage } from "./cost.js";
+import { BillingLedger, QuotaExceededError, computeCost, type TokenUsage } from "./cost.ts";
 
 // ── Result types ──────────────────────────────────────────────────────────────
 

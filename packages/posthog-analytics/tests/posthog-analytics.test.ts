@@ -5,7 +5,7 @@ import {
   PostHogAnalyticsClient,
   NexusAnalytics,
   NexusEvents,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── InMemoryAnalyticsClient ───────────────────────────────────────────────────
 

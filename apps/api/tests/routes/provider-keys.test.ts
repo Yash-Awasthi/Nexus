@@ -34,7 +34,7 @@ function authHeader(): string {
 
 describe.runIf(RUN)("BYOK /api/user/provider-keys (integration)", () => {
   it("requires authentication", async () => {
-    const { buildServer } = await import("../../src/server.js");
+    const { buildServer } = await import("../../src/server.ts");
     const app = await buildServer();
     await app.ready();
     const res = await app.inject({
@@ -47,7 +47,7 @@ describe.runIf(RUN)("BYOK /api/user/provider-keys (integration)", () => {
   });
 
   it("stores (encrypted), lists without the secret, and deletes a key", async () => {
-    const { buildServer } = await import("../../src/server.js");
+    const { buildServer } = await import("../../src/server.ts");
     const app = await buildServer();
     await app.ready();
     const headers = { authorization: authHeader() };
@@ -97,7 +97,7 @@ describe.runIf(RUN)("BYOK /api/user/provider-keys (integration)", () => {
   });
 
   it("rejects an invalid provider", async () => {
-    const { buildServer } = await import("../../src/server.js");
+    const { buildServer } = await import("../../src/server.ts");
     const app = await buildServer();
     await app.ready();
     const res = await app.inject({

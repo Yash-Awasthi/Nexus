@@ -8,8 +8,8 @@
 #   make dev-up
 #
 # Adds:
-#   - Builds from "development" stage (tsx hot-reload, no pre-compiled dist)
-#   - Bind-mounts full monorepo into container so tsx sees source changes
+#   - Builds from "development" stage (node --watch on TypeScript source, no compile step)
+#   - Bind-mounts full monorepo into container so node --watch sees source changes
 #   - Exposes Node.js inspector ports (9229 api, 9230 worker)
 #   - Exposes Python debugpy port (5678) on ingest
 #   - Sets LOG_LEVEL=debug for all services
@@ -21,7 +21,7 @@ services:
       dockerfile: apps/api/Dockerfile
       target: development
     volumes:
-      # Full monorepo bind-mount — tsx watches src/ directly, no dist needed
+      # Full monorepo bind-mount — node --watch runs src/ directly
       - .:/app:ro
       # Anonymous volume prevents the bind-mount from shadowing node_modules
       - /app/node_modules

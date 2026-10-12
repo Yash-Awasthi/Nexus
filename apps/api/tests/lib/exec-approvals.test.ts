@@ -14,7 +14,7 @@ import {
   pruneApprovals,
   redeemApproval,
   requestApproval,
-} from "../../src/lib/exec-approvals.js";
+} from "../../src/lib/exec-approvals.ts";
 import type { ExecAction } from "@nexus/exec-policy";
 
 const OWNER = "owner-expiry";
@@ -59,7 +59,7 @@ describe("the record outlives the process", () => {
   it("is still there after the store is reloaded", async () => {
     const pending = requestApproval(`${OWNER}-restart`, ACTION, "Nothing covers npm.", T0);
 
-    const store = await import("../../src/lib/exec-approvals.js");
+    const store = await import("../../src/lib/exec-approvals.ts");
     store._resetApprovalStoreForTests();
     await store.loadApprovalStore();
 

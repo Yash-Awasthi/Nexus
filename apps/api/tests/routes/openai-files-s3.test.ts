@@ -55,9 +55,9 @@ beforeAll(async () => {
     DRIVE_BACKUP_S3_SECRET_ACCESS_KEY: "secret",
     DRIVE_BACKUP_S3_REGION: "us-east-1",
   });
-  const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-  const { getPgPool } = await import("../../src/lib/pg-pool.js");
-  const { buildServer } = await import("../../src/server.js");
+  const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+  const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+  const { buildServer } = await import("../../src/server.ts");
   await migrateEmbedded(getPgPool(process.env.DATABASE_URL)!);
   app = await buildServer();
   await app.ready();
