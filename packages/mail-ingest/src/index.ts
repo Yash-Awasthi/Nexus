@@ -103,7 +103,7 @@ function extractAddresses(raw: string): string[] {
  * Parse a raw RFC 2822 / MIME email into structured form.
  * Handles simple single-part and basic MIME multipart messages.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// oxlint-disable-next-line @typescript-eslint/no-unused-vars
 export function parseEmail(raw: string, uid?: number): ParsedEmail {
   const lines = raw.replace(/\r\n/g, "\n").split("\n");
   const headers: Record<string, string> = {};

@@ -10,7 +10,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "lint": "eslint src/",
     "test": "vitest run",
     "clean": "rm -rf dist coverage"
   },

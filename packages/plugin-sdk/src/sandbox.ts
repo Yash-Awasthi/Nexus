@@ -23,9 +23,8 @@
 import { execFile } from "node:child_process";
 import { dirname } from "node:path";
 
-import type { LoadedPlugin } from "./plugin-manifest.ts";
-
 import type { AdapterCapability } from "./index.ts";
+import type { LoadedPlugin } from "./plugin-manifest.ts";
 
 /** Error raised when a plugin attempts a capability it was not granted. */
 export class CapabilityDeniedError extends Error {

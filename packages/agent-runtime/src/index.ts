@@ -103,7 +103,7 @@ export const CACHE_POLICIES: Record<CacheControlPolicy, CacheControlHeader> = {
 };
 
 /** Cache control. */
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+// oxlint-disable-next-line @typescript-eslint/no-extraneous-class
 export class CacheControl {
   static headerFor(policy: CacheControlPolicy): CacheControlHeader {
     return CACHE_POLICIES[policy];
@@ -146,9 +146,9 @@ export class ToolStreamParser {
       const name = match[1]!;
       const argStr = match[2]!.trim();
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const args = JSON.parse(argStr);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         calls.push({ name, arguments: args });
       } catch {
         calls.push({ name, arguments: { raw: argStr } });

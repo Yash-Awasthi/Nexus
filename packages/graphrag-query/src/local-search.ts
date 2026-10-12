@@ -31,7 +31,6 @@
  */
 
 import type { IndexedEntity, IndexedRelation } from "./index-graphrag.ts";
-
 import type { QueryRouter, CommunityReport } from "./index.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -27,7 +27,7 @@ function advanceTime(ms: number) {
 }
 
 function makeKVStore(): KVStoreLike {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   const store = new Map<string, { value: any; expiresAt?: number }>();
 
   return {

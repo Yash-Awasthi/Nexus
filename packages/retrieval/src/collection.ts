@@ -21,10 +21,10 @@
  * differs, noted); persistence/server semantics are the store's (in-memory
  * here), not chroma's server.
  */
-import type { WhereClause, WhereDocumentClause } from "./where.ts";
 
 import { InMemoryRagtimeStore } from "./index.ts";
 import type { IEmbedder, IMemoryStore } from "./index.ts";
+import type { WhereClause, WhereDocumentClause } from "./where.ts";
 
 export type CollectionInclude = "documents" | "metadatas" | "distances" | "embeddings";
 

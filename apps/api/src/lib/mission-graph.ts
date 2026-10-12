@@ -134,7 +134,7 @@ export class MissionGraphRecorder {
   onToolError?: (toolName: string, error: string) => void;
 
   wrapTool(tool: RuntimeTool): RuntimeTool {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the returned object's arrow handlers must capture this instance
+    // oxlint-disable-next-line @typescript-eslint/no-this-alias -- the returned object's arrow handlers must capture this instance
     const recorder = this;
     const handler = tool.handler;
     return {

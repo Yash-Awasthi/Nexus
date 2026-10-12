@@ -8,14 +8,12 @@ packages:
 catalog:
   "@types/node": ^26.6.5
   "@vitest/coverage-v8": ^2.1.9
-  typescript: 7.0.2
+  # TypeScript 7 provides `tsc`; tools that import the compiler API
+  # (typescript-eslint, openapi-typescript, knip) get the 6.0 API under the
+  # `typescript` name, as the TypeScript 7 release recommends.
+  "@typescript/native": npm:typescript@7.0.2
+  typescript: npm:@typescript/typescript6@^6.0.2
   vitest: ^2.1.9
-
-catalogs:
-  # openapi-typescript prints its output with the TypeScript 5 compiler API,
-  # which TypeScript 7 no longer ships; @nexus/contracts provides it as the peer.
-  openapi:
-    typescript: ^5.9.3
 
 engineStrict: true
 strictPeerDependencies: false
@@ -38,4 +36,17 @@ allowBuilds:
   protobufjs: false
   sharp: true
   tesseract.js: false
+  unrs-resolver: false
   workerd: true
+minimumReleaseAgeExclude:
+  - "@typescript-eslint/eslint-plugin@8.71.2"
+  - "@typescript-eslint/parser@8.71.2"
+  - "@typescript-eslint/project-service@8.71.2"
+  - "@typescript-eslint/scope-manager@8.71.2"
+  - "@typescript-eslint/tsconfig-utils@8.71.2"
+  - "@typescript-eslint/type-utils@8.71.2"
+  - "@typescript-eslint/types@8.71.2"
+  - "@typescript-eslint/typescript-estree@8.71.2"
+  - "@typescript-eslint/utils@8.71.2"
+  - "@typescript-eslint/visitor-keys@8.71.2"
+  - typescript-eslint@8.71.2

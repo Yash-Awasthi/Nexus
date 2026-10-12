@@ -10,10 +10,6 @@
       "persistent": true,
       "cache": false
     },
-    "lint": {},
-    "lint:fix": {
-      "cache": false
-    },
     "test": {
       "outputs": ["coverage/**"]
     },

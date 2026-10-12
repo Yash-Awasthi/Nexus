@@ -8,7 +8,6 @@
     "dev": "react-router dev",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "eslint app/",
     "clean": "rm -rf build .react-router"
   },
   "dependencies": {

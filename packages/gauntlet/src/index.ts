@@ -371,7 +371,7 @@ export function raceModels(
         if (successCount >= minResults && !graceTimer) {
           graceTimer = setTimeout(finish, gracePeriod);
         }
-        // eslint-disable-next-line promise/always-return
+        // oxlint-disable-next-line promise/always-return
         if (settled === models.length) finish();
       });
     };

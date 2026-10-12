@@ -45,7 +45,7 @@ export class GroqTransport implements ILLMTransport {
       model,
       messages: messages,
       temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens ?? 512,
+      max_completion_tokens: options?.maxTokens ?? 512,
     });
 
     const content = res.choices[0]?.message?.content ?? "";

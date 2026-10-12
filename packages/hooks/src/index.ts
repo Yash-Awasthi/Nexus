@@ -289,7 +289,7 @@ export interface Plugin {
 
 // ── Internal handler record ───────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line @typescript-eslint/no-explicit-any
 interface HandlerRecord<T = any> {
   id: string;
   event: HookEvent;
@@ -361,7 +361,7 @@ function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
     result.push(handlers[i]!);
     const dependents = Array.from(before[i]!).sort((a, b) => a - b);
     for (const j of dependents) {
-      // eslint-disable-next-line @typescript-eslint/no-confusing-non-null-assertion
+      // oxlint-disable-next-line @typescript-eslint/no-confusing-non-null-assertion
       if (--inDegree[j]! === 0) {
         queue.push(j);
         queue.sort((a, b) => a - b);
@@ -489,7 +489,7 @@ export class HookRegistry {
    * @returns Number of handlers successfully rehydrated.
    */
   async rehydrate(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-explicit-any
     namedHandlers: Record<string, HookHandler<any>>,
   ): Promise<number> {
     if (!this.store) return 0;
@@ -619,7 +619,7 @@ export class HookRegistry {
 
       Promise.resolve(record.handler(payload)).then(
         (r) => {
-          // eslint-disable-next-line promise/always-return
+          // oxlint-disable-next-line promise/always-return
           if (!done) {
             done = true;
             clearTimeout(timer);

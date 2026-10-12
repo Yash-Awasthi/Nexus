@@ -62,7 +62,7 @@ import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@ne
 import { createDefaultPipeline } from "@nexus/stm";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import { ThinkTagParser } from "@nexus/think-parser";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// oxlint-disable-next-line @typescript-eslint/no-unused-vars
 import { makeTierGatePreHandler } from "@nexus/tier-gate";
 import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
 import { createDefaultRegistry } from "@nexus/tool-registry";

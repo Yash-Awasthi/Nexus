@@ -99,7 +99,7 @@ export class ToolJsonRepair {
     let inString = false;
     let escape = false;
 
-    // eslint-disable-next-line @typescript-eslint/prefer-for-of
+    // oxlint-disable-next-line @typescript-eslint/prefer-for-of
     for (let i = 0; i < text.length; i++) {
       const ch = text[i]!;
       if (escape) {
@@ -349,7 +349,7 @@ export class StreamRecoveryOrchestrator {
     this.holdback = new HoldbackBuffer({ holdMs: opts.holdMs ?? 750 });
     this.jsonRepair = new ToolJsonRepair();
     this.continuation = new ContinuationSuffix();
-    this.retryHandler = new StreamRetryHandler<string>(
+    this.retryHandler = new StreamRetryHandler(
       new RetryStrategy({
         maxAttempts: opts.maxRetries ?? 5,
         initialDelayMs: opts.initialDelayMs ?? 100,

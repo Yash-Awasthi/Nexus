@@ -91,7 +91,7 @@ describe("GroqTransport", () => {
       const mockGroqInstance = (Groq as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
       await transport.chat([{ role: "user", content: "hi" }], { maxTokens: 256 });
       expect(mockGroqInstance.chat.completions.create).toHaveBeenCalledWith(
-        expect.objectContaining({ max_tokens: 256 }),
+        expect.objectContaining({ max_completion_tokens: 256 }),
       );
     });
 

@@ -211,7 +211,7 @@ export function _resetCFContext(): void {
 // Thin wrappers around the Cloudflare Cache API for HTTP response caching.
 // Used by edge handlers to cache deterministic GET responses.
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// oxlint-disable-next-line @typescript-eslint/no-unused-vars
 interface CFCacheEntry {
   body: string;
   status: number;

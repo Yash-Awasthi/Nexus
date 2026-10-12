@@ -52,7 +52,7 @@ function makeRequest(overrides: Partial<LLMRequest> = {}): LLMRequest {
 
 // Minimal in-memory KVStore mock
 function makeKVStore(): KVStoreLike {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   const store = new Map<string, { value: any; expiresAt?: number }>();
   const now = () => Date.now();
 
