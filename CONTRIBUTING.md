@@ -26,7 +26,7 @@ Thank you for your interest in contributing. This guide covers everything you ne
 | ------- | --------- | ----------------------------------------------- |
 | Node.js | 26 (`26`) | [nvm](https://github.com/nvm-sh/nvm): `nvm use` |
 | pnpm    | 12.x      | `npm i -g pnpm@12`                              |
-| Python  | 3.11      | [pyenv](https://github.com/pyenv/pyenv)         |
+| Python  | 3.14 (uv) | [uv](https://docs.astral.sh/uv/)                |
 | Docker  | 24+       | [docker.com](https://docker.com)                |
 | Git     | 2.40+     | system package manager                          |
 
@@ -66,8 +66,7 @@ For the Python ingest service:
 
 ```bash
 cd services/ingest
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+uv sync --extra dev        # Python 3.14, versions pinned by uv.lock
 ```
 
 Start the full stack (Postgres + Redis + API + ingest):

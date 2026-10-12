@@ -8,6 +8,8 @@ Routes:
   POST /scrape/{source}        — single source scrape
   POST /scrape/batch           — multi-source concurrent scrape
   GET  /scrape/sources         — list registered scrapers
+  POST /push, POST /scan       — forward fin-scrape signals to the Nexus API
+  GET  /status                 — fin-scrape bridge counters
   GET  /health                 — liveness + readiness (includes DB check)
   GET  /metrics                — Prometheus metrics (optional)
 """
@@ -27,6 +29,7 @@ from nexus_ingest.auth import AuthDep
 from nexus_ingest.db import close_pool, write_ingested_event
 from nexus_ingest.models import HealthResponse
 from nexus_ingest.queue import close_redis, publish_event_job
+from nexus_ingest.routes.bridge import router as bridge_router
 from nexus_ingest.routes.scrape import router as scrape_router
 from nexus_ingest.scrapers.registry import warm_registry
 from nexus_ingest.settings import get_settings
@@ -116,6 +119,7 @@ def create_app() -> FastAPI:
 
     # ── Scrape routes (existing) ───────────────────────────────────────────────
     app.include_router(scrape_router)
+    app.include_router(bridge_router)
 
     # ── Ingest routes ──────────────────────────────────────────────────────────
 

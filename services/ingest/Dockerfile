@@ -1,46 +1,37 @@
 # SPDX-License-Identifier: Apache-2.0
 # nexus-ingest — production Dockerfile
-# Multi-stage: builder installs deps, final image is minimal
+# Multi-stage: builder installs the locked deps with uv, final image is minimal
 
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.14
 
 # ── Builder stage ─────────────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION}-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/uv
 
-WORKDIR /build
+# The venv lives at /venv, the same path as in the final stage, so console-script
+# shebangs stay valid after COPY (a venv is not relocatable).
+ENV UV_PROJECT_ENVIRONMENT=/venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-# Install build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev git \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build/services/ingest
 
-# Copy project manifests
-COPY services/ingest/pyproject.toml services/ingest/
+# Dependencies first so source edits reuse this layer. finscrape (a local
+# sibling repo) is not in the lock; scrapers degrade gracefully without it.
+COPY services/ingest/pyproject.toml services/ingest/uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
 
-# Install production deps into /venv (same path as final stage so console-script
-# shebangs stay valid after COPY — a venv is not relocatable).
-# finscrape is an optional [finscrape] extra (local sibling repo); not included in the
-# Docker image — scrapers degrade gracefully when finscrape is absent.
-RUN python -m venv /venv
-ENV PATH="/venv/bin:$PATH"
-
-# Copy the rest of the ingest service
-COPY services/ingest/ /build/services/ingest/
-
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir /build/services/ingest/
+COPY services/ingest/ ./
+RUN uv sync --locked --no-dev --no-editable
 
 # ── Final stage ───────────────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION}-slim AS final
 
 WORKDIR /app
 
-# Runtime system deps (libpq for asyncpg)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy venv and service source from builder
 COPY --from=builder /venv /venv
 COPY --from=builder /build/services/ingest /app
 

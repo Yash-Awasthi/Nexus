@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-# Automated fin-scrape → ingest-py → Nexus signal ingestion
+# Automated fin-scrape → nexus-ingest → Nexus signal ingestion
 #
-# Runs every 30 min. Calls ingest-py /scan endpoint which picks up
+# Runs every 30 min. Calls the ingest service's /scan endpoint which picks up
 # any JSON files written by fin-scrape and forwards them to the Nexus
 # ingest API as structured signal events.
 #
 # Secrets required:
-#   INGEST_PY_URL      — base URL of the ingest-py service (e.g. https://ingest.nexus.dev)
-#   NEXUS_INGEST_TOKEN — bearer token for the ingest-py /scan endpoint
+#   INGEST_PY_URL      — base URL of the ingest service (services/ingest, e.g. https://ingest.nexus.dev)
+#   NEXUS_INGEST_TOKEN — the ingest service's NEXUS_INGEST_API_KEY
 name: Ingest fin-scrape signals
 
 on:
@@ -24,12 +24,12 @@ env:
 
 jobs:
   scan:
-    name: Trigger ingest-py scan
+    name: Trigger ingest scan
     runs-on: ubuntu-latest
     if: vars.INGEST_PY_URL != ''
 
     steps:
-      - name: Call ingest-py /scan
+      - name: Call ingest /scan
         run: |
           STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
             -X POST "${{ vars.INGEST_PY_URL }}/scan" \

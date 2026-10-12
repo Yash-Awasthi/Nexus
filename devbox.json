@@ -5,7 +5,8 @@
   "packages": {
     "nodejs_26": "latest",
     "nodePackages.pnpm": "latest",
-    "python311": "latest",
+    "python314": "latest",
+    "uv": "latest",
     "git": "latest",
     "docker": "latest",
     "docker-compose": "latest"

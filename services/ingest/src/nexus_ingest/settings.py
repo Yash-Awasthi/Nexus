@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     nexus_api_url: str | None = Field(None, alias="NEXUS_API_URL")
     nexus_api_secret: str | None = Field(None, alias="NEXUS_API_SECRET")
 
+    # fin-scrape bridge: JSON files the scraper writes, moved to done_dir once pushed
+    finscrape_output_dir: str = Field("/data/finscrape", alias="FINSCRAPE_OUTPUT_DIR")
+    finscrape_done_dir: str = Field("/data/finscrape/done", alias="FINSCRAPE_DONE_DIR")
+
     # Database (optional — for persisting ingested events)
     database_url: str | None = Field(None, alias="DATABASE_URL")
 

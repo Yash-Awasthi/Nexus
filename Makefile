@@ -15,7 +15,7 @@
 
 .PHONY: help setup dev-infra dev-infra-down dev-up dev-down dev-logs \
         migrate migrate-neon db-studio seed build test lint clean \
-        finscrape-up finscrape-down ingest-scan
+        ingest-scan
 
 # ── Default target ────────────────────────────────────────────────────────────
 
@@ -114,21 +114,10 @@ typecheck: ## Run TypeScript type-check across all packages
 
 # ── fin-scrape bridge ─────────────────────────────────────────────────────────
 
-finscrape-up: ## Start ingest-bridge container (profile: finscrape)
-	docker compose --profile finscrape up ingest-bridge --build -d
-	@echo "ingest-bridge running → http://localhost:8001"
-
-finscrape-down: ## Stop ingest-bridge container
-	docker compose --profile finscrape stop ingest-bridge
-
-ingest-scan: ## Trigger a /scan on the running ingest-bridge (flushes fin-scrape output dir)
-	@BRIDGE_URL=$${BRIDGE_URL:-http://localhost:8001}; \
-	BRIDGE_KEY=$${BRIDGE_API_KEY:-}; \
-	if [ -n "$$BRIDGE_KEY" ]; then \
-	  curl -sf -X POST "$$BRIDGE_URL/scan" -H "Authorization: Bearer $$BRIDGE_KEY" | python3 -m json.tool; \
-	else \
-	  curl -sf -X POST "$$BRIDGE_URL/scan" | python3 -m json.tool; \
-	fi
+ingest-scan: ## Trigger a /scan on the ingest service (flushes the fin-scrape output dir)
+	@INGEST_URL=$${INGEST_URL:-http://localhost:8000}; \
+	INGEST_KEY=$${NEXUS_INGEST_API_KEY:-}; \
+	curl -sf -X POST "$$INGEST_URL/scan" -H "Authorization: Bearer $$INGEST_KEY" | python3 -m json.tool
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 

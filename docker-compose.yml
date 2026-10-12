@@ -7,7 +7,6 @@
 # Optional profiles:
 #   --profile ui          → React UI dev server with hot reload (host :5173)
 #   --profile observability → OTel collector
-#   --profile finscrape   → fin-scrape ingest bridge
 #
 # Usage:
 #   docker compose up                          # core stack
@@ -324,6 +323,13 @@ services:
       REDIS_URL: redis://redis:6379
       NEXUS_API_KEY: ${NEXUS_API_KEY}
       LOG_LEVEL: info
+      # fin-scrape bridge (POST /scan, /push): pushes signals to the API's ingest endpoint.
+      NEXUS_API_URL: http://api:3001
+      NEXUS_API_SECRET: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
+      FINSCRAPE_OUTPUT_DIR: /data/finscrape
+      FINSCRAPE_DONE_DIR: /data/finscrape/done
+    volumes:
+      - finscrape_data:/data/finscrape
     depends_on:
       postgres:
         condition: service_healthy
@@ -348,43 +354,6 @@ services:
         reservations:
           cpus: "0.5"
           memory: 512M
-
-  # ── fin-scrape → Nexus ingest bridge ─────────────────────────────────────────
-
-  ingest-bridge:
-    build:
-      context: apps/ingest-py
-      dockerfile: Dockerfile
-    container_name: nexus-ingest-bridge
-    restart: unless-stopped
-    ports:
-      - "8001:8001"
-    environment:
-      NEXUS_API_URL: http://api:3001
-      NEXUS_INGEST_API_KEY: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
-      FINSCRAPE_OUTPUT_DIR: /data/finscrape
-      FINSCRAPE_DONE_DIR: /data/finscrape/done
-      BRIDGE_PORT: "8001"
-      BRIDGE_API_KEY: ${BRIDGE_API_KEY:-}
-      LOG_LEVEL: info
-    volumes:
-      - finscrape_data:/data/finscrape
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    profiles:
-      - finscrape
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
 
   # ── SearXNG self-hosted metasearch ────────────────────────────────────────────
 

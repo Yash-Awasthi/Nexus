@@ -153,11 +153,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
-          python-version: "3.11"
-          cache: pip
+          python-version: "3.14"
+          enable-cache: true
       - working-directory: services/ingest
         run: |
-          pip install -e ".[dev]"
-          pytest --tb=short -q
+          uv sync --locked --extra dev
+          uv run pytest --tb=short -q
