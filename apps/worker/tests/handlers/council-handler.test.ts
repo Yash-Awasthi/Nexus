@@ -4,9 +4,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockDeliberate = vi.fn();
 
 vi.mock("@nexus/council", () => ({
-  CouncilService: vi.fn().mockImplementation(() => ({
-    deliberate: mockDeliberate,
-  })),
+  CouncilService: vi.fn(function () {
+    return { deliberate: mockDeliberate };
+  }),
 }));
 
 // council-handler.ts imports @nexus/db which throws at module-init if

@@ -7,14 +7,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
     // Large source file (3400+ lines) needs extra heap in the test workers
-    poolOptions: {
-      threads: {
-        execArgv: ["--max-old-space-size=4096"],
-      },
-      forks: {
-        execArgv: ["--max-old-space-size=4096"],
-      },
-    },
+    execArgv: ["--max-old-space-size=4096"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
