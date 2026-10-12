@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * End-to-end checks at phone width against the desktop-mode API, which serves
- * the built UI itself. Build first (`pnpm --filter @nexus/api build` and
- * `pnpm --filter @nexus/ui build`); an API already listening on the port is
- * refused; each run starts an isolated API with fresh embedded storage.
+ * the built UI itself. Build the UI first (`pnpm --filter @nexus/ui build`; the
+ * API runs from source); an API already listening on the port is refused; each
+ * run starts an isolated API with fresh embedded storage.
  */
 import { defineConfig, devices } from "@playwright/test";
 
