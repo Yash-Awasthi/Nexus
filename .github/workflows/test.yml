@@ -28,9 +28,6 @@ jobs:
       # Verify the committed dependency graph; never auto-heal it in CI.
       - run: pnpm install --frozen-lockfile
 
-      # Build all packages so cross-package type imports resolve at test time.
-      - run: pnpm build
-
       # Run vitest from the workspace root so the root vitest.config.ts
       # controls the include globs (packages/*/tests/**) rather than having
       # each per-package script inherit the root config from a subdirectory,
@@ -81,7 +78,6 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
 
       # apps/api, apps/ui and apps/desktop each carry their own vitest config —
       # apps/api's setup file stubs pg and Redis for every file in the suite.
@@ -123,7 +119,6 @@ jobs:
           node-version: "26"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - name: Enable pgvector extension
         run: PGPASSWORD=nexus psql -h localhost -U nexus -d nexus_e2e -c "CREATE EXTENSION IF NOT EXISTS vector;"
       - name: Apply database schema

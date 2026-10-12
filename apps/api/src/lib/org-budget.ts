@@ -20,8 +20,8 @@
 
 import crypto from "node:crypto";
 
-import { priceOf } from "./cost-log.js";
-import { createNotification } from "./notifications-store.js";
+import { priceOf } from "./cost-log.ts";
+import { createNotification } from "./notifications-store.ts";
 import {
   addCallGuard,
   addRunGate,
@@ -30,7 +30,7 @@ import {
   onRunFinished,
   stepsCostUsd,
   type Run,
-} from "./org-runtime.js";
+} from "./org-runtime.ts";
 import {
   OrgError,
   getAgent,
@@ -45,9 +45,9 @@ import {
   setAgentStatus,
   setCompanyStatus,
   type Agent,
-} from "./org-store.js";
-import { getGoal, getTask, whyChain, type Task } from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
+} from "./org-store.ts";
+import { getGoal, getTask, whyChain, type Task } from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 export const SCOPE_TYPES = ["company", "agent", "goal"] as const;
 export type ScopeType = (typeof SCOPE_TYPES)[number];

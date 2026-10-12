@@ -51,7 +51,7 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 
 // ── Imports (after mocks) ──────────────────────────────────────────────────────
 
-import { createApiKey, lookupApiKey, revokeApiKey, listApiKeys } from "../src/api-keys.js";
+import { createApiKey, lookupApiKey, revokeApiKey, listApiKeys } from "../src/api-keys.ts";
 
 const FAKE_KEY = {
   id: "uuid-1",

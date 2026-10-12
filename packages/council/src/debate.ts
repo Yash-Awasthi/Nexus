@@ -29,8 +29,8 @@ import {
   type AgreementJudgement,
   type AgreementResult,
   type PositionGroup,
-} from "./agreement.js";
-import type { ILLMMessage } from "./engine.js";
+} from "./agreement.ts";
+import type { ILLMMessage } from "./engine.ts";
 
 /** Upper bound on debate depth, guarding resource use from caller-supplied values. */
 export const MAX_DEBATE_ROUNDS = 4;

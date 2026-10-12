@@ -12,7 +12,7 @@ vi.mock("@nexus/runtime", async (importOriginal) => ({
   },
 }));
 
-const { fetchPublic } = await import("../../src/lib/public-url.js");
+const { fetchPublic } = await import("../../src/lib/public-url.ts");
 
 beforeEach(() => {
   calls.length = 0;

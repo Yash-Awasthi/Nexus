@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { buildAgentRunJob, parseCompressHeader } from "../../src/lib/agent-queue.js";
+import { buildAgentRunJob, parseCompressHeader } from "../../src/lib/agent-queue.ts";
 
 describe("buildAgentRunJob", () => {
   it("keys sessionId and taskId off the same id", () => {

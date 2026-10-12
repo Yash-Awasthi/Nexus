@@ -12,7 +12,7 @@ import {
   collectChecks,
   loadNexusSettings,
   parseNexusSettings,
-} from "../../src/handlers/workspace-manager.js";
+} from "../../src/handlers/workspace-manager.ts";
 
 // Every case shells out to git, which passes 5s only when the machine is otherwise idle.
 vi.setConfig({ testTimeout: 30_000 });

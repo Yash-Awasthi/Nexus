@@ -2,7 +2,7 @@
 /** A run's MCP servers are caller-named URLs: on a server none may reach a private address. */
 import { afterEach, expect, it, vi } from "vitest";
 
-import { mcpToolsFromServers } from "../../src/handlers/agent-mcp.js";
+import { mcpToolsFromServers } from "../../src/handlers/agent-mcp.ts";
 
 afterEach(() => {
   delete process.env.NEXUS_DESKTOP;

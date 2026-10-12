@@ -28,8 +28,8 @@ async function streamReply(opts: LlmRequestOptions, handler: StreamHandler): Pro
   } as LlmResponse;
 }
 
-vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/provider-keys.js")>()),
+vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
   buildUserDriverRegistry: async (_userId: string | undefined, providers: Iterable<string>) => {
     const registry = new DriverRegistry();
     for (const p of new Set(providers)) {
@@ -47,9 +47,9 @@ vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
   },
 }));
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { globalFlags } = await import("@nexus/feature-flags");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");

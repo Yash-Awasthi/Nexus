@@ -5,7 +5,7 @@ import {
   isDangerousToolCall,
   makeGovernanceGate,
   defaultAgentGovernanceEngine,
-} from "../../src/handlers/agent-governance.js";
+} from "../../src/handlers/agent-governance.ts";
 
 const req = (toolName: string, args: Record<string, unknown> = {}) => ({
   toolName,

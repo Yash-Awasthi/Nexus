@@ -5,10 +5,10 @@
  * Agents answer, read each other's positions and revise until they agree or stop moving.
  */
 
-export { majorityFinalAnswer, runMultiAgentDebate } from "./multiagent-debate.js";
+export { majorityFinalAnswer, runMultiAgentDebate } from "./multiagent-debate.ts";
 export type {
   AgentMessage,
   AgentTranscript,
   MultiAgentDebateOptions,
   MultiAgentDebateResult,
-} from "./multiagent-debate.js";
+} from "./multiagent-debate.ts";

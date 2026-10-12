@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 const SECRET = "conversation-analysis-owner-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 
-const { conversationAnalysisRoutes } = await import("../../src/routes/conversation-analysis.js");
+const { conversationAnalysisRoutes } = await import("../../src/routes/conversation-analysis.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

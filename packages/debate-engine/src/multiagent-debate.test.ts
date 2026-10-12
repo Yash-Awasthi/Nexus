@@ -5,7 +5,7 @@ import {
   runMultiAgentDebate,
   type AgentMessage,
   type MultiAgentDebateResult,
-} from "./multiagent-debate.js";
+} from "./multiagent-debate.ts";
 
 /** Echo transport: answer with the agent's own number plus prior answers seen. */
 function echoTransport(seen: { agent: string; round: number; sawOthers: string[] }[] = []): {

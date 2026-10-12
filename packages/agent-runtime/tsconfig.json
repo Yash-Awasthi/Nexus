@@ -1,8 +1,21 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
     "outDir": "dist",
-    "rootDir": "src"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../best-of-n"
+    },
+    {
+      "path": "../llm-compress"
+    },
+    {
+      "path": "../shared"
+    }
+  ]
 }

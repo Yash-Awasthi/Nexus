@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { createRuntimeContext, startRuntime, stopRuntime } from "../src/runtime-context.js";
+import { createRuntimeContext, startRuntime, stopRuntime } from "../src/runtime-context.ts";
 
 let repoRoot: string;
 let prevEnv: Record<string, string | undefined> = {};

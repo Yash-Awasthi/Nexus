@@ -16,7 +16,7 @@ import path from "node:path";
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-type StoreModule = typeof import("../../src/lib/archetype-store.js");
+type StoreModule = typeof import("../../src/lib/archetype-store.ts");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-archetype-store-"));
 let previousDatabaseUrl: string | undefined;
@@ -25,7 +25,7 @@ let previousDataDir: string | undefined;
 /** Import the store as a cold process would: empty module registry, no memory. */
 async function bootStore(): Promise<StoreModule> {
   vi.resetModules();
-  const mod = (await import("../../src/lib/archetype-store.js")) as StoreModule;
+  const mod = (await import("../../src/lib/archetype-store.ts")) as StoreModule;
   await mod.loadArchetypeStore();
   return mod;
 }

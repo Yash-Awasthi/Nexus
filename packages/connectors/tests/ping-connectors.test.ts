@@ -7,7 +7,7 @@ import {
   cloudflareConnector,
   googleCalendarConnector,
   salesforceConnector,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function fake(status: number, body: unknown, seen: { url: string; auth: string | null }[]) {
   return (async (url: string, init?: RequestInit) => {

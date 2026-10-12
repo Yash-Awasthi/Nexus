@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { weatherHandler } from "../src/index.js";
+import { weatherHandler } from "../src/index.ts";
 
 const GEO = { results: [{ name: "Paris", country: "France", latitude: 48.85, longitude: 2.35 }] };
 const DAILY = {

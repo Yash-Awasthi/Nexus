@@ -60,19 +60,19 @@ function scaffoldAdapter(name: string): void {
         description: `NEXUS adapter for ${name}`,
         license: "Apache-2.0",
         type: "module",
-        main: "./dist/index.js",
-        types: "./dist/index.d.ts",
-        exports: { ".": { import: "./dist/index.js", types: "./dist/index.d.ts" } },
+        main: "./src/index.ts",
+        exports: { ".": "./src/index.ts" },
         scripts: {
-          build: "tsc --project tsconfig.json",
-          dev: "tsc --project tsconfig.json --watch",
-          typecheck: "tsc --noEmit",
           lint: "eslint src/",
           clean: "rm -rf dist coverage",
           test: "vitest run --passWithNoTests",
         },
-        devDependencies: { typescript: "^5.6.3" },
         dependencies: { "@nexus/plugin-sdk": "workspace:*" },
+        publishConfig: {
+          main: "./dist/index.js",
+          types: "./dist/index.d.ts",
+          exports: { ".": { import: "./dist/index.js", types: "./dist/index.d.ts" } },
+        },
       },
       null,
       2,
@@ -84,8 +84,14 @@ function scaffoldAdapter(name: string): void {
     JSON.stringify(
       {
         extends: "../../../tsconfig.base.json",
-        compilerOptions: { outDir: "dist", rootDir: "src" },
+        compilerOptions: {
+          composite: true,
+          rootDir: "src",
+          outDir: "dist",
+          tsBuildInfoFile: "dist/tsconfig.tsbuildinfo",
+        },
         include: ["src"],
+        references: [{ path: "../../plugin-sdk" }],
       },
       null,
       2,
@@ -168,7 +174,7 @@ import type { IExecutionContext } from "@nexus/plugin-sdk";
 import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { ${name.replace(/-/g, "")}Adapter } from "../src/index.js";
+import { ${name.replace(/-/g, "")}Adapter } from "../src/index.ts";
 
 function makeCtx(env: Record<string, string> = {}): IExecutionContext {
   return {
@@ -250,6 +256,12 @@ NEXUS adapter for ${name}
 `,
   );
 
+  // tsconfig.build.json lists every package `pnpm build` compiles for publishing.
+  const buildFile = join(ROOT, "tsconfig.build.json");
+  const build = JSON.parse(readFileSync(buildFile, "utf8")) as { references: { path: string }[] };
+  build.references.push({ path: `packages/adapters/${name}` });
+  writeFileSync(buildFile, JSON.stringify(build, null, 2) + "\n");
+  console.log("  ~ tsconfig.build.json");
   console.log(`\n✓ Scaffolded packages/adapters/${name}`);
   console.log("  Next: pnpm install && pnpm --filter @nexus/adapter-" + name + " test");
 }
@@ -303,7 +315,7 @@ export class ${Class} extends OpenAICompatibleDriver {
 
 function main(): void {
   const [kind, name] = process.argv.slice(2);
-  if (!kind || !name) fail("usage: tsx scripts/scaffold.ts <adapter|driver> <name>");
+  if (!kind || !name) fail("usage: node scripts/scaffold.ts <adapter|driver> <name>");
   if (!NAME_RE.test(name)) fail(`invalid name "${name}" — use lowercase letters, digits, dashes`);
 
   switch (kind) {

@@ -2,7 +2,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { loadEnvFile } from "./env-loader.js";
+import { loadEnvFile } from "./env-loader.ts";
 
 interface ConductorConfig {
   apiPort: number;

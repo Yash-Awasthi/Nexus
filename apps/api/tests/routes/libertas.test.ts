@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;

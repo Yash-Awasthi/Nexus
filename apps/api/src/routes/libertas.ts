@@ -28,7 +28,7 @@
 import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
-import { countRequest } from "../lib/rate-limiter.js";
+import { countRequest } from "../lib/rate-limiter.ts";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

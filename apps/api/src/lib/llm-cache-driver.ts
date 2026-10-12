@@ -54,8 +54,8 @@ import {
 } from "@nexus/llm-cache";
 import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm-drivers";
 
-import { getSharedKV } from "./shared-kv.js";
-import { getCacheUserId, recordLlmStep } from "./user-context.js";
+import { getSharedKV } from "./shared-kv.ts";
+import { getCacheUserId, recordLlmStep } from "./user-context.ts";
 
 const DEFAULT_TTL_MS = parseInt(process.env.LLM_CACHE_TTL_MS ?? "900000", 10);
 const DISABLED = process.env.LLM_CACHE_DISABLED === "1";
@@ -183,11 +183,12 @@ export class CachingDriver implements LlmDriver {
   readonly provider: string;
   readonly model: string;
 
-  constructor(
-    private readonly inner: LlmDriver,
-    private readonly ttlMs: number = DEFAULT_TTL_MS,
-    cache?: PromptCache,
-  ) {
+  private readonly inner: LlmDriver;
+  private readonly ttlMs: number;
+
+  constructor(inner: LlmDriver, ttlMs: number = DEFAULT_TTL_MS, cache?: PromptCache) {
+    this.inner = inner;
+    this.ttlMs = ttlMs;
     this.provider = inner.provider;
     this.model = inner.model;
     if (cache) _injectedCache = cache;

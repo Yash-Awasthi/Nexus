@@ -9,7 +9,7 @@ import {
   applySTMs,
   STMPipeline,
   createDefaultPipeline,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── HedgeReducer ──────────────────────────────────────────────────────────────
 

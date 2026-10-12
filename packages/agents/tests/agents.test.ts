@@ -13,7 +13,7 @@ import {
   type ResearchRunner,
   type ResearchRunResult,
   type AgentFileSystem,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test helpers

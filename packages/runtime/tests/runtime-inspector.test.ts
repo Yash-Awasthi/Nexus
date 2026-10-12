@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { RuntimeInspector } from "../src/runtime-inspector.js";
-import type { RuntimeInspector as Insp } from "../src/runtime-inspector.js";
+import { RuntimeInspector } from "../src/runtime-inspector.ts";
+import type { RuntimeInspector as Insp } from "../src/runtime-inspector.ts";
 
 interface Stubs {
   metrics: { getMetrics: ReturnType<typeof vi.fn> };

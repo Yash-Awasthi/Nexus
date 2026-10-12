@@ -7,7 +7,7 @@ import {
   MIN_EXPORT_EXAMPLES,
   CORPUS_INSTRUCTION_TEMPLATE,
   type CorpusDocumentLike,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const DOCS: CorpusDocumentLike[] = [
   {

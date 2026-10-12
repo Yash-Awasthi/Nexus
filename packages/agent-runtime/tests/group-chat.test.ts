@@ -8,7 +8,7 @@ import {
   llmSpeakerPicker,
   type ConversableAgent,
   type LlmToolFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Scripted LLM ─────────────────────────────────────────────────────────────
 

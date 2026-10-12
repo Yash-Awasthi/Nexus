@@ -24,8 +24,8 @@
 
 import type { MissionRecord } from "@nexus/agent-engine";
 
-import { getMission } from "./mission-store.js";
-import { getSessionGraph, type GraphNode, type SessionGraph } from "./session-graph.js";
+import { getMission } from "./mission-store.ts";
+import { getSessionGraph, type GraphNode, type SessionGraph } from "./session-graph.ts";
 
 const MAX_GOAL_CHARS = 120;
 const MAX_ISSUE_CHARS = 140;

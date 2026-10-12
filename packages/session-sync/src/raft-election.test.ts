@@ -2,7 +2,7 @@
 // Raft leader election (hashicorp/raft parity slice) — deterministic tests
 // driven by an injected clock and a deferred in-memory transport.
 import { describe, it, expect } from "vitest";
-import { RaftNode, type RaftMessage } from "./raft-election.js";
+import { RaftNode, type RaftMessage } from "./raft-election.ts";
 
 interface Cluster {
   clock: { t: number };

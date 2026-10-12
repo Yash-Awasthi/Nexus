@@ -20,8 +20,8 @@ describe.skipIf(!HAS_DB)("E2E: Signal pipeline (live Postgres)", () => {
   let db: Awaited<ReturnType<typeof import("@nexus/db")>>["db"];
   let ingestedEvents: Awaited<ReturnType<typeof import("@nexus/db/schema")>>["ingestedEvents"];
   let signals: Awaited<ReturnType<typeof import("@nexus/db/schema")>>["signals"];
-  let DrizzleEventSource: (typeof import("../../src/workers/drizzle-adapters.js"))["DrizzleEventSource"];
-  let DrizzleSignalSink: (typeof import("../../src/workers/drizzle-adapters.js"))["DrizzleSignalSink"];
+  let DrizzleEventSource: (typeof import("../../src/workers/drizzle-adapters.ts"))["DrizzleEventSource"];
+  let DrizzleSignalSink: (typeof import("../../src/workers/drizzle-adapters.ts"))["DrizzleSignalSink"];
   let SignalProcessor: (typeof import("@nexus/pipeline-signal"))["SignalProcessor"];
   let eq: (typeof import("drizzle-orm"))["eq"];
 
@@ -32,7 +32,7 @@ describe.skipIf(!HAS_DB)("E2E: Signal pipeline (live Postgres)", () => {
     ({ db } = await import("@nexus/db"));
     ({ ingestedEvents, signals } = await import("@nexus/db/schema"));
     ({ DrizzleEventSource, DrizzleSignalSink } =
-      await import("../../src/workers/drizzle-adapters.js"));
+      await import("../../src/workers/drizzle-adapters.ts"));
     ({ SignalProcessor } = await import("@nexus/pipeline-signal"));
     ({ eq } = await import("drizzle-orm"));
   });

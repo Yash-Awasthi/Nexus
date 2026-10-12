@@ -4,7 +4,7 @@ import type { NlpLlmClient } from "@nexus/nlp-utils";
 import { REMOVED } from "@nexus/shared";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { classifierFromClient, screenForPrompt } from "../../src/lib/injection-classifier.js";
+import { classifierFromClient, screenForPrompt } from "../../src/lib/injection-classifier.ts";
 
 describe("injection classifier", () => {
   const saved = process.env.NEXUS_INJECTION_CLASSIFIER;

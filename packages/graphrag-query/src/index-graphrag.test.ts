@@ -6,7 +6,7 @@ import {
   parseSummaryJson,
   GraphRAGQueryEngine,
   type CommunityReport,
-} from "./index.js";
+} from "./index.ts";
 
 // Deterministic extractor: recognizes "<Name> is a <Type>" and "<A> relates to <B>".
 const extractEntities = (chunk: string) => {

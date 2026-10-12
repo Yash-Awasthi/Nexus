@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import type { ILanguageModel } from "../src/interfaces/language-model.interface.js";
-import type { IExecutionContext } from "../src/interfaces/execution.interface.js";
-import { WebSearchAdapter } from "../src/web-search-adapter.js";
+import type { ILanguageModel } from "../src/interfaces/language-model.interface.ts";
+import type { IExecutionContext } from "../src/interfaces/execution.interface.ts";
+import { WebSearchAdapter } from "../src/web-search-adapter.ts";
 
 const ctx = {
   taskId: "ws-1",

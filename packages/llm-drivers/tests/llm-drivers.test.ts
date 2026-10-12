@@ -56,7 +56,7 @@ import {
   estimateTokens,
   type LlmRequestOptions,
   type StreamDelta,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

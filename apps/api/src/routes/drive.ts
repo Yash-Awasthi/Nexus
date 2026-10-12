@@ -40,11 +40,11 @@ import {
 } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
-import { guardExec } from "../lib/exec-guard.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { withKeyLock } from "../lib/with-key-lock.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { guardExec } from "../lib/exec-guard.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { withKeyLock } from "../lib/with-key-lock.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants

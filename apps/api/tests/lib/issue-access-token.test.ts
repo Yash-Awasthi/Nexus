@@ -3,7 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { verifyJwt, verifyJwtRS256 } from "@nexus/auth";
-import { issueAccessToken, toNexusRole } from "../../src/lib/issue-access-token.js";
+import { issueAccessToken, toNexusRole } from "../../src/lib/issue-access-token.ts";
 
 const SECRET = "test-jwt-secret";
 const { privateKey: kp, publicKey: pub } = generateKeyPairSync("rsa", { modulusLength: 2048 });

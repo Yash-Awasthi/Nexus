@@ -25,7 +25,7 @@ import {
 } from "@nexus/nlp-utils";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── LLM adapter — wraps LLMRouter into NlpLlmClient ──────────────────────────
 

@@ -14,7 +14,7 @@ import {
   type LLMProvider,
   type LLMRequest,
   type LLMResponse,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ import {
   predictOutcome,
   sensitivityAnalysis,
   type Scenario,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

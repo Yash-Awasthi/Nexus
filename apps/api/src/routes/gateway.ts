@@ -69,17 +69,17 @@ import { createDefaultRegistry } from "@nexus/tool-registry";
 import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
-import { parseCompressHeader } from "../lib/agent-queue.js";
-import { costLogStore, scopeCostEntriesToUser, trackCost } from "../lib/cost-log.js";
-import { getLlmCacheStats } from "../lib/llm-cache-driver.js";
-import { getMemoryStore } from "../lib/memory-store.js";
-import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
-import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
-import { listUserDrivers, listUserModels } from "../lib/provider-keys.js";
-import { getSharedKV } from "../lib/shared-kv.js";
-import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+import { parseCompressHeader } from "../lib/agent-queue.ts";
+import { costLogStore, scopeCostEntriesToUser, trackCost } from "../lib/cost-log.ts";
+import { getLlmCacheStats } from "../lib/llm-cache-driver.ts";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { createOAuthTokenStore } from "../lib/oauth-token-store.ts";
+import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.ts";
+import { listUserDrivers, listUserModels } from "../lib/provider-keys.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
+import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.ts";
 
-import { getDefaultDriver, getFreeDriver } from "./api-bridge.js";
+import { getDefaultDriver, getFreeDriver } from "./api-bridge.ts";
 
 /** What the caller has spent through Nexus so far, from the shared cost log. */
 const spentBy = (userId: string | undefined) =>

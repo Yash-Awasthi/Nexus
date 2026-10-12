@@ -2,7 +2,7 @@
 import Fastify from "fastify";
 import { DriverRegistry, type LlmDriver } from "@nexus/llm-drivers";
 import { expect, it, vi } from "vitest";
-import { workflowsRoutes } from "../../src/routes/workflows.js";
+import { workflowsRoutes } from "../../src/routes/workflows.ts";
 
 it("does not send an explicitly selected missing provider's model to the default provider", async () => {
   const complete = vi.fn(async () => ({ content: "wrong provider answered" }));

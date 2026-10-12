@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IExtendedRuntimeInspector } from "./runtime-inspector.js";
+import type { IExtendedRuntimeInspector } from "./runtime-inspector.ts";
 
 export class RuntimeDiagnosticAPI {
   private inspector: IExtendedRuntimeInspector;

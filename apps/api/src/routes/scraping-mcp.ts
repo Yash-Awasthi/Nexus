@@ -21,8 +21,8 @@ import { ScrapingMcpServer, SessionStore, type ScrapingBackend } from "@nexus/sc
 import { createStealthBackend, isPatchrightAvailable } from "@nexus/stealth-browser";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
-import { unsafeUrlReason } from "../lib/public-url.js";
-import { requireAuth } from "../middleware/auth.js";
+import { unsafeUrlReason } from "../lib/public-url.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Backend factory ───────────────────────────────────────────────────────────
 

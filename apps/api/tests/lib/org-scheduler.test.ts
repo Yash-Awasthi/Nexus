@@ -8,13 +8,13 @@ import crypto from "node:crypto";
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir({ NEXUS_SECRETS_KEY: crypto.randomBytes(32).toString("hex") });
 
 async function boot() {
   const { org, work, rt, sched } = await bootOrg(async () => ({
-    sched: await import("../../src/lib/org-scheduler.js"),
+    sched: await import("../../src/lib/org-scheduler.ts"),
   }));
   const seen: { agent: string; source: string; task: string | null }[] = [];
   rt.registerAdapter("nexus", async (ctx) => {

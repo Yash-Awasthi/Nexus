@@ -8,7 +8,7 @@ import {
   trimOldToolOutputs,
   type LlmToolFn,
   type RuntimeMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const big = "x".repeat(2_000);
 

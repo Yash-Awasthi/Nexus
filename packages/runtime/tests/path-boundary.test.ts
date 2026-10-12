@@ -4,7 +4,7 @@ import * as path from "path";
 
 import { describe, it, expect } from "vitest";
 
-import { assertPathDescendsFrom, resolvePathInRoot } from "../src/path-boundary.js";
+import { assertPathDescendsFrom, resolvePathInRoot } from "../src/path-boundary.ts";
 
 const TMP = os.tmpdir();
 

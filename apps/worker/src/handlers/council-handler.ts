@@ -77,10 +77,13 @@ if (!Object.hasOwn(COUNCIL_DRIVER_ALIASES, COUNCIL_MODEL)) {
  * Lets CouncilService use any registered provider, not just Groq SDK directly.
  */
 class LlmDriversTransport implements ILLMTransport {
-  constructor(
-    private readonly registry: DriverRegistry,
-    private readonly modelAlias: string,
-  ) {}
+  private readonly registry: DriverRegistry;
+  private readonly modelAlias: string;
+
+  constructor(registry: DriverRegistry, modelAlias: string) {
+    this.registry = registry;
+    this.modelAlias = modelAlias;
+  }
 
   async chat(
     messages: ILLMMessage[],

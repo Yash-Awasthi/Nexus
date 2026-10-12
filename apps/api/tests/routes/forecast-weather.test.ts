@@ -39,7 +39,7 @@ vi.stubGlobal(
   }),
 );
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 const headers = (() => {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

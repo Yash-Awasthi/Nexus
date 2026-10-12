@@ -17,7 +17,7 @@
  * runtime is a later slice; this seam defines the contract it will honour.
  */
 
-import type { AdapterCapability } from "./index.js";
+import type { AdapterCapability } from "./index.ts";
 
 /** SemVer-ish `MAJOR.MINOR.PATCH` with an optional pre-release/build suffix. */
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
@@ -78,13 +78,18 @@ const KNOWN_CAPABILITY_SET = new Set<string>(KNOWN_CAPABILITIES);
 
 /** Error raised when a manifest fails validation or a load-time capability check. */
 export class PluginManifestError extends Error {
+  public readonly code: "INVALID_MANIFEST" | "UNKNOWN_CAPABILITY" | "CAPABILITY_NOT_GRANTED";
+  public readonly issues: string[];
+
   constructor(
     message: string,
-    public readonly code: "INVALID_MANIFEST" | "UNKNOWN_CAPABILITY" | "CAPABILITY_NOT_GRANTED",
+    code: "INVALID_MANIFEST" | "UNKNOWN_CAPABILITY" | "CAPABILITY_NOT_GRANTED",
     /** Field-level problems, when the failure is a schema violation. */
-    public readonly issues: string[] = [],
+    issues: string[] = [],
   ) {
     super(message);
+    this.code = code;
+    this.issues = issues;
     this.name = "PluginManifestError";
   }
 }

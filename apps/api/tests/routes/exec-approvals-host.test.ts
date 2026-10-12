@@ -13,8 +13,8 @@ process.env.NEXUS_JWT_SECRET = SECRET;
 delete process.env.NEXUS_DESKTOP;
 delete process.env.NEXUS_EXEC_MODE;
 
-const { buildServer } = await import("../../src/server.js");
-const { requestApproval } = await import("../../src/lib/exec-approvals.js");
+const { buildServer } = await import("../../src/server.ts");
+const { requestApproval } = await import("../../src/lib/exec-approvals.ts");
 
 function tokenFor(userId: string, role: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

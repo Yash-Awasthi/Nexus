@@ -27,8 +27,8 @@ import {
 } from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
-import { getMemoryStore } from "../lib/memory-store.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 

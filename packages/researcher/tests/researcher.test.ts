@@ -7,7 +7,7 @@ import {
   ResearchSession,
   type SearchResult,
   type WebSearchFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── WebResearcher ─────────────────────────────────────────────────────────────
 

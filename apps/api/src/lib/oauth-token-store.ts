@@ -31,7 +31,11 @@ export const msToDate = (ms: number | null | undefined): Date | null =>
 
 /** Concrete drizzle binding of the port. `database` is injectable for unit tests. */
 export class DrizzleSealedTokenStore implements SealedTokenStore {
-  constructor(private readonly database: NexusDB = defaultDb) {}
+  private readonly database: NexusDB;
+
+  constructor(database: NexusDB = defaultDb) {
+    this.database = database;
+  }
 
   async upsert(rec: SealedRecord): Promise<void> {
     const expiresAt = msToDate(rec.expiresAt);

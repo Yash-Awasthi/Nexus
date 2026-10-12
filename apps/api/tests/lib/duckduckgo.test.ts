@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { parseDuckDuckGo } from "../../src/lib/duckduckgo.js";
+import { parseDuckDuckGo } from "../../src/lib/duckduckgo.ts";
 
 const result = (url: string, title: string, snippet: string) => `
   <div class="result results_links web-result">

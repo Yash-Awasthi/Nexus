@@ -9,7 +9,7 @@
 import type { DriverRegistry } from "@nexus/llm-drivers";
 import { describe, it, expect } from "vitest";
 
-import { LlmDriversTransport, resolveMemberModel } from "../../src/routes/council.js";
+import { LlmDriversTransport, resolveMemberModel } from "../../src/routes/council.ts";
 
 interface Completion {
   model: string;

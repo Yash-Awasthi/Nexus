@@ -19,9 +19,9 @@ fs.mkdirSync(process.env.AGENT_FS_ROOT);
 fs.writeFileSync(path.join(ROOT, "secret.txt"), "outside the root");
 fs.writeFileSync(path.join(ROOT, "workspace", "notes.txt"), "inside the root");
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");
 

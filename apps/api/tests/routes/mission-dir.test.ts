@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { expect, it } from "vitest";
 
-import { missionDir } from "../../src/routes/missions.js";
+import { missionDir } from "../../src/routes/missions.ts";
 
 it("gives two owners of the same mission id separate folders", async () => {
   const a = await missionDir("user-a", "mission-same");

@@ -11,7 +11,7 @@ import {
   type AnalystEvent,
   type AnalystDomain,
   type StreamingLlmFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

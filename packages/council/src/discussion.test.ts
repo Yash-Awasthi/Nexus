@@ -6,9 +6,9 @@
  */
 import { describe, it, expect } from "vitest";
 
-import type { DebateMember, IStreamingTransport } from "./debate.js";
-import { runDiscussion, SUPERVISOR_PROMPT, type DiscussionOptions } from "./discussion.js";
-import type { ILLMMessage } from "./engine.js";
+import type { DebateMember, IStreamingTransport } from "./debate.ts";
+import { runDiscussion, SUPERVISOR_PROMPT, type DiscussionOptions } from "./discussion.ts";
+import type { ILLMMessage } from "./engine.ts";
 
 interface Script {
   /** Latency of this member's turn, in milliseconds. */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import type { ModelCapability } from "../../src/lib/model-discovery.js";
-import { routeModel } from "../../src/lib/model-routing.js";
+import type { ModelCapability } from "../../src/lib/model-discovery.ts";
+import { routeModel } from "../../src/lib/model-routing.ts";
 
 function m(partial: Partial<ModelCapability> & { id: string }): ModelCapability {
   return {

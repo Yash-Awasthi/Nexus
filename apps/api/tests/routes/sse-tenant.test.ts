@@ -160,7 +160,7 @@ async function buildWithAuth(): Promise<FastifyInstance> {
   process.env.DATABASE_URL =
     "postgresql://test:test@ep-test-sse.us-east-2.aws.neon.tech/sse_test?sslmode=require";
 
-  const { buildServer } = await import("../../src/server.js");
+  const { buildServer } = await import("../../src/server.ts");
   const server = await buildServer();
   await server.ready();
   return server;

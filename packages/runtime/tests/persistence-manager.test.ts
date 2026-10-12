@@ -8,7 +8,7 @@ import {
   FileEventStore,
   FileRuntimePersistence,
   backupRuntimePersistence,
-} from "../src/persistence-manager.js";
+} from "../src/persistence-manager.ts";
 
 let dir: string;
 

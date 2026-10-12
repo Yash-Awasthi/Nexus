@@ -6,7 +6,7 @@
  * Activated when SENTRY_DSN is set. No-ops silently when absent.
  *
  * Usage:
- *   import { sentryReporter } from "./sentry-reporter.js";
+ *   import { sentryReporter } from "./sentry-reporter.ts";
  *   sentryReporter.captureException(err, { request_id, url, method });
  *
  * Environment variables:

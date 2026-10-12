@@ -2,7 +2,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { assertPathDescendsFrom } from "./path-boundary.js";
+import { assertPathDescendsFrom } from "./path-boundary.ts";
 
 export interface RuntimeSandboxLayout {
   root: string;

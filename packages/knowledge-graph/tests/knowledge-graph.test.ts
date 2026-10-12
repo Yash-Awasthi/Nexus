@@ -18,7 +18,7 @@ import {
   type Relationship,
   type EntityExtractor,
   type RelationshipExtractor,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

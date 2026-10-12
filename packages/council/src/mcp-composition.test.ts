@@ -10,9 +10,9 @@
  */
 import { describe, expect, it } from "vitest";
 import { McpHttpServer, type McpCallResult } from "@nexus/mcp-client";
-import { DeliberativeCouncil } from "./deliberative.js";
-import type { Archetype } from "./archetypes.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import { DeliberativeCouncil } from "./deliberative.ts";
+import type { Archetype } from "./archetypes.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 const PANEL: Archetype[] = [
   {

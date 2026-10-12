@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { rrfFusion, HybridSearchEngine, InMemoryBM25, type SearchHit } from "../src/index.js";
+import { rrfFusion, HybridSearchEngine, InMemoryBM25, type SearchHit } from "../src/index.ts";
 
 function hit(id: string, score: number, text = ""): SearchHit {
   return { id, score, text };

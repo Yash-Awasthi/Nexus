@@ -8,7 +8,7 @@ import {
   UnauthorizedError,
   BudgetExceededError,
   GovernanceViolationError,
-} from "../src/errors.js";
+} from "../src/errors.ts";
 
 describe("NexusError", () => {
   it("sets message, code, and name", () => {

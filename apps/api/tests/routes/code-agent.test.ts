@@ -23,7 +23,7 @@ vi.mock("@nexus/code-repl", async (importOriginal) => {
   return { ...real, isDockerAvailable: async () => docker.up, DockerReplExecutor: FakeDocker };
 });
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

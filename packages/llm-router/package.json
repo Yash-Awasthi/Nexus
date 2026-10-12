@@ -5,25 +5,26 @@
   "description": "Multi-provider LLM abstraction — dynamic routing, alias resolution, fallback chains, OpenAI-compat passthrough",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "dependencies": {}
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  }
 }

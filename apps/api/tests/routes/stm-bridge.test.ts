@@ -13,7 +13,7 @@ import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 
@@ -169,7 +169,7 @@ describe("STM state outlives the process", () => {
   it("reloads a user's history from the store", async () => {
     await call("POST", "/api/stm/history", ALICE, { query: "survives a restart", modules: [] });
 
-    const store = await import("../../src/lib/stm-store.js");
+    const store = await import("../../src/lib/stm-store.ts");
     store._resetStmStoreForTests();
     await store.loadStmStore();
 

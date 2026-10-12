@@ -10,8 +10,8 @@ import {
   MemoryEventSource,
   MemorySignalSink,
   type RawEvent,
-} from "../src/processor.js";
-import { SignalClassifier } from "../src/classifier.js";
+} from "../src/processor.ts";
+import { SignalClassifier } from "../src/classifier.ts";
 
 function makeEvent(overrides?: Partial<RawEvent>): RawEvent {
   return {

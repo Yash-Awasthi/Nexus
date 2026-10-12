@@ -51,12 +51,15 @@ export interface TypedClientOptions {
 }
 
 export class TypedRequestError extends Error {
-  constructor(
-    readonly status: number,
-    readonly path: string,
-    readonly body: string,
-  ) {
+  readonly status: number;
+  readonly path: string;
+  readonly body: string;
+
+  constructor(status: number, path: string, body: string) {
     super(`${path} responded ${status}`);
+    this.status = status;
+    this.path = path;
+    this.body = body;
     this.name = "TypedRequestError";
   }
 }

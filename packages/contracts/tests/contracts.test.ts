@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { SCRAPE_SOURCES } from "../src/index.js";
+import { SCRAPE_SOURCES } from "../src/index.ts";
 import type {
   ScrapeSource,
   ScrapeRequest,
@@ -19,7 +19,7 @@ import type {
   ProposalResult,
   CouncilRequest,
   CouncilResponse,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── SCRAPE_SOURCES ─────────────────────────────────────────────────────────────
 

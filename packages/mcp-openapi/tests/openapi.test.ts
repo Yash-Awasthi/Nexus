@@ -2,7 +2,7 @@
 /** MCP tools generated from an OpenAPI spec, and the calls they make. */
 import { describe, expect, it } from "vitest";
 
-import { openApiToMcp } from "../src/index.js";
+import { openApiToMcp } from "../src/index.ts";
 
 describe("openApiToMcp", () => {
   const spec = {

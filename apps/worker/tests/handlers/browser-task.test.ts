@@ -2,7 +2,7 @@
 import type { BrowserAgentPage, BrowserAgentSession } from "@nexus/browser-automation";
 import { describe, it, expect } from "vitest";
 
-import { handleBrowserTaskJob } from "../../src/handlers/browser-task.js";
+import { handleBrowserTaskJob } from "../../src/handlers/browser-task.ts";
 
 function session(over: Partial<BrowserAgentSession> = {}): BrowserAgentSession {
   return {

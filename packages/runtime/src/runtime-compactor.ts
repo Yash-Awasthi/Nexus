@@ -16,12 +16,12 @@
  * - CompactionScheduler: periodic compaction cycles
  */
 
-import type { IEventBus, EventBusStats } from "./event-bus.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
-import type { MetricsCollector } from "./observability-manager.js";
-import type { RuntimeGraph } from "./runtime-graph.js";
+import type { IEventBus, EventBusStats } from "./event-bus.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
+import type { IQueueBackend } from "./interfaces/queue.interface.ts";
+import type { MetricsCollector } from "./observability-manager.ts";
+import type { RuntimeGraph } from "./runtime-graph.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -119,15 +119,26 @@ export class LeakDetector {
   private readings: { timestamp: Date; heapUsedMB: number; activeSubscriptions: number }[] = [];
   private readonly MAX_READINGS = 20;
 
+  private eventBus: IEventBus;
+  private options?: {
+    /** Suspect memory leak if heap grows more than this MB per minute (default 50) */
+    memoryGrowthThresholdMBperMin?: number;
+    /** Suspect subscription leak if count grows more than this per minute (default 10) */
+    subscriptionGrowthThresholdPerMin?: number;
+  };
+
   constructor(
-    private eventBus: IEventBus,
-    private options?: {
+    eventBus: IEventBus,
+    options?: {
       /** Suspect memory leak if heap grows more than this MB per minute (default 50) */
       memoryGrowthThresholdMBperMin?: number;
       /** Suspect subscription leak if count grows more than this per minute (default 10) */
       subscriptionGrowthThresholdPerMin?: number;
     },
-  ) {}
+  ) {
+    this.eventBus = eventBus;
+    this.options = options;
+  }
 
   /**
    * Record a diagnostic reading and return a leak report.
@@ -229,10 +240,10 @@ export class LeakDetector {
 export class ResourceQuotaManager {
   private quotas: ResourceQuota;
 
-  constructor(
-    quotas?: Partial<ResourceQuota>,
-    private metrics?: MetricsCollector,
-  ) {
+  private metrics?: MetricsCollector;
+
+  constructor(quotas?: Partial<ResourceQuota>, metrics?: MetricsCollector) {
+    this.metrics = metrics;
     this.quotas = { ...DEFAULT_QUOTAS, ...quotas };
   }
 
@@ -336,10 +347,10 @@ export class RuntimeCompactor {
   /** Last journal size snapshot for growth heuristic */
   private lastJournalSize = 0;
 
-  constructor(
-    private eventBus: IEventBus,
-    config: RuntimeCompactorConfig = {},
-  ) {
+  private eventBus: IEventBus;
+
+  constructor(eventBus: IEventBus, config: RuntimeCompactorConfig = {}) {
+    this.eventBus = eventBus;
     this.config = config;
     if (config.options?.autoCompact && config.options?.compactIntervalMs) {
       this.start(config.options.compactIntervalMs);

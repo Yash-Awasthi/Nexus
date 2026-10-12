@@ -11,8 +11,8 @@
  * Callers are auth-gated (requireAuthWithTier) — uid is always resolved.
  */
 
-import { getSharedKV } from "./shared-kv.js";
-import { withKeyLock } from "./with-key-lock.js";
+import { getSharedKV } from "./shared-kv.ts";
+import { withKeyLock } from "./with-key-lock.ts";
 
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAX_RECORDS = 50;

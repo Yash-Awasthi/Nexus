@@ -27,7 +27,7 @@ import {
 } from "@nexus/llm-compress";
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
-import { HookDispatcher, type AgentHooks, type HookDecision } from "./hooks.js";
+import { HookDispatcher, type AgentHooks, type HookDecision } from "./hooks.ts";
 
 export {
   HookDispatcher,
@@ -39,7 +39,7 @@ export {
   type PostToolUseInput,
   type SubagentStopInput,
   type StopInput,
-} from "./hooks.js";
+} from "./hooks.ts";
 
 // Re-export so consumers (api, worker) can type `compressToolOutput` without
 // taking a direct dependency on @nexus/llm-compress.
@@ -306,12 +306,12 @@ export {
   createRunCommandTool,
   resolveInWorkspace,
   globToRegExp,
-} from "./fs-tools.js";
-export type { CommandExecutor, CommandResult } from "./fs-tools.js";
-export { SANDBOX_PRELUDE } from "./sandbox-prelude.js";
+} from "./fs-tools.ts";
+export type { CommandExecutor, CommandResult } from "./fs-tools.ts";
+export { SANDBOX_PRELUDE } from "./sandbox-prelude.ts";
 // MCP tool bridge — dependency-injected, defaults to the requires_permission tier.
-export { createMcpTools } from "./mcp-tools.js";
-export type { McpBridgeOptions, McpToolClient, McpToolInfo, McpToolResult } from "./mcp-tools.js";
+export { createMcpTools } from "./mcp-tools.ts";
+export type { McpBridgeOptions, McpToolClient, McpToolInfo, McpToolResult } from "./mcp-tools.ts";
 
 /** A request to run a tool that requires approval. */
 export interface PermissionRequest {
@@ -2459,7 +2459,7 @@ export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): Runti
 
       // Sandbox path: a child Node; `call()` comes back here and stays gated.
       if (opts.sandbox) {
-        const { runToolScript } = await import("./ptc-sandbox.js");
+        const { runToolScript } = await import("./ptc-sandbox.ts");
         return runToolScript(code, {
           toolSet: opts.toolSet,
           ...(opts.permissionGate ? { permissionGate: opts.permissionGate } : {}),
@@ -2514,4 +2514,4 @@ export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): Runti
 }
 
 // Conversational group chat (AutoGen AgentChat parity).
-export * from "./group-chat.js";
+export * from "./group-chat.ts";

@@ -10,9 +10,9 @@ const importSite = vi.fn(async (_url: string, _opts: { maxPages: number }) => ({
   ],
   disallowed: 2,
 }));
-vi.mock("../../src/lib/site-import.js", () => ({ importSite }));
+vi.mock("../../src/lib/site-import.ts", () => ({ importSite }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 beforeAll(async () => {

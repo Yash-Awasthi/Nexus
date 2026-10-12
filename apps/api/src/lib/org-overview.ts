@@ -5,12 +5,12 @@
  * the other org modules; it stores nothing.
  */
 
-import { listApprovals as listExecApprovals } from "./exec-approvals.js";
-import { listApprovals } from "./org-approvals.js";
-import { budgetOverview, toUsd } from "./org-budget.js";
-import { allRuns } from "./org-runtime.js";
-import { getCompany, listActivity, listAgents, listCompanies } from "./org-store.js";
-import { listTasks, TASK_STATUSES } from "./org-work.js";
+import { listApprovals as listExecApprovals } from "./exec-approvals.ts";
+import { listApprovals } from "./org-approvals.ts";
+import { budgetOverview, toUsd } from "./org-budget.ts";
+import { allRuns } from "./org-runtime.ts";
+import { getCompany, listActivity, listAgents, listCompanies } from "./org-store.ts";
+import { listTasks, TASK_STATUSES } from "./org-work.ts";
 
 const DAY_MS = 86_400_000;
 

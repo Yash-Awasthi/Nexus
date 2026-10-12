@@ -6,9 +6,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "dev": "node --watch src/index.ts",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,12 +15,10 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "tsx": "^4.23.10",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "bin": {
-    "nexus": "./dist/index.js"
+    "nexus": "./src/index.ts"
   },
   "dependencies": {
     "@nexus/agent-runtime": "workspace:*",

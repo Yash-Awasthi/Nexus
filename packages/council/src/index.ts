@@ -4,18 +4,18 @@
  *
  * Deliberation engine, Groq transport, archetypes, and service facade.
  */
-export * from "./agreement.js";
-export { rankPeers, type PeerStanding } from "./borda.js";
-export * from "./archetypes.js";
-export * from "./debate.js";
-export * from "./discussion.js";
-export * from "./deliberative.js";
-export * from "./engine.js";
-export * from "./council.js";
-export * from "./groq-transport.js";
-export * from "./council-service.js";
-export * from "./verify.js";
-export * from "./critique.js";
-export * from "./transcript.js";
-export * from "./run-transcript.js";
-export * from "./mcp-server.js";
+export * from "./agreement.ts";
+export { rankPeers, type PeerStanding } from "./borda.ts";
+export * from "./archetypes.ts";
+export * from "./debate.ts";
+export * from "./discussion.ts";
+export * from "./deliberative.ts";
+export * from "./engine.ts";
+export * from "./council.ts";
+export * from "./groq-transport.ts";
+export * from "./council-service.ts";
+export * from "./verify.ts";
+export * from "./critique.ts";
+export * from "./transcript.ts";
+export * from "./run-transcript.ts";
+export * from "./mcp-server.ts";

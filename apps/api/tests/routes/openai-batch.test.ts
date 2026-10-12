@@ -22,9 +22,9 @@ process.env.NEXUS_DESKTOP = "1";
 process.env.LLM_CACHE_DISABLED = "1";
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-batch-"));
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 
 function authFor(userId: string) {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

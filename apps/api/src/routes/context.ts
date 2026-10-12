@@ -38,9 +38,9 @@ import { FixedEmbedder, MemoryManager, createBestEmbedder } from "@nexus/memory"
 import { and, desc, or, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { getMemoryStore } from "../lib/memory-store.js";
-import { ownerScope } from "../lib/owner.js";
-import { requireAuth } from "../middleware/auth.js";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { ownerScope } from "../lib/owner.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton memory manager (mirrors agents.ts / memory.ts pattern) ──
 const _ctxMemStore = getMemoryStore();

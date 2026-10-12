@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { BFIndex, HNSWIndex, makeDistance, type HnswSpace } from "./hnsw-index.js";
+import { BFIndex, HNSWIndex, makeDistance, type HnswSpace } from "./hnsw-index.ts";
 
 /** Deterministic pseudo-random vectors (mulberry32) so tests are stable. */
 function seededVectors(count: number, dim: number, seed = 7): number[][] {

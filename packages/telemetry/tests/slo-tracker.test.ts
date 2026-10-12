@@ -2,7 +2,7 @@
 import * as fc from "fast-check";
 import { describe, it, expect, vi } from "vitest";
 
-import { SloTracker, percentile } from "../src/slo-tracker.js";
+import { SloTracker, percentile } from "../src/slo-tracker.ts";
 
 // ─── percentile helper ────────────────────────────────────────────────────────
 

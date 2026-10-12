@@ -2,9 +2,9 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import type { EventRecord } from "./interfaces/event-store.interface.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { EventRecord } from "./interfaces/event-store.interface.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.ts";
 
 /**
  * Append-only JSONL event log with best-effort replay.

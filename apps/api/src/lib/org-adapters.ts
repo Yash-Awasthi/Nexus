@@ -10,10 +10,10 @@
 
 import type { LlmResponse } from "@nexus/llm-drivers";
 
-import type { FailoverDriver } from "./llm-failover.js";
-import { CallRefused } from "./llm-failover.js";
-import type { Adapter } from "./org-runtime.js";
-import type { Agent } from "./org-store.js";
+import type { FailoverDriver } from "./llm-failover.ts";
+import { CallRefused } from "./llm-failover.ts";
+import type { Adapter } from "./org-runtime.ts";
+import type { Agent } from "./org-store.ts";
 
 export interface ResolvedDriver {
   /** Always a failover chain: it is what applies the per-call budget guard. */

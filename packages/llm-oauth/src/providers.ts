@@ -17,7 +17,7 @@
  * NOT IMPLEMENTED (descriptor stub with reason, per product direction — no
  * workarounds): GitHub Models. See DESCRIPTORS below.
  */
-import { generatePkce, randomState } from "./crypto.js";
+import { generatePkce, randomState } from "./crypto.ts";
 import type {
   AuthProvider,
   AuthStartResult,
@@ -25,7 +25,7 @@ import type {
   PendingAuth,
   ProviderDescriptor,
   TokenHttp,
-} from "./types.js";
+} from "./types.ts";
 
 // ── Default transport (fetch + form encoding) ───────────────────────────────────
 
@@ -80,10 +80,13 @@ export class GoogleVertexAuthProvider implements AuthProvider {
   private static readonly TOKEN_URL = "https://oauth2.googleapis.com/token";
   private static readonly SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
-  constructor(
-    private readonly cfg: GoogleVertexConfig,
-    private readonly http: TokenHttp = new FetchTokenHttp(),
-  ) {}
+  private readonly cfg: GoogleVertexConfig;
+  private readonly http: TokenHttp;
+
+  constructor(cfg: GoogleVertexConfig, http: TokenHttp = new FetchTokenHttp()) {
+    this.cfg = cfg;
+    this.http = http;
+  }
 
   async startLogin({ redirectUri }: { redirectUri: string }): Promise<AuthStartResult> {
     const pkce = generatePkce();
@@ -195,10 +198,13 @@ export class MicrosoftEntraAuthProvider implements AuthProvider {
   // `.default` requests the app's statically-consented scopes; offline_access buys a refresh token.
   private static readonly SCOPE = "https://cognitiveservices.azure.com/.default offline_access";
 
-  constructor(
-    private readonly cfg: MicrosoftEntraConfig,
-    private readonly http: TokenHttp = new FetchTokenHttp(),
-  ) {}
+  private readonly cfg: MicrosoftEntraConfig;
+  private readonly http: TokenHttp;
+
+  constructor(cfg: MicrosoftEntraConfig, http: TokenHttp = new FetchTokenHttp()) {
+    this.cfg = cfg;
+    this.http = http;
+  }
 
   private authUrl(): string {
     return `https://login.microsoftonline.com/${this.cfg.tenantId}/oauth2/v2.0/authorize`;

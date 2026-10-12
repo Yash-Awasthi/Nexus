@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IEventStore } from "./interfaces/event-store.interface.js";
-import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventStore } from "./interfaces/event-store.interface.ts";
+import type { ILogger } from "./interfaces/logger.interface.ts";
 
 export interface EventSubscription {
   unsubscribe(): void;

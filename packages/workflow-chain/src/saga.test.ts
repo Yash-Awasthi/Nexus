@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Saga compensation (Temporal parity) — focused tests.
 import { describe, it, expect, beforeEach } from "vitest";
-import { createWorkflowChain, type WorkflowEvent } from "./index.js";
+import { createWorkflowChain, type WorkflowEvent } from "./index.ts";
 
 const log: string[] = [];
 

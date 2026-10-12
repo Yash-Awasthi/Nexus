@@ -465,4 +465,4 @@ export class DrizzleSyncStore extends SyncStore {
   }
 }
 
-export * from "./raft-election.js";
+export * from "./raft-election.ts";

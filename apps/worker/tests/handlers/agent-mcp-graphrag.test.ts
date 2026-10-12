@@ -6,7 +6,7 @@
 // and offline: a deterministic in-memory index + scripted transport drive it.
 import { describe, expect, it } from "vitest";
 
-import { graphRagRuntimeTools } from "../../src/handlers/agent-mcp.js";
+import { graphRagRuntimeTools } from "../../src/handlers/agent-mcp.ts";
 import type { ILLMTransport } from "@nexus/council";
 
 const ENTITIES = [

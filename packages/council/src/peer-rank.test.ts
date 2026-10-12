@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { rankPeers } from "./borda.js";
+import { rankPeers } from "./borda.ts";
 
 const finals = [
   { label: "Qwen", text: "FINAL: Use Postgres." },

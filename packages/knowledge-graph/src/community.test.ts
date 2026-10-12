@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Community detection (Leiden/Louvain parity) — focused tests.
 import { describe, it, expect } from "vitest";
-import { detectCommunities, modularity } from "./community.js";
-import { KnowledgeGraph, InMemoryKGStore, type KGNode, type KGEdge } from "./index.js";
+import { detectCommunities, modularity } from "./community.ts";
+import { KnowledgeGraph, InMemoryKGStore, type KGNode, type KGEdge } from "./index.ts";
 
 function adj(pairs: [string, string][]): Map<string, Set<string>> {
   const g = new Map<string, Set<string>>();

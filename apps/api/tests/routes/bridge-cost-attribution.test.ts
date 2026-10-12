@@ -24,17 +24,17 @@ const savedConnection = () => [
   },
 ];
 // asUser reads listUserDrivers through its own module binding, so both are replaced.
-vi.mock("../../src/lib/provider-keys.js", async (original) => {
-  const { userContext } = await import("../../src/lib/user-context.js");
+vi.mock("../../src/lib/provider-keys.ts", async (original) => {
+  const { userContext } = await import("../../src/lib/user-context.ts");
   return {
-    ...(await original<typeof import("../../src/lib/provider-keys.js")>()),
+    ...(await original<typeof import("../../src/lib/provider-keys.ts")>()),
     listUserDrivers: async () => savedConnection(),
     asUser: (userId: string | null, fn: () => unknown) =>
       userContext.run({ userId, userDrivers: savedConnection() }, fn),
   };
 });
-const { buildServer } = await import("../../src/server.js");
-const { costLogStore } = await import("../../src/lib/cost-log.js");
+const { buildServer } = await import("../../src/server.ts");
+const { costLogStore } = await import("../../src/lib/cost-log.ts");
 const secret = "bridge-cost-regression-secret";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const head = b64({ alg: "HS256", typ: "JWT" });

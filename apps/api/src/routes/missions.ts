@@ -39,10 +39,10 @@ import type { ExecAction } from "@nexus/exec-policy";
 import { executeCode } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
-import { APPROVAL_TTL_MS, classifyAction } from "../lib/exec-approvals.js";
-import { guardExec } from "../lib/exec-guard.js";
-import { MissionGraphRecorder } from "../lib/mission-graph.js";
-import { loadMissionMemory, type MissionMemory } from "../lib/mission-memory.js";
+import { APPROVAL_TTL_MS, classifyAction } from "../lib/exec-approvals.ts";
+import { guardExec } from "../lib/exec-guard.ts";
+import { MissionGraphRecorder } from "../lib/mission-graph.ts";
+import { loadMissionMemory, type MissionMemory } from "../lib/mission-memory.ts";
 import {
   createMission,
   deleteMission,
@@ -50,9 +50,9 @@ import {
   newMissionId,
   kvMissionStore,
   listMissions,
-} from "../lib/mission-store.js";
-import { dataDir } from "../lib/persistent-store.js";
-import { compressSkillsForTaskSemantic, slugify } from "../lib/skill-compress.js";
+} from "../lib/mission-store.ts";
+import { dataDir } from "../lib/persistent-store.ts";
+import { compressSkillsForTaskSemantic, slugify } from "../lib/skill-compress.ts";
 import {
   composeSkillSystemPrompt,
   executeSkillsOnce,
@@ -61,11 +61,11 @@ import {
   withOutputStyle,
   type MissionOutputStyle,
   type SkillRecord,
-} from "../lib/skill-runner.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/skill-runner.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { getDefaultDriver } from "./api-bridge.js";
-import { getSkillsByIds } from "./skills.js";
+import { getDefaultDriver } from "./api-bridge.ts";
+import { getSkillsByIds } from "./skills.ts";
 
 const MISSION_ACTING_PROMPT = `You are a mission agent. Work toward the stated goal autonomously using your tools.
 Build on prior work already present in the conversation. When the reviewer sends feedback, address it directly.

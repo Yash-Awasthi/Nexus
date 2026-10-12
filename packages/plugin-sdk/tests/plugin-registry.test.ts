@@ -7,7 +7,7 @@ import {
   PluginManifestError,
   type PluginManifest,
   type RegistryFetchFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const MANIFEST: PluginManifest = {
   id: "com.acme.summarizer",

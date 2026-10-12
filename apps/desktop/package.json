@@ -9,7 +9,6 @@
     "build": "tsc --project tsconfig.json",
     "start": "electron dist/main.js",
     "dev": "tsc --project tsconfig.json && electron dist/main.js",
-    "typecheck": "tsc --noEmit --project tsconfig.test.json",
     "test": "vitest run",
     "clean": "rm -rf dist coverage",
     "smoke": "node scripts/smoke.cjs",
@@ -18,7 +17,6 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "electron": "^44.4.5",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

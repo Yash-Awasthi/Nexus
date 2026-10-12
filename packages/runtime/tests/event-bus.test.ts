@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { LocalEventBus } from "../src/event-bus.js";
+import { LocalEventBus } from "../src/event-bus.ts";
 
 describe("LocalEventBus — publish & subscribe", () => {
   let bus: LocalEventBus;

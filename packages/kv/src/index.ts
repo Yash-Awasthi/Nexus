@@ -33,12 +33,13 @@ import { randomUUID } from "node:crypto";
 // ── Error ──────────────────────────────────────────────────────────────────────
 
 export class KVError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "KVError";
   }
 }
@@ -221,10 +222,13 @@ export interface RedisClientLike {
 
 /** Redis-backed KVStore. Values are JSON-serialised before storage. */
 export class RedisKVStore implements KVStore {
-  constructor(
-    private readonly client: RedisClientLike,
-    private readonly opts: { keyPrefix?: string } = {},
-  ) {}
+  private readonly client: RedisClientLike;
+  private readonly opts: { keyPrefix?: string };
+
+  constructor(client: RedisClientLike, opts: { keyPrefix?: string } = {}) {
+    this.client = client;
+    this.opts = opts;
+  }
 
   private _k(key: string): string {
     return this.opts.keyPrefix ? `${this.opts.keyPrefix}:${key}` : key;
@@ -428,10 +432,13 @@ export class RedisDistributedLock implements DistributedLock {
     end
   `;
 
-  constructor(
-    private readonly client: RedisClientLike,
-    private readonly opts: { keyPrefix?: string } = {},
-  ) {}
+  private readonly client: RedisClientLike;
+  private readonly opts: { keyPrefix?: string };
+
+  constructor(client: RedisClientLike, opts: { keyPrefix?: string } = {}) {
+    this.client = client;
+    this.opts = opts;
+  }
 
   private _k(key: string): string {
     return this.opts.keyPrefix ? `${this.opts.keyPrefix}:lock:${key}` : `lock:${key}`;

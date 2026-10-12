@@ -11,6 +11,12 @@ catalog:
   typescript: 7.0.2
   vitest: ^2.1.9
 
+catalogs:
+  # openapi-typescript prints its output with the TypeScript 5 compiler API,
+  # which TypeScript 7 no longer ships; @nexus/contracts provides it as the peer.
+  openapi:
+    typescript: ^5.9.3
+
 engineStrict: true
 strictPeerDependencies: false
 autoInstallPeers: true

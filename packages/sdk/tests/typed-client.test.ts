@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
-import { TypedNexusClient, TypedRequestError, buildUrl } from "../src/typed.js";
+import { TypedNexusClient, TypedRequestError, buildUrl } from "../src/typed.ts";
 
 function respond(status: number, body: string): Response {
   return new Response(body, { status });

@@ -7,7 +7,7 @@ import {
   MailIngestor,
   type ParsedEmail,
   type ImapMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

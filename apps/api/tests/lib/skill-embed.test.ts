@@ -14,7 +14,7 @@ import {
   semanticScores,
   skillEmbedText,
   type EmbedSkill,
-} from "../../src/lib/skill-embed.js";
+} from "../../src/lib/skill-embed.ts";
 
 /** Fake fetch that returns one-hot vectors keyed by input index. */
 function oneHotFetch(texts: string[][]): typeof fetch {

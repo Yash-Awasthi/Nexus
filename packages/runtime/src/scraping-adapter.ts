@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
+import { getBridgeManager, BridgeManager } from "./bridge-manager.ts";
 import type {
   IScrapingExecutionAdapter,
   IScrapingTask,
   IEnvironmentTelemetry,
-} from "./interfaces/environment.interface.js";
-import type { IExecutionContext } from "./interfaces/execution.interface.js";
-import { isSafeUrl } from "./security-utils.js";
+} from "./interfaces/environment.interface.ts";
+import type { IExecutionContext } from "./interfaces/execution.interface.ts";
+import { isSafeUrl } from "./security-utils.ts";
 
 export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
-  constructor(
-    private telemetry: IEnvironmentTelemetry,
-    private isOfflineMode = true,
-  ) {}
+  private telemetry: IEnvironmentTelemetry;
+  private isOfflineMode: boolean;
+
+  constructor(telemetry: IEnvironmentTelemetry, isOfflineMode = true) {
+    this.telemetry = telemetry;
+    this.isOfflineMode = isOfflineMode;
+  }
 
   canExecute(taskType: string): boolean {
     return taskType === "scraping";

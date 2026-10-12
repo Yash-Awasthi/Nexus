@@ -184,12 +184,12 @@ export class InterpreterProcess implements ReplProcess {
   private pending?: { resolve: (r: ReplResult) => void; t0: number; timer: NodeJS.Timeout };
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(
-    bin: string,
-    args: string[],
-    private readonly marker: string,
-    private readonly onClose?: () => void,
-  ) {
+  private readonly marker: string;
+  private readonly onClose?: () => void;
+
+  constructor(bin: string, args: string[], marker: string, onClose?: () => void) {
+    this.marker = marker;
+    this.onClose = onClose;
     const m = escapeRe(marker);
     this.doneOut = new RegExp(`(^|\\n)${m} (\\d+)\\r?\\n`);
     this.doneErr = new RegExp(`(^|\\n)${m}\\r?\\n`);

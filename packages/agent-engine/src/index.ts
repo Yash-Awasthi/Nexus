@@ -67,7 +67,7 @@ export {
   type MissionSpawnTask,
   type MissionStatus,
   type MissionStore,
-} from "./mission.js";
+} from "./mission.ts";
 
 /** Executes a tool call requested by the model; returns the result text fed back. */
 export type ToolExecutor = (call: ToolCall) => string | Promise<string>;
@@ -87,11 +87,19 @@ export interface Engine {
 export class OpenAIEngine implements Engine {
   readonly name = "openai";
 
+  private baseUrl: string;
+  private apiKey?: string;
+  private executeTool: ToolExecutor;
+
   constructor(
-    private baseUrl = "https://api.openai.com/v1",
-    private apiKey?: string,
-    private executeTool: ToolExecutor = () => "No tool executor configured for this engine.",
-  ) {}
+    baseUrl = "https://api.openai.com/v1",
+    apiKey?: string,
+    executeTool: ToolExecutor = () => "No tool executor configured for this engine.",
+  ) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+    this.executeTool = executeTool;
+  }
 
   async run(task: string, config: EngineConfig): Promise<EngineResult> {
     const start = Date.now();

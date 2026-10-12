@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const savedDb = process.env.DATABASE_URL;
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 let kbId = "";

@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { afterAll, expect, it } from "vitest";
 
-import { closeEmbeddedDb, getEmbeddedDb } from "../src/embedded.js";
+import { closeEmbeddedDb, getEmbeddedDb } from "../src/embedded.ts";
 
 const root = mkdtempSync(path.join(tmpdir(), "nexus-embedded-"));
 const url = `pglite://${path.join(root, "gone", "pg").replace(/\\/g, "/")}`;

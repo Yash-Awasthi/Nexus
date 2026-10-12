@@ -20,7 +20,7 @@ vi.mock("@nexus/db", () => ({
   },
 }));
 
-import { loadProviderModelsIntoRegistry } from "../../src/lib/models-seed.js";
+import { loadProviderModelsIntoRegistry } from "../../src/lib/models-seed.ts";
 import { globalRegistry } from "@nexus/provider-registry";
 
 const ROWS = [

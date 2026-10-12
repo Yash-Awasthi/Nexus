@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IEventBus } from "./event-bus.js";
-import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { IEventStore } from "./interfaces/persistence.interface.ts";
 
 export interface Task {
   id: string;

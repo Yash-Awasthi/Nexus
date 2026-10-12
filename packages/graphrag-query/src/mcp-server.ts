@@ -32,14 +32,14 @@
  */
 import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
 
-import type { IndexedEntity, IndexedRelation } from "./index-graphrag.js";
+import type { IndexedEntity, IndexedRelation } from "./index-graphrag.ts";
 
 import {
   GraphRAGQueryEngine,
   LocalSearchEngine,
   type CommunityReport,
   type QueryRouter,
-} from "./index.js";
+} from "./index.ts";
 
 export interface GraphRagMcpServerOptions {
   /** Indexed entity graph the local-search engine anchors on. */

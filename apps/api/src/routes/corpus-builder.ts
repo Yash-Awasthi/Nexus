@@ -26,7 +26,7 @@ import {
 import { RuleTagger, QualityScorer } from "@nexus/sft-tagger";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
+import { requireAuthWithTier, getTierFromRequest } from "../middleware/auth.ts";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 

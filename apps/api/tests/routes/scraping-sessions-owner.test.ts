@@ -3,14 +3,14 @@
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", () => ({
+vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   },
 }));
 delete process.env.STEALTH_BROWSER_URL;
 
-const { scrapingMcpRoutes } = await import("../../src/routes/scraping-mcp.js");
+const { scrapingMcpRoutes } = await import("../../src/routes/scraping-mcp.ts");
 
 it("keeps browser sessions to the account that opened them", async () => {
   const app = Fastify();

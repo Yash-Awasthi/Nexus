@@ -15,9 +15,9 @@ process.env.DATABASE_URL = DB;
 process.env.NEXUS_SECRETS_KEY = "ab".repeat(32);
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-council-seed-"));
 
-const { buildServer } = await import("../../src/server.js");
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
+const { buildServer } = await import("../../src/server.ts");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");
 

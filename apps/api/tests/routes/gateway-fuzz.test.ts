@@ -29,8 +29,8 @@ vi.mock("@nexus/council", async (importOriginal) => ({
 }));
 
 import * as fc from "fast-check";
-import { buildServer } from "../../src/server.js";
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+import { buildServer } from "../../src/server.ts";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import type { FastifyInstance } from "fastify";
 
 // fetch is mocked here, so local Ollama is expected at its default port, not setup's closed one.

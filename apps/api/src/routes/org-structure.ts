@@ -3,15 +3,15 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { inboxDigest, sendInboxDigests } from "../lib/org-inbox.js";
-import { companyOverview, portfolio } from "../lib/org-overview.js";
+import { inboxDigest, sendInboxDigests } from "../lib/org-inbox.ts";
+import { companyOverview, portfolio } from "../lib/org-overview.ts";
 import {
   TEMPLATES,
   exportCompany,
   importCompany,
   instantiateTemplate,
-} from "../lib/org-portability.js";
-import { askOrg } from "../lib/org-runtime.js";
+} from "../lib/org-portability.ts";
+import { askOrg } from "../lib/org-runtime.ts";
 import {
   createAgent,
   createCompany,
@@ -32,8 +32,8 @@ import {
   updateCompany,
   type AgentInput,
   type CompanyInput,
-} from "../lib/org-store.js";
-import { listComments, listTasks } from "../lib/org-work.js";
+} from "../lib/org-store.ts";
+import { listComments, listTasks } from "../lib/org-work.ts";
 
 import {
   OWNER_CAN,
@@ -42,7 +42,7 @@ import {
   ownerOf,
   workspaceRolesFor,
   type Id,
-} from "./org-http.js";
+} from "./org-http.ts";
 
 export async function orgStructureRoutes(app: FastifyInstance): Promise<void> {
   // ── Companies ──────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ import {
   BUILTIN_ALIASES,
   type AnthropicRequest,
   type GatewayConfig,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

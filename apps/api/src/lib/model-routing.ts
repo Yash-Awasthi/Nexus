@@ -13,7 +13,7 @@
  * preferences RANK (tier adequacy, then cost, then context headroom).
  */
 
-import type { ModelCapability, ReasoningTier } from "./model-discovery.js";
+import type { ModelCapability, ReasoningTier } from "./model-discovery.ts";
 
 export interface CapabilityRequirement {
   /** Model must accept image inputs. */

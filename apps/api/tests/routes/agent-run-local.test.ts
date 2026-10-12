@@ -21,9 +21,9 @@ process.env.NEXUS_DESKTOP = "1";
 delete process.env.NEXUS_EXEC_MODE;
 delete process.env.REDIS_URL;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { globalBus } = await import("@nexus/sse");
 
 function tokenFor(userId: string): string {

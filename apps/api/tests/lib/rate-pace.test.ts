@@ -5,7 +5,7 @@
  */
 import { afterEach, expect, it, vi } from "vitest";
 
-import { pacedFetch } from "../../src/lib/rate-pace.js";
+import { pacedFetch } from "../../src/lib/rate-pace.ts";
 
 afterEach(() => vi.useRealTimers());
 

@@ -5,8 +5,8 @@ import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { Pool } from "pg";
 
-import { getEmbeddedDb, isEmbeddedUrl } from "./embedded.js";
-import * as schema from "./schema/index.js";
+import { getEmbeddedDb, isEmbeddedUrl } from "./embedded.ts";
+import * as schema from "./schema/index.ts";
 
 /**
  * Nexus DB client — Drizzle ORM.

@@ -5,9 +5,9 @@ import { expect, it } from "vitest";
 const DB = "pglite://:memory:grant-admin";
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { grantAdmin } = await import("../../src/lib/grant-admin.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { grantAdmin } = await import("../../src/lib/grant-admin.ts");
 
 it("promotes an existing account by email, and says when there is none", async () => {
   const pool = getPgPool(DB)!;

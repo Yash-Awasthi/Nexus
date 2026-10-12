@@ -10,11 +10,11 @@ const { mockLookupApiKey, mockQuotaCheck, mockRecordUsage } = vi.hoisted(() => {
   return { mockLookupApiKey, mockQuotaCheck, mockRecordUsage };
 });
 
-vi.mock("../src/api-keys.js", () => ({
+vi.mock("../src/api-keys.ts", () => ({
   lookupApiKey: mockLookupApiKey,
 }));
 
-vi.mock("../src/quota.js", () => ({
+vi.mock("../src/quota.ts", () => ({
   QuotaChecker: vi.fn(() => ({
     check: mockQuotaCheck,
     recordUsage: mockRecordUsage,
@@ -23,7 +23,7 @@ vi.mock("../src/quota.js", () => ({
 
 // ── Imports (after mocks) ──────────────────────────────────────────────────────
 
-import { billingPreHandler } from "../src/middleware.js";
+import { billingPreHandler } from "../src/middleware.ts";
 import type { ApiKey } from "@nexus/db/schema";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────

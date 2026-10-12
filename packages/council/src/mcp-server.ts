@@ -33,11 +33,11 @@
 import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/debate-engine";
 import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
 
-import type { Archetype } from "./archetypes.js";
-import { runCritique } from "./critique.js";
-import { DeliberativeCouncil } from "./deliberative.js";
-import type { ILLMMessage, ILLMTransport } from "./engine.js";
-import { runMavVerification } from "./verify.js";
+import type { Archetype } from "./archetypes.ts";
+import { runCritique } from "./critique.ts";
+import { DeliberativeCouncil } from "./deliberative.ts";
+import type { ILLMMessage, ILLMTransport } from "./engine.ts";
+import { runMavVerification } from "./verify.ts";
 
 /** Which protocol tools to expose. Default: all five. */
 export type CouncilProtocolTool = "deliberate" | "vote" | "debate" | "critique" | "verify";

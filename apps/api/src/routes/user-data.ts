@@ -9,8 +9,8 @@
 import { db, eraseUserData, type ErasableDb } from "@nexus/db";
 import type { FastifyInstance } from "fastify";
 
-import { handleSelfErasure } from "../lib/gdpr-erasure.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { handleSelfErasure } from "../lib/gdpr-erasure.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export async function userDataRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { id: string } }>(

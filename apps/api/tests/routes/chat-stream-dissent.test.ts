@@ -27,8 +27,8 @@ async function stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<
   } as LlmResponse;
 }
 
-vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/provider-keys.js")>()),
+vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
   buildUserDriverRegistry: async (_userId: string | undefined, providers: Iterable<string>) => {
     const registry = new DriverRegistry();
     for (const p of new Set(providers))
@@ -40,7 +40,7 @@ vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => ({
   },
 }));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

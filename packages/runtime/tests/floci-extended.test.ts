@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { EXTENDED_FLOCI_ACTIONS, dispatchExtendedAction } from "../src/floci-extended.js";
+import { EXTENDED_FLOCI_ACTIONS, dispatchExtendedAction } from "../src/floci-extended.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();

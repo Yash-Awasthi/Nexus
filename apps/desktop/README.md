@@ -30,10 +30,9 @@ directory, serving the built `apps/ui` from the same origin. Every `/api/*` call
 the renderer makes is same-origin, exactly as in a browser tab, and no server
 and no network are involved.
 
-The child runs with `--import tsx/esm`. That is not a convenience: 39 workspace
-packages point `main` at their TypeScript source, and Node's own type stripping
-rejects the parameter properties several of them use, so plain
-`node dist/index.js` dies on the first such import.
+The child runs `apps/api/src/index.ts` directly: every workspace package exports
+its TypeScript source and uses only erasable syntax, so Node's own type
+stripping loads the whole API without a compile step or loader.
 
 The embedded database is migrated at boot, so a first launch asks for a local
 account (email and password) and keeps its session in the OS keychain. PGlite

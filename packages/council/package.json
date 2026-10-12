@@ -5,24 +5,16 @@
   "description": "Multi-model deliberation engine (ex-Judica): providers, modes, presets, synthesis, guardrails",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
@@ -31,5 +23,15 @@
     "@nexus/mcp-client": "workspace:*",
     "@nexus/shared": "workspace:*",
     "groq-sdk": "^0.37.0"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

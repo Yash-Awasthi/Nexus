@@ -7,7 +7,7 @@ delete process.env.POLYMARKET_ENABLED;
 delete process.env.YOUTUBE_API_KEY;
 delete process.env.HF_TOKEN;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 const call = (method: "GET" | "POST", url: string, payload?: object) =>

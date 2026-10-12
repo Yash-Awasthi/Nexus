@@ -13,10 +13,10 @@ process.env.NEXUS_JWT_SECRET = "auth-mfa-login-secret";
 process.env.DATABASE_URL = DB;
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-auth-mfa-"));
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { authUsersRoutes } = await import("../../src/routes/auth-users.js");
-const { mfaRoutes } = await import("../../src/routes/mfa.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { authUsersRoutes } = await import("../../src/routes/auth-users.ts");
+const { mfaRoutes } = await import("../../src/routes/mfa.ts");
 
 let app: FastifyInstance;
 

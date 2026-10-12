@@ -9,7 +9,7 @@ import {
   sourcesFooter,
   sourcesPrompt,
   supportingNumbers,
-} from "../../src/lib/citations.js";
+} from "../../src/lib/citations.ts";
 
 const chunk = (
   id: string,

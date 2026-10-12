@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { loadConductorConfig } from "../src/nexus-config.js";
+import { loadConductorConfig } from "../src/nexus-config.ts";
 
 const ENV_KEYS = [
   "GHOSTSTACK_API_PORT",

@@ -12,7 +12,7 @@ process.env.DATABASE_URL = "pglite://:memory:otel-request-span";
 const exporter = new InMemorySpanExporter();
 startTracing("nexus-api", exporter);
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 beforeAll(async () => {

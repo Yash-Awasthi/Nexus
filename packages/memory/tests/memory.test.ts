@@ -16,8 +16,8 @@ import {
   extractEntities,
   normalizeEntity,
   parseRelativeTimeWindow,
-} from "../src/index.js";
-import type { MemoryEntry } from "../src/index.js";
+} from "../src/index.ts";
+import type { MemoryEntry } from "../src/index.ts";
 
 // ── Math helpers ──────────────────────────────────────────────────────────────
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 // These cover the handlers; who may reach them is admin-config-guards.test.ts.
-vi.mock("../../src/routes/admin-users.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/routes/admin-users.js")>()),
+vi.mock("../../src/routes/admin-users.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/routes/admin-users.ts")>()),
   requireAdminRole: async () => {},
 }));
 

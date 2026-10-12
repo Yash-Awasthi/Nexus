@@ -45,17 +45,17 @@ import {
 import { pinnedFetch } from "@nexus/runtime";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { IdleMap } from "../lib/idle-map.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { IdleMap } from "../lib/idle-map.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import {
   SecretEncryptionUnavailableError,
   listSecrets,
   putSecret,
   resolveSecret,
-} from "../lib/secret-store.js";
-import { requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/secret-store.ts";
+import { requireAuth, requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Registries, one per account ───────────────────────────────────────────────
 

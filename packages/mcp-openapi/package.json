@@ -5,18 +5,11 @@
   "description": "OpenAPI to MCP: every operation in a spec becomes an MCP tool with an executor",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run"
@@ -25,7 +18,16 @@
     "@nexus/mcp-client": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

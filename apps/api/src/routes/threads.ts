@@ -19,8 +19,8 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { emitReaction } from "../lib/reactions.js";
-import { appendGraphEvent } from "../lib/session-graph.js";
+import { emitReaction } from "../lib/reactions.ts";
+import { appendGraphEvent } from "../lib/session-graph.ts";
 import {
   appendMessages,
   createThread,
@@ -31,8 +31,8 @@ import {
   searchThreads,
   updateThread,
   type ThreadMessage,
-} from "../lib/threads-store.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/threads-store.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 const AUTH = { preHandler: requireAuthWithTier };
 

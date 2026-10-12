@@ -4,7 +4,7 @@
 // these tests pin the seam that makes the advertised stage real, mirroring
 // weaviate's hybrid rerank tool: fused candidates are reranked and cut to limit.
 import { describe, it, expect } from "vitest";
-import { HybridSearchEngine, InMemoryBM25, type VectorSearchAdapter } from "../src/index.js";
+import { HybridSearchEngine, InMemoryBM25, type VectorSearchAdapter } from "../src/index.ts";
 import { NullReranker, FunctionReranker, BM25Reranker, type Reranker } from "@nexus/reranker";
 
 interface Doc {

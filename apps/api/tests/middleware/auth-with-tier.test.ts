@@ -8,7 +8,7 @@ import {
   requireAuthWithTier,
   getTierFromRequest,
   requireUserId,
-} from "../../src/middleware/auth.js";
+} from "../../src/middleware/auth.ts";
 
 // `pg` is imported dynamically inside the api_keys identity fallback, so the
 // mock intercepts that import. It lets the fallback be exercised without a

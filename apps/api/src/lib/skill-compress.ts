@@ -20,8 +20,8 @@
  * composite (same fail-safe as merge).
  */
 
-import { semanticScores } from "./skill-embed.js";
-import { splitSkillCodeImports } from "./skill-imports.js";
+import { semanticScores } from "./skill-embed.ts";
+import { splitSkillCodeImports } from "./skill-imports.ts";
 import {
   commentPrefix,
   estimateTokens,
@@ -29,7 +29,7 @@ import {
   polishMergedSkill,
   type PolishDriver,
   type SkillSource,
-} from "./skill-merge.js";
+} from "./skill-merge.ts";
 
 /** Words that carry no capability signal — never used for relevance scoring. */
 const STOPWORDS = new Set([

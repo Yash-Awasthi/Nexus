@@ -13,11 +13,11 @@ import {
   TaskGraphLimitGuardrail,
   HighCostPlanGuardrail,
   DuplicateActionGuardrail,
-} from "../src/governance-engine.js";
+} from "../src/governance-engine.ts";
 import type {
   ITaskSynthesisResult,
   ICognitiveTrace,
-} from "../src/interfaces/governance.interface.js";
+} from "../src/interfaces/governance.interface.ts";
 
 function makeTask(overrides: Partial<ITaskSynthesisResult> = {}): ITaskSynthesisResult {
   return {

@@ -22,7 +22,7 @@ import {
 } from "@nexus/sft-tagger";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 const now = (): string => new Date().toISOString();
 

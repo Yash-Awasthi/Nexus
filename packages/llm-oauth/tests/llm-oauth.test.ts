@@ -14,7 +14,7 @@ import {
   registryFromEnv,
   type TokenHttp,
   type OAuthTokens,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Vault ───────────────────────────────────────────────────────────────────
 

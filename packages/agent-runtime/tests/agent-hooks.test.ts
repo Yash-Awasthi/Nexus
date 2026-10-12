@@ -17,7 +17,7 @@ import {
   type HookDecision,
   type ToolSpec,
   type SpawnAgentResult,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 

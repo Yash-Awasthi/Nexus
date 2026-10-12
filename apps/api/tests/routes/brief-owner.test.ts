@@ -3,14 +3,14 @@
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", () => ({
+vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   },
 }));
 delete process.env.DATABASE_URL;
 
-const { briefRoutes } = await import("../../src/routes/brief.js");
+const { briefRoutes } = await import("../../src/routes/brief.ts");
 
 it("keeps each account's brief to that account", async () => {
   const app = Fastify();

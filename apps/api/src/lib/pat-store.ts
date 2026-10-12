@@ -42,7 +42,7 @@ import { db as defaultDb } from "@nexus/db";
 import { apiKeys, type ApiKey } from "@nexus/db/schema";
 import { and, eq, like, isNull, lt } from "drizzle-orm";
 
-import { sha256hex } from "./crypto-utils.js";
+import { sha256hex } from "./crypto-utils.ts";
 
 interface PersonalAccessToken {
   id: string;

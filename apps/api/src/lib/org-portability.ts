@@ -21,9 +21,9 @@ import {
   toUsd,
   type ScopeType,
   type WindowKind,
-} from "./org-budget.js";
-import { addLesson, listLessons, type LessonKind } from "./org-memory.js";
-import { createRoutine, listRoutines } from "./org-scheduler.js";
+} from "./org-budget.ts";
+import { addLesson, listLessons, type LessonKind } from "./org-memory.ts";
+import { createRoutine, listRoutines } from "./org-scheduler.ts";
 import {
   OrgError,
   createAgent,
@@ -36,8 +36,8 @@ import {
   type AdapterType,
   type Company,
   type HeartbeatPolicy,
-} from "./org-store.js";
-import { createGoal, listGoals, type GoalLevel, type GoalStatus } from "./org-work.js";
+} from "./org-store.ts";
+import { createGoal, listGoals, type GoalLevel, type GoalStatus } from "./org-work.ts";
 
 export const BUNDLE_FORMAT = "nexus-company/1";
 

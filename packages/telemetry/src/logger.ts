@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 
-import type { ILogger } from "./interfaces/logger.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.ts";
 
 // ─── Log level ordering ────────────────────────────────────────────────────────
 

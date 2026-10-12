@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import type { IRuntimePersistence } from "../src/interfaces/persistence.interface.js";
-import type { IApprovalWorkflow } from "../src/interfaces/governance.interface.js";
-import type { IEventBus } from "../src/event-bus.js";
-import type { Task } from "../src/task-router.js";
-import { RuntimeGraph } from "../src/runtime-graph.js";
+import type { IRuntimePersistence } from "../src/interfaces/persistence.interface.ts";
+import type { IApprovalWorkflow } from "../src/interfaces/governance.interface.ts";
+import type { IEventBus } from "../src/event-bus.ts";
+import type { Task } from "../src/task-router.ts";
+import { RuntimeGraph } from "../src/runtime-graph.ts";
 import {
   WorkflowEngine,
   WorkflowRegistry,
@@ -17,8 +17,8 @@ import {
   DocumentProcessingTemplate,
   GovernedEtlWorkflowTemplate,
   SpecToExecutionTemplate,
-} from "../src/workflow-engine.js";
-import type { ConductorOrchestrator } from "../src/orchestrator.js";
+} from "../src/workflow-engine.ts";
+import type { ConductorOrchestrator } from "../src/orchestrator.ts";
 
 // ─── In-memory persistence + fakes ──────────────────────────────────────────
 

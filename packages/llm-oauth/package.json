@@ -5,23 +5,26 @@
   "description": "Official-authentication framework for LLM providers — provider-agnostic plugins, AES-256-GCM credential vault, PKCE/device-code OAuth, token refresh with dedup. scoped to SANCTIONED third-party auth only. No subscription-CLI routing, no official-CLI client-ID reuse.",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

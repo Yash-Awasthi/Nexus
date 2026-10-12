@@ -28,7 +28,7 @@ import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexu
 import type { Reranker } from "@nexus/reranker";
 import type { WhereClause, WhereDocumentClause } from "@nexus/retrieval";
 
-import { HybridSearchEngine, type BM25SearchAdapter, type VectorSearchAdapter } from "./index.js";
+import { HybridSearchEngine, type BM25SearchAdapter, type VectorSearchAdapter } from "./index.ts";
 
 export interface HybridSearchMcpServerOptions {
   /** Dense leg: any @nexus/hybrid-search VectorSearchAdapter implementation. */

@@ -184,7 +184,11 @@ export class GatewayAdminService {
  * Call `handle(req)` from any HTTP framework adapter.
  */
 export class AdminRouter {
-  constructor(private readonly service: GatewayAdminService) {}
+  private readonly service: GatewayAdminService;
+
+  constructor(service: GatewayAdminService) {
+    this.service = service;
+  }
 
   handle<T = unknown>(req: AdminRequest): AdminResponse<T> {
     try {

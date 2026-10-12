@@ -5,7 +5,7 @@
  * rest await the same promise. Prevents the refresh stampede (and the
  * double-rotation that revokes a just-issued token) is worth guarding against.
  */
-import type { AuthProvider, OAuthTokens } from "./types.js";
+import type { AuthProvider, OAuthTokens } from "./types.ts";
 
 /** Refresh when the token expires within this skew (default 60s). */
 const DEFAULT_SKEW_MS = 60_000;
@@ -13,7 +13,11 @@ const DEFAULT_SKEW_MS = 60_000;
 export class TokenRefresher {
   private readonly inFlight = new Map<string, Promise<OAuthTokens>>();
 
-  constructor(private readonly skewMs: number = DEFAULT_SKEW_MS) {}
+  private readonly skewMs: number;
+
+  constructor(skewMs: number = DEFAULT_SKEW_MS) {
+    this.skewMs = skewMs;
+  }
 
   /** True when the token is missing an expiry or is within the skew window. */
   isExpiring(tokens: OAuthTokens, nowMs: number): boolean {

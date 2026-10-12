@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { compressOutputForCommand } from "./token-saver.js";
+import { compressOutputForCommand } from "./token-saver.ts";
 
 function bigDiff(additions: number): string {
   const lines = [

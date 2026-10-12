@@ -2,7 +2,7 @@
 /** A per-account cache lets go of accounts that went quiet, and releases what they held. */
 import { afterEach, expect, it, vi } from "vitest";
 
-import { IdleMap } from "../../src/lib/idle-map.js";
+import { IdleMap } from "../../src/lib/idle-map.ts";
 
 afterEach(() => {
   vi.useRealTimers();

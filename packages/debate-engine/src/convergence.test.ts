@@ -14,7 +14,7 @@ import {
   runMultiAgentDebate,
   type AgentMessage,
   type MultiAgentDebateResult,
-} from "./multiagent-debate.js";
+} from "./multiagent-debate.ts";
 
 /** Transport that plays back per-agent scripts indexed by round number. */
 function scriptedTransport(scripts: Record<string, readonly string[]>) {

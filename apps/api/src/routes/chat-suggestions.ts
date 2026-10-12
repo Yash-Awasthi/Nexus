@@ -8,7 +8,7 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Static suggestion sets ────────────────────────────────────────────────────
 

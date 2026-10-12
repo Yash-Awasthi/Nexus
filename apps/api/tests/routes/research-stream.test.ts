@@ -4,15 +4,15 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
 // Search finds nothing, so the synthesis step takes its no-model path and no call leaves the machine.
-vi.mock("../../src/lib/duckduckgo.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/duckduckgo.js")>()),
+vi.mock("../../src/lib/duckduckgo.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/duckduckgo.ts")>()),
   searchDuckDuckGo: async () => [],
 }));
 
 for (const k of Object.keys(process.env))
   if (/_API_KEYS?$|^SEARXNG_URL$/.test(k)) delete process.env[k];
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 beforeAll(async () => {

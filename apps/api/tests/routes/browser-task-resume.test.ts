@@ -38,8 +38,8 @@ vi.mock("@nexus/stealth-browser", async (importOriginal) => {
   };
 });
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { db } = await import("@nexus/db");
 const { userProviderCredentials } = await import("@nexus/db/schema");
 
@@ -91,7 +91,7 @@ beforeAll(async () => {
     SESSION,
     stale,
   ]);
-  const { buildServer } = await import("../../src/server.js");
+  const { buildServer } = await import("../../src/server.ts");
   app = await buildServer();
   await app.ready();
 }, 120_000);

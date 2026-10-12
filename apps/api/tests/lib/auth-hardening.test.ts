@@ -10,7 +10,7 @@ import {
   recordLoginSuccess,
   revokeAllForSubject,
   revokeJti,
-} from "../../src/lib/auth-hardening.js";
+} from "../../src/lib/auth-hardening.ts";
 
 describe("loginThrottleKey", () => {
   it("normalizes email case and whitespace, keeps the ip", () => {

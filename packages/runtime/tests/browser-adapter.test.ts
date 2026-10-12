@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
 }));
 
-vi.mock("../src/bridge-manager.js", () => ({
+vi.mock("../src/bridge-manager.ts", () => ({
   getBridgeManager: () => ({ url: mocks.url }),
   BridgeManager: { post: mocks.post },
 }));
 
-import type { IExecutionContext } from "../src/interfaces/execution.interface.js";
-import { BrowserExecutionAdapter } from "../src/browser-adapter.js";
+import type { IExecutionContext } from "../src/interfaces/execution.interface.ts";
+import { BrowserExecutionAdapter } from "../src/browser-adapter.ts";
 
 function telemetry() {
   return {

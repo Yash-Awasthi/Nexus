@@ -9,7 +9,7 @@ import {
   DisasterRecovery,
   MemoryDisasterRecovery,
   type RuntimeCheckpoint,
-} from "../src/disaster-recovery.js";
+} from "../src/disaster-recovery.ts";
 
 function makeCheckpoint(overrides: Partial<RuntimeCheckpoint> = {}): RuntimeCheckpoint {
   return {

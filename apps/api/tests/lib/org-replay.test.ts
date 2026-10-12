@@ -5,14 +5,14 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 const boot = () =>
   bootOrg(async () => ({
-    budget: await import("../../src/lib/org-budget.js"),
-    replay: await import("../../src/lib/org-replay.js"),
+    budget: await import("../../src/lib/org-budget.ts"),
+    replay: await import("../../src/lib/org-replay.ts"),
   }));
 
 describe("run replay", () => {

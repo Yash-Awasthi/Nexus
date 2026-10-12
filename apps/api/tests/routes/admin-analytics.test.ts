@@ -10,10 +10,10 @@ const DB = "pglite://:memory:admin-analytics";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
-const { costLogStore } = await import("../../src/lib/cost-log.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
+const { costLogStore } = await import("../../src/lib/cost-log.ts");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");
 

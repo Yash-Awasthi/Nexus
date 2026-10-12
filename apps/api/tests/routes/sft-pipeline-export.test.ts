@@ -7,7 +7,7 @@
  * the ≥10-example export precondition (422 insufficient_data).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 vi.mock("@nexus/db", () => ({

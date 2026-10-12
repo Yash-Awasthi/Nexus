@@ -8,7 +8,7 @@
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
-import type { Vault } from "./types.js";
+import type { Vault } from "./types.ts";
 
 // ── PKCE ────────────────────────────────────────────────────────────────────
 
@@ -37,8 +37,11 @@ export function randomState(): string {
 // ── AES-256-GCM vault ─────────────────────────────────────────────────────────
 
 export class AesGcmVault implements Vault {
+  private readonly key: Buffer;
+
   /** @param key exactly 32 bytes (AES-256). */
-  constructor(private readonly key: Buffer) {
+  constructor(key: Buffer) {
+    this.key = key;
     if (key.length !== 32) {
       throw new Error(`AesGcmVault: key must be 32 bytes, got ${key.length}`);
     }

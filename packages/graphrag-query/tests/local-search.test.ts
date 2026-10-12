@@ -5,9 +5,9 @@
 // relationship filter (in-network first, mutual-link priority outside), token-
 // budgeted tables, report attachment, single-pass answer.
 import { describe, it, expect } from "vitest";
-import { LocalSearchEngine } from "../src/index.js";
-import type { QueryRouter } from "../src/index.js";
-import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.js";
+import { LocalSearchEngine } from "../src/index.ts";
+import type { QueryRouter } from "../src/index.ts";
+import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.ts";
 
 function stubRouter(contents: string[] = ["synthesized answer"]): {
   router: QueryRouter;

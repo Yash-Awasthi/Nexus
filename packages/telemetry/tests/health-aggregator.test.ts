@@ -2,7 +2,7 @@
 import * as fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
-import { HealthAggregator, queueDepthProbe, type ProbeFn } from "../src/health-aggregator.js";
+import { HealthAggregator, queueDepthProbe, type ProbeFn } from "../src/health-aggregator.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

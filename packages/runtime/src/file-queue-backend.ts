@@ -26,8 +26,8 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import type { IMetricsCollector } from "./interfaces/observability.interface.js";
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+import type { IMetricsCollector } from "./interfaces/observability.interface.ts";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.ts";
 
 const PRIORITY_WEIGHTS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 

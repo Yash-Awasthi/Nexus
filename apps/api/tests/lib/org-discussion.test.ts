@@ -6,14 +6,14 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 const boot = () =>
   bootOrg(async () => ({
-    budget: await import("../../src/lib/org-budget.js"),
-    talk: await import("../../src/lib/org-discussion.js"),
+    budget: await import("../../src/lib/org-budget.ts"),
+    talk: await import("../../src/lib/org-discussion.ts"),
   }));
 
 const step = { provider: "x", model: "unpriced", latencyMs: 1, cached: false };
@@ -239,7 +239,7 @@ describe("a settled discussion", () => {
 
   it("remembers how a decision ended, so a later run on the question recalls it", async () => {
     const { org, work, talk } = await boot();
-    const memory = await import("../../src/lib/org-memory.js");
+    const memory = await import("../../src/lib/org-memory.ts");
     const c = org.createCompany("alice", { name: "Lesson Co" });
     const lead = org.createAgent("alice", c.id, {
       name: "Lead",

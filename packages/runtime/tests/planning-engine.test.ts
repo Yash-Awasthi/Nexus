@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { PlanningEngine } from "../src/planning-engine.js";
+import { PlanningEngine } from "../src/planning-engine.ts";
 
 describe("PlanningEngine — keyword-based blueprint selection", () => {
   const engine = new PlanningEngine(); // no LLM → keyword matching

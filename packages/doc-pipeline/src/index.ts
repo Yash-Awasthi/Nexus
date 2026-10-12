@@ -24,7 +24,7 @@
 
 import { defineAdapter, type IExecutionContext } from "@nexus/plugin-sdk";
 
-export { ComponentPipeline, type PipelineComponent, type PipelineRunResult } from "./pipeline.js";
+export { ComponentPipeline, type PipelineComponent, type PipelineRunResult } from "./pipeline.ts";
 
 // ── Public types ───────────────────────────────────────────────────────────────
 

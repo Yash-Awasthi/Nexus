@@ -11,9 +11,9 @@ import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { enqueueJob } from "../lib/agent-queue.js";
-import { ownerScope } from "../lib/owner.js";
-import { requireAuth } from "../middleware/auth.js";
+import { enqueueJob } from "../lib/agent-queue.ts";
+import { ownerScope } from "../lib/owner.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── /ingest/events ────────────────────────────────────────────────────────────
 

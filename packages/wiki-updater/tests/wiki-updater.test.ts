@@ -6,7 +6,7 @@ import {
   WikiUpdatePipeline,
   type WikiDocument,
   type UpdateRequest,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function makeDoc(content = "Machine learning is a subset of AI.", id = "doc-1"): WikiDocument {
   return { id, content, source: "test-source" };

@@ -6,14 +6,14 @@
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 useOrgDataDir();
 
 describe("org memory", () => {
   it("learns from finished work and board feedback, and feeds it to later runs", async () => {
     const { memory, rt, work, org } = await bootOrg(async () => ({
-      memory: await import("../../src/lib/org-memory.js"),
+      memory: await import("../../src/lib/org-memory.ts"),
     }));
 
     const c = org.createCompany("alice", { name: "Learn Co" });
@@ -71,7 +71,7 @@ describe("org memory", () => {
 
   it("recalls the agent's knowledge bases and the owner's memory into its prompt", async () => {
     const { memory, rt, work, org } = await bootOrg(async () => ({
-      memory: await import("../../src/lib/org-memory.js"),
+      memory: await import("../../src/lib/org-memory.ts"),
     }));
     const c = org.createCompany("alice", { name: "Know Co" });
     const a = org.createAgent("alice", c.id, { name: "Dev", knowledgeBaseIds: ["kb1"] });

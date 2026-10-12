@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 
 const boot = "window.__boot = 1;";
 let app: FastifyInstance;

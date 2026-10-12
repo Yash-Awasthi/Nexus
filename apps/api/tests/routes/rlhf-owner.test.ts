@@ -3,13 +3,13 @@
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", () => ({
+vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   },
 }));
 
-const { rlhfRoutes } = await import("../../src/routes/rlhf.js");
+const { rlhfRoutes } = await import("../../src/routes/rlhf.ts");
 
 describe("rlhf feedback", () => {
   it("is private to its account", async () => {

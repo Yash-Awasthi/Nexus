@@ -16,10 +16,10 @@
 
 import { spawn } from "node:child_process";
 
-import { SANDBOX_PRELUDE } from "./sandbox-prelude.js";
+import { SANDBOX_PRELUDE } from "./sandbox-prelude.ts";
 
-import type { PermissionGate, RuntimeToolSet, ToolContext } from "./index.js";
-import { gatedInvoke } from "./index.js";
+import type { PermissionGate, RuntimeToolSet, ToolContext } from "./index.ts";
+import { gatedInvoke } from "./index.ts";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_OUTPUT = 16_000;

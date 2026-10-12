@@ -78,17 +78,14 @@ export function nodeLocalApiPorts(dataDir: string, port: number): LocalApiPorts 
     }),
     waitForHealth: (url) => waitForHealth(url),
     spawn: (entry, env): SpawnedProcess => {
-      // Both are build outputs and both are gitignored, so a checkout that has
-      // never been built reaches here with neither. Failing on the missing path
-      // beats a child that exits with a stack about a module it could not find.
+      // The UI is a gitignored build output; failing on a missing path beats a
+      // child that exits with a stack about a module it could not find.
       for (const [what, where] of [
         ["API", entry],
         ["UI", env.NEXUS_SPA_DIR],
       ] as const) {
         if (!where || !existsSync(where)) {
-          throw new Error(
-            `Built ${what} not found at ${where ?? "(unset)"}. Run \`pnpm build\` first.`,
-          );
+          throw new Error(`${what} not found at ${where ?? "(unset)"}. Run \`pnpm build\` first.`);
         }
       }
       return fork(entry, [], {
@@ -96,11 +93,6 @@ export function nodeLocalApiPorts(dataDir: string, port: number): LocalApiPorts 
         // the developer's shell would otherwise point the desktop app at a
         // cloud database.
         env: { PATH: process.env.PATH ?? "", ...env },
-        // 39 workspace packages point `main` at their TypeScript source, and
-        // Node's built-in stripping rejects the parameter properties several of
-        // them use — plain `node dist/index.js` dies on the first one. The
-        // loader is what the API's own Docker dev stage already uses.
-        execArgv: ["--import", "tsx/esm"],
         stdio: ["ignore", "inherit", "inherit", "ipc"],
       });
     },

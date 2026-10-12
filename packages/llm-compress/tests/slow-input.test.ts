@@ -11,7 +11,7 @@ import {
   compressPreset,
   type CompressionModeName,
   type PresetName,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const N = 64 * 1024;
 const INPUTS: Record<string, string> = {

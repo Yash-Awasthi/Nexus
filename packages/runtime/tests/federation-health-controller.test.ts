@@ -10,13 +10,13 @@ const mocks = vi.hoisted(() => ({
   resolveFlociEndpoint: vi.fn(() => "http://localhost:4566"),
 }));
 
-vi.mock("../src/floci-client.js", () => ({
+vi.mock("../src/floci-client.ts", () => ({
   probeFlociHealth: mocks.probeFlociHealth,
   resolveFlociEndpoint: mocks.resolveFlociEndpoint,
 }));
 
-import { FederationHealthController } from "../src/federation-health-controller.js";
-import type { FederationSupervisor } from "../src/federation-supervisor.js";
+import { FederationHealthController } from "../src/federation-health-controller.ts";
+import type { FederationSupervisor } from "../src/federation-supervisor.ts";
 
 const DATA_DIR = "data-runtime";
 

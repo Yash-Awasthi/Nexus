@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AgentBus, TaskDelegationAgent, type AgentMessage } from "../src/agent-bus.js";
-import { EventBus } from "../src/event-bus.js";
-import type { ILogger } from "../src/interfaces/logger.interface.js";
+import { AgentBus, TaskDelegationAgent, type AgentMessage } from "../src/agent-bus.ts";
+import { EventBus } from "../src/event-bus.ts";
+import type { ILogger } from "../src/interfaces/logger.interface.ts";
 
 const logger: ILogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 

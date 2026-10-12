@@ -31,7 +31,7 @@ import {
   type DocumentConnector,
   type SyncedDocument,
   type ReadFileFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

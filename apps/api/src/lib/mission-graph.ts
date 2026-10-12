@@ -17,7 +17,7 @@
 
 import type { RuntimeTool } from "@nexus/agent-runtime";
 
-import { appendGraphEvent, type ExecutionStatus, type GraphEvent } from "./session-graph.js";
+import { appendGraphEvent, type ExecutionStatus, type GraphEvent } from "./session-graph.ts";
 
 /** Injection seam for tests; defaults to the real KV-backed appender. */
 export type GraphSink = (event: GraphEvent) => void | Promise<void>;

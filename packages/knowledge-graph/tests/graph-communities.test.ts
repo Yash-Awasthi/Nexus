@@ -9,7 +9,7 @@ import {
   makeNodeId,
   summarizeCommunities,
   type KGNode,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const NOW = 1_700_000_000;
 

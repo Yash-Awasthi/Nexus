@@ -8,10 +8,10 @@
  * or network call is needed. Training is deterministic for a given seed.
  */
 
-import { KNNRouter } from "./knn-router.js";
-import { MFBilinearRouter } from "./mf-router.js";
-import { MLPRouter } from "./mlp-router.js";
-import { SVMRouter } from "./svm-router.js";
+import { KNNRouter } from "./knn-router.ts";
+import { MFBilinearRouter } from "./mf-router.ts";
+import { MLPRouter } from "./mlp-router.ts";
+import { SVMRouter } from "./svm-router.ts";
 
 export interface RoutingSample {
   query: string;

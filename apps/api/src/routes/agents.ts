@@ -32,11 +32,11 @@ import { globalHooks } from "@nexus/hooks";
 import { MemoryManager, createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
-import { getKG, getKGStore, searchGraph } from "../lib/knowledge-graph-store.js";
-import { getMemoryStore } from "../lib/memory-store.js";
-import { requireAuth } from "../middleware/auth.js";
+import { getKG, getKGStore, searchGraph } from "../lib/knowledge-graph-store.ts";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 

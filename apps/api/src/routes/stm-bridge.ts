@@ -13,7 +13,7 @@
 import { computeAutoTuneParams } from "@nexus/drift";
 import type { FastifyInstance } from "fastify";
 
-import { ownerIdFor } from "../lib/owner.js";
+import { ownerIdFor } from "../lib/owner.ts";
 import {
   clearStmHistory,
   getActiveModules,
@@ -24,7 +24,7 @@ import {
   setActiveModules,
   setProjectModules,
   toggleModule,
-} from "../lib/stm-store.js";
+} from "../lib/stm-store.ts";
 
 /** Params a module list produces for a neutral prompt, for the status views. */
 function neutralParams() {

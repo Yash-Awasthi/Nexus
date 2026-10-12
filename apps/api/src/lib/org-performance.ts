@@ -8,11 +8,11 @@
 
 import type { CouncilRequest, CouncilResponse } from "@nexus/contracts";
 
-import { bookCompanySpend, companyHeadroomUsd } from "./org-budget.js";
-import { allRuns } from "./org-runtime.js";
-import { OrgError, getAgent, getCompany, onOrgLoad, registerCompanyScoped } from "./org-store.js";
-import { getTask, listTasks } from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
+import { bookCompanySpend, companyHeadroomUsd } from "./org-budget.ts";
+import { allRuns } from "./org-runtime.ts";
+import { OrgError, getAgent, getCompany, onOrgLoad, registerCompanyScoped } from "./org-store.ts";
+import { getTask, listTasks } from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 export interface PerformanceReview {
   id: string;

@@ -231,7 +231,7 @@ export {
   makeCommunitySummarizer,
   parseSummaryJson,
   mergeGraphEntities,
-} from "./index-graphrag.js";
+} from "./index-graphrag.ts";
 export type {
   EntityExtraction,
   RelationExtraction,
@@ -244,11 +244,11 @@ export type {
   GraphRagIndexResult,
   MergeGraphOptions,
   MergedGraph,
-} from "./index-graphrag.js";
+} from "./index-graphrag.ts";
 
 // ── Local search (entity-anchored, graphrag dual-mode parity) ─────────────────
-export { LocalSearchEngine } from "./local-search.js";
-export type { LocalSearchResult, LocalSearchOptions } from "./local-search.js";
+export { LocalSearchEngine } from "./local-search.ts";
+export type { LocalSearchResult, LocalSearchOptions } from "./local-search.ts";
 
-export { createGraphRagMcpServer } from "./mcp-server.js";
-export type { GraphRagMcpServerOptions } from "./mcp-server.js";
+export { createGraphRagMcpServer } from "./mcp-server.ts";
+export type { GraphRagMcpServerOptions } from "./mcp-server.ts";

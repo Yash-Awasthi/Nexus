@@ -132,7 +132,11 @@ export type ScoringFn = (query: string, doc: string) => number;
 
 /** Wraps any (query, doc) → number function as a Reranker. */
 export class FunctionReranker implements Reranker {
-  constructor(private readonly fn: ScoringFn) {}
+  private readonly fn: ScoringFn;
+
+  constructor(fn: ScoringFn) {
+    this.fn = fn;
+  }
 
   async rerank(
     query: string,

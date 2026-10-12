@@ -91,11 +91,19 @@ class WorkflowInstance<RESULT> {
     | undefined;
   private done = false;
 
+  readonly workflowId: string;
+  private readonly runtime: DurableRuntime;
+  private readonly body: (ctx: WorkflowContext) => Promise<RESULT>;
+
   constructor(
-    readonly workflowId: string,
-    private readonly runtime: DurableRuntime,
-    private readonly body: (ctx: WorkflowContext) => Promise<RESULT>,
-  ) {}
+    workflowId: string,
+    runtime: DurableRuntime,
+    body: (ctx: WorkflowContext) => Promise<RESULT>,
+  ) {
+    this.workflowId = workflowId;
+    this.runtime = runtime;
+    this.body = body;
+  }
 
   /** The workflow body's own handle to this instance's signals/waits. */
   private ctx(): WorkflowContext {

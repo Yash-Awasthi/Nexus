@@ -2,7 +2,7 @@
 import { sql } from "drizzle-orm";
 import { pgTable, uuid, text, real, numeric, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 
-import { signals } from "./signals.js";
+import { signals } from "./signals.ts";
 
 /**
  * verdicts — council deliberation outcomes.

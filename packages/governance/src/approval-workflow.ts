@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IEventBus } from "./event-bus.js";
-import type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
-import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.ts";
+import type { IEventStore } from "./interfaces/persistence.interface.ts";
 
 export class ApprovalWorkflow implements IApprovalWorkflow {
   private eventStore: IEventStore;

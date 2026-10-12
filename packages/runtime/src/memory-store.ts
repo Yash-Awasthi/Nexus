@@ -6,8 +6,8 @@
  * semantic indexing, and trace-based retrieval.
  */
 
-import type { ILogger } from "./interfaces/logger.interface.js";
-import type { IRuntimePersistence, IEventStore } from "./interfaces/persistence.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.ts";
+import type { IRuntimePersistence, IEventStore } from "./interfaces/persistence.interface.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -462,10 +462,13 @@ function intersect(a: Set<string>, b: Set<string>): Set<string> {
 export class TraceIndexer {
   private lastIndexed = 0;
 
-  constructor(
-    private eventStore: IEventStore,
-    private memoryStore: IMemoryStore,
-  ) {}
+  private eventStore: IEventStore;
+  private memoryStore: IMemoryStore;
+
+  constructor(eventStore: IEventStore, memoryStore: IMemoryStore) {
+    this.eventStore = eventStore;
+    this.memoryStore = memoryStore;
+  }
 
   async indexRecentEvents(): Promise<number> {
     const events = await this.eventStore.replayEvents();

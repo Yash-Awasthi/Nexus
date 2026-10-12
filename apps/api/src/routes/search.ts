@@ -11,11 +11,11 @@ import type { MemoryManager } from "@nexus/memory";
 import type { RetrievalSource, ScoredChunk, SourceRetrieverFn } from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
-import { citedNumbers, numberSources, sourcesPrompt } from "../lib/citations.js";
-import { screenForPrompt } from "../lib/injection-classifier.js";
-import { getKGStore, searchGraph } from "../lib/knowledge-graph-store.js";
+import { citedNumbers, numberSources, sourcesPrompt } from "../lib/citations.ts";
+import { screenForPrompt } from "../lib/injection-classifier.ts";
+import { getKGStore, searchGraph } from "../lib/knowledge-graph-store.ts";
 
-import { listKbsFor, searchKb } from "./kb.js";
+import { listKbsFor, searchKb } from "./kb.ts";
 
 interface SearchDeps {
   getMemory: () => MemoryManager;

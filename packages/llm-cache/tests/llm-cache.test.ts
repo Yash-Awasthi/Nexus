@@ -15,7 +15,7 @@ import {
   type LLMProvider,
   type KVStoreLike,
   type EmbedFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

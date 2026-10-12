@@ -5,7 +5,7 @@
  * Verifies that every .ts, .tsx, .py, and .sql source file in the repo
  * starts with an SPDX license identifier comment.
  *
- * Usage: tsx scripts/check-license-headers.ts
+ * Usage: node scripts/check-license-headers.ts
  * Exit 0 = all files compliant. Exit 1 = violations found.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";

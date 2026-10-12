@@ -28,7 +28,7 @@ vi.mock("drizzle-orm", () => ({
 
 // ── Imports (after mocks) ──────────────────────────────────────────────────────
 
-import { QuotaChecker } from "../src/quota.js";
+import { QuotaChecker } from "../src/quota.ts";
 
 const rpmKey = {
   id: "key-rpm-BASE",

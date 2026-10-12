@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 
 let app: FastifyInstance;
 

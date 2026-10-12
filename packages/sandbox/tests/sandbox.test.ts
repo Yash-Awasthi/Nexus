@@ -25,7 +25,7 @@ import {
   type Runner,
   type RunnerResult,
   type DockerSandboxConfig,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Mock fs/promises so no real temp files are touched ───────────────────────
 

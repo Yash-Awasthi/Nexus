@@ -15,10 +15,10 @@
 import { policyFromEnv } from "@nexus/exec-policy";
 import type { FastifyInstance } from "fastify";
 
-import { decideApproval, listApprovals, loadApprovalStore } from "../lib/exec-approvals.js";
-import { HOST_SHELL_ADMIN_ONLY, hostShellNeedsAdmin } from "../lib/exec-guard.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { decideApproval, listApprovals, loadApprovalStore } from "../lib/exec-approvals.ts";
+import { HOST_SHELL_ADMIN_ONLY, hostShellNeedsAdmin } from "../lib/exec-guard.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export async function execApprovalRoutes(app: FastifyInstance): Promise<void> {
   await loadApprovalStore();

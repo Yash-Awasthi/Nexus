@@ -16,8 +16,8 @@
 import { GatewayAdminService } from "@nexus/admin-gateway";
 import type { FastifyInstance } from "fastify";
 
-import { requireAdminRole } from "./admin-users.js";
-import { DRIVER_ALIASES, gatewayLog } from "./gateway.js";
+import { requireAdminRole } from "./admin-users.ts";
+import { DRIVER_ALIASES, gatewayLog } from "./gateway.ts";
 
 // ── Singleton admin service ───────────────────────────────────────────────────
 

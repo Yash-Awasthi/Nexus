@@ -24,7 +24,7 @@ import {
   type McpCallResult,
   type McpClient,
   type McpToolDefinition,
-} from "./index.js";
+} from "./index.ts";
 
 /** One backend server behind the facade. */
 export interface McpProxyServer {

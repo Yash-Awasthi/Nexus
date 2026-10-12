@@ -4,10 +4,10 @@ import { HealthAggregator, postgresProbe } from "@nexus/telemetry";
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { costLogStore } from "../lib/cost-log.js";
-import { getLlmCacheStats } from "../lib/llm-cache-driver.js";
-import { getProviderSnapshot, getProviderStats } from "../lib/llm-failover.js";
-import { getSharedKV } from "../lib/shared-kv.js";
+import { costLogStore } from "../lib/cost-log.ts";
+import { getLlmCacheStats } from "../lib/llm-cache-driver.ts";
+import { getProviderSnapshot, getProviderStats } from "../lib/llm-failover.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
 
 // ── Readiness probes ────────────────────────────────────────────────────────────
 // Built once and reused. DB is critical (failure → "down" → 503); the shared KV /

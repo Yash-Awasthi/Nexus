@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { signJwt } from "@nexus/auth";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { buildServer } from "../../src/server.js";
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+import { buildServer } from "../../src/server.ts";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import type { FastifyInstance } from "fastify";
 
 // fetch is mocked here, so local Ollama is expected at its default port, not setup's closed one.
@@ -11,7 +11,7 @@ delete process.env.OLLAMA_BASE_URL;
 // §4.1: resolveFresh is mocked here — it exercises gateway.ts's own OAuth wiring
 // (pool → store.resolveFresh → provider.toDriverCredentials → VertexDriver), not
 // @nexus/llm-oauth's TokenRefresher, which already has its own unit coverage.
-vi.mock("../../src/lib/oauth-token-store.js", () => ({
+vi.mock("../../src/lib/oauth-token-store.ts", () => ({
   createOAuthTokenStore: () => ({
     resolveFresh: async () => ({
       accessToken: "ya29.mock-vertex-token",

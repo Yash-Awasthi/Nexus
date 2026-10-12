@@ -11,29 +11,29 @@
 import { MemoryManager, createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
-import { ANON_OWNER, listArchetypes } from "../lib/archetype-store.js";
-import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { getMemoryStore } from "../lib/memory-store.js";
-import { nativeAdapter, type DriverResolver } from "../lib/org-adapters.js";
-import { setCouncilRunner } from "../lib/org-approvals.js";
-import { registerExternalAdapters, setSkillResolver } from "../lib/org-cli-adapters.js";
-import { setDiscussionSpeaker } from "../lib/org-discussion.js";
-import { setKnowledgeRecall, setMemoryMirror } from "../lib/org-memory.js";
-import { setPerformanceCouncil } from "../lib/org-performance.js";
-import { setReplayCaller } from "../lib/org-replay.js";
-import { registerAdapter, setOwnerContextRunner, setPersonaResolver } from "../lib/org-runtime.js";
-import { fireRoutineWebhook, startScheduler } from "../lib/org-scheduler.js";
-import { OrgError, loadOrgStore, setAuditSink, type Agent } from "../lib/org-store.js";
-import { asUser } from "../lib/provider-keys.js";
+import { ANON_OWNER, listArchetypes } from "../lib/archetype-store.ts";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { nativeAdapter, type DriverResolver } from "../lib/org-adapters.ts";
+import { setCouncilRunner } from "../lib/org-approvals.ts";
+import { registerExternalAdapters, setSkillResolver } from "../lib/org-cli-adapters.ts";
+import { setDiscussionSpeaker } from "../lib/org-discussion.ts";
+import { setKnowledgeRecall, setMemoryMirror } from "../lib/org-memory.ts";
+import { setPerformanceCouncil } from "../lib/org-performance.ts";
+import { setReplayCaller } from "../lib/org-replay.ts";
+import { registerAdapter, setOwnerContextRunner, setPersonaResolver } from "../lib/org-runtime.ts";
+import { fireRoutineWebhook, startScheduler } from "../lib/org-scheduler.ts";
+import { OrgError, loadOrgStore, setAuditSink, type Agent } from "../lib/org-store.ts";
+import { asUser } from "../lib/provider-keys.ts";
 
-import { getPinnedDriver } from "./api-bridge.js";
-import { deliberateForUser, resolveMemberModel } from "./council.js";
-import { searchKb } from "./kb.js";
-import { orgGovernanceRoutes } from "./org-governance.js";
-import { forMember, isMemberRead, orgReply, shareGuard } from "./org-http.js";
-import { orgStructureRoutes } from "./org-structure.js";
-import { orgTaskRoutes } from "./org-tasks.js";
-import { getSkillsByIds } from "./skills.js";
+import { getPinnedDriver } from "./api-bridge.ts";
+import { deliberateForUser, resolveMemberModel } from "./council.ts";
+import { searchKb } from "./kb.ts";
+import { orgGovernanceRoutes } from "./org-governance.ts";
+import { forMember, isMemberRead, orgReply, shareGuard } from "./org-http.ts";
+import { orgStructureRoutes } from "./org-structure.ts";
+import { orgTaskRoutes } from "./org-tasks.ts";
+import { getSkillsByIds } from "./skills.ts";
 
 // Runs happen outside any request; give each one its owner's identity and keys.
 setOwnerContextRunner((ownerId, steps, fn) =>

@@ -2,7 +2,7 @@
 /** A research run is found only by the account that made it. */
 import { describe, it, expect } from "vitest";
 
-const { loadRun, persistRun } = await import("../../src/routes/researcher.js");
+const { loadRun, persistRun } = await import("../../src/routes/researcher.ts");
 
 describe("research runs", () => {
   it("are read back only by their owner", async () => {
@@ -22,7 +22,7 @@ describe("research runs", () => {
 describe("POST /researcher/research without a search backend", () => {
   it("says what it needs instead of returning a placeholder result", async () => {
     const Fastify = (await import("fastify")).default;
-    const { researcherRoutes } = await import("../../src/routes/researcher.js");
+    const { researcherRoutes } = await import("../../src/routes/researcher.ts");
     const app = Fastify();
     await app.register(researcherRoutes);
     await app.ready();

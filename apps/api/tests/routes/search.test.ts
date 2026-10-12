@@ -21,13 +21,13 @@ const model = {
   },
 } as unknown as LlmDriver;
 
-vi.mock("../../src/lib/user-context.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/lib/user-context.js")>()),
+vi.mock("../../src/lib/user-context.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/user-context.ts")>()),
   getUserDrivers: () => [{ id: "scripted", driver: model }],
 }));
 
 const savedDb = process.env.DATABASE_URL;
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 const search = (payload: object) =>
@@ -101,7 +101,7 @@ describe("POST /api/search", () => {
   });
 
   it("searches the graph and ranks a matching document above it", async () => {
-    const { getKGStore } = await import("../../src/lib/knowledge-graph-store.js");
+    const { getKGStore } = await import("../../src/lib/knowledge-graph-store.ts");
     const store = getKGStore();
     const now = 1;
     const node = (id: string, name: string, type: string) => ({

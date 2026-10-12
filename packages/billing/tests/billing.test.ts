@@ -36,8 +36,8 @@ vi.mock("@nexus/db/schema", () => ({
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-import { generateRawKey, hashKey, prefixOf } from "../src/api-keys.js";
-import { QuotaChecker } from "../src/quota.js";
+import { generateRawKey, hashKey, prefixOf } from "../src/api-keys.ts";
+import { QuotaChecker } from "../src/quota.ts";
 
 describe("API key helpers", () => {
   it("generateRawKey produces nxk_<32 hex> format", () => {

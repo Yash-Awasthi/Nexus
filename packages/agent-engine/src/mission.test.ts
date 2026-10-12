@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RuntimeToolSet } from "@nexus/agent-runtime";
 import type { LlmToolFn } from "@nexus/agent-runtime";
 
-import { MissionRunner, type MissionRecord, type MissionStore } from "./mission.js";
+import { MissionRunner, type MissionRecord, type MissionStore } from "./mission.ts";
 
 const THINK = "Think step by step about the best approach.";
 

@@ -2,7 +2,7 @@
 /** Rows from before owner scoping belong to no one on a shared server, and to the user on the desktop. */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ownsRow } from "../../src/lib/owner.js";
+import { ownsRow } from "../../src/lib/owner.ts";
 
 afterEach(() => {
   delete process.env.NEXUS_DESKTOP;

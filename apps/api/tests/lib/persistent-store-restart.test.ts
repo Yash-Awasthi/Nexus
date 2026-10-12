@@ -9,12 +9,12 @@ import { join } from "node:path";
 
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/lib/pg-pool.js", () => ({ getPgPool: () => null }));
+vi.mock("../../src/lib/pg-pool.ts", () => ({ getPgPool: () => null }));
 process.env.NEXUS_DATA_DIR = mkdtempSync(join(tmpdir(), "store-restart-"));
 
 async function boot() {
   vi.resetModules();
-  const { PersistentStore } = await import("../../src/lib/persistent-store.js");
+  const { PersistentStore } = await import("../../src/lib/persistent-store.ts");
   return PersistentStore;
 }
 

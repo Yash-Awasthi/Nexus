@@ -7,11 +7,11 @@
  * event emission for the runtime's event bus.
  */
 
-import { getBridgeManager } from "./bridge-manager.js";
-import type { FlociHealth } from "./floci-client.js";
-import { probeFlociHealth } from "./floci-client.js";
-import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
-import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import { getBridgeManager } from "./bridge-manager.ts";
+import type { FlociHealth } from "./floci-client.ts";
+import { probeFlociHealth } from "./floci-client.ts";
+import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.ts";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
 
 interface FlociAdapterOptions {
   /** Reject tasks that reference unregistered Floci services when true (default: false). */

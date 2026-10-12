@@ -7,8 +7,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+import { buildServer } from "../../src/server.ts";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 
 const AUTH = { authorization: "Bearer test" };
 

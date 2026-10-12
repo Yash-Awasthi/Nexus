@@ -14,8 +14,8 @@ import {
   USER_SCOPED_TABLES,
   type ErasableDb,
   type ErasureResult,
-} from "../src/gdpr.js";
-import { users } from "../src/schema/index.js";
+} from "../src/gdpr.ts";
+import { users } from "../src/schema/index.ts";
 
 // A fake db that records each delete(table).where(cond) and returns a fixed count.
 function recorderDb(rowCount = 1): {

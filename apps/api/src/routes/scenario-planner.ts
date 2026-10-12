@@ -25,7 +25,7 @@ import {
 } from "@nexus/scenario-planner";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 

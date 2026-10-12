@@ -5,13 +5,13 @@
  */
 import { describe, it, expect } from "vitest";
 
-import type { ILLMMessage } from "./engine.js";
+import type { ILLMMessage } from "./engine.ts";
 import {
   runCouncilDebate,
   type DebateMember,
   type IStreamingTransport,
   type DebateEvents,
-} from "./debate.js";
+} from "./debate.ts";
 
 interface Turn {
   label: string;

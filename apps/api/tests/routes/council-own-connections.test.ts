@@ -21,10 +21,10 @@ const custom = {
 } as unknown as LlmDriver;
 
 let connections: { id: string; driver: LlmDriver }[] = [{ id: "tokenharbor", driver: custom }];
-vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => {
+vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => {
   const { DriverRegistry } = await import("@nexus/llm-drivers");
   return {
-    ...(await importOriginal<typeof import("../../src/lib/provider-keys.js")>()),
+    ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
     // No key for any council alias provider.
     buildUserDriverRegistry: async (_u: string | undefined, providers: Iterable<string>) => ({
       registry: new DriverRegistry(),
@@ -34,7 +34,7 @@ vi.mock("../../src/lib/provider-keys.js", async (importOriginal) => {
   };
 });
 
-const { deliberateForUser } = await import("../../src/routes/council.js");
+const { deliberateForUser } = await import("../../src/routes/council.ts");
 
 const request = {
   proposal: { title: "Should we approve this hire?", description: "A writer for the bakery site." },

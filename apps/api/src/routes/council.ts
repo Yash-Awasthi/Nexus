@@ -28,12 +28,12 @@ import { makeTierGatePreHandler } from "@nexus/tier-gate";
 import { and, eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.js";
-import { emitCouncilTranscript } from "../lib/council-transcript.js";
-import { FailoverDriver } from "../lib/llm-failover.js";
-import { ownerScope } from "../lib/owner.js";
-import { buildUserDriverRegistry, listUserDrivers } from "../lib/provider-keys.js";
-import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
+import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.ts";
+import { emitCouncilTranscript } from "../lib/council-transcript.ts";
+import { FailoverDriver } from "../lib/llm-failover.ts";
+import { ownerScope } from "../lib/owner.ts";
+import { buildUserDriverRegistry, listUserDrivers } from "../lib/provider-keys.ts";
+import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middleware/auth.ts";
 
 // ── Council config ─────────────────────────────────────────────────────────────
 
@@ -114,10 +114,13 @@ export function resolveMemberModel(choice: string): { provider: string; model: s
  * same transport so provider behaviour is consistent.
  */
 export class LlmDriversTransport implements ILLMTransport {
-  constructor(
-    private readonly registry: DriverRegistry,
-    private readonly modelAlias: string,
-  ) {}
+  private readonly registry: DriverRegistry;
+  private readonly modelAlias: string;
+
+  constructor(registry: DriverRegistry, modelAlias: string) {
+    this.registry = registry;
+    this.modelAlias = modelAlias;
+  }
 
   async chat(
     messages: ILLMMessage[],
@@ -168,7 +171,11 @@ export class LlmDriversTransport implements ILLMTransport {
  * when no council alias provider is reachable, e.g. the caller saved only a custom endpoint.
  */
 class OwnDriversTransport implements ILLMTransport {
-  constructor(private readonly driver: FailoverDriver) {}
+  private readonly driver: FailoverDriver;
+
+  constructor(driver: FailoverDriver) {
+    this.driver = driver;
+  }
 
   async chat(
     messages: ILLMMessage[],

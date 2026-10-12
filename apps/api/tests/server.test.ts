@@ -14,7 +14,7 @@ vi.mock("@nexus/council", async (importOriginal) => ({
   })),
 }));
 
-import { buildServer } from "../src/server.js";
+import { buildServer } from "../src/server.ts";
 
 describe("buildServer()", () => {
   it("creates a Fastify instance that can be readied", async () => {

@@ -23,8 +23,8 @@ COPY apps/ui/ apps/ui/
 # Install the UI's dependency closure (frozen lockfile for reproducible CI)
 RUN pnpm install --frozen-lockfile --filter "@nexus/ui..."
 
-# Build the workspace packages the UI imports (their exports point at dist/), then the SPA
-RUN pnpm --filter "@nexus/ui..." build
+# Workspace packages export TypeScript source, which Vite bundles directly.
+RUN pnpm --filter @nexus/ui build
 
 # ── Stage 2: nginx ────────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runner

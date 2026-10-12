@@ -12,7 +12,7 @@ const SECRET = "drive-isolation-test-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_DRIVE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-drive-iso-"));
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

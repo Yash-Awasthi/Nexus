@@ -21,8 +21,8 @@
  * workspace per install); a per-user cost log would be the follow-up.
  */
 
-import { createNotification, userIdFor, type AppNotification } from "./notifications-store.js";
-import { getSharedKV } from "./shared-kv.js";
+import { createNotification, userIdFor, type AppNotification } from "./notifications-store.ts";
+import { getSharedKV } from "./shared-kv.ts";
 
 export interface WeeklyStats {
   requests: number;

@@ -16,7 +16,7 @@ import {
   type MemoryFilter,
 } from "@nexus/memory";
 
-import { getPgPool, isEmbeddedUrl, isNeonCompatibleUrl, type PgLike } from "./pg-pool.js";
+import { getPgPool, isEmbeddedUrl, isNeonCompatibleUrl, type PgLike } from "./pg-pool.ts";
 
 /** Where desktop builds without pgvector kept memory: nexus_kv rows of this collection. */
 const LEGACY_COLLECTION = "memory_entries";

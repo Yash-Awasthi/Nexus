@@ -35,9 +35,9 @@ const ollama = http.createServer((req, res) => {
 await new Promise<void>((r) => ollama.listen(0, "127.0.0.1", r));
 process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${(ollama.address() as { port: number }).port}`;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

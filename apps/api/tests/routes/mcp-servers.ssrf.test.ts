@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { validateMcpEndpoint } from "../../src/routes/mcp-servers.js";
+import { validateMcpEndpoint } from "../../src/routes/mcp-servers.ts";
 
 describe("validateMcpEndpoint — SSRF guard", () => {
   it("accepts a normal public https endpoint", () => {

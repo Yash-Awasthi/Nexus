@@ -2,18 +2,21 @@
   "name": "@nexus/researcher",
   "version": "0.1.0",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./src/index.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "vitest": "catalog:",
-    "typescript": "catalog:"
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "exports": {
+      ".": "./dist/index.js"
+    }
   }
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { LocalAgentRegistry } from "../src/agent-registry.js";
-import { MCPServerRegistry } from "../src/mcp-registry.js";
+import { LocalAgentRegistry } from "../src/agent-registry.ts";
+import { MCPServerRegistry } from "../src/mcp-registry.ts";
 
 describe("LocalAgentRegistry", () => {
   const agent = (id: string, caps: string[] = []) => ({

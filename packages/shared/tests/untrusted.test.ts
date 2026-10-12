@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
-import { REMOVED, screenUntrusted, screenUntrustedAll } from "../src/untrusted.js";
+import { REMOVED, screenUntrusted, screenUntrustedAll } from "../src/untrusted.ts";
 
 describe("screenUntrusted", () => {
   it("cuts instructions aimed at the model and keeps the facts around them", () => {

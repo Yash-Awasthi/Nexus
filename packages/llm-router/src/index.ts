@@ -50,12 +50,13 @@ export type FetchFn = typeof fetch;
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 export class LLMRouterError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "LLMRouterError";
   }
 }
@@ -583,12 +584,12 @@ export class LLMRouter {
 
 // ── Re-export additional routers ─────────────────────────────────────────────
 
-export type { KNNModelProfile, KNNRouteResult, KNNRouterConfig } from "./knn-router.js";
+export type { KNNModelProfile, KNNRouteResult, KNNRouterConfig } from "./knn-router.ts";
 
-export type { MLPRouterConfig, MLPRouteResult, ActivationFn } from "./mlp-router.js";
+export type { MLPRouterConfig, MLPRouteResult, ActivationFn } from "./mlp-router.ts";
 
-export type { SVMRouterConfig, SVMRouteResult } from "./svm-router.js";
+export type { SVMRouterConfig, SVMRouteResult } from "./svm-router.ts";
 
-export { hashEmbed, trainRouters } from "./train.js";
-export type { RoutingSample, TrainedRouters, TrainOptions } from "./train.js";
-export type { MFBilinearRouterConfig, MFModelProfile, MFRouteResult } from "./mf-router.js";
+export { hashEmbed, trainRouters } from "./train.ts";
+export type { RoutingSample, TrainedRouters, TrainOptions } from "./train.ts";
+export type { MFBilinearRouterConfig, MFModelProfile, MFRouteResult } from "./mf-router.ts";

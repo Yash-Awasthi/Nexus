@@ -38,13 +38,7 @@ export function createServerEnvironment(parent) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const child = spawn(
     process.execPath,
-    [
-      "--require",
-      path.join(root, "scripts/e2e-offline.cjs"),
-      "--import",
-      "tsx/esm",
-      "dist/index.js",
-    ],
+    ["--require", path.join(root, "scripts/e2e-offline.cjs"), "src/index.ts"],
     {
       cwd: path.join(root, "apps/api"),
       env: createServerEnvironment(process.env),

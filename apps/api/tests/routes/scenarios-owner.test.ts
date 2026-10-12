@@ -3,13 +3,13 @@
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 
-vi.mock("../../src/middleware/auth.js", () => ({
+vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {
     req.nexusUserId = req.headers["x-user"];
   },
 }));
 
-const { scenarioPlannerRoutes } = await import("../../src/routes/scenario-planner.js");
+const { scenarioPlannerRoutes } = await import("../../src/routes/scenario-planner.ts");
 
 it("keeps scenarios to their author and deletes for real", async () => {
   const app = Fastify();

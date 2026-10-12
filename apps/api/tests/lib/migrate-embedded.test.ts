@@ -6,8 +6,8 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 
-import { migrateEmbedded } from "../../src/lib/migrate-embedded.js";
-import { closePgPools, getPgPool } from "../../src/lib/pg-pool.js";
+import { migrateEmbedded } from "../../src/lib/migrate-embedded.ts";
+import { closePgPools, getPgPool } from "../../src/lib/pg-pool.ts";
 
 const DB = "pglite://:memory:migrate-test";
 

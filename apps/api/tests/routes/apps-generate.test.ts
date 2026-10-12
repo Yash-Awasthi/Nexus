@@ -26,11 +26,11 @@ delete process.env.NEXUS_EXEC_MODE;
 delete process.env.REDIS_URL;
 
 const { userDrivePath } = await import("@nexus/sandbox");
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { appFolderName, fallbackDesign, parseDesign, pickDesign, scaffoldApp } =
-  await import("../../src/lib/app-scaffold.js");
+  await import("../../src/lib/app-scaffold.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

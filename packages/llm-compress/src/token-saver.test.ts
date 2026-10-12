@@ -6,7 +6,7 @@ import {
   genericProcessor,
   testOutputProcessor,
   type OutputProcessor,
-} from "./token-saver.js";
+} from "./token-saver.ts";
 
 /** Build a synthetic pytest run with a long traceback failure. */
 function pytestFailure(): string {

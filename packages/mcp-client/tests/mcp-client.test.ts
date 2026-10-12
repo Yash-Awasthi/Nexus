@@ -6,7 +6,7 @@ import {
   McpClientError,
   type McpToolDefinition,
   type McpResourceEntry,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // Route each JSON-RPC call to a per-method result body, so initialize() (which
 // also fires notifications/initialized) and a subsequent gated call can resolve

@@ -24,7 +24,7 @@ import {
   loadArchetypeStore,
   updateArchetype,
   type ArchetypeInput,
-} from "../lib/archetype-store.js";
+} from "../lib/archetype-store.ts";
 
 /** Owner bucket for this request. Callers with no identity share ANON_OWNER. */
 function ownerOf(request: { nexusUserId?: string }): string {

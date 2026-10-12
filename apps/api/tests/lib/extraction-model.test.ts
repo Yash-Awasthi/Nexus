@@ -8,12 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const pinned = vi.fn();
 const fallback = vi.fn();
-vi.mock("../../src/routes/api-bridge.js", () => ({
+vi.mock("../../src/routes/api-bridge.ts", () => ({
   getPinnedDriver: (...args: unknown[]) => pinned(...args),
   getDefaultDriver: () => fallback(),
 }));
 
-const { extractionClient } = await import("../../src/lib/knowledge-graph-store.js");
+const { extractionClient } = await import("../../src/lib/knowledge-graph-store.ts");
 
 function stub(model: string): LlmDriver & { calls: LlmRequestOptions[] } {
   const calls: LlmRequestOptions[] = [];

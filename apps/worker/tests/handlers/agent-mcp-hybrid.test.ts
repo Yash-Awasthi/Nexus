@@ -6,7 +6,7 @@
 // and returns a parsed fused result, with the executor error path. DB-free and
 // offline: deterministic in-memory dense + BM25 adapters drive the search.
 import { describe, expect, it } from "vitest";
-import { hybridSearchRuntimeTools } from "../../src/handlers/agent-mcp.js";
+import { hybridSearchRuntimeTools } from "../../src/handlers/agent-mcp.ts";
 import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
 
 const CORPUS = [

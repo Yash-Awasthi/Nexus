@@ -29,9 +29,9 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { type ConnectionOptions, Worker, type Job } from "bullmq";
 import { and, eq, ne } from "drizzle-orm";
 
-import { handleAgentRunJob, type AgentRunPayload } from "../handlers/agent-handler.js";
-import { handleBrowserTaskJob, type BrowserTaskPayload } from "../handlers/browser-task.js";
-import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
+import { handleAgentRunJob, type AgentRunPayload } from "../handlers/agent-handler.ts";
+import { handleBrowserTaskJob, type BrowserTaskPayload } from "../handlers/browser-task.ts";
+import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.ts";
 import {
   handleDriveBackupJob,
   handleDriveReclaimJob,
@@ -39,8 +39,8 @@ import {
   type DriveBackupPayload,
   type DriveReclaimPayload,
   type DriveSweepPayload,
-} from "../handlers/drive-lifecycle.js";
-import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
+} from "../handlers/drive-lifecycle.ts";
+import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.ts";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

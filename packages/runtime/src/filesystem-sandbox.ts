@@ -2,14 +2,17 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import type { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface.js";
-import { isSafeSandboxPath } from "./security-utils.js";
+import type { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface.ts";
+import { isSafeSandboxPath } from "./security-utils.ts";
 
 export class SandboxConstraint implements ISandboxConstraint {
-  constructor(
-    public maxWriteBytes: number,
-    public allowedPathPrefix: string,
-  ) {}
+  public maxWriteBytes: number;
+  public allowedPathPrefix: string;
+
+  constructor(maxWriteBytes: number, allowedPathPrefix: string) {
+    this.maxWriteBytes = maxWriteBytes;
+    this.allowedPathPrefix = allowedPathPrefix;
+  }
 
   validateWrite(filePath: string, contentSize: number, currentTotal: number): boolean {
     if (!isSafeSandboxPath(this.allowedPathPrefix, filePath)) {
@@ -26,10 +29,12 @@ export class FilesystemSandbox implements IFilesystemSandbox {
   private writeLog: { timestamp: Date; file: string; bytes: number }[] = [];
   private totalBytesWritten = 0;
 
-  constructor(
-    private sandboxDir: string,
-    private constraint: ISandboxConstraint,
-  ) {
+  private sandboxDir: string;
+  private constraint: ISandboxConstraint;
+
+  constructor(sandboxDir: string, constraint: ISandboxConstraint) {
+    this.sandboxDir = sandboxDir;
+    this.constraint = constraint;
     if (!fs.existsSync(this.sandboxDir)) {
       fs.mkdirSync(this.sandboxDir, { recursive: true });
     }

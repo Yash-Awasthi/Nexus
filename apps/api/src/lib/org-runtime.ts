@@ -18,15 +18,15 @@
 
 import crypto from "node:crypto";
 
-import { costLogStore, priceOf } from "./cost-log.js";
-import { createNotification } from "./notifications-store.js";
+import { costLogStore, priceOf } from "./cost-log.ts";
+import { createNotification } from "./notifications-store.ts";
 import {
   addPromptContributor,
   buildPrompt,
   downline,
   parseOutcome,
   type ParsedOutcome,
-} from "./org-protocol.js";
+} from "./org-protocol.ts";
 import {
   OrgError,
   createAgent,
@@ -44,7 +44,7 @@ import {
   type AdapterType,
   type Agent,
   type Company,
-} from "./org-store.js";
+} from "./org-store.ts";
 import {
   addComment,
   checkoutTask,
@@ -61,9 +61,9 @@ import {
   type Actor,
   type Task,
   type TaskStatus,
-} from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
-import type { LlmStep } from "./request-traces.js";
+} from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
+import type { LlmStep } from "./request-traces.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

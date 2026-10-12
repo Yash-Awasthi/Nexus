@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { pgTable, uuid, text, jsonb, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { verdicts } from "./verdicts.js";
+import { verdicts } from "./verdicts.ts";
 
 /**
  * runtime_tasks — tasks submitted for execution by the GhostStack runtime.

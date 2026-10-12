@@ -20,7 +20,7 @@
  * module is provider-agnostic and deterministic to test.
  */
 
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 /** A response (or candidate) eligible for critique. */
 export interface CritiqueTarget {

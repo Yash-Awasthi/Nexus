@@ -22,12 +22,13 @@ import { randomUUID } from "node:crypto";
 // ── Error ──────────────────────────────────────────────────────────────────────
 
 export class GatewayLogError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "GatewayLogError";
   }
 }
@@ -302,10 +303,10 @@ export interface KVStoreLike {
 export class KVGatewayLog implements IGatewayLog {
   private readonly prefix: string;
 
-  constructor(
-    private readonly kv: KVStoreLike,
-    opts: { keyPrefix?: string; entryTtlMs?: number } = {},
-  ) {
+  private readonly kv: KVStoreLike;
+
+  constructor(kv: KVStoreLike, opts: { keyPrefix?: string; entryTtlMs?: number } = {}) {
+    this.kv = kv;
     this.prefix = opts.keyPrefix ? `${opts.keyPrefix}:gwlog` : "gwlog";
     this._entryTtlMs = opts.entryTtlMs;
   }
@@ -394,11 +395,16 @@ export class LoggingLLMProvider implements LLMProvider {
   private readonly tagsFn: (req: LLMRequest, resp?: LLMResponse) => Record<string, string>;
   private readonly _now: () => number;
 
+  private readonly inner: LLMProvider;
+  private readonly log: IGatewayLog;
+
   constructor(
-    private readonly inner: LLMProvider,
-    private readonly log: IGatewayLog,
+    inner: LLMProvider,
+    log: IGatewayLog,
     opts: LoggingLLMProviderOptions & { now?: () => number } = {},
   ) {
+    this.inner = inner;
+    this.log = log;
     this.name = `logging(${inner.name})`;
     this.models = inner.models;
     this.identityFn = opts.identityFn ?? ((req) => req.metadata?.identity as string | undefined);

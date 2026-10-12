@@ -7,14 +7,14 @@
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 const boot = () =>
   bootOrg(async () => ({
-    port: await import("../../src/lib/org-portability.js"),
-    budget: await import("../../src/lib/org-budget.js"),
-    sched: await import("../../src/lib/org-scheduler.js"),
-    memory: await import("../../src/lib/org-memory.js"),
+    port: await import("../../src/lib/org-portability.ts"),
+    budget: await import("../../src/lib/org-budget.ts"),
+    sched: await import("../../src/lib/org-scheduler.ts"),
+    memory: await import("../../src/lib/org-memory.ts"),
   }));
 
 useOrgDataDir();

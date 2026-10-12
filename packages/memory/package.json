@@ -5,18 +5,11 @@
   "description": "Long-term agent memory: vector search, context window management, recall",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run",
@@ -28,7 +21,16 @@
   },
   "devDependencies": {
     "@types/pg": "^8.20.4",
-    "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

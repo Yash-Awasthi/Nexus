@@ -13,8 +13,8 @@
  *   Guardrails  — runtime checks on plan-level or log-level data (loop detection, cost ceiling)
  */
 
-export { ApprovalWorkflow } from "./approval-workflow.js";
-export type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
+export { ApprovalWorkflow } from "./approval-workflow.ts";
+export type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.ts";
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 

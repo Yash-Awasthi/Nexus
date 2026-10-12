@@ -16,7 +16,7 @@
 import { promises as fs, realpathSync } from "node:fs";
 import * as path from "node:path";
 
-import type { RuntimeTool, ToolContext } from "./index.js";
+import type { RuntimeTool, ToolContext } from "./index.ts";
 
 /** Directory names skipped by recursive walks (`glob`, `grep`, recursive `list_files`). */
 const IGNORED_DIRS: ReadonlySet<string> = new Set([

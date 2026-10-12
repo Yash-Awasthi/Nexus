@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import type { EventBusStats } from "../src/event-bus.js";
-import type { IQueueBackend } from "../src/interfaces/queue.interface.js";
-import type { MetricsCollector } from "../src/observability-manager.js";
-import { MetricsCollector as RealMetricsCollector } from "../src/observability-manager.js";
-import { LeakDetector, ResourceQuotaManager, RuntimeCompactor } from "../src/runtime-compactor.js";
+import type { EventBusStats } from "../src/event-bus.ts";
+import type { IQueueBackend } from "../src/interfaces/queue.interface.ts";
+import type { MetricsCollector } from "../src/observability-manager.ts";
+import { MetricsCollector as RealMetricsCollector } from "../src/observability-manager.ts";
+import { LeakDetector, ResourceQuotaManager, RuntimeCompactor } from "../src/runtime-compactor.ts";
 
 function stats(overrides: Partial<EventBusStats> = {}): EventBusStats {
   return {

@@ -10,7 +10,7 @@ import {
   InMemoryBM25,
   type VectorSearchAdapter,
   type SearchHit,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 interface Doc {
   id: string;

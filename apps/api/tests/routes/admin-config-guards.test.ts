@@ -10,9 +10,9 @@ const DB = "pglite://:memory:admin-config-guards";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { buildServer } = await import("../../src/server.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { buildServer } = await import("../../src/server.ts");
 const { db } = await import("@nexus/db");
 const { users } = await import("@nexus/db/schema");
 
@@ -110,7 +110,7 @@ describe("instance settings", () => {
   });
 
   it("count only the caller's own tokens in token usage", async () => {
-    const { costLogStore } = await import("../../src/lib/cost-log.js");
+    const { costLogStore } = await import("../../src/lib/cost-log.ts");
     costLogStore.record({
       ts: new Date().toISOString(),
       model: "groq/secret-model",

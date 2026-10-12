@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { ConductorOrchestrator } from "../src/orchestrator.js";
-import { TaskRouter } from "../src/task-router.js";
-import type { Task } from "../src/task-router.js";
-import type { IRuntimeManager } from "../src/runtime-manager.js";
-import type { IEventStore } from "../src/interfaces/persistence.interface.js";
-import type { IQueueBackend } from "../src/interfaces/queue.interface.js";
+import { ConductorOrchestrator } from "../src/orchestrator.ts";
+import { TaskRouter } from "../src/task-router.ts";
+import type { Task } from "../src/task-router.ts";
+import type { IRuntimeManager } from "../src/runtime-manager.ts";
+import type { IEventStore } from "../src/interfaces/persistence.interface.ts";
+import type { IQueueBackend } from "../src/interfaces/queue.interface.ts";
 
 interface Harness {
   orchestrator: ConductorOrchestrator;

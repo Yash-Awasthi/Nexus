@@ -19,7 +19,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
-import { execScript, type PgLike } from "./pg-pool.js";
+import { execScript, type PgLike } from "./pg-pool.ts";
 
 interface Journal {
   entries: { idx: number; tag: string }[];

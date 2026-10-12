@@ -13,10 +13,10 @@
 import { globalFlags, type FlagDefinition, type FlagValue } from "@nexus/feature-flags";
 import type { FastifyInstance } from "fastify";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-import { requireAuth } from "../middleware/auth.js";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
-import { requireAdminRole } from "./admin-users.js";
+import { requireAdminRole } from "./admin-users.ts";
 
 const overrides = new PersistentStore<{ key: string; value: FlagValue }>("feature-flag-overrides");
 

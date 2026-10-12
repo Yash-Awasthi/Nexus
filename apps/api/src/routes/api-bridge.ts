@@ -65,10 +65,10 @@ import { StealthBrowser, PatchrightDriver, isPatchrightAvailable } from "@nexus/
 import { eq, and, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import { launchBrowserTask } from "../lib/agent-queue.js";
-import { observeAnswer } from "../lib/answer-drift.js";
-import { ANON_OWNER, loadArchetypeStore, seatCouncil } from "../lib/archetype-store.js";
-import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { launchBrowserTask } from "../lib/agent-queue.ts";
+import { observeAnswer } from "../lib/answer-drift.ts";
+import { ANON_OWNER, loadArchetypeStore, seatCouncil } from "../lib/archetype-store.ts";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
   applyBrowserAction,
   browserDecisionMessages,
@@ -80,9 +80,9 @@ import {
   type BrowserAgentStep,
   runBrowserAgentTask,
   DEFAULT_MAX_AGENT_STEPS,
-} from "../lib/browser-agent.js";
-import { closeChannel, createChannel, writeChannel } from "../lib/channels.js";
-import { findPii, maskProfanity, redactPii } from "../lib/chat-safety.js";
+} from "../lib/browser-agent.ts";
+import { closeChannel, createChannel, writeChannel } from "../lib/channels.ts";
+import { findPii, maskProfanity, redactPii } from "../lib/chat-safety.ts";
 import {
   citedNumbers,
   gatherSources,
@@ -90,33 +90,33 @@ import {
   sourcesPrompt,
   supportingNumbers,
   type SourceSet,
-} from "../lib/citations.js";
+} from "../lib/citations.ts";
 import {
   costLogStore,
   scopeCostEntriesToUser,
   trackCost,
   type CostEntry,
-} from "../lib/cost-log.js";
-import { sha256hex } from "../lib/crypto-utils.js";
-import { searchDuckDuckGo } from "../lib/duckduckgo.js";
-import { guardExec } from "../lib/exec-guard.js";
-import { screenForPrompt } from "../lib/injection-classifier.js";
-import { getKG } from "../lib/knowledge-graph-store.js";
-import { cachedDriver } from "../lib/llm-cache-driver.js";
+} from "../lib/cost-log.ts";
+import { sha256hex } from "../lib/crypto-utils.ts";
+import { searchDuckDuckGo } from "../lib/duckduckgo.ts";
+import { guardExec } from "../lib/exec-guard.ts";
+import { screenForPrompt } from "../lib/injection-classifier.ts";
+import { getKG } from "../lib/knowledge-graph-store.ts";
+import { cachedDriver } from "../lib/llm-cache-driver.ts";
 import {
   FailoverDriver,
   getFailoverDriver,
   setFailoverProviders,
   type FailoverProviderEntry,
-} from "../lib/llm-failover.js";
-import { getMemoryStore } from "../lib/memory-store.js";
-import { heuristicScores, openaiScores } from "../lib/moderation-score.js";
-import { resolveOAuthDriver } from "../lib/oauth-drivers.js";
-import { pendingCount } from "../lib/org-approvals.js";
-import { allRuns } from "../lib/org-runtime.js";
-import { claimable, ownerIdFor, ownsRow, seesOwnerless } from "../lib/owner.js";
-import { PersistentStore } from "../lib/persistent-store.js";
-import { getPgPool } from "../lib/pg-pool.js";
+} from "../lib/llm-failover.ts";
+import { getMemoryStore } from "../lib/memory-store.ts";
+import { heuristicScores, openaiScores } from "../lib/moderation-score.ts";
+import { resolveOAuthDriver } from "../lib/oauth-drivers.ts";
+import { pendingCount } from "../lib/org-approvals.ts";
+import { allRuns } from "../lib/org-runtime.ts";
+import { claimable, ownerIdFor, ownsRow, seesOwnerless } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { getPgPool } from "../lib/pg-pool.ts";
 import {
   asUser,
   buildUserDriverRegistry,
@@ -126,9 +126,9 @@ import {
   listUserModels,
   serviceKey,
   userEndpoint,
-} from "../lib/provider-keys.js";
-import { fetchPublic, unsafeUrlReason } from "../lib/public-url.js";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+} from "../lib/provider-keys.ts";
+import { fetchPublic, unsafeUrlReason } from "../lib/public-url.ts";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import {
   emitReaction,
   fireReactionEvent,
@@ -137,36 +137,36 @@ import {
   reactionEvents,
   reactionRules,
   type ReactionRule,
-} from "../lib/reactions.js";
-import { getTrace, listTraces } from "../lib/request-traces.js";
-import { listResearchJobs } from "../lib/research-jobs.js";
-import { recordCouncilRun } from "../lib/routing-data.js";
-import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
-import { getThread } from "../lib/threads-store.js";
-import { runUntrustedJs } from "../lib/untrusted-js.js";
+} from "../lib/reactions.ts";
+import { getTrace, listTraces } from "../lib/request-traces.ts";
+import { listResearchJobs } from "../lib/research-jobs.ts";
+import { recordCouncilRun } from "../lib/routing-data.ts";
+import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.ts";
+import { getThread } from "../lib/threads-store.ts";
+import { runUntrustedJs } from "../lib/untrusted-js.ts";
 // Event emitters push completion/failure into the per-user notification store.
 // (The HTTP surface for the store lives in routes/notifications.ts.)
-import { getCacheUserId, getUserDrivers } from "../lib/user-context.js";
-import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
-import { requireAuthWithTier, requireUserId } from "../middleware/auth.js";
+import { getCacheUserId, getUserDrivers } from "../lib/user-context.ts";
+import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.ts";
+import { requireAuthWithTier, requireUserId } from "../middleware/auth.ts";
 
-import { requireAdminRole as requireAdminRoleBridge } from "./admin-users.js";
-import { archetypesRoutes } from "./archetypes.js";
-import { connectorsBridgeRoutes } from "./connectors-bridge.js";
-import { costsRoutes } from "./costs.js";
-import { gatewayLog } from "./gateway.js";
-import { kbRoutes, listKbsFor, searchKb } from "./kb.js";
-import { kgRoutes } from "./kg.js";
-import { marketplaceRoutes } from "./marketplace.js";
-import { memoryBridgeRoutes } from "./memory-bridge.js";
-import { registerResearchRoutes } from "./research.js";
-import { allFeedback } from "./rlhf.js";
-import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.js";
-import { searchRoutes } from "./search.js";
-import { registerSkillRoutes } from "./skills.js";
-import { stmBridgeRoutes } from "./stm-bridge.js";
-import { tokensRoutes } from "./tokens.js";
-import { workflowsRoutes } from "./workflows.js";
+import { requireAdminRole as requireAdminRoleBridge } from "./admin-users.ts";
+import { archetypesRoutes } from "./archetypes.ts";
+import { connectorsBridgeRoutes } from "./connectors-bridge.ts";
+import { costsRoutes } from "./costs.ts";
+import { gatewayLog } from "./gateway.ts";
+import { kbRoutes, listKbsFor, searchKb } from "./kb.ts";
+import { kgRoutes } from "./kg.ts";
+import { marketplaceRoutes } from "./marketplace.ts";
+import { memoryBridgeRoutes } from "./memory-bridge.ts";
+import { registerResearchRoutes } from "./research.ts";
+import { allFeedback } from "./rlhf.ts";
+import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.ts";
+import { searchRoutes } from "./search.ts";
+import { registerSkillRoutes } from "./skills.ts";
+import { stmBridgeRoutes } from "./stm-bridge.ts";
+import { tokensRoutes } from "./tokens.ts";
+import { workflowsRoutes } from "./workflows.ts";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 

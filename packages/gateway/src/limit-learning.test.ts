@@ -10,7 +10,7 @@ import {
   parseRetryAfterMs,
   parseRetryFromText,
   MAX_RETRY_AFTER_MS,
-} from "./limit-learning.js";
+} from "./limit-learning.ts";
 
 const T0 = 1_750_000_000_000;
 

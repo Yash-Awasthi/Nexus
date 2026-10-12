@@ -129,10 +129,10 @@ export function computeChainHash(
 export class AuditLog {
   private readonly hmacKey: Buffer;
 
-  constructor(
-    private readonly store: AuditStore,
-    hmacKeyHex: string,
-  ) {
+  private readonly store: AuditStore;
+
+  constructor(store: AuditStore, hmacKeyHex: string) {
+    this.store = store;
     if (!hmacKeyHex || hmacKeyHex.length < 32) {
       throw new Error(
         "NEXUS_AUDIT_KEY must be at least 32 hex characters (16 bytes). " +

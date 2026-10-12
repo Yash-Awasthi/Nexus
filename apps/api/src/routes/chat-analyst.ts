@@ -33,8 +33,8 @@ import {
 } from "@nexus/chat-analyst";
 import type { FastifyInstance } from "fastify";
 
-import { getSharedKV } from "../lib/shared-kv.js";
-import { requireAuth } from "../middleware/auth.js";
+import { getSharedKV } from "../lib/shared-kv.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── KV-backed session persistence (cross-pod safe) ───────────────────────────
 // AnalystSessionManager is in-process. To survive pod restarts and make sessions

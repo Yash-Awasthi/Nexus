@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
 
-import { PerfBenchmark, type BenchmarkResult } from "../src/perf-benchmark.js";
+import { PerfBenchmark, type BenchmarkResult } from "../src/perf-benchmark.ts";
 
 /** Minimal async no-op for fast benchmarking in tests. */
 const noop = async () => {};

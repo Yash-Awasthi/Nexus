@@ -6,7 +6,7 @@ import {
   createProgrammaticToolTool,
   gatedInvoke,
   type PermissionGate,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 function toolSet(): RuntimeToolSet {
   const ts = new RuntimeToolSet();

@@ -8,7 +8,7 @@ import {
   validateWebhookSignature,
   SDK_VERSION,
   type ToolDefinition,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

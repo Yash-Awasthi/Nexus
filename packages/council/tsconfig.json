@@ -1,8 +1,24 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
     "outDir": "dist",
-    "rootDir": "src"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../debate-engine"
+    },
+    {
+      "path": "../mcp-client"
+    },
+    {
+      "path": "../shared"
+    }
+  ]
 }

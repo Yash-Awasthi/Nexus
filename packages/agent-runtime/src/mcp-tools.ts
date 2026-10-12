@@ -12,7 +12,7 @@
  * reaches an external server, so it is never auto-allowed.
  */
 
-import type { ActionTier, RuntimeTool, ToolContext } from "./index.js";
+import type { ActionTier, RuntimeTool, ToolContext } from "./index.ts";
 
 /** A tool advertised by an MCP server — subset of `@nexus/mcp-client`'s McpToolDefinition. */
 export interface McpToolInfo {

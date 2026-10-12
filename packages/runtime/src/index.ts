@@ -8,10 +8,10 @@
 
 // ── Queue backends ────────────────────────────────────────────────────────────
 
-export type { RedisQueueBackendOptions } from "./redis-queue-backend.js";
+export type { RedisQueueBackendOptions } from "./redis-queue-backend.ts";
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
-export type { IQueueBackend, QueueJob, RetryPolicy } from "./interfaces/queue.interface.js";
+export type { IQueueBackend, QueueJob, RetryPolicy } from "./interfaces/queue.interface.ts";
 export type {
   IMetricsCollector,
   ITraceRecorder,
@@ -21,12 +21,12 @@ export type {
   IEventSnapshot,
   ITelemetrySink,
   IRuntimeInspector,
-} from "./interfaces/observability.interface.js";
-export type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+} from "./interfaces/observability.interface.ts";
+export type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
 
 // ── Event bus ─────────────────────────────────────────────────────────────────
 
-export type { IEventBus, EventSubscription } from "./event-bus.js";
+export type { IEventBus, EventSubscription } from "./event-bus.ts";
 
 // ── Circuit breaker ───────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ export type {
   CouncilBridgeConfig,
   RouterConfig,
   RoutedTask,
-} from "./council-bridge.js";
+} from "./council-bridge.ts";
 
 // ── Crash recovery ────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ export type {
   IRecoveryStore,
   RecoveryResult,
   CrashRecoveryConfig,
-} from "./crash-recovery.js";
+} from "./crash-recovery.ts";
 
 // ── OTel tracing ──────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export type {
   TraceContext,
   PropagationHeaders,
   OtelTracerConfig,
-} from "./tracing/otel-tracer.js";
+} from "./tracing/otel-tracer.ts";
 
 // ── Execution interfaces ───────────────────────────────────────────────────────
 export type {
@@ -69,49 +69,49 @@ export type {
   IExecutionAdapter,
   ITaskDependencyResolver,
   ITaskExecutor,
-} from "./interfaces/execution.interface.js";
+} from "./interfaces/execution.interface.ts";
 
 // ── Diagnostic API ────────────────────────────────────────────────────────────
-export { RuntimeDiagnosticAPI } from "./diagnostic-api.js";
+export { RuntimeDiagnosticAPI } from "./diagnostic-api.ts";
 
 // ── MCP bridge ────────────────────────────────────────────────────────────────
-export { registerConductorMcpBridge } from "./conductor-mcp-bridge.js";
+export { registerConductorMcpBridge } from "./conductor-mcp-bridge.ts";
 
 // ── Planning engine ───────────────────────────────────────────────────────────
-export { PlanningEngine } from "./planning-engine.js";
+export { PlanningEngine } from "./planning-engine.ts";
 
 // ── Spec loader ───────────────────────────────────────────────────────────────
-export { specToWorkflowDefinition } from "./spec-loader.js";
-export type { WorkflowSpecTask, WorkflowSpecFile } from "./spec-loader.js";
+export { specToWorkflowDefinition } from "./spec-loader.ts";
+export type { WorkflowSpecTask, WorkflowSpecFile } from "./spec-loader.ts";
 
 // ── Runtime context factory ───────────────────────────────────────────────────
-export { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
-export type { ConductorRuntimeContext } from "./runtime-context.js";
+export { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.ts";
+export type { ConductorRuntimeContext } from "./runtime-context.ts";
 
 // ── Adapter manifest ──────────────────────────────────────────────────────────
-export { ADAPTER_MANIFEST } from "./adapters/manifest.js";
-export type { AdapterManifestEntry, AdapterIntegrationMode } from "./adapters/manifest.js";
+export { ADAPTER_MANIFEST } from "./adapters/manifest.ts";
+export type { AdapterManifestEntry, AdapterIntegrationMode } from "./adapters/manifest.ts";
 
 // ── Federation ────────────────────────────────────────────────────────────────
-export { runFederationE2e } from "./e2e-federation.js";
-export type { FederationE2eResult, FederationE2eOptions } from "./e2e-federation.js";
-export { FederationSupervisor } from "./federation-supervisor.js";
+export { runFederationE2e } from "./e2e-federation.ts";
+export type { FederationE2eResult, FederationE2eOptions } from "./e2e-federation.ts";
+export { FederationSupervisor } from "./federation-supervisor.ts";
 export type {
   FederationServiceStatus,
   FederationSupervisorStatus,
-} from "./federation-supervisor.js";
+} from "./federation-supervisor.ts";
 
 // ── Conductor config ─────────────────────────────────────────────────────────
-export { loadConductorConfig } from "./conductor-config.js";
-export type { ConductorConfig, ConductorFeatures } from "./conductor-config.js";
+export { loadConductorConfig } from "./conductor-config.ts";
+export type { ConductorConfig, ConductorFeatures } from "./conductor-config.ts";
 
 // ── Conductor server ─────────────────────────────────────────────────────────
-export { createConductorServer } from "./conductor-server.js";
-export type { ConductorServer } from "./conductor-server.js";
+export { createConductorServer } from "./conductor-server.ts";
+export type { ConductorServer } from "./conductor-server.ts";
 
 // ── Bootstrap & healthcheck ───────────────────────────────────────────────────
-export { bootstrap } from "./bootstrap.js";
-export { runHealthcheck } from "./healthcheck.js";
+export { bootstrap } from "./bootstrap.ts";
+export { runHealthcheck } from "./healthcheck.ts";
 
 // ── Browser execution ─────────────────────────────────────────────────────────
 
@@ -122,12 +122,12 @@ export type {
   IBrowserExecutionAdapter,
   IScrapingTask,
   IScrapingExecutionAdapter,
-} from "./interfaces/environment.interface.js";
+} from "./interfaces/environment.interface.ts";
 
 // ── SSRF / outbound-URL safety ────────────────────────────────────────────────
-export { isSafeUrl, makeSafeLookup } from "./security-utils.js";
-export type { ResolvedAddress, AllAddressResolver, SafeLookup } from "./security-utils.js";
-export { createPinnedFetch, pinnedFetch } from "./pinned-fetch.js";
+export { isSafeUrl, makeSafeLookup } from "./security-utils.ts";
+export type { ResolvedAddress, AllAddressResolver, SafeLookup } from "./security-utils.ts";
+export { createPinnedFetch, pinnedFetch } from "./pinned-fetch.ts";
 
 // ── Governance interfaces ─────────────────────────────────────────────────────
 export type {
@@ -137,4 +137,4 @@ export type {
   IApprovalRecord,
   IApprovalWorkflow,
   IGovernanceEngine,
-} from "./interfaces/governance.interface.js";
+} from "./interfaces/governance.interface.ts";

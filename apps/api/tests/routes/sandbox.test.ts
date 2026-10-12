@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 
 // lib/untrusted-js gives its child Node 30 s to boot on a busy machine; a run needs more than that.
 vi.setConfig({ testTimeout: 60_000 });

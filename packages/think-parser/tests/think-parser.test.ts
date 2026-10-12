@@ -7,7 +7,7 @@ import {
   extractThinking,
   extractText,
   type ContentChunk,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── ThinkTagParser — one-shot ──────────────────────────────────────────────
 

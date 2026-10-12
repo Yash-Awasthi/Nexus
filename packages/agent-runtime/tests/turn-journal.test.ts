@@ -8,7 +8,7 @@ import {
   reconcileJournal,
   type LlmToolFn,
   type RuntimeMessage,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const twoCalls: RuntimeMessage = {
   role: "assistant",

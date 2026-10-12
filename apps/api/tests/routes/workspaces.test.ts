@@ -14,9 +14,9 @@ const DB = "pglite://:memory:workspaces-test";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.DATABASE_URL = DB;
 
-const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.js");
-const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.js");
-const { workspacesRoutes } = await import("../../src/routes/workspaces.js");
+const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
+const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");
+const { workspacesRoutes } = await import("../../src/routes/workspaces.ts");
 const { db } = await import("@nexus/db");
 const { eq } = await import("drizzle-orm");
 const { auditLog, users } = await import("@nexus/db/schema");

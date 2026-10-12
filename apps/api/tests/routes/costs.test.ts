@@ -17,8 +17,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createHmac } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
-import { buildServer } from "../../src/server.js";
-import { costLogStore } from "../../src/lib/cost-log.js";
+import { buildServer } from "../../src/server.ts";
+import { costLogStore } from "../../src/lib/cost-log.ts";
 
 const SECRET = "costs-route-test-secret";
 

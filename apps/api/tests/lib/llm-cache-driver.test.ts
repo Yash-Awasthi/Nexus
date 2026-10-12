@@ -8,9 +8,9 @@ import {
   cachedDriver,
   getLlmCacheStats,
   resetLlmCache,
-} from "../../src/lib/llm-cache-driver.js";
-import { getSharedKV } from "../../src/lib/shared-kv.js";
-import { userContext } from "../../src/lib/user-context.js";
+} from "../../src/lib/llm-cache-driver.ts";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
+import { userContext } from "../../src/lib/user-context.ts";
 
 class FakeDriver implements LlmDriver {
   provider = "fake";

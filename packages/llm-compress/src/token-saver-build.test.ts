@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { cargoClippyProcessor, compressOutputForCommand } from "./token-saver.js";
+import { cargoClippyProcessor, compressOutputForCommand } from "./token-saver.ts";
 
 describe("buildOutputProcessor — error retention", () => {
   const errorLog = [

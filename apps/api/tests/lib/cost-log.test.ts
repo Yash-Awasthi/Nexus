@@ -3,15 +3,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { KVStore } from "@nexus/kv";
 import { MemoryKVStore } from "@nexus/kv";
 
-import { discoverModels } from "../../src/lib/model-discovery.js";
-import { fetchWithTimeout, getSharedKV, withTimeout } from "../../src/lib/shared-kv.js";
+import { discoverModels } from "../../src/lib/model-discovery.ts";
+import { fetchWithTimeout, getSharedKV, withTimeout } from "../../src/lib/shared-kv.ts";
 import {
   CostLogStore,
   MODEL_PRICES,
   priceOf,
   scopeCostEntriesToUser,
   type CostEntry,
-} from "../../src/lib/cost-log.js";
+} from "../../src/lib/cost-log.ts";
 
 function entry(over: Partial<CostEntry> & { ts: string }): CostEntry {
   return { model: "ollama/qwen", inputTokens: 100, outputTokens: 50, costUsd: 0.0005, ...over };

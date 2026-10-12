@@ -52,16 +52,16 @@ import { FixedEmbedder, MemoryManager, PgVectorStore, createBestEmbedder } from 
 import { pinnedFetch } from "@nexus/runtime";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
-import { publishAgentEvent } from "./agent-events.js";
-import { defaultAgentGovernanceEngine, makeGovernanceGate } from "./agent-governance.js";
+import { publishAgentEvent } from "./agent-events.ts";
+import { defaultAgentGovernanceEngine, makeGovernanceGate } from "./agent-governance.ts";
 import {
   mcpToolsFromServers,
   councilRuntimeToolsFromTransport,
   debateRuntimeTool,
   type McpServerConfig,
-} from "./agent-mcp.js";
-import { proposeLearningUpdates, reviewSession } from "./agent-review.js";
-import { createCodingToolSet } from "./agent-tools.js";
+} from "./agent-mcp.ts";
+import { proposeLearningUpdates, reviewSession } from "./agent-review.ts";
+import { createCodingToolSet } from "./agent-tools.ts";
 import {
   WorkspaceManager,
   WorkspaceRunner,
@@ -71,7 +71,7 @@ import {
   type NexusSettings,
   type RunHandle,
   type Workspace,
-} from "./workspace-manager.js";
+} from "./workspace-manager.ts";
 
 /** Max time a `.nexus` setup script may run before it is stopped (5 min). */
 const SETUP_TIMEOUT_MS = 5 * 60_000;

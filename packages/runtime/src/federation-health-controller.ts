@@ -18,8 +18,8 @@ import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";
 
-import type { FederationSupervisor, FederationServiceStatus } from "./federation-supervisor.js";
-import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client.js";
+import type { FederationSupervisor, FederationServiceStatus } from "./federation-supervisor.ts";
+import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 

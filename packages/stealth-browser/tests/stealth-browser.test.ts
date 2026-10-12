@@ -11,7 +11,7 @@ import {
   buildContextOptions,
   type MockPageOptions,
   type StealthProfile,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── MockBrowserPage ───────────────────────────────────────────────────────────
 

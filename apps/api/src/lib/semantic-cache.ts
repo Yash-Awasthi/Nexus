@@ -8,8 +8,8 @@
 
 import { FixedEmbedder, createBestEmbedder } from "@nexus/memory";
 
-import { sha256hex } from "./crypto-utils.js";
-import { PersistentStore } from "./persistent-store.js";
+import { sha256hex } from "./crypto-utils.ts";
+import { PersistentStore } from "./persistent-store.ts";
 
 interface CacheEntry {
   key: string;

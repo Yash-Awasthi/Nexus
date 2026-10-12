@@ -4,27 +4,18 @@
   "//": "Tasks declare no `inputs`: turbo then hashes every tracked file in the package. Per-task globs have to name every source root, and one that misses a root (apps/ui keeps its sources in app/**, not src/**) turns a real change into a cache hit and reports a pass that never ran.",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
     },
     "dev": {
-      "dependsOn": ["^build"],
       "persistent": true,
       "cache": false
     },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
+    "lint": {},
     "lint:fix": {
-      "dependsOn": ["^build"],
       "cache": false
     },
     "test": {
-      "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
-    },
-    "typecheck": {
-      "dependsOn": ["^build"]
     },
     "clean": {
       "cache": false

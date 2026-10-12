@@ -22,7 +22,7 @@
  * plan). The output feeds straight back into {@link Crew} as its `tasks`.
  */
 
-import type { CrewLlm, RoleAgentConfig, TaskConfig } from "./crew.js";
+import type { CrewLlm, RoleAgentConfig, TaskConfig } from "./crew.ts";
 
 export interface PlanOptions {
   /** What the crew should achieve. */

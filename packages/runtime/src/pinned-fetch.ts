@@ -23,7 +23,7 @@ import net from "node:net";
 import { Readable } from "node:stream";
 import zlib from "node:zlib";
 
-import { isPrivateAddress, safeLookup, type SafeLookup } from "./security-utils.js";
+import { isPrivateAddress, safeLookup, type SafeLookup } from "./security-utils.ts";
 
 function normalizeHeaders(h: RequestInit["headers"]): Record<string, string> {
   if (!h) return {};

@@ -10,7 +10,7 @@ import {
   debateRuntimeTool,
   type DebateAgentTransport,
   type TranscriptSink,
-} from "../../src/handlers/agent-mcp.js";
+} from "../../src/handlers/agent-mcp.ts";
 import type { CouncilTranscript, ILLMTransport } from "@nexus/council";
 
 function collector(): { transcripts: CouncilTranscript[]; sink: TranscriptSink } {

@@ -8,7 +8,7 @@ import { gunzipSync } from "node:zlib";
 import { userDrivePath } from "@nexus/sandbox";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { handleDriveBackupJob, s3BackupStore } from "../../src/handlers/drive-lifecycle.js";
+import { handleDriveBackupJob, s3BackupStore } from "../../src/handlers/drive-lifecycle.ts";
 
 const CFG = {
   endpoint: "https://acct123.r2.cloudflarestorage.com",

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsc/node.tsbuildinfo"
+  },
+  "include": [
+    "packages/*/src",
+    "packages/adapters/*/src",
+    "apps/api/src",
+    "apps/worker/src",
+    "apps/cli/src"
+  ]
+}

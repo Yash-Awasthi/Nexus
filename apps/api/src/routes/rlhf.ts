@@ -24,8 +24,8 @@ import {
 } from "@nexus/rlhf-pipeline";
 import type { FastifyInstance } from "fastify";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-import { requireAuth } from "../middleware/auth.js";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 

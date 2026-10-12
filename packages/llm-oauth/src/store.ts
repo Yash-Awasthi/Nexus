@@ -14,8 +14,8 @@
  * live grant) and the local delete is authoritative — a failed upstream revoke
  * never leaves a live credential behind.
  */
-import { TokenRefresher } from "./refresh.js";
-import type { AuthProvider, OAuthTokens, Vault } from "./types.js";
+import { TokenRefresher } from "./refresh.ts";
+import type { AuthProvider, OAuthTokens, Vault } from "./types.ts";
 
 /** A persisted, encrypted credential. `sealed` = Vault.seal(JSON(OAuthTokens)). */
 export interface SealedRecord {
@@ -50,11 +50,12 @@ export class OAuthTokenStore {
   private readonly refresher: TokenRefresher;
   private readonly now: () => number;
 
-  constructor(
-    private readonly vault: Vault,
-    private readonly store: SealedTokenStore,
-    opts: OAuthTokenStoreOptions = {},
-  ) {
+  private readonly vault: Vault;
+  private readonly store: SealedTokenStore;
+
+  constructor(vault: Vault, store: SealedTokenStore, opts: OAuthTokenStoreOptions = {}) {
+    this.vault = vault;
+    this.store = store;
     this.refresher = opts.refresher ?? new TokenRefresher();
     this.now = opts.now ?? Date.now;
   }

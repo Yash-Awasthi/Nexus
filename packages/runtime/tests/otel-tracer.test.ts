@@ -5,7 +5,7 @@ import {
   NexusOtelTracer,
   encodeTraceparent,
   parseTraceparent,
-} from "../src/tracing/otel-tracer.js";
+} from "../src/tracing/otel-tracer.ts";
 
 describe("traceparent helpers", () => {
   it("encodes a valid W3C traceparent", () => {

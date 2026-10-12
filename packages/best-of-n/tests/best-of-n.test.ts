@@ -5,7 +5,7 @@ import {
   NullBonLlmClient,
   defaultScorer,
   type BonCandidate,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── defaultScorer ─────────────────────────────────────────────────────────────
 

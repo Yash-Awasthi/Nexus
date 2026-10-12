@@ -6,7 +6,7 @@
 import type { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
-import { buildServer } from "../../src/server.js";
+import { buildServer } from "../../src/server.ts";
 
 const MATURITIES = ["durable", "dedicated-volatile", "bridge"];
 

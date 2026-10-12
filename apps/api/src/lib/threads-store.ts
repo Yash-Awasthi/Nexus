@@ -12,8 +12,8 @@
  *   thread:msgs:{userId}:{id}     → serialized ThreadMessage[] (bounded)
  */
 
-import { getSharedKV } from "./shared-kv.js";
-import { withKeyLock } from "./with-key-lock.js";
+import { getSharedKV } from "./shared-kv.ts";
+import { withKeyLock } from "./with-key-lock.ts";
 
 interface Thread {
   id: string;

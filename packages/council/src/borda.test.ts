@@ -2,10 +2,10 @@
 // Borda-tallied peer rankings (llm-council-app v2 parity) — focused tests for
 // the pure tally core and the DeliberativeCouncil rankedReview/runRanked wiring.
 import { describe, expect, it } from "vitest";
-import { parseBordaRanking, tallyBorda, maxBordaPoints, formatBordaStandings } from "./borda.js";
-import { DeliberativeCouncil } from "./deliberative.js";
-import type { Archetype } from "./archetypes.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
+import { parseBordaRanking, tallyBorda, maxBordaPoints, formatBordaStandings } from "./borda.ts";
+import { DeliberativeCouncil } from "./deliberative.ts";
+import type { Archetype } from "./archetypes.ts";
+import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 
 // ── parseBordaRanking ────────────────────────────────────────────────────────
 

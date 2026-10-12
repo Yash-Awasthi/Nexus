@@ -17,12 +17,12 @@
 import { ScrapingMcpServer, SessionStore } from "@nexus/scraping-mcp";
 import type { FastifyInstance } from "fastify";
 
-import { classifyAction, redeemApproval, requestApproval } from "../lib/exec-approvals.js";
-import { ownerIdFor } from "../lib/owner.js";
-import { requireAuth } from "../middleware/auth.js";
+import { classifyAction, redeemApproval, requestApproval } from "../lib/exec-approvals.ts";
+import { ownerIdFor } from "../lib/owner.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
-import { requireAdminRole } from "./admin-users.js";
-import { buildScrapingBackend } from "./scraping-mcp.js";
+import { requireAdminRole } from "./admin-users.ts";
+import { buildScrapingBackend } from "./scraping-mcp.ts";
 
 // ── SSE event bus ─────────────────────────────────────────────────────────────
 

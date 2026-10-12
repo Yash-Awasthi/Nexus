@@ -15,7 +15,7 @@ import {
   type FlagValue,
   type FlagReadFileFn,
   type FlagWriteFileFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── MemoryFlagStore ───────────────────────────────────────────────────────────
 

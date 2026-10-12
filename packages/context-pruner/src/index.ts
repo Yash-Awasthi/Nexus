@@ -32,12 +32,13 @@
 // ── Error ──────────────────────────────────────────────────────────────────────
 
 export class PrunerError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "PrunerError";
   }
 }
@@ -156,7 +157,11 @@ function makeResult(
  * Simple, predictable, O(n).
  */
 export class SlidingWindowPruner implements IContextPruner {
-  constructor(private readonly tokenizer: ITokenizer = new NaiveTokenizer()) {}
+  private readonly tokenizer: ITokenizer;
+
+  constructor(tokenizer: ITokenizer = new NaiveTokenizer()) {
+    this.tokenizer = tokenizer;
+  }
 
   estimate(messages: Message[]): number {
     return totalTokens(messages, this.tokenizer);
@@ -223,7 +228,11 @@ function tfScore(query: Map<string, number>, doc: Map<string, number>): number {
  * Remaining budget filled by highest-scoring messages.
  */
 export class TFIDFPruner implements IContextPruner {
-  constructor(private readonly tokenizer: ITokenizer = new NaiveTokenizer()) {}
+  private readonly tokenizer: ITokenizer;
+
+  constructor(tokenizer: ITokenizer = new NaiveTokenizer()) {
+    this.tokenizer = tokenizer;
+  }
 
   estimate(messages: Message[]): number {
     return totalTokens(messages, this.tokenizer);
@@ -295,7 +304,11 @@ const ROLE_WEIGHT: Record<MessageRole, number> = {
  * Always keeps system message; fills budget by highest importance.
  */
 export class ImportanceWeightedPruner implements IContextPruner {
-  constructor(private readonly tokenizer: ITokenizer = new NaiveTokenizer()) {}
+  private readonly tokenizer: ITokenizer;
+
+  constructor(tokenizer: ITokenizer = new NaiveTokenizer()) {
+    this.tokenizer = tokenizer;
+  }
 
   estimate(messages: Message[]): number {
     return totalTokens(messages, this.tokenizer);
@@ -351,7 +364,10 @@ export class ImportanceWeightedPruner implements IContextPruner {
  * is ≤ maxTokens. Falls back to the last pruner's result if none satisfy.
  */
 export class PrunerChain implements IContextPruner {
-  constructor(private readonly pruners: IContextPruner[]) {
+  private readonly pruners: IContextPruner[];
+
+  constructor(pruners: IContextPruner[]) {
+    this.pruners = pruners;
     if (pruners.length === 0)
       throw new PrunerError("PrunerChain requires at least one pruner", "EMPTY_CHAIN");
   }
@@ -420,11 +436,14 @@ export class BudgetGuard implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
 
-  constructor(
-    private readonly inner: LLMProvider,
-    private readonly pruner: IContextPruner,
-    private readonly opts: BudgetGuardOptions = {},
-  ) {
+  private readonly inner: LLMProvider;
+  private readonly pruner: IContextPruner;
+  private readonly opts: BudgetGuardOptions;
+
+  constructor(inner: LLMProvider, pruner: IContextPruner, opts: BudgetGuardOptions = {}) {
+    this.inner = inner;
+    this.pruner = pruner;
+    this.opts = opts;
     this.name = `budget-guarded(${inner.name})`;
     this.models = inner.models;
   }

@@ -114,14 +114,17 @@ export function estimateMaxCost(
 /** Thrown when a reservation would push projected spend past the cap. */
 export class QuotaExceededError extends Error {
   readonly code = "QUOTA_EXCEEDED";
-  constructor(
-    readonly scope: string,
-    readonly capUsd: number,
-    readonly projectedUsd: number,
-  ) {
+  readonly scope: string;
+  readonly capUsd: number;
+  readonly projectedUsd: number;
+
+  constructor(scope: string, capUsd: number, projectedUsd: number) {
     super(
       `quota exceeded for ${scope}: projected $${projectedUsd.toFixed(6)} > cap $${capUsd.toFixed(6)}`,
     );
+    this.scope = scope;
+    this.capUsd = capUsd;
+    this.projectedUsd = projectedUsd;
     this.name = "QuotaExceededError";
   }
 }
@@ -149,10 +152,13 @@ export class BillingLedger {
   private settled = 0;
   private readonly holds = new Map<string, number>();
 
-  constructor(
-    private readonly capUsd: number | null = null,
-    private readonly scope = "ledger",
-  ) {}
+  private readonly capUsd: number | null;
+  private readonly scope: string;
+
+  constructor(capUsd: number | null = null, scope = "ledger") {
+    this.capUsd = capUsd;
+    this.scope = scope;
+  }
 
   /** Total actually-charged spend. */
   get committed(): number {

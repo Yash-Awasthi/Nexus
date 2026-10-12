@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { ILanguageModel, ChatMessage } from "../src/interfaces/language-model.interface.js";
-import { WebSearchEngine } from "../src/web-search-engine.js";
+import type { ILanguageModel, ChatMessage } from "../src/interfaces/language-model.interface.ts";
+import { WebSearchEngine } from "../src/web-search-engine.ts";
 
 // ─── Mock node:https so the Tavily client never leaves the process ───────────
 

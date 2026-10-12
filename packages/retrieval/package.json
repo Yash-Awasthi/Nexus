@@ -5,27 +5,29 @@
   "description": "Hybrid RAG retrieval with recency weighting, importance scoring, and multi-stage retrieve-then-rerank",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
     "@nexus/shared": "workspace:*"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   }
 }

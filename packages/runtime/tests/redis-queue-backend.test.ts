@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { QueueJob } from "../src/interfaces/queue.interface.js";
-import { RedisQueueBackend } from "../src/redis-queue-backend.js";
+import type { QueueJob } from "../src/interfaces/queue.interface.ts";
+import { RedisQueueBackend } from "../src/redis-queue-backend.ts";
 
 // ─── Fake BullMQ Queue ───────────────────────────────────────────────────────
 

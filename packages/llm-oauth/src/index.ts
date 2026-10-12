@@ -21,15 +21,15 @@
  * `SealedTokenStore` adapter. TODO(P5-routes): add apps/api routes that start the
  * login, persist via OAuthTokenStore.save(), and resolve via resolveFresh().
  */
-export * from "./types.js";
-export { AesGcmVault, generatePkce, randomState, type Pkce } from "./crypto.js";
-export { TokenRefresher } from "./refresh.js";
+export * from "./types.ts";
+export { AesGcmVault, generatePkce, randomState, type Pkce } from "./crypto.ts";
+export { TokenRefresher } from "./refresh.ts";
 export {
   GoogleVertexAuthProvider,
   MicrosoftEntraAuthProvider,
   type GoogleVertexConfig,
   type MicrosoftEntraConfig,
-} from "./providers.js";
-export { AuthProviderRegistry, registryFromEnv } from "./registry.js";
-export { OAuthTokenStore } from "./store.js";
-export type { SealedRecord, SealedTokenStore, OAuthTokenStoreOptions } from "./store.js";
+} from "./providers.ts";
+export { AuthProviderRegistry, registryFromEnv } from "./registry.ts";
+export { OAuthTokenStore } from "./store.ts";
+export type { SealedRecord, SealedTokenStore, OAuthTokenStoreOptions } from "./store.ts";

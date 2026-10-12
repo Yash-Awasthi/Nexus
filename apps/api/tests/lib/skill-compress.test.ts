@@ -17,13 +17,13 @@ import {
   semanticSelection,
   slugify,
   tokenize,
-} from "../../src/lib/skill-compress.js";
-import type { SkillSource } from "../../src/lib/skill-merge.js";
+} from "../../src/lib/skill-compress.ts";
+import type { SkillSource } from "../../src/lib/skill-merge.ts";
 import {
   composeSkillSystemPrompt,
   mergeSkillCodeBodies,
   type SkillRecord,
-} from "../../src/lib/skill-runner.js";
+} from "../../src/lib/skill-runner.ts";
 
 const FRONTEND_SKILL: SkillRecord & SkillSource = {
   id: "f1",

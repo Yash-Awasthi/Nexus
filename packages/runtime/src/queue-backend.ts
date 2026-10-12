@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.ts";
 
 export class MemoryQueueBackend implements IQueueBackend {
   private activeQueue: QueueJob[] = [];

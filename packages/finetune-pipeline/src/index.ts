@@ -70,12 +70,13 @@ export interface AssembleResult {
 
 /** Error raised when an export precondition fails. */
 export class FinetuneExportError extends Error {
-  constructor(
-    message: string,
-    public readonly code: "INSUFFICIENT_DATA" | "EMPTY_DATASET",
-    public readonly readyCount: number,
-  ) {
+  public readonly code: "INSUFFICIENT_DATA" | "EMPTY_DATASET";
+  public readonly readyCount: number;
+
+  constructor(message: string, code: "INSUFFICIENT_DATA" | "EMPTY_DATASET", readyCount: number) {
     super(message);
+    this.code = code;
+    this.readyCount = readyCount;
     this.name = "FinetuneExportError";
   }
 }

@@ -15,8 +15,8 @@
  * - Deepened repair (edge-node ref consistency, duplicate cleanup)
  */
 
-import type { IEventBus } from "./event-bus.js";
-import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -106,22 +106,23 @@ interface IntegrityCheckpoint {
 // ─── Error Types ─────────────────────────────────────────────────────
 
 export class GraphMutationError extends Error {
-  constructor(
-    message: string,
-    public op: string,
-    public override cause?: Error,
-  ) {
+  public op: string;
+  public override cause?: Error;
+
+  constructor(message: string, op: string, cause?: Error) {
     super(message);
+    this.op = op;
+    this.cause = cause;
     this.name = "GraphMutationError";
   }
 }
 
 export class GraphConsistencyError extends Error {
-  constructor(
-    message: string,
-    public report: GraphIntegrityReport,
-  ) {
+  public report: GraphIntegrityReport;
+
+  constructor(message: string, report: GraphIntegrityReport) {
     super(message);
+    this.report = report;
     this.name = "GraphConsistencyError";
   }
 }

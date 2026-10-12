@@ -116,7 +116,7 @@ describe("Atomic INCR path (Upstash pipeline)", () => {
   it("uses atomic INCR to count calls correctly", async () => {
     // First request: count = 1
     mockUpstashPipeline(1);
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 3, windowMs: 60_000, keyPrefix: "atomic" });
 
     const r1 = makeReply();
@@ -143,7 +143,7 @@ describe("Atomic INCR path (Upstash pipeline)", () => {
   it("returns 429 when INCR exceeds limit", async () => {
     // Already at limit + 1
     mockUpstashPipeline(4); // limit is 3, so 4 → over limit
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 3, windowMs: 60_000, keyPrefix: "over" });
 
     const reply = makeReply();
@@ -158,7 +158,7 @@ describe("Atomic INCR path (Upstash pipeline)", () => {
   it("different IPs have independent atomic counters", async () => {
     // IP A: count = 1 → pass
     mockUpstashPipeline(1);
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "iso-at" });
 
     await handler(makeRequest("10.0.0.1"), makeReply());
@@ -187,7 +187,7 @@ describe("In-memory fallback (no Upstash env)", () => {
 
   it("uses in-memory KV when Upstash is not configured", async () => {
     // No Upstash env → shared KV falls back to MemoryKVStore
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "memfall" });
 
     // First request
@@ -209,7 +209,7 @@ describe("In-memory fallback (no Upstash env)", () => {
   });
 
   it("in-memory counters are independent across keyPrefix values", async () => {
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const hA = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "indep-a" });
     const hB = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "indep-b" });
 
@@ -261,7 +261,7 @@ describe("Window drain — Upstash pipeline", () => {
 
   it("stamps EXPIRE only when INCR creates the key (result 1), never in-window", async () => {
     const { bodies } = mockUpstashWithRecordedBodies();
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "drain-up" });
 
     // First request creates the key → INCR + EXPIRE
@@ -290,15 +290,15 @@ describe("Window drain — KV fallback", () => {
     vi.restoreAllMocks();
     // doMock registrations survive resetModules — undo ours so later tests
     // (e.g. the fail-open group) get the natural shared-kv singleton again.
-    vi.doUnmock("../../src/lib/shared-kv.js");
+    vi.doUnmock("../../src/lib/shared-kv.ts");
   });
 
   it("bucket pushed over the limit drains after the window when traffic stops", async () => {
     let now = 1_000_000;
     const kv = new MemoryKVStore({ now: () => now });
-    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({ getSharedKV: () => kv }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "drain-mem" });
 
     const r1 = makeReply();
@@ -321,9 +321,9 @@ describe("Window drain — KV fallback", () => {
   it("in-window traffic does not refresh the expiry", async () => {
     let now = 2_000_000;
     const kv = new MemoryKVStore({ now: () => now });
-    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({ getSharedKV: () => kv }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({
       limit: 2,
       windowMs: 60_000,
@@ -354,9 +354,9 @@ describe("Window drain — KV fallback", () => {
   it("serializes concurrent arrivals so the bucket counts exactly", async () => {
     const now = 3_000_000;
     const kv = new MemoryKVStore({ now: () => now });
-    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({ getSharedKV: () => kv }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({
       limit: 10,
       windowMs: 60_000,
@@ -396,7 +396,7 @@ describe("Local limits when the shared store is unavailable", () => {
     setUpstashEnv();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo1" });
 
     const codes: number[] = [];
@@ -412,7 +412,7 @@ describe("Local limits when the shared store is unavailable", () => {
     setUpstashEnv();
     mockUpstashError();
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo2" });
 
     const codes: number[] = [];
@@ -437,11 +437,11 @@ describe("Local limits when the shared store is unavailable", () => {
     // The shared-kv singleton may be cached from a previous test group.
     // Force it to use Upstash by resetting the singleton through a fresh import.
     const kv = new MemoryKVStore();
-    vi.doMock("../../src/lib/shared-kv.js", () => ({
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({
       getSharedKV: () => kv,
     }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo3" });
 
     const reply = makeReply();
@@ -462,11 +462,11 @@ describe("Local limits when the shared store is unavailable", () => {
       throw new Error("KV down");
     };
 
-    vi.doMock("../../src/lib/shared-kv.js", () => ({
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({
       getSharedKV: () => brokenKV,
     }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo4" });
 
     // Should not throw; should silently pass through
@@ -484,11 +484,11 @@ describe("Local limits when the shared store is unavailable", () => {
       throw new Error("KV down");
     };
 
-    vi.doMock("../../src/lib/shared-kv.js", () => ({
+    vi.doMock("../../src/lib/shared-kv.ts", () => ({
       getSharedKV: () => brokenKV,
     }));
 
-    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 5, windowMs: 60_000, keyPrefix: "fo5" });
 
     const reply = makeReply();

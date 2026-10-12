@@ -21,7 +21,7 @@ import {
   withOutputStyle,
   type SkillExecutionRecorder,
   type SkillRecord,
-} from "../../src/lib/skill-runner.js";
+} from "../../src/lib/skill-runner.ts";
 
 function fakeRunner(result: Partial<RunnerResult>): Runner {
   return async () => ({
@@ -377,8 +377,8 @@ describe("skill-execution graph events (runtime-emitted, zero model writes)", ()
 
 describe("skill exec approvals", () => {
   it("bind to the skill's code, so an edited skill asks again", async () => {
-    const { skillExecAction: action } = await import("../../src/lib/skill-runner.js");
-    const approvals = await import("../../src/lib/exec-approvals.js");
+    const { skillExecAction: action } = await import("../../src/lib/skill-runner.ts");
+    const approvals = await import("../../src/lib/exec-approvals.ts");
     const before = action({ id: "s1", language: "python", code: "print(1)" });
     const after = action({ id: "s1", language: "python", code: "import os; os.remove('x')" });
     expect(after.args).not.toEqual(before.args);

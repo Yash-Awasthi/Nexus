@@ -29,12 +29,13 @@ import { createHash } from "node:crypto";
 // ── Error ──────────────────────────────────────────────────────────────────────
 
 export class CacheError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>,
-  ) {
+  public readonly code: string;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
+    this.code = code;
+    this.context = context;
     this.name = "CacheError";
   }
 }
@@ -238,10 +239,10 @@ export class KVPromptCache implements PromptCache {
   private _misses = 0;
   private readonly prefix: string;
 
-  constructor(
-    private readonly kv: KVStoreLike,
-    opts: { keyPrefix?: string } = {},
-  ) {
+  private readonly kv: KVStoreLike;
+
+  constructor(kv: KVStoreLike, opts: { keyPrefix?: string } = {}) {
+    this.kv = kv;
     this.prefix = opts.keyPrefix ? `${opts.keyPrefix}:` : "cache:";
   }
 
@@ -314,11 +315,14 @@ export class CachingLLMProvider implements LLMProvider {
   private readonly keyFn: (req: LLMRequest) => string;
   private readonly respectNoCache: boolean;
 
-  constructor(
-    private readonly inner: LLMProvider,
-    private readonly cache: PromptCache,
-    private readonly opts: CachingLLMProviderOptions = {},
-  ) {
+  private readonly inner: LLMProvider;
+  private readonly cache: PromptCache;
+  private readonly opts: CachingLLMProviderOptions;
+
+  constructor(inner: LLMProvider, cache: PromptCache, opts: CachingLLMProviderOptions = {}) {
+    this.inner = inner;
+    this.cache = cache;
+    this.opts = opts;
     this.name = `cached(${inner.name})`;
     this.models = inner.models;
     this.keyFn = opts.keyFn ?? buildCacheKey;
@@ -369,11 +373,12 @@ export class TieredPromptCache implements PromptCache {
   private _misses = 0;
   private readonly l1TtlMs?: number;
 
-  constructor(
-    private readonly l1: PromptCache,
-    private readonly l2: PromptCache,
-    opts: { l1TtlMs?: number } = {},
-  ) {
+  private readonly l1: PromptCache;
+  private readonly l2: PromptCache;
+
+  constructor(l1: PromptCache, l2: PromptCache, opts: { l1TtlMs?: number } = {}) {
+    this.l1 = l1;
+    this.l2 = l2;
     this.l1TtlMs = opts.l1TtlMs;
   }
 
@@ -478,11 +483,12 @@ export class SemanticCachingLLMProvider implements LLMProvider {
   private _hits = 0;
   private _misses = 0;
 
-  constructor(
-    private readonly inner: LLMProvider,
-    private readonly embed: EmbedFn,
-    opts: SemanticCachingOptions = {},
-  ) {
+  private readonly inner: LLMProvider;
+  private readonly embed: EmbedFn;
+
+  constructor(inner: LLMProvider, embed: EmbedFn, opts: SemanticCachingOptions = {}) {
+    this.inner = inner;
+    this.embed = embed;
     this.name = `semantic(${inner.name})`;
     this.models = inner.models;
     this.threshold = opts.threshold ?? 0.95;

@@ -7,9 +7,9 @@
 
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
-type Org = typeof import("../../src/lib/org-store.js");
+type Org = typeof import("../../src/lib/org-store.ts");
 
 const boot = async (): Promise<Org> => (await bootOrg()).org;
 

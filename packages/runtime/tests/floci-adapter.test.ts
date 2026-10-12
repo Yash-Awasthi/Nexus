@@ -6,17 +6,17 @@ const mocks = vi.hoisted(() => ({
   probeFlociHealth: vi.fn(),
 }));
 
-vi.mock("../src/bridge-manager.js", () => ({
+vi.mock("../src/bridge-manager.ts", () => ({
   getBridgeManager: () => ({ url: mocks.url }),
 }));
 
-vi.mock("../src/floci-client.js", () => ({
+vi.mock("../src/floci-client.ts", () => ({
   probeFlociHealth: mocks.probeFlociHealth,
   resolveFlociEndpoint: vi.fn(() => "http://localhost:4566"),
 }));
 
-import { FlociExecutionAdapter } from "../src/floci-adapter.js";
-import { EXTENDED_FLOCI_ACTIONS } from "../src/floci-extended.js";
+import { FlociExecutionAdapter } from "../src/floci-adapter.ts";
+import { EXTENDED_FLOCI_ACTIONS } from "../src/floci-extended.ts";
 
 function stubFetch(ok: boolean, body: unknown): ReturnType<typeof vi.fn> {
   const fn = vi.fn().mockResolvedValue({

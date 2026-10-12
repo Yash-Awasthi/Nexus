@@ -26,11 +26,11 @@ import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { Command } from "commander";
 
-import { api, fail } from "./lib/client.js";
-import { runLocalAgent } from "./lib/local-agent.js";
-import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.js";
-import { registerOrgCommands } from "./lib/org.js";
-import { streamSse } from "./lib/sse-stream.js";
+import { api, fail } from "./lib/client.ts";
+import { runLocalAgent } from "./lib/local-agent.ts";
+import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.ts";
+import { registerOrgCommands } from "./lib/org.ts";
+import { streamSse } from "./lib/sse-stream.ts";
 
 const program = new Command();
 

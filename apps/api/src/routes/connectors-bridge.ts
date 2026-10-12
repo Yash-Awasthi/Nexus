@@ -37,16 +37,16 @@ import type { MemoryManager } from "@nexus/memory";
 import { nextCronRun, cronMatches, parseCron } from "@nexus/trigger-engine";
 import type { FastifyInstance } from "fastify";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-import { callerFetch, unsafeUrlReason } from "../lib/public-url.js";
-import { emitReaction } from "../lib/reactions.js";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { callerFetch, unsafeUrlReason } from "../lib/public-url.ts";
+import { emitReaction } from "../lib/reactions.ts";
 import {
   decryptSecret,
   encryptSecret,
   SecretCryptoUnavailableError,
-} from "../lib/secret-crypto.js";
+} from "../lib/secret-crypto.ts";
 
-import { ensureKb, htmlToText, pruneKbDocs, putKbText } from "./kb.js";
+import { ensureKb, htmlToText, pruneKbDocs, putKbText } from "./kb.ts";
 
 const now = (): string => new Date().toISOString();
 

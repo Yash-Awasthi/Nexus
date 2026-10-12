@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 
-import { closePgPools, getPgPool, isEmbeddedUrl } from "../../src/lib/pg-pool.js";
+import { closePgPools, getPgPool, isEmbeddedUrl } from "../../src/lib/pg-pool.ts";
 
 const MEM = "pglite://:memory:";
 

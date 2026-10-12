@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { IEventBus } from "./event-bus.js";
-import type { IApprovalWorkflow } from "./interfaces/governance.interface.js";
-import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IEventBus } from "./event-bus.ts";
+import type { IApprovalWorkflow } from "./interfaces/governance.interface.ts";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.ts";
 import type {
   IWorkflowDefinition,
   IWorkflowExecution,
@@ -12,10 +12,10 @@ import type {
   IWorkflowReplay,
   IWorkflowApprovalPolicy,
   IWorkflowConstraint,
-} from "./interfaces/workflow.interface.js";
-import type { ConductorOrchestrator } from "./orchestrator.js";
-import type { RuntimeGraph } from "./runtime-graph.js";
-import type { Task } from "./task-router.js";
+} from "./interfaces/workflow.interface.ts";
+import type { ConductorOrchestrator } from "./orchestrator.ts";
+import type { RuntimeGraph } from "./runtime-graph.ts";
+import type { Task } from "./task-router.ts";
 
 // ─── Replay Context Types ───────────────────────────────────────────
 
@@ -40,10 +40,16 @@ interface ReplayLineage {
 
 // 1. Generic Workflow Constraint Implementation
 export class WorkflowConstraint implements IWorkflowConstraint {
+  public name: string;
+  private checker: (tasks: Task[]) => Promise<{ allowed: boolean; reason?: string }>;
+
   constructor(
-    public name: string,
-    private checker: (tasks: Task[]) => Promise<{ allowed: boolean; reason?: string }>,
-  ) {}
+    name: string,
+    checker: (tasks: Task[]) => Promise<{ allowed: boolean; reason?: string }>,
+  ) {
+    this.name = name;
+    this.checker = checker;
+  }
   async evaluate(tasks: Task[]): Promise<{ allowed: boolean; reason?: string }> {
     return this.checker(tasks);
   }
@@ -51,10 +57,13 @@ export class WorkflowConstraint implements IWorkflowConstraint {
 
 // 2. Generic Workflow Approval Policy Implementation
 export class WorkflowApprovalPolicy implements IWorkflowApprovalPolicy {
-  constructor(
-    public workflowName: string,
-    private decider: (tasks: Task[]) => Promise<boolean>,
-  ) {}
+  public workflowName: string;
+  private decider: (tasks: Task[]) => Promise<boolean>;
+
+  constructor(workflowName: string, decider: (tasks: Task[]) => Promise<boolean>) {
+    this.workflowName = workflowName;
+    this.decider = decider;
+  }
   async requiresApproval(tasks: Task[]): Promise<boolean> {
     return this.decider(tasks);
   }
@@ -227,15 +236,30 @@ export class WorkflowEngine implements IWorkflowReplay {
   /** Monotonic replay generation counter — ensures ordering across replays. */
   private replayGenerationCounter = 0;
 
+  private registry: IWorkflowRegistry;
+  private telemetry: IWorkflowTelemetry;
+  private orchestrator: ConductorOrchestrator;
+  private approvalWorkflow?: IApprovalWorkflow;
+  private persistence?: IRuntimePersistence;
+  private eventBus?: IEventBus;
+  private runtimeGraph?: RuntimeGraph;
+
   constructor(
-    private registry: IWorkflowRegistry,
-    private telemetry: IWorkflowTelemetry,
-    private orchestrator: ConductorOrchestrator,
-    private approvalWorkflow?: IApprovalWorkflow,
-    private persistence?: IRuntimePersistence,
-    private eventBus?: IEventBus,
-    private runtimeGraph?: RuntimeGraph,
+    registry: IWorkflowRegistry,
+    telemetry: IWorkflowTelemetry,
+    orchestrator: ConductorOrchestrator,
+    approvalWorkflow?: IApprovalWorkflow,
+    persistence?: IRuntimePersistence,
+    eventBus?: IEventBus,
+    runtimeGraph?: RuntimeGraph,
   ) {
+    this.registry = registry;
+    this.telemetry = telemetry;
+    this.orchestrator = orchestrator;
+    this.approvalWorkflow = approvalWorkflow;
+    this.persistence = persistence;
+    this.eventBus = eventBus;
+    this.runtimeGraph = runtimeGraph;
     // Load any persisted checkpoints on construction
     this.loadCheckpoints();
   }

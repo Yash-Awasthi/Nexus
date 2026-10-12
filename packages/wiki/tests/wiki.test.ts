@@ -8,7 +8,7 @@ import {
   WikiSearch,
   WikiNotifier,
   WikiStore,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── WikiPageStore ─────────────────────────────────────────────────────────────
 

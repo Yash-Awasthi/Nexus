@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Make an existing account an admin. Run from inside the deployment (see src/grant-admin.ts). */
-import type { PgLike } from "./pg-pool.js";
+import type { PgLike } from "./pg-pool.ts";
 
 export async function grantAdmin(pool: PgLike, email: string): Promise<boolean> {
   const { rows } = await pool.query<{ id: string }>(

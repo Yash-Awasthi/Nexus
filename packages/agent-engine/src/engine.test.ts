@@ -2,7 +2,7 @@
 // agent-engine tool-execution loop + registry — focused tests with a
 // stubbed fetch driving the OpenAI tool-calling protocol.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { OpenAIEngine, EngineRegistry, type EngineConfig, type ToolCall } from "./index.js";
+import { OpenAIEngine, EngineRegistry, type EngineConfig, type ToolCall } from "./index.ts";
 
 const CFG: EngineConfig = {
   model: "gpt-4o-mini",

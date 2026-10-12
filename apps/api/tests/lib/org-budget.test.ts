@@ -8,15 +8,15 @@
 import type { LlmDriver } from "@nexus/llm-drivers";
 import { describe, it, expect } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
-type Runtime = typeof import("../../src/lib/org-runtime.js");
+type Runtime = typeof import("../../src/lib/org-runtime.ts");
 
 const boot = () =>
   bootOrg(async () => ({
-    budget: await import("../../src/lib/org-budget.js"),
-    adapters: await import("../../src/lib/org-adapters.js"),
-    failover: await import("../../src/lib/llm-failover.js"),
+    budget: await import("../../src/lib/org-budget.ts"),
+    adapters: await import("../../src/lib/org-adapters.ts"),
+    failover: await import("../../src/lib/llm-failover.ts"),
   }));
 
 /** A run that spends $0.0025: 1000 input and 500 output tokens on an unpriced model. */

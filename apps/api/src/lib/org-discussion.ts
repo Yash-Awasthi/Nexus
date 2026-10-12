@@ -10,9 +10,9 @@
 import { MAX_DEBATE_ROUNDS, runCouncilDebate, type DebateMember } from "@nexus/council";
 import { globalFlags } from "@nexus/feature-flags";
 
-import { callAllowance, estimateCallMicros, recordRunSpend } from "./org-budget.js";
-import { addLesson } from "./org-memory.js";
-import { personaOf, runAsOwner, stepsCostUsd } from "./org-runtime.js";
+import { callAllowance, estimateCallMicros, recordRunSpend } from "./org-budget.ts";
+import { addLesson } from "./org-memory.ts";
+import { personaOf, runAsOwner, stepsCostUsd } from "./org-runtime.ts";
 import {
   OrgError,
   getAgent,
@@ -23,7 +23,7 @@ import {
   onOrgLoad,
   registerCompanyScoped,
   type Agent,
-} from "./org-store.js";
+} from "./org-store.ts";
 import {
   addComment,
   createTask,
@@ -31,9 +31,9 @@ import {
   listComments,
   orgEvents,
   taskContext,
-} from "./org-work.js";
-import { PersistentStore } from "./persistent-store.js";
-import type { LlmStep } from "./request-traces.js";
+} from "./org-work.ts";
+import { PersistentStore } from "./persistent-store.ts";
+import type { LlmStep } from "./request-traces.ts";
 
 const MAX_TOKENS = 700;
 const SYSTEM = { type: "system", id: "discussion" } as const;

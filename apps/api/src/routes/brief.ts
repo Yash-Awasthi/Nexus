@@ -23,9 +23,9 @@ import {
 } from "@nexus/brief-engine";
 import type { FastifyInstance } from "fastify";
 
-import { isNeonCompatibleUrl } from "../lib/pg-pool.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { requireAuth } from "../middleware/auth.js";
+import { isNeonCompatibleUrl } from "../lib/pg-pool.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton engine ──────────────────────────────────────────────────────────
 

@@ -26,8 +26,8 @@
 
 import crypto from "node:crypto";
 
-import { PersistentStore } from "./persistent-store.js";
-import { decryptSecret, encryptSecret, isSecretCryptoAvailable } from "./secret-crypto.js";
+import { PersistentStore } from "./persistent-store.ts";
+import { decryptSecret, encryptSecret, isSecretCryptoAvailable } from "./secret-crypto.ts";
 
 /** What a caller may see: everything about a secret except the secret. */
 interface SecretMetadata {

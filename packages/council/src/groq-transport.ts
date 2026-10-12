@@ -8,7 +8,7 @@
 
 import Groq from "groq-sdk";
 
-import type { ILLMTransport, ILLMMessage, ILLMResponse } from "./engine.js";
+import type { ILLMTransport, ILLMMessage, ILLMResponse } from "./engine.ts";
 
 /**
  * Default Groq model. llama-3.3-70b-versatile was decommissioned by Groq on

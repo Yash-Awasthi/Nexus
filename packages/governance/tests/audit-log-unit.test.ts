@@ -15,7 +15,7 @@ import {
   hashPayload,
   computeChainHash,
   type AuditPayload,
-} from "../src/audit-log.js";
+} from "../src/audit-log.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

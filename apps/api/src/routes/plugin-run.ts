@@ -27,13 +27,13 @@ import {
 } from "@nexus/plugin-sdk";
 import type { FastifyInstance } from "fastify";
 
-import { searchDuckDuckGo } from "../lib/duckduckgo.js";
-import { createNotification } from "../lib/notifications-store.js";
-import { dataDir, PersistentStore } from "../lib/persistent-store.js";
-import { withPluginBridge, type HostHandler } from "../lib/plugin-host.js";
-import { requireAuth } from "../middleware/auth.js";
+import { searchDuckDuckGo } from "../lib/duckduckgo.ts";
+import { createNotification } from "../lib/notifications-store.ts";
+import { dataDir, PersistentStore } from "../lib/persistent-store.ts";
+import { withPluginBridge, type HostHandler } from "../lib/plugin-host.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
-import { getDefaultDriver } from "./api-bridge.js";
+import { getDefaultDriver } from "./api-bridge.ts";
 
 /** Passed to the script as one argv entry, so it stays well under OS command-line limits. */
 const MAX_INPUT_BYTES = 16 * 1024;

@@ -19,7 +19,7 @@ process.env.NEXUS_JWT_SECRET = SECRET_JWT;
 // A 32-byte key, so the store is usable: it fails closed without one.
 process.env.NEXUS_SECRETS_KEY = "a".repeat(64);
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 
@@ -188,14 +188,14 @@ describe("asking for a secret instead of asking in conversation", () => {
 
 describe("the value itself", () => {
   it("is readable in-process and nowhere else", async () => {
-    const store = await import("../../src/lib/secret-store.js");
+    const store = await import("../../src/lib/secret-store.ts");
 
     expect(store.resolveSecret(ALICE, "STRIPE_KEY")).toBe(VALUE);
     expect(store.resolveSecret(BOB, "STRIPE_KEY")).toBeNull();
   });
 
   it("records that it was used, without recording what it says", async () => {
-    const store = await import("../../src/lib/secret-store.js");
+    const store = await import("../../src/lib/secret-store.ts");
     store.resolveSecret(ALICE, "STRIPE_KEY");
 
     const { secrets } = JSON.parse((await call("GET", "/api/v1/secrets", ALICE)).payload) as {
@@ -210,7 +210,7 @@ describe("the value itself", () => {
   });
 
   it("survives a restart, still sealed", async () => {
-    const store = await import("../../src/lib/secret-store.js");
+    const store = await import("../../src/lib/secret-store.ts");
     store._resetSecretStoreForTests();
     await store.loadSecretStore();
 

@@ -24,7 +24,7 @@ import {
 } from "@nexus/i18n";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Catalog + I18n singleton ──────────────────────────────────────────────────
 

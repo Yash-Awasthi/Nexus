@@ -20,10 +20,10 @@ import { users } from "@nexus/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
+import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
 const mfaRateLimit = makeRateLimitPreHandler({

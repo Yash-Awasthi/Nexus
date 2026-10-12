@@ -7,7 +7,7 @@ import {
   PluginManifestError,
   KNOWN_CAPABILITIES,
   type PluginManifest,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 const VALID: PluginManifest = {
   id: "com.acme.summarizer",

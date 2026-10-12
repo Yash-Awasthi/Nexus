@@ -15,8 +15,8 @@
 
 import * as https from "https";
 
-import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
-import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+import { getBridgeManager, BridgeManager } from "./bridge-manager.ts";
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

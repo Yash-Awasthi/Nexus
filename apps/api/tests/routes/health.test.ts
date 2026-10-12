@@ -24,8 +24,8 @@ vi.mock("pg", () => {
 
 import { db } from "@nexus/db";
 
-import { buildServer } from "../../src/server.js";
-import { costLogStore } from "../../src/lib/cost-log.js";
+import { buildServer } from "../../src/server.ts";
+import { costLogStore } from "../../src/lib/cost-log.ts";
 
 describe("GET /health", () => {
   it("returns 200 with status, version, and timestamp", async () => {

@@ -7,12 +7,12 @@
 
 import { describe, it, expect, vi } from "vitest";
 
-import { bootOrg, useOrgDataDir } from "./org-test-env.js";
+import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
 const boot = () =>
   bootOrg(async () => ({
-    approvals: await import("../../src/lib/org-approvals.js"),
-    budget: await import("../../src/lib/org-budget.js"),
+    approvals: await import("../../src/lib/org-approvals.ts"),
+    budget: await import("../../src/lib/org-budget.ts"),
   }));
 
 const reply = (body: string, ctl: Record<string, unknown>) =>

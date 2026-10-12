@@ -49,41 +49,50 @@ cd packages/adapters/$ADAPTER
   "description": "NEXUS adapter for MyService",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
     "@nexus/plugin-sdk": "workspace:*"
   },
-  "devDependencies": {
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.4"
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" }
+    }
   }
 }
 ```
+
+Inside the workspace the package exports its TypeScript source, which Node 26,
+Vite and Vitest load directly; `publishConfig` swaps in the compiled `dist/`
+when the package is published.
 
 ### 3.2 `tsconfig.json`
 
 ```json
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "rootDir": "src",
     "outDir": "dist",
-    "declarationDir": "dist"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src"],
+  "references": [{ "path": "../../plugin-sdk" }]
 }
 ```
+
+Add the package to `tsconfig.build.json` so `pnpm build` compiles it for
+publishing (`pnpm scaffold:adapter` does this for you). Relative imports name the
+`.ts` file (`./client.ts`); the build rewrites them to `.js`.
 
 ### 3.3 Register in `pnpm-workspace.yaml`
 

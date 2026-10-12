@@ -14,7 +14,7 @@ import {
   type BotHooks,
   type BotTriggerMode,
   type FetchFn,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test helpers

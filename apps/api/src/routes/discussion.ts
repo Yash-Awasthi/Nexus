@@ -26,11 +26,11 @@ import {
 import type { LlmRole } from "@nexus/llm-drivers";
 import type { FastifyInstance } from "fastify";
 
-import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.js";
-import { buildUserDriverRegistry } from "../lib/provider-keys.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.ts";
+import { buildUserDriverRegistry } from "../lib/provider-keys.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { resolveCouncilModelAlias, resolveMemberModel } from "./council.js";
+import { resolveCouncilModelAlias, resolveMemberModel } from "./council.ts";
 
 /** Caps a caller may lower but not raise. */
 const LIMITS = {

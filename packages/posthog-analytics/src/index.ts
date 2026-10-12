@@ -194,7 +194,11 @@ export type NexusEventName = (typeof NexusEvents)[keyof typeof NexusEvents];
 // ── Convenience tracker ───────────────────────────────────────────────────────
 
 export class NexusAnalytics {
-  constructor(private client: AnalyticsClient) {}
+  private client: AnalyticsClient;
+
+  constructor(client: AnalyticsClient) {
+    this.client = client;
+  }
 
   async chatMessageSent(userId: string, model: string, sessionId: string): Promise<void> {
     await this.client.track(NexusEvents.CHAT_MESSAGE_SENT, userId, {

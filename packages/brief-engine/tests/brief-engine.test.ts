@@ -9,7 +9,7 @@ import {
   BriefEngine,
   type DigestEvent,
   type DigestSnapshot,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

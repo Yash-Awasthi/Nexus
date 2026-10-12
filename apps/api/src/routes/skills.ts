@@ -21,8 +21,8 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-import { compressSkillsForTaskSemantic, polishComposite } from "../lib/skill-compress.js";
+import { PersistentStore } from "../lib/persistent-store.ts";
+import { compressSkillsForTaskSemantic, polishComposite } from "../lib/skill-compress.ts";
 import {
   mergeReport,
   mergeSkillCodes,
@@ -30,7 +30,7 @@ import {
   polishMergedSkill,
   type PolishDriver,
   type SkillSource,
-} from "../lib/skill-merge.js";
+} from "../lib/skill-merge.ts";
 
 const POLISH_TIMEOUT_MS = parseInt(process.env.SKILL_POLISH_TIMEOUT_MS ?? "60000", 10);
 

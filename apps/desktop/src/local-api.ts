@@ -17,7 +17,7 @@
  */
 
 export interface LocalApiPaths {
-  /** Compiled API entrypoint (`apps/api/dist/index.js`). */
+  /** API entrypoint (`apps/api/src/index.ts`), run with Node's type stripping. */
   entry: string;
   /** Built SPA directory (`apps/ui/build/client`). */
   spaDir: string;

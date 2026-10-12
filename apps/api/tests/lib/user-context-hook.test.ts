@@ -8,8 +8,8 @@ import { describe, it, expect } from "vitest";
 const SECRET = "user-context-hook-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 
-const { enterUserContext } = await import("../../src/server.js");
-const { userContext } = await import("../../src/lib/user-context.js");
+const { enterUserContext } = await import("../../src/server.ts");
+const { userContext } = await import("../../src/lib/user-context.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

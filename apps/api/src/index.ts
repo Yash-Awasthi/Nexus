@@ -16,7 +16,7 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { closePgPools, getPgPool, isEmbeddedUrl } from "./lib/pg-pool.js";
+import { closePgPools, getPgPool, isEmbeddedUrl } from "./lib/pg-pool.ts";
 
 // ── .env loader (zero-dependency) ───────────────────────────────────────────
 // Parses a standard KEY=VALUE .env file at the monorepo root so `pnpm dev:api`
@@ -224,7 +224,7 @@ async function main(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL;
   if (dbUrl && isEmbeddedUrl(dbUrl)) {
     try {
-      const { migrateEmbedded } = await import("./lib/migrate-embedded.js");
+      const { migrateEmbedded } = await import("./lib/migrate-embedded.ts");
       const { applied, skipped } = await migrateEmbedded(getPgPool(dbUrl)!);
       console.log(
         `[startup] embedded database migrated: ${applied.length} applied` +
@@ -239,7 +239,7 @@ async function main(): Promise<void> {
 
   // ── Step 2: Load full Fastify server (slow on low-CPU) ──────────────────────
   console.log("[startup] loading server modules (may take a moment on low-CPU)...");
-  const { buildServer } = await import("./server.js");
+  const { buildServer } = await import("./server.ts");
 
   console.log("[startup] building Fastify server...");
   const app = await buildServer();
@@ -252,7 +252,7 @@ async function main(): Promise<void> {
   // race a cold model load. Health checks were already served by the early
   // server during this window, so the 30-second deploy window is unaffected.
   try {
-    const { embedderWarmup } = await import("./routes/api-bridge.js");
+    const { embedderWarmup } = await import("./routes/api-bridge.ts");
     await Promise.race([
       embedderWarmup(),
       new Promise<void>((resolve) => setTimeout(resolve, 8_000)),
@@ -267,7 +267,7 @@ async function main(): Promise<void> {
   // `nexus models seed [--file <path>]`; with no DATABASE_URL or an empty
   // table the registry keeps its curated defaults (fail-open).
   try {
-    const { loadProviderModelsIntoRegistry } = await import("./lib/models-seed.js");
+    const { loadProviderModelsIntoRegistry } = await import("./lib/models-seed.ts");
     const seeded = await loadProviderModelsIntoRegistry();
     console.log(`[startup] provider_models loaded: ${seeded} model(s) ✓`);
   } catch {

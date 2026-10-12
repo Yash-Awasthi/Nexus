@@ -39,9 +39,9 @@ export function useOrgDataDir(env: Record<string, string | undefined> = {}): voi
 export async function bootOrg<E extends object = object>(extras?: () => Promise<E>) {
   vi.resetModules();
   const more = ((await extras?.()) ?? {}) as E;
-  const rt = await import("../../src/lib/org-runtime.js");
-  const work = await import("../../src/lib/org-work.js");
-  const org = await import("../../src/lib/org-store.js");
+  const rt = await import("../../src/lib/org-runtime.ts");
+  const work = await import("../../src/lib/org-work.ts");
+  const org = await import("../../src/lib/org-store.ts");
   await org.loadOrgStore();
   return { ...more, rt, work, org };
 }

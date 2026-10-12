@@ -2,7 +2,7 @@
 /** Every request a page makes is answered by the server's guard, never by the browser's own connection. */
 import { describe, expect, it } from "vitest";
 
-import { routeThrough, type RequestVia, type RouteLike } from "../src/index.js";
+import { routeThrough, type RequestVia, type RouteLike } from "../src/index.ts";
 
 function fakeRoute(url: string, method = "GET", body: Buffer | null = null) {
   const seen: { fulfilled?: Parameters<RouteLike["fulfill"]>[0]; aborted?: string } = {};

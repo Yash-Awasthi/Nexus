@@ -288,10 +288,13 @@ export class BrowserActor {
   private snapshot: DomSnapshot | null = null;
   private history: { action: ActorAction; result: ActionResult; timestamp: number }[] = [];
 
-  constructor(
-    private readonly driver: BrowserDriver,
-    private readonly options: BrowserActorOptions = {},
-  ) {}
+  private readonly driver: BrowserDriver;
+  private readonly options: BrowserActorOptions;
+
+  constructor(driver: BrowserDriver, options: BrowserActorOptions = {}) {
+    this.driver = driver;
+    this.options = options;
+  }
 
   /** Currently open page (null until navigate()). */
   get currentPage(): BrowserPage | null {
@@ -486,4 +489,4 @@ export class BrowserActor {
   }
 }
 
-export * from "./agent.js";
+export * from "./agent.ts";

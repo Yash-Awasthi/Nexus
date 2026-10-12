@@ -24,8 +24,8 @@ import {
 import { MemoryKVStore } from "@nexus/kv";
 import type { FastifyInstance } from "fastify";
 
-import { execScript, getPgPool, type PgLike } from "../lib/pg-pool.js";
-import { requireAuth } from "../middleware/auth.js";
+import { execScript, getPgPool, type PgLike } from "../lib/pg-pool.ts";
+import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton ForecastService ─────────────────────────────────────────────────
 

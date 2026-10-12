@@ -8,7 +8,7 @@ import {
   detectLocale,
   EN_CATALOG,
   HI_CATALOG,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── TranslationCatalog ────────────────────────────────────────────────────────
 

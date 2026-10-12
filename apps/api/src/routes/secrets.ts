@@ -20,7 +20,7 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { ownerIdFor } from "../lib/owner.js";
+import { ownerIdFor } from "../lib/owner.ts";
 import {
   SecretEncryptionUnavailableError,
   cancelSecretRequest,
@@ -31,8 +31,8 @@ import {
   loadSecretStore,
   putSecret,
   requestSecret,
-} from "../lib/secret-store.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+} from "../lib/secret-store.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export async function secretRoutes(app: FastifyInstance): Promise<void> {
   await loadSecretStore();

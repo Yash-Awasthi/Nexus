@@ -14,7 +14,7 @@ import {
   SsoPolicyError,
   assertMayProvision,
   mayProvision,
-} from "../../src/lib/sso-provisioning.js";
+} from "../../src/lib/sso-provisioning.ts";
 
 const ON = {
   NEXUS_SSO_AUTO_PROVISION: "1",

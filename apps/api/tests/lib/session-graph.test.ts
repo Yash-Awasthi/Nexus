@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { getSharedKV } from "../../src/lib/shared-kv.js";
+import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import {
   appendGraphEvent,
   getSessionGraph,
   listSessionGraphs,
-} from "../../src/lib/session-graph.js";
+} from "../../src/lib/session-graph.ts";
 
 // No REDIS_URL / UPSTASH env in tests → getSharedKV() falls back to the
 // in-process MemoryKVStore. Clear it before every test so cases are isolated.

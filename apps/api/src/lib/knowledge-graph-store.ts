@@ -26,9 +26,9 @@ import {
 import type { LlmDriver, LlmRole } from "@nexus/llm-drivers";
 import { extractEntities, extractRelationships, type NlpLlmClient } from "@nexus/nlp-utils";
 
-import { ANON_OWNER, claimable } from "./owner.js";
-import { getPgPool } from "./pg-pool.js";
-import { getCacheUserId } from "./user-context.js";
+import { ANON_OWNER, claimable } from "./owner.ts";
+import { getPgPool } from "./pg-pool.ts";
+import { getCacheUserId } from "./user-context.ts";
 
 // ponytail: only used without a database, where nothing outlives the process anyway.
 const _memory = new Map<string, InMemoryKGStore>();
@@ -109,8 +109,8 @@ export function extractionClient(): Promise<NlpLlmClient | null> {
 /** A client for `choice` ("provider/model"), else the caller's default chain; null with neither. */
 export async function namedModelClient(choice?: string): Promise<NlpLlmClient | null> {
   // Deferred: api-bridge imports this module, so a static import would cycle.
-  const { getDefaultDriver, getPinnedDriver } = await import("../routes/api-bridge.js");
-  const { resolveMemberModel } = await import("../routes/council.js");
+  const { getDefaultDriver, getPinnedDriver } = await import("../routes/api-bridge.ts");
+  const { resolveMemberModel } = await import("../routes/council.ts");
   choice = choice?.trim();
   const wanted = choice ? resolveMemberModel(choice) : null;
   const pinned = wanted ? getPinnedDriver(wanted.provider) : undefined;

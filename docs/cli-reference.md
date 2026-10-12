@@ -12,8 +12,7 @@
 
 ```bash
 # From repo (dev)
-pnpm --filter @nexus/cli build
-node apps/cli/dist/index.js
+node apps/cli/src/index.ts
 
 # Global (once published)
 npm install -g @nexus/cli

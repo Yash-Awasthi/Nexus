@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { extractFinalAnswer, answerSimilarity, scoreAgreement } from "./agreement.js";
+import { extractFinalAnswer, answerSimilarity, scoreAgreement } from "./agreement.ts";
 
 describe("extractFinalAnswer", () => {
   it("takes the explicit FINAL line", () => {

@@ -12,7 +12,7 @@ import {
   getTracer,
   setTracer,
   type SpanContext,
-} from "../src/index.js";
+} from "../src/index.ts";
 
 // ── Tracer ────────────────────────────────────────────────────────────────────
 

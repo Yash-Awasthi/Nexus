@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HealthMonitor, LocalServiceDiscovery } from "../src/service-discovery.js";
-import type { IConfigLoader } from "../src/config-loader.js";
-import type { ILogger } from "../src/interfaces/logger.interface.js";
+import { HealthMonitor, LocalServiceDiscovery } from "../src/service-discovery.ts";
+import type { IConfigLoader } from "../src/config-loader.ts";
+import type { ILogger } from "../src/interfaces/logger.interface.ts";
 
 // ── LocalServiceDiscovery ─────────────────────────────────────────────────────
 

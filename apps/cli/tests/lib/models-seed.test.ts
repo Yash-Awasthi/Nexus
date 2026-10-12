@@ -15,7 +15,7 @@ import {
   loadModelsDevSource,
   upsertProviderModels,
   type SeedDb,
-} from "../../src/lib/models-seed.js";
+} from "../../src/lib/models-seed.ts";
 import { rowToModelDefinition } from "@nexus/provider-registry";
 
 /** Capture the insert calls a stub DB receives. */

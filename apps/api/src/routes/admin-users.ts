@@ -19,8 +19,8 @@ import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, isNull, isNotNull, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
-import { assignOwnerless, ownerlessCounts } from "../lib/owner.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
+import { assignOwnerless, ownerlessCounts } from "../lib/owner.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Admin role guard ──────────────────────────────────────────────────────────
 

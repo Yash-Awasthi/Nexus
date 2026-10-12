@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // MCP-over-HTTP server core — focused tests.
 import { describe, it, expect } from "vitest";
-import { McpHttpServer } from "./server.js";
-import type { McpToolDefinition } from "./index.js";
+import { McpHttpServer } from "./server.ts";
+import type { McpToolDefinition } from "./index.ts";
 
 const WEATHER: McpToolDefinition = {
   name: "get_weather",

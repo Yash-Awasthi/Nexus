@@ -127,13 +127,15 @@ export type LlmErrorCode =
 
 /** Llm error. */
 export class LlmError extends Error {
-  constructor(
-    public readonly code: LlmErrorCode,
-    message: string,
-    public readonly provider: string,
-    public readonly statusCode?: number,
-  ) {
+  public readonly code: LlmErrorCode;
+  public readonly provider: string;
+  public readonly statusCode?: number;
+
+  constructor(code: LlmErrorCode, message: string, provider: string, statusCode?: number) {
     super(message);
+    this.code = code;
+    this.provider = provider;
+    this.statusCode = statusCode;
     this.name = "LlmError";
   }
 }

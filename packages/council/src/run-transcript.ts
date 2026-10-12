@@ -38,7 +38,7 @@ import {
   finalizeTranscript,
   transcriptToJson,
   type CouncilTranscript,
-} from "./transcript.js";
+} from "./transcript.ts";
 
 // ── Tool-level recorder (worker agent-mcp pass 62 / CLI pass 63) ─────────────
 

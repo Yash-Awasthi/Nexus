@@ -9,7 +9,7 @@ import {
   parseLearnings,
   proposeLearningUpdates,
   reviewSession,
-} from "../../src/handlers/agent-review.js";
+} from "../../src/handlers/agent-review.ts";
 
 describe("parseLearnings", () => {
   it("parses a JSON array of learnings, embedded in prose", () => {

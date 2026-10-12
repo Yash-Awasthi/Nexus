@@ -118,9 +118,9 @@ async function main(): Promise<void> {
   // Heavy modules are imported dynamically (after the .env loader above) so
   // @nexus/db sees DATABASE_URL at module-eval time — mirrors apps/api entry.
   const [{ SignalNotifyListener }, { SignalWorker }, { createTaskWorkers }] = await Promise.all([
-    import("./workers/signal-notify-listener.js"),
-    import("./workers/signal-worker.js"),
-    import("./workers/task-worker.js"),
+    import("./workers/signal-notify-listener.ts"),
+    import("./workers/signal-worker.ts"),
+    import("./workers/task-worker.ts"),
   ]);
 
   const connection = parseRedisUrl(REDIS_URL);

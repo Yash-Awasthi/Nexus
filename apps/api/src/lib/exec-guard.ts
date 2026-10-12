@@ -12,8 +12,8 @@
 import type { ExecAction } from "@nexus/exec-policy";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-import { classifyAction, redeemApproval, requestApproval } from "./exec-approvals.js";
-import { ownerIdFor } from "./owner.js";
+import { classifyAction, redeemApproval, requestApproval } from "./exec-approvals.ts";
+import { ownerIdFor } from "./owner.ts";
 
 /** `proceed` means the caller may run the action; `handled` means a reply was sent. */
 type GuardOutcome = "proceed" | "handled";

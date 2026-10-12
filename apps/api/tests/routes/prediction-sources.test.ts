@@ -6,7 +6,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 delete process.env.POLYMARKET_ENABLED;
 delete process.env.METACULUS_TOKEN;
 
-const { buildServer } = await import("../../src/server.js");
+const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
 const seen: { url: string; auth: string | null }[] = [];

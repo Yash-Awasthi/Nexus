@@ -28,7 +28,7 @@ vi.mock("drizzle-orm", () => ({ sql: vi.fn(() => "sql-expr") }));
 
 // cost.js is NOT mocked — real BillingLedger / computeCost / QuotaExceededError.
 
-import { QuotaChecker } from "../src/quota.js";
+import { QuotaChecker } from "../src/quota.ts";
 
 const baseKey = {
   id: "key-cost",

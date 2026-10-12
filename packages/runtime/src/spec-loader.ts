@@ -2,8 +2,8 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import type { IWorkflowDefinition } from "./interfaces/workflow.interface.js";
-import type { Task } from "./task-router.js";
+import type { IWorkflowDefinition } from "./interfaces/workflow.interface.ts";
+import type { Task } from "./task-router.ts";
 
 export interface WorkflowSpecTask {
   id: string;

@@ -10,7 +10,7 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 
-import { fail } from "./client.js";
+import { fail } from "./client.ts";
 
 const BASE_URL = (process.env.NEXUS_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
