@@ -65,14 +65,12 @@ layout assertions, not a comprehensive accessibility audit.
 
 ## Python ingest
 
-Use a dedicated virtual environment (Python >=3.11; CI uses 3.11):
+The service pins Python 3.14 and locks its dependencies in `uv.lock`:
 
 ```sh
 cd services/ingest
-python -m venv .venv
-# Activate .venv/bin/activate (Unix) or .venv/Scripts/Activate.ps1 (Windows)
-python -m pip install -e '.[dev]'
-python -m pytest --tb=short -q
+uv sync --extra dev
+uv run pytest --tb=short -q
 ```
 
 Tests mock DB, Redis and scraping. Avoid inherited service configuration or a local

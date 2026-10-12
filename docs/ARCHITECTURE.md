@@ -66,7 +66,6 @@ nexus/
 ├── apps/
 │   ├── api/            Fastify HTTP/SSE/WebSocket gateway (61 route modules)
 │   ├── cli/            Developer CLI (commander.js)
-│   ├── ingest-py/      Python ingest helpers
 │   ├── ui/             React Router v7 SPA dashboard (100+ routes)
 │   └── worker/         BullMQ workers — signal, task, and repeatable drive jobs
 ├── packages/           90 scoped @nexus/* packages
@@ -103,7 +102,7 @@ nexus/
 │                               drive, github, gmail, groq, hubspot, jira,
 │                               linear, neon, notion, salesforce, slack, ...
 ├── services/
-│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB
+│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB, fin-scrape bridge
 ├── infra/
 │   ├── docker/         docker-compose.dev/observability
 │   ├── grafana/        Pre-provisioned dashboards

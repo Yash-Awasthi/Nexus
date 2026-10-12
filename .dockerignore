@@ -1,5 +1,6 @@
 # Installs and builds happen inside the image; a host's would carry its OS's binaries.
 **/node_modules
+**/.venv
 **/dist
 **/coverage
 **/test-results
