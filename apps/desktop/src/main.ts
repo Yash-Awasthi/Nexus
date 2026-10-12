@@ -93,11 +93,9 @@ function createWindow(rendererUrl: string): BrowserWindow {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      // ponytail: the preload requires ./bridge, which a sandboxed preload
-      // cannot resolve. contextIsolation plus nodeIntegration: false already
-      // keep Node out of the renderer; re-enable the sandbox once the preload
-      // is bundled into a single file.
-      sandbox: false,
+      // The preload is bundled into one file at build time (rolldown), because
+      // a sandboxed preload can require only `electron` and a few Node builtins.
+      sandbox: true,
     },
   });
 

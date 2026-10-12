@@ -6,9 +6,9 @@
   "license": "Apache-2.0",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.json && rolldown src/preload.ts --file dist/preload.js --format cjs --platform node --external electron",
     "start": "electron dist/main.js",
-    "dev": "tsc --project tsconfig.json && electron dist/main.js",
+    "dev": "pnpm build && electron dist/main.js",
     "test": "vitest run",
     "clean": "rm -rf dist coverage",
     "smoke": "node scripts/smoke.cjs",
@@ -16,7 +16,8 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "electron": "^44.4.5",
+    "electron": "45.0.0-beta.1",
+    "rolldown": "^1.2.13",
     "vitest": "catalog:"
   }
 }
