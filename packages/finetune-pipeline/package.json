@@ -16,7 +16,7 @@
     "@nexus/sft-tagger": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "*",
-    "vitest": "*"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

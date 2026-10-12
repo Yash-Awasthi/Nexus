@@ -17,8 +17,8 @@
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "vitest": "*",
-    "typescript": "*"
+    "vitest": "catalog:",
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@nexus/contracts": "workspace:*"

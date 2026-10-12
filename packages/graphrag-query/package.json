@@ -18,8 +18,8 @@
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "vitest": "^2.1.8",
-    "typescript": "^5.6.3"
+    "vitest": "catalog:",
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@nexus/mcp-client": "workspace:*"

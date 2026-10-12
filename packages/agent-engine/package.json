@@ -17,7 +17,7 @@
     "@nexus/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "*",
-    "vitest": "*"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -12,7 +12,7 @@
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "vitest": "*",
-    "typescript": "*"
+    "vitest": "catalog:",
+    "typescript": "catalog:"
   }
 }

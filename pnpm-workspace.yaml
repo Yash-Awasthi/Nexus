@@ -3,3 +3,33 @@ packages:
   - "apps/*"
   - "packages/*"
   - "packages/adapters/*"
+
+# One version per tool across all workspace packages: `"typescript": "catalog:"`.
+catalog:
+  "@types/node": ^26.6.5
+  "@vitest/coverage-v8": ^2.1.9
+  typescript: 6.0.3
+  vitest: ^2.1.9
+
+engineStrict: true
+strictPeerDependencies: false
+autoInstallPeers: true
+shamefullyHoist: true
+# Packages resolve ESLint plugins, Prettier and Vitest from the root config.
+publicHoistPattern:
+  - "*eslint*"
+  - "*prettier*"
+  - "*vitest*"
+  - "@vitest*"
+
+# Install scripts run only for packages listed true; native binaries need them.
+allowBuilds:
+  core-js: false
+  esbuild: true
+  msgpackr-extract: true
+  node-pty: true
+  onnxruntime-node: true
+  protobufjs: false
+  sharp: true
+  tesseract.js: false
+  workerd: true

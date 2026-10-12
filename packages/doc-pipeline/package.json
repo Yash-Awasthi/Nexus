@@ -22,9 +22,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.8",
-    "@vitest/coverage-v8": "^2.1.8"
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
   },
   "dependencies": {
     "@nexus/plugin-sdk": "workspace:*"

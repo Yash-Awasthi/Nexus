@@ -16,7 +16,7 @@
     "@neondatabase/serverless": "^0.10.4"
   },
   "devDependencies": {
-    "vitest": "*",
-    "typescript": "*"
+    "vitest": "catalog:",
+    "typescript": "catalog:"
   }
 }
