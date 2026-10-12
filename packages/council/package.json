@@ -21,7 +21,7 @@
     "@nexus/debate-engine": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/shared": "workspace:*",
-    "groq-sdk": "^0.37.0"
+    "groq-sdk": "^1.6.0"
   },
   "publishConfig": {
     "main": "./dist/index.js",

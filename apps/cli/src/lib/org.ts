@@ -7,7 +7,8 @@
  * access token or a sign-in JWT) when set, and fall back to NEXUS_API_KEY.
  */
 
-import chalk from "chalk";
+import { styleText } from "node:util";
+
 import type { Command } from "commander";
 
 import { fail } from "./client.ts";
@@ -138,7 +139,9 @@ export function formatInbox(d: InboxDigest): string[] {
     lines.push(c.name);
     for (const i of c.items) {
       const acts = ACTIONS[i.kind].map((a) => (a === "reassign" ? "reassign <agent>" : a));
-      lines.push(`  ${++n}. ${i.text}${acts.length ? chalk.dim(`  (${acts.join(" | ")})`) : ""}`);
+      lines.push(
+        `  ${++n}. ${i.text}${acts.length ? styleText("dim", `  (${acts.join(" | ")})`) : ""}`,
+      );
     }
   }
   return lines.length ? lines : ["Nothing waits on you."];
@@ -186,8 +189,10 @@ export function registerOrgCommands(program: Command): void {
         const { companies } = await orgRequest<{ companies: CompanyRow[] }>("GET", "/portfolio");
         for (const c of companies)
           console.log(
-            `${c.name}  ${chalk.dim(c.status)}  ${c.running}/${c.agents} running  $${c.monthUsd.toFixed(4)}/mo` +
-              (c.pendingApprovals ? chalk.magenta(`  ${c.pendingApprovals} waiting on you`) : ""),
+            `${c.name}  ${styleText("dim", c.status)}  ${c.running}/${c.agents} running  $${c.monthUsd.toFixed(4)}/mo` +
+              (c.pendingApprovals
+                ? styleText("magenta", `  ${c.pendingApprovals} waiting on you`)
+                : ""),
           );
       } catch (err) {
         fail(err);
@@ -220,7 +225,7 @@ export function registerOrgCommands(program: Command): void {
           task: { id: string; identifier: string };
           agent: { name: string };
         }>("POST", `/companies/${c.id}/ask`, { question });
-        console.log(chalk.dim(`${res.task.identifier} → ${res.agent.name}`));
+        console.log(styleText("dim", `${res.task.identifier} → ${res.agent.name}`));
         if (!opts.wait) return;
         for (let i = 0; i < 120; i++) {
           await new Promise((r) => setTimeout(r, 2000));
@@ -234,11 +239,11 @@ export function registerOrgCommands(program: Command): void {
             return;
           }
           if (["cancelled", "blocked"].includes(d.task.status)) {
-            console.log(chalk.yellow(`The task is ${d.task.status}; see it in the app.`));
+            console.log(styleText("yellow", `The task is ${d.task.status}; see it in the app.`));
             return;
           }
         }
-        console.log(chalk.yellow("Still working; check `nexus org status` later."));
+        console.log(styleText("yellow", "Still working; check `nexus org status` later."));
       } catch (err) {
         fail(err);
       }
@@ -275,7 +280,7 @@ export function registerOrgCommands(program: Command): void {
             ...(opts.amount ? { amountUsd: Number(opts.amount) } : {}),
           });
           console.log(
-            chalk.green("✓"),
+            styleText("green", "✓"),
             `${verb === "approve" ? "Approved" : "Rejected"}: ${hit[0]!.title}`,
           );
         } catch (err) {
@@ -298,7 +303,7 @@ export function registerOrgCommands(program: Command): void {
         }
         const req = inboxRequest(digest, action, Number(n), agent);
         await orgRequest(req.method, req.path, req.body);
-        console.log(chalk.green("✓"), `${action}: item ${n}`);
+        console.log(styleText("green", "✓"), `${action}: item ${n}`);
       } catch (err) {
         fail(err);
       }
@@ -332,7 +337,7 @@ export function registerOrgCommands(program: Command): void {
         const run = await orgRequest<{ id: string }>("POST", `/agents/${agent.id}/wake`, {
           taskId,
         });
-        console.log(chalk.green("✓"), `${agent.name} woken (run ${run.id.slice(0, 8)})`);
+        console.log(styleText("green", "✓"), `${agent.name} woken (run ${run.id.slice(0, 8)})`);
       } catch (err) {
         fail(err);
       }

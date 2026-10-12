@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "@neondatabase/serverless": "catalog:"
   },
   "devDependencies": {
     "vitest": "catalog:"

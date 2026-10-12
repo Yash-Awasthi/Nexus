@@ -8,7 +8,7 @@ export default defineConfig({
     alias: [
       // UI `~` alias (matches apps/ui/vite.config.ts) so apps/ui/app tests and
       // any lazy imports inside them resolve under the root vitest run.
-      { find: "~", replacement: resolve(__dirname, "apps/ui/app") },
+      { find: "~", replacement: resolve(import.meta.dirname, "apps/ui/app") },
     ],
   },
   test: {

@@ -15,11 +15,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4",
-    "pg": "^8.22.0"
+    "@neondatabase/serverless": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
-    "@types/pg": "^8.20.4",
+    "@types/pg": "catalog:",
     "vitest": "catalog:"
   },
   "publishConfig": {

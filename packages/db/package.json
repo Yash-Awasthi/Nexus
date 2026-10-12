@@ -23,16 +23,16 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "@electric-sql/pglite-pgvector": "0.0.9",
-    "@neondatabase/serverless": "^0.10.4",
-    "drizzle-orm": "^0.45.2",
-    "pg": "^8.22.0"
+    "@electric-sql/pglite": "^0.5.9",
+    "@electric-sql/pglite-pgvector": "0.0.10",
+    "@neondatabase/serverless": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
-    "@types/pg": "^8.20.4",
+    "@types/pg": "catalog:",
     "drizzle-kit": "^0.31.10",
-    "fast-check": "^3.23.2",
+    "fast-check": "catalog:",
     "vitest": "catalog:"
   },
   "publishConfig": {

@@ -7,7 +7,7 @@
  * unimplemented method, and a method must not be reachable without its
  * capability being declared.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 
 import {
   CAPABILITY_METHODS,
@@ -21,15 +21,15 @@ import {
 const SESSION = { user: { id: "u1" }, accessToken: "jwt" };
 
 function impl(): HostImplementation & {
-  setGlass: ReturnType<typeof vi.fn>;
-  saveCouncilMembers: ReturnType<typeof vi.fn>;
+  setGlass: Mock<HostImplementation["setGlass"]>;
+  saveCouncilMembers: Mock<HostImplementation["saveCouncilMembers"]>;
 } {
   return {
     runMode: () => ({ mode: "local-only" as const, apiUrl: "http://127.0.0.1:41000" }),
     syncNow: () => Promise.resolve({ pulled: 0, pushed: 0 }),
     syncLedger: () => [],
-    setGlass: vi.fn(),
-    saveCouncilMembers: vi.fn(),
+    setGlass: vi.fn<HostImplementation["setGlass"]>(),
+    saveCouncilMembers: vi.fn<HostImplementation["saveCouncilMembers"]>(),
     auth: {
       signIn: vi.fn().mockResolvedValue(SESSION),
       signInWithPassword: vi.fn().mockResolvedValue(SESSION),

@@ -22,8 +22,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { styleText } from "node:util";
 
-import chalk from "chalk";
 import { Command } from "commander";
 
 import { api, fail } from "./lib/client.ts";
@@ -44,7 +44,7 @@ program
   .action(async () => {
     try {
       const res = await api.health();
-      console.log(chalk.green("✓"), "API is", chalk.bold(res.status));
+      console.log(styleText("green", "✓"), "API is", styleText("bold", res.status));
     } catch (err) {
       fail(err);
     }
@@ -64,36 +64,36 @@ function renderAgentFrame(
 ): boolean {
   switch (event) {
     case "agent.run_started":
-      console.log(chalk.gray(`  ▸ ${String(data.instruction ?? "").slice(0, 100)}`));
+      console.log(styleText("gray", `  ▸ ${String(data.instruction ?? "").slice(0, 100)}`));
       return false;
     case "agent.step": {
       const tools = Array.isArray(data.toolCalls) ? (data.toolCalls as string[]) : [];
-      const label = tools.length ? tools.join(", ") : chalk.gray("(thinking)");
-      console.log(`  ${chalk.cyan(`step ${String(data.stepIndex)}`)}  ${label}`);
+      const label = tools.length ? tools.join(", ") : styleText("gray", "(thinking)");
+      console.log(`  ${styleText("cyan", `step ${String(data.stepIndex)}`)}  ${label}`);
       return false;
     }
     case "agent.compaction":
-      console.log(chalk.gray(`  ~ compacted ${String(data.summarized)} turns`));
+      console.log(styleText("gray", `  ~ compacted ${String(data.summarized)} turns`));
       return false;
     case "agent.learnings": {
       const learnings = Array.isArray(data.learnings)
         ? (data.learnings as { type: string; content: string }[])
         : [];
       if (learnings.length) {
-        console.log(chalk.magenta("\n✎ learnings:"));
-        for (const l of learnings) console.log(`  ${chalk.gray(`[${l.type}]`)} ${l.content}`);
+        console.log(styleText("magenta", "\n✎ learnings:"));
+        for (const l of learnings)
+          console.log(`  ${styleText("gray", `[${l.type}]`)} ${l.content}`);
       }
       return true; // learnings is the terminal event when a review was requested
     }
     case "agent.status": {
       const status = String(data.status);
-      const color =
-        status === "completed" ? chalk.green : status === "error" ? chalk.red : chalk.yellow;
+      const color = status === "completed" ? "green" : status === "error" ? "red" : "yellow";
       console.log(
-        color(`\n● ${status.toUpperCase()}`),
-        data.steps !== undefined ? chalk.gray(`(${String(data.steps)} steps)`) : "",
+        styleText(color, `\n● ${status.toUpperCase()}`),
+        data.steps !== undefined ? styleText("gray", `(${String(data.steps)} steps)`) : "",
       );
-      if (data.error) console.error(chalk.red(String(data.error)));
+      if (data.error) console.error(styleText("red", String(data.error)));
       // When a review was requested, keep the stream open for agent.learnings.
       return !awaitLearnings;
     }
@@ -115,7 +115,7 @@ async function runCodeLocal(
     deliberate?: boolean;
   },
 ): Promise<void> {
-  console.log(chalk.gray(`  ▸ ${task.slice(0, 100)} ${chalk.dim("(local)")}\n`));
+  console.log(styleText("gray", `  ▸ ${task.slice(0, 100)} ${styleText("dim", "(local)")}\n`));
   const result = await runLocalAgent({
     instruction: task,
     rootDir: opts.dir ?? process.cwd(),
@@ -127,8 +127,8 @@ async function runCodeLocal(
     enableShell: opts.shell !== false,
     onStep: (step) => {
       const tools = step.toolCalls.map((c) => c.name);
-      const label = tools.length ? tools.join(", ") : chalk.gray("(thinking)");
-      console.log(`  ${chalk.cyan(`step ${step.stepIndex}`)}  ${label}`);
+      const label = tools.length ? tools.join(", ") : styleText("gray", "(thinking)");
+      console.log(`  ${styleText("cyan", `step ${step.stepIndex}`)}  ${label}`);
     },
     onToolTranscript: (event) => {
       // Worker-shaped artifact contract (pass 62): the structured JSON event is
@@ -136,15 +136,21 @@ async function runCodeLocal(
       console.log(JSON.stringify(event));
       const t = event.transcript;
       console.log(
-        chalk.gray("  ⌘ deliberation transcript"),
-        chalk.cyan(t.protocol ?? ""),
-        chalk.gray(`degraded=${String(t.degraded ?? false)} warnings=${(t.warnings ?? []).length}`),
+        styleText("gray", "  ⌘ deliberation transcript"),
+        styleText("cyan", t.protocol ?? ""),
+        styleText(
+          "gray",
+          `degraded=${String(t.degraded ?? false)} warnings=${(t.warnings ?? []).length}`,
+        ),
       );
     },
   });
   const status = result.aborted ? "aborted" : result.stopReason ? result.stopReason : "completed";
-  const color = status === "completed" ? chalk.green : chalk.yellow;
-  console.log(color(`\n● ${status.toUpperCase()}`), chalk.gray(`(${result.steps.length} steps)`));
+  const color = status === "completed" ? "green" : "yellow";
+  console.log(
+    styleText(color, `\n● ${status.toUpperCase()}`),
+    styleText("gray", `(${result.steps.length} steps)`),
+  );
   if (result.finalContent) console.log(`\n${result.finalContent}`);
 }
 
@@ -195,7 +201,7 @@ program
       if (launched.approvalId) {
         if (!opts.yes) {
           console.log(
-            chalk.yellow("!"),
+            styleText("yellow", "!"),
             "This run's shell needs your approval. Run again with --yes to allow it once.",
           );
           return;
@@ -206,10 +212,10 @@ program
           approvalId: launched.approvalId,
         });
       }
-      console.log(chalk.green("✓"), "Launched:", chalk.bold(launched.sessionId));
+      console.log(styleText("green", "✓"), "Launched:", styleText("bold", launched.sessionId));
       if (!opts.wait) return;
 
-      console.log(chalk.gray("  streaming… (Ctrl-C to detach)\n"));
+      console.log(styleText("gray", "  streaming… (Ctrl-C to detach)\n"));
       const controller = new AbortController();
       try {
         for await (const frame of streamSse(
@@ -269,7 +275,7 @@ tasks
       payload,
       priority: opts.priority,
     });
-    console.log(chalk.green("✓ Task created:"));
+    console.log(styleText("green", "✓ Task created:"));
     console.log(JSON.stringify(data, null, 2));
   });
 
@@ -286,7 +292,7 @@ tasks
   .description("Cancel a queued task")
   .action(async (taskId) => {
     const data = await api.patch(`/runtime/tasks/${taskId}`, { action: "cancel" });
-    console.log(chalk.yellow("⊘ Task cancelled:"));
+    console.log(styleText("yellow", "⊘ Task cancelled:"));
     console.log(JSON.stringify(data, null, 2));
   });
 
@@ -316,7 +322,7 @@ approvals
       resolved_by: opts.by,
       reason: opts.reason,
     });
-    console.log(chalk.green("✓ Approved:"));
+    console.log(styleText("green", "✓ Approved:"));
     console.log(JSON.stringify(data, null, 2));
   });
 
@@ -330,7 +336,7 @@ approvals
       resolved_by: opts.by,
       reason: opts.reason,
     });
-    console.log(chalk.yellow("⊘ Rejected:"));
+    console.log(styleText("yellow", "⊘ Rejected:"));
     console.log(JSON.stringify(data, null, 2));
   });
 
@@ -347,7 +353,7 @@ council
   .option("--signal-id <id>", "Link to an existing signal ID")
   .option("--mode <mode>", "majority | unanimous | weighted", "majority")
   .action(async (opts) => {
-    console.log(chalk.cyan("⚙ Deliberating..."), chalk.bold(opts.title));
+    console.log(styleText("cyan", "⚙ Deliberating..."), styleText("bold", opts.title));
     const data = await api.post("/council/deliberate", {
       proposal: { title: opts.title, description: opts.desc },
       budgetUsd: parseFloat(opts.budget),
@@ -362,9 +368,8 @@ council
     };
     if (res.ok && res.result) {
       const outcome = res.result.outcome;
-      const color =
-        outcome === "approved" ? chalk.green : outcome === "rejected" ? chalk.red : chalk.yellow;
-      console.log(color(`\n● Outcome: ${outcome.toUpperCase()}`));
+      const color = outcome === "approved" ? "green" : outcome === "rejected" ? "red" : "yellow";
+      console.log(styleText(color, `\n● Outcome: ${outcome.toUpperCase()}`));
       console.log(`  Consensus: ${(res.result.consensus * 100).toFixed(0)}%`);
       console.log(`  Summary:   ${res.result.summary}`);
       if (res.verdictId) console.log(`  Verdict:   ${res.verdictId}`);
@@ -401,7 +406,7 @@ ingest
       priority: opts.priority,
       idempotency_key: opts.key,
     });
-    console.log(chalk.green("✓ Event accepted:"));
+    console.log(styleText("green", "✓ Event accepted:"));
     console.log(JSON.stringify(data, null, 2));
   });
 
@@ -427,7 +432,7 @@ audit
     const data = await api.get<{ valid: boolean; checked_count: number; message: string }>(
       "/audit/log/verify",
     );
-    const icon = data.valid ? chalk.green("✓") : chalk.red("✗");
+    const icon = data.valid ? styleText("green", "✓") : styleText("red", "✗");
     console.log(
       icon,
       `Chain ${data.valid ? "intact" : "COMPROMISED"} — ${data.checked_count} entries checked`,
@@ -451,11 +456,16 @@ gateway
         providers: string[];
       }>("/gateway/models");
       console.log(
-        chalk.bold(`\n${data.models.length} model aliases (${data.providers.length} providers)\n`),
+        styleText(
+          "bold",
+          `\n${data.models.length} model aliases (${data.providers.length} providers)\n`,
+        ),
       );
       for (const m of data.models) {
-        const icon = m.available ? chalk.green("✓") : chalk.gray("○");
-        console.log(` ${icon} ${chalk.cyan(m.id.padEnd(24))} → ${m.provider}/${m.backend_model}`);
+        const icon = m.available ? styleText("green", "✓") : styleText("gray", "○");
+        console.log(
+          ` ${icon} ${styleText("cyan", m.id.padEnd(24))} → ${m.provider}/${m.backend_model}`,
+        );
       }
     } catch (err) {
       fail(err);
@@ -479,10 +489,11 @@ gateway
         stream: false,
       });
       const text = data.content.map((b: { type: string; text: string }) => b.text).join("");
-      console.log(chalk.bold("\nAssistant:"), "\n");
+      console.log(styleText("bold", "\nAssistant:"), "\n");
       console.log(text);
       console.log(
-        chalk.gray(
+        styleText(
+          "gray",
           `\n[${data.model} | ${data.usage.input_tokens}↑ ${data.usage.output_tokens}↓ tokens]`,
         ),
       );
@@ -503,11 +514,14 @@ gateway
         runs: { ts: string; model: string; costUsd: number }[];
       }>(`/gateway/cost-report?limit=${opts.limit}`);
       console.log(
-        chalk.bold(`\nCost Report — ${data.totalRuns} calls, $${data.totalUsd.toFixed(4)} total\n`),
+        styleText(
+          "bold",
+          `\nCost Report — ${data.totalRuns} calls, $${data.totalUsd.toFixed(4)} total\n`,
+        ),
       );
       for (const run of data.runs) {
         console.log(
-          ` ${chalk.gray(run.ts.slice(0, 19))}  $${run.costUsd.toFixed(4)}  ${chalk.gray(run.model)}`,
+          ` ${styleText("gray", run.ts.slice(0, 19))}  $${run.costUsd.toFixed(4)}  ${styleText("gray", run.model)}`,
         );
       }
     } catch (err) {
@@ -533,13 +547,16 @@ memory
         (m) => !opts.category || m.metadata?.category === opts.category,
       );
       console.log(
-        chalk.bold(`
+        styleText(
+          "bold",
+          `
 ${shown.length} memories
-`),
+`,
+        ),
       );
       for (const m of shown) {
-        const cat = m.metadata?.category ? chalk.yellow(` #${m.metadata.category}`) : "";
-        console.log(` ${chalk.gray(m.id.slice(0, 8))}…${cat}`);
+        const cat = m.metadata?.category ? styleText("yellow", ` #${m.metadata.category}`) : "";
+        console.log(` ${styleText("gray", m.id.slice(0, 8))}…${cat}`);
         console.log(`   ${m.text.slice(0, 120)}${m.text.length > 120 ? "…" : ""}`);
       }
     } catch (err) {
@@ -558,7 +575,7 @@ memory
       if (opts.category) metadata.category = opts.category;
       if (opts.tags) metadata.tags = opts.tags.split(",").map((t) => t.trim());
       const data = await api.post<{ id: string }>("/memory", { text: content, metadata });
-      console.log(chalk.green("✓"), "Memory stored:", chalk.gray(data.id));
+      console.log(styleText("green", "✓"), "Memory stored:", styleText("gray", data.id));
     } catch (err) {
       fail(err);
     }
@@ -575,7 +592,7 @@ research
   .action(async (query: string, opts: { wait: boolean }) => {
     try {
       const job = await api.unversioned<{ id: string }>("POST", "/api/research", { query });
-      console.log(chalk.green("✓"), `Job: ${chalk.bold(job.id)}`);
+      console.log(styleText("green", "✓"), `Job: ${styleText("bold", job.id)}`);
       if (!opts.wait) return;
       // The run happens while its stream is open, as it does for the web page.
       for await (const frame of streamSse(
@@ -588,7 +605,8 @@ research
         } catch {
           continue;
         }
-        if (data.type === "phase_start" && data.label) console.log(chalk.gray(`  ${data.label}`));
+        if (data.type === "phase_start" && data.label)
+          console.log(styleText("gray", `  ${data.label}`));
         if (data.type === "report")
           console.log(`
 ${data.content ?? ""}`);
@@ -611,19 +629,22 @@ research
       }>("GET", "/api/research");
       const shown = jobs.slice(0, Number(opts.limit) || 10);
       console.log(
-        chalk.bold(`
+        styleText(
+          "bold",
+          `
 ${shown.length} research jobs
-`),
+`,
+        ),
       );
       for (const j of shown) {
         const icon =
           j.status === "done"
-            ? chalk.green("✓")
+            ? styleText("green", "✓")
             : j.status === "error"
-              ? chalk.red("✗")
-              : chalk.yellow("◌");
+              ? styleText("red", "✗")
+              : styleText("yellow", "◌");
         console.log(
-          ` ${icon} ${chalk.gray(j.id.slice(0, 12))}  ${j.query.slice(0, 60)}${j.query.length > 60 ? "…" : ""}`,
+          ` ${icon} ${styleText("gray", j.id.slice(0, 12))}  ${j.query.slice(0, 60)}${j.query.length > 60 ? "…" : ""}`,
         );
       }
     } catch (err) {
@@ -644,10 +665,12 @@ admin
         routes: { alias: string; model: string; provider: string; overridden: boolean }[];
         total: number;
       }>("/admin/routes");
-      console.log(chalk.bold(`\n${data.total} routes\n`));
+      console.log(styleText("bold", `\n${data.total} routes\n`));
       for (const r of data.routes) {
-        const override = r.overridden ? chalk.yellow(" [overridden]") : "";
-        console.log(` ${chalk.cyan(r.alias.padEnd(24))} → ${r.provider}/${r.model}${override}`);
+        const override = r.overridden ? styleText("yellow", " [overridden]") : "";
+        console.log(
+          ` ${styleText("cyan", r.alias.padEnd(24))} → ${r.provider}/${r.model}${override}`,
+        );
       }
     } catch (err) {
       fail(err);
@@ -668,16 +691,16 @@ admin
           avgLatencyMs: number;
         }[];
       }>("/admin/stats");
-      console.log(chalk.bold("\nGateway stats\n"));
+      console.log(styleText("bold", "\nGateway stats\n"));
       console.log(
         ` ${"Alias".padEnd(24)} ${"Requests".padEnd(10)} ${"Tokens".padEnd(12)} ${"Errors".padEnd(8)} Latency`,
       );
       console.log(" " + "─".repeat(70));
       for (const s of data.stats) {
         if (s.requests === 0) continue;
-        const errColor = s.errors > 0 ? chalk.red : chalk.green;
+        const errColor = s.errors > 0 ? "red" : "green";
         console.log(
-          ` ${chalk.cyan(s.alias.padEnd(24))} ${String(s.requests).padEnd(10)} ${String(s.totalTokens).padEnd(12)} ${errColor(String(s.errors).padEnd(8))} ${s.avgLatencyMs.toFixed(0)}ms`,
+          ` ${styleText("cyan", s.alias.padEnd(24))} ${String(s.requests).padEnd(10)} ${String(s.totalTokens).padEnd(12)} ${styleText(errColor, String(s.errors).padEnd(8))} ${s.avgLatencyMs.toFixed(0)}ms`,
         );
       }
     } catch (err) {
@@ -710,13 +733,13 @@ admin
         }[];
         total: number;
       }>(`/admin/traces?${qs}`);
-      console.log(chalk.bold(`\n${data.total} trace entries\n`));
+      console.log(styleText("bold", `\n${data.total} trace entries\n`));
       for (const e of data.entries.slice(0, 20)) {
         const statusColor =
-          e.status === "success" ? chalk.green : e.status === "cached" ? chalk.cyan : chalk.red;
+          e.status === "success" ? "green" : e.status === "cached" ? "cyan" : "red";
         const time = new Date(e.ts).toISOString().slice(11, 23);
         console.log(
-          ` ${chalk.gray(time)}  ${statusColor(e.status.padEnd(8))}  ${e.provider}/${e.model.slice(0, 24)}  ${e.latencyMs}ms`,
+          ` ${styleText("gray", time)}  ${styleText(statusColor, e.status.padEnd(8))}  ${e.provider}/${e.model.slice(0, 24)}  ${e.latencyMs}ms`,
         );
       }
     } catch (err) {
@@ -740,7 +763,7 @@ models
       const source = await loadModelsDevSource(opts.file);
       const written = await seedModelsFromSource(source);
       console.log(
-        chalk.green("✓"),
+        styleText("green", "✓"),
         `provider_models seeded: ${written} model(s) from ${source.source}`,
       );
     } catch (err) {
