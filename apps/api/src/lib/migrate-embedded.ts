@@ -9,21 +9,17 @@
  * for themselves — the Drizzle-schema tables (users, refresh_tokens,
  * provider_models) were absent and local sign-in could not work.
  *
- * The ledger is `nexus_drizzle_migrations`, the same table and the same
- * "sha256 of the file" hash `drizzle-kit` writes, so the two agree about what
- * has already run on a database either of them touched.
+ * The ledger is `nexus_drizzle_migrations` with the columns Drizzle 1.0 keeps
+ * (the "sha256 of the file" hash and the migration folder name), so the two
+ * agree about what has already run on a database either of them touched.
  */
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { execScript, type PgLike } from "./pg-pool.ts";
-
-interface Journal {
-  entries: { idx: number; tag: string }[];
-}
 
 /** Where `@nexus/db` keeps its `.sql` files, resolved through the package. */
 function migrationsDir(): string {
@@ -51,22 +47,29 @@ interface MigrateResult {
  * already in the ledger is not run again.
  */
 export async function migrateEmbedded(pool: PgLike, dir = migrationsDir()): Promise<MigrateResult> {
-  const journal = JSON.parse(await readFile(join(dir, "meta", "_journal.json"), "utf8")) as Journal;
-  const ordered = [...journal.entries].sort((a, b) => a.idx - b.idx);
+  // Drizzle 1.0 layout: one `<timestamp>_<name>/migration.sql` folder per migration, run in name order.
+  const entries = await readdir(dir, { withFileTypes: true });
+  const ordered = entries
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort((a, b) => a.localeCompare(b));
 
   // The ledger itself is created by 0000, so the first run has no table to
   // read; an empty set is the honest answer to "what has run here".
   await execScript(
     pool,
     `CREATE TABLE IF NOT EXISTS "nexus_drizzle_migrations" (
-       id serial PRIMARY KEY, hash text NOT NULL, created_at bigint)`,
+       id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);
+     ALTER TABLE "nexus_drizzle_migrations" ADD COLUMN IF NOT EXISTS name text;
+     ALTER TABLE "nexus_drizzle_migrations"
+       ADD COLUMN IF NOT EXISTS applied_at timestamp with time zone DEFAULT now();`,
   );
   const done = await pool.query<{ hash: string }>(`SELECT hash FROM nexus_drizzle_migrations`);
   const seen = new Set(done.rows.map((r) => r.hash));
 
   const result: MigrateResult = { applied: [], skipped: [] };
-  for (const { tag } of ordered) {
-    const sql = await readFile(join(dir, `${tag}.sql`), "utf8");
+  for (const tag of ordered) {
+    const sql = await readFile(join(dir, tag, "migration.sql"), "utf8");
     const hash = createHash("sha256").update(sql).digest("hex");
     if (seen.has(hash)) continue;
 
@@ -77,10 +80,10 @@ export async function migrateEmbedded(pool: PgLike, dir = migrationsDir()): Prom
       result.skipped.push(tag);
       continue;
     }
-    await pool.query(`INSERT INTO nexus_drizzle_migrations (hash, created_at) VALUES ($1, $2)`, [
-      hash,
-      Date.now(),
-    ]);
+    await pool.query(
+      `INSERT INTO nexus_drizzle_migrations (hash, created_at, name) VALUES ($1, $2, $3)`,
+      [hash, Date.now(), tag],
+    );
     result.applied.push(tag);
   }
   return result;
