@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * RedisQueueBackend — production IQueueBackend implementation backed by
- * BullMQ on Redis 7 (ADR-0007, ADR-0012).
+ * BullMQ on Redis 8 (ADR-0007, ADR-0012).
  *
  * Design:
  *  - One BullMQ Queue per priority tier (high / medium / low).

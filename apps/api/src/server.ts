@@ -109,6 +109,7 @@ import { orgHookRoutes, orgRoutes } from "./routes/org.ts";
 import { pluginRegistryRoutes } from "./routes/plugin-registry.ts";
 import { pluginRunRoutes } from "./routes/plugin-run.ts";
 import { predictionMarketRoutes } from "./routes/prediction-market.ts";
+import { queueDashboardRoutes } from "./routes/queue-dashboard.ts";
 import { redteamRoutes } from "./routes/redteam.ts";
 import { researcherRoutes } from "./routes/researcher.ts";
 import { rlhfRoutes } from "./routes/rlhf.ts";
@@ -459,6 +460,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
   await app.register(healthRoutes);
+
+  // ── BullMQ dashboard (/admin/queues, opt-in) ──────────────────────────────
+  await app.register(queueDashboardRoutes);
 
   // ── API v1 routes ─────────────────────────────────────────────────────────
   await app.register(

@@ -20,7 +20,7 @@ This document covers the NEXUS autonomous orchestration platform as deployed in 
 - `packages/runtime` — Task orchestrator
 - `services/ingest` — Python FastAPI scraping service
 - `packages/adapters/*` — 15 external integrations
-- Infrastructure: Postgres 16, Redis 7, MinIO/S3 (optional), OTel collector
+- Infrastructure: Postgres 18, Redis 8, MinIO/S3 (optional), OTel collector
 
 Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cloud infrastructure.
 
