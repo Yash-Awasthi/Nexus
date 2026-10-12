@@ -2,7 +2,7 @@
   "name": "@nexus/db",
   "version": "0.1.0",
   "private": false,
-  "description": "Drizzle ORM schemas, migrations, and DB client for Postgres 16 + pgvector",
+  "description": "Drizzle ORM schemas, migrations, and DB client for Postgres 18 + pgvector",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./src/index.ts",

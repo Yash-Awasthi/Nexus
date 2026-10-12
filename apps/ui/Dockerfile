@@ -27,7 +27,7 @@ RUN pnpm install --frozen-lockfile --filter "@nexus/ui..."
 RUN pnpm --filter @nexus/ui build
 
 # ── Stage 2: nginx ────────────────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.31-alpine AS runner
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf

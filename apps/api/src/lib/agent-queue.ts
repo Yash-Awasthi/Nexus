@@ -21,7 +21,7 @@ type QueueLike = {
 };
 
 /** Parse a redis:// URL into BullMQ ConnectionOptions (mirrors the worker). */
-function parseRedisUrl(url: string): {
+export function parseRedisUrl(url: string): {
   host: string;
   port: number;
   password?: string;

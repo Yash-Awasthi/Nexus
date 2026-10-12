@@ -37,7 +37,7 @@ services:
 
   # ── Redis — BullMQ queue backend ─────────────────────────────────────────
   redis:
-    image: redis:7-alpine
+    image: redis:8.10-alpine
     ports:
       - "6379:6379"
     command: >
@@ -55,7 +55,7 @@ services:
 
   # ── Postgres — primary relational store ──────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     ports:
       - "5432:5432"
     environment:
@@ -69,7 +69,7 @@ services:
       retries: 10
       start_period: 10s
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     restart: unless-stopped
 
 volumes:

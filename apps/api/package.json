@@ -28,6 +28,8 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@bull-board/api": "^9.10.4",
+    "@bull-board/fastify": "^9.10.4",
     "@fastify/cors": "^11.3.1",
     "@fastify/helmet": "^13.1.2",
     "@fastify/multipart": "^10.1.3",
