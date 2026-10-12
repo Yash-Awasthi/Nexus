@@ -107,12 +107,13 @@ jobs:
 
           const __dirname = dirname(fileURLToPath(import.meta.url));
           const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-          const db = drizzle(pool);
+          const db = drizzle({ client: pool });
 
           try {
             await migrate(db, {
               migrationsFolder: join(__dirname, "packages/db/migrations"),
               migrationsTable: "nexus_drizzle_migrations",
+              migrationsSchema: "public",
             });
             console.log("✅ Migrations applied successfully");
           } catch (err) {

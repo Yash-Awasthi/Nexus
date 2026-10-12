@@ -6,7 +6,6 @@ import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { Pool } from "pg";
 
 import { getEmbeddedDb, isEmbeddedUrl } from "./embedded.ts";
-import * as schema from "./schema/index.ts";
 
 /**
  * Nexus DB client — Drizzle ORM.
@@ -27,7 +26,7 @@ function isNeonUrl(url: string): boolean {
   return url.includes(".neon.tech") || url.includes(".neon.host");
 }
 
-function createClient(): NeonHttpDatabase<typeof schema> {
+function createClient(): NeonHttpDatabase {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL is required — set it in .env or Doppler");
@@ -36,21 +35,19 @@ function createClient(): NeonHttpDatabase<typeof schema> {
   if (isEmbeddedUrl(url)) {
     // Same instance the API's pool factory uses: PGlite is single-writer, so
     // a second one on the same directory would corrupt it.
-    return drizzlePglite(getEmbeddedDb(url) as never, {
-      schema,
-    }) as unknown as NeonHttpDatabase<typeof schema>;
+    return drizzlePglite({ client: getEmbeddedDb(url) as never }) as unknown as NeonHttpDatabase;
   }
 
   if (isNeonUrl(url)) {
     const sql = neon(url);
-    return drizzle(sql, { schema });
+    return drizzle({ client: sql });
   }
 
   // Standard TCP Postgres — local dev containers, CI, self-hosted.
   // Cast to NeonHttpDatabase: both adapters implement the same query interface
   // and share identical method signatures for all operations we use.
   const pool = new Pool({ connectionString: url });
-  return drizzlePg(pool, { schema }) as unknown as NeonHttpDatabase<typeof schema>;
+  return drizzlePg({ client: pool }) as unknown as NeonHttpDatabase;
 }
 
 export const db = createClient();

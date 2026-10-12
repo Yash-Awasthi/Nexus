@@ -112,9 +112,9 @@ pnpm test --coverage                     # with coverage report
 
 Conventions for new work: build against mocks (`MockTransport`, an injectable `fetchFn` or
 `TokenHttp`) so no test needs a live account; new env vars go in `.env.example`; every new file
-carries the SPDX `Apache-2.0` header (`pnpm check:headers`); migrations take the next free number in
-`packages/db/migrations/` plus a `meta/_journal.json` entry (without it `db:migrate` skips the
-file); UI routes register in `apps/ui/app/routes.ts`, compose `app/components/page.tsx`, and follow
+carries the SPDX `Apache-2.0` header (`pnpm check:headers`); migrations are a
+`packages/db/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql` folder with a timestamp later than
+every existing one (folders run in name order); UI routes register in `apps/ui/app/routes.ts`, compose `app/components/page.tsx`, and follow
 `provider-keys.tsx` for CRUD pages or `costs.tsx` for dashboards. Route changes regenerate
 `openapi.yaml` (`pnpm openapi:generate`) and the contract types (`pnpm types:generate`).
 

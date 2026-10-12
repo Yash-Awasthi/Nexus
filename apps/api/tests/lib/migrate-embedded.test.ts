@@ -29,7 +29,7 @@ describe("migrateEmbedded", () => {
   it("applies every migration, pgvector's included, and creates the tables sign-in needs", async () => {
     const { applied, skipped } = await migrateEmbedded(getPgPool(DB)!);
 
-    expect(applied).toContain("0002_auto_schema_tables");
+    expect(applied).toContain("20240610061320_0002_auto_schema_tables");
     expect(skipped).toEqual([]);
     const tables = ["users", "refresh_tokens", "provider_models", "api_keys", "memory_entries"];
     const present = [];
