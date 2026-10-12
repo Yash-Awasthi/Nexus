@@ -5,14 +5,14 @@
 # Stage 2: nginx serves static files + proxies /api/* to nexus-api
 
 # ── Stage 1: builder ─────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
 # python3/make/g++ are needed to compile node-pty's native extension during
 # pnpm install (no prebuilt binary for alpine/musl).
 RUN apk add --no-cache python3 make g++ \
- && npm install -g pnpm@9
+ && npm install -g pnpm@12.11.2
 
 # Copy workspace config
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./

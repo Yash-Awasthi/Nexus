@@ -288,7 +288,7 @@ services:
         max-file: "3"
 
   ui-dev:
-    image: node:22-alpine
+    image: node:26-alpine
     container_name: nexus-ui-dev
     working_dir: /app
     volumes:

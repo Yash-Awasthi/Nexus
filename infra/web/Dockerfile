@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Single-origin image: the API serving the built web UI.
 # Build: docker build -t nexus-web -f infra/web/Dockerfile .
-FROM node:22-alpine AS build
-RUN apk add --no-cache python3 make g++ && npm install -g pnpm@9.14.4 --no-fund --no-audit
+FROM node:26-alpine AS build
+RUN apk add --no-cache python3 make g++ && npm install -g pnpm@12.11.2 --no-fund --no-audit
 WORKDIR /src
 COPY . .
 RUN pnpm install --frozen-lockfile --filter "@nexus/api..." --filter "@nexus/ui..."
@@ -10,7 +10,7 @@ RUN pnpm --filter "@nexus/api..." --filter "@nexus/ui..." build \
  && pnpm --filter @nexus/api deploy --prod /deploy \
  && cp -r apps/ui/build/client /deploy/public
 
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus \
  && mkdir -p /tmp/nexus/drives && chown -R nexus:nexus /tmp/nexus

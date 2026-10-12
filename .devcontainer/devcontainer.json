@@ -1,6 +1,6 @@
 {
   "name": "NEXUS",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:26",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
@@ -11,7 +11,7 @@
     "5432": { "label": "Postgres" },
     "6379": { "label": "Redis" }
   },
-  "onCreateCommand": "corepack enable && corepack prepare pnpm@9.14.4 --activate",
+  "onCreateCommand": "corepack enable && corepack prepare pnpm@12.11.2 --activate",
   "postCreateCommand": "pnpm install && cp -n .env.example .env || true",
   "customizations": {
     "vscode": {

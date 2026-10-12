@@ -12,9 +12,8 @@ Docker isn't running. Start it (`systemctl start docker` on Linux, or launch Doc
 Desktop), then retry. The local stack needs Docker for Postgres and Redis.
 
 **`pnpm install` errors about the Node or pnpm version**
-The repo pins Node 20.x (`.nvmrc`) and pnpm 9.x. Use `nvm use` and
-`corepack enable` so the right toolchain is active. Node 21+/22+ may work but is
-unsupported. Always use `pnpm`, never `npm` or `yarn` (workspace protocol).
+The repo pins Node 26 (`.nvmrc`, Node 24 also supported) and pnpm 12. Use
+`nvm use` and `corepack enable` so the right toolchain is active. Always use `pnpm`, never `npm` or `yarn` (workspace protocol).
 
 **`pnpm db:migrate` fails or hangs**
 Postgres must be up and reachable at `DATABASE_URL` first:
