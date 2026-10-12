@@ -18,11 +18,11 @@ catalog:
   "@typescript/native": npm:typescript@7.0.2
   typescript: npm:@typescript/typescript6@^6.0.2
   "@vitest/coverage-v8": 5.0.4
-  bullmq: ^5.81.5
+  bullmq: ^6.3.13
   drizzle-orm: 1.0.0-rc.4
   fast-check: ^4.10.2
   fastify: ^5.12.5
-  ioredis: ^5.11.1
+  ioredis: ^6.0.0
   pg: ^8.23.1
   playwright-core: 1.64.0
   vitest: 5.0.4
@@ -118,3 +118,4 @@ minimumReleaseAgeExclude:
   - "@radix-ui/react-visually-hidden@1.2.13"
   - radix-ui@1.8.0
   - "@electric-sql/pglite-pgvector@0.0.10"
+  - bullmq@6.3.13
