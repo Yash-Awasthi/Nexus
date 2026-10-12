@@ -165,8 +165,8 @@ settings:
 catalogs:
   default:
     '@neondatabase/serverless':
-      specifier: ^0.10.4
-      version: 0.10.4
+      specifier: ^1.2.0
+      version: 1.2.0
     '@opentelemetry/api':
       specifier: ^1.9.1
       version: 1.9.1
@@ -552,7 +552,7 @@ importers:
         version: 7.0.6
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
+        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
@@ -852,7 +852,7 @@ importers:
         version: 5.81.5(supports-color@10.2.2)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
+        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
       ioredis:
         specifier: 'catalog:'
         version: 5.11.1(supports-color@10.2.2)
@@ -950,7 +950,7 @@ importers:
         version: link:../provider-registry
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(@typescript/typescript6@6.0.2))(zod@4.6.6)
+        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -978,7 +978,7 @@ importers:
     dependencies:
       '@neondatabase/serverless':
         specifier: 'catalog:'
-        version: 0.10.4
+        version: 1.2.0
     devDependencies:
       vitest:
         specifier: 'catalog:'
@@ -1063,10 +1063,10 @@ importers:
         version: 0.0.10(@electric-sql/pglite@0.5.9)
       '@neondatabase/serverless':
         specifier: 'catalog:'
-        version: 0.10.4
+        version: 1.2.0
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(@typescript/typescript6@6.0.2))(zod@4.6.6)
+        version: 1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6)
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -1334,7 +1334,7 @@ importers:
     dependencies:
       '@neondatabase/serverless':
         specifier: 'catalog:'
-        version: 0.10.4
+        version: 1.2.0
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -1501,7 +1501,7 @@ importers:
     dependencies:
       '@neondatabase/serverless':
         specifier: 'catalog:'
-        version: 0.10.4
+        version: 1.2.0
     devDependencies:
       vitest:
         specifier: 'catalog:'
@@ -1614,7 +1614,7 @@ importers:
     dependencies:
       '@neondatabase/serverless':
         specifier: 'catalog:'
-        version: 0.10.4
+        version: 1.2.0
     devDependencies:
       vitest:
         specifier: 'catalog:'
@@ -3145,8 +3145,9 @@ packages:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
 
-  '@neondatabase/serverless@0.10.4':
-    resolution: {integrity: sha512-2nZuh3VUO9voBauuh+IGYRhGU/MskWHt1IuZvHcJw6GLjDgtqj/KViKo7SIrLdGLdot7vFbiRRw+BgEy3wT9HA==}
+  '@neondatabase/serverless@1.2.0':
+    resolution: {integrity: sha512-tnaqgixUengZQNd9ZrS3ytQfamJzLKY8QxgqWQTNHHtB+KrFQWk77JTbbpg4RD+J3qE4eO2lVytvGDX5Kj6FdQ==}
+    engines: {node: '>=19.0.0'}
 
   '@node-saml/node-saml@5.1.0':
     resolution: {integrity: sha512-t3cJnZ4aC7HhPZ6MGylGZULvUtBOZ6FzuUndaHGXjmIZHXnLfC/7L8a57O9Q9V7AxJGKAiRM5zu2wNm9EsvQpw==}
@@ -5395,9 +5396,6 @@ packages:
 
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
-
-  '@types/pg@8.11.6':
-    resolution: {integrity: sha512-/2WmmBXHLsfRqzfHW7BNZ8SbYzE8OSk7i3WjFYvfgRHj7S1xj+16Je5fUKv3lVdVzk/zn9TXOqf+avFCFIE0yQ==}
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
@@ -8520,9 +8518,6 @@ packages:
     resolution: {integrity: sha512-8u/hfXFRBD1O0hPUjioLhoWFHRmt6tKA4/vZPyckBr18l1KE9uHrFaFaUi8MDRTpi4uak2goyPTSNJLXX2k2Hw==}
     engines: {node: '>= 0.4'}
 
-  obuf@1.1.2:
-    resolution: {integrity: sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg==}
-
   obug@3.0.0:
     resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
     engines: {node: '>=12.20.0'}
@@ -8745,10 +8740,6 @@ packages:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
     engines: {node: '>=4.0.0'}
 
-  pg-numeric@1.0.2:
-    resolution: {integrity: sha512-BM/Thnrw5jm2kKLE5uJkXqqExRUY/toLHda65XgFTBTFYZyopbKjBe29Ii3RbkvlsMoFwD+tHeGaCjjv0gHlyw==}
-    engines: {node: '>=4'}
-
   pg-pool@3.14.0:
     resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
     peerDependencies:
@@ -8763,10 +8754,6 @@ packages:
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
-
-  pg-types@4.1.0:
-    resolution: {integrity: sha512-o2XFanIMy/3+mThw69O8d4n1E5zsLhdO+OPqswezu7Z5ekP4hYDqlDjlmOpYMbzY2Br0ufCwJLdDIXeNVwcWFg==}
-    engines: {node: '>=10'}
 
   pg@8.23.1:
     resolution: {integrity: sha512-aL96AHANtWjPLDOLqnhx+ngp9+UK7ETEU8VJrDCGvsSSi/mGLcWYsS6Herg7lmaBJe4uwrfqsa7gTEFaSizDoQ==}
@@ -8868,36 +8855,17 @@ packages:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
 
-  postgres-array@3.0.4:
-    resolution: {integrity: sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ==}
-    engines: {node: '>=12'}
-
   postgres-bytea@1.0.1:
     resolution: {integrity: sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ==}
     engines: {node: '>=0.10.0'}
-
-  postgres-bytea@3.0.0:
-    resolution: {integrity: sha512-CNd4jim9RFPkObHSjVHlVrxoVQXz7quwNFpz7RY1okNNme49+sVyiTvTRobiLV548Hx/hb1BG+iE7h9493WzFw==}
-    engines: {node: '>= 6'}
 
   postgres-date@1.0.7:
     resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
     engines: {node: '>=0.10.0'}
 
-  postgres-date@2.1.0:
-    resolution: {integrity: sha512-K7Juri8gtgXVcDfZttFKVmhglp7epKb1K4pgrkLxehjqkrgPhfG6OO8LHLkfaqkbpjNRnra018XwAr1yQFWGcA==}
-    engines: {node: '>=12'}
-
   postgres-interval@1.2.0:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
-
-  postgres-interval@3.0.0:
-    resolution: {integrity: sha512-BSNDnbyZCXSxgA+1f5UU2GmwhoI0aU5yMxRGO8CdFEcY2BQF9xm/7MqKnYoM1nJDk8nONNWDk9WeSmePFhQdlw==}
-    engines: {node: '>=12'}
-
-  postgres-range@1.1.4:
-    resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -12099,9 +12067,7 @@ snapshots:
       '@tybys/wasm-util': 0.10.4
     optional: true
 
-  '@neondatabase/serverless@0.10.4':
-    dependencies:
-      '@types/pg': 8.11.6
+  '@neondatabase/serverless@1.2.0': {}
 
   '@node-saml/node-saml@5.1.0(supports-color@10.2.2)':
     dependencies:
@@ -14262,6 +14228,7 @@ snapshots:
   '@types/node@25.9.3':
     dependencies:
       undici-types: 7.24.6
+    optional: true
 
   '@types/node@26.6.5':
     dependencies:
@@ -14274,12 +14241,6 @@ snapshots:
     optional: true
 
   '@types/parse-json@4.0.2': {}
-
-  '@types/pg@8.11.6':
-    dependencies:
-      '@types/node': 25.9.3
-      pg-protocol: 1.16.0
-      pg-types: 4.1.0
 
   '@types/pg@8.23.1':
     dependencies:
@@ -15501,20 +15462,10 @@ snapshots:
       get-tsconfig: 4.14.3
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(@typescript/typescript6@6.0.2))(zod@4.6.6):
+  drizzle-orm@1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6):
     optionalDependencies:
       '@electric-sql/pglite': 0.5.9
-      '@neondatabase/serverless': 0.10.4
-      '@opentelemetry/api': 1.9.1
-      '@types/pg': 8.23.1
-      pg: 8.23.1
-      valibot: 1.4.2(@typescript/typescript6@6.0.2)
-      zod: 4.6.6
-
-  drizzle-orm@1.0.0-rc.4(@electric-sql/pglite@0.5.9)(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.6):
-    optionalDependencies:
-      '@electric-sql/pglite': 0.5.9
-      '@neondatabase/serverless': 0.10.4
+      '@neondatabase/serverless': 1.2.0
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       pg: 8.23.1
@@ -17863,8 +17814,6 @@ snapshots:
       es-object-atoms: 1.1.2
     optional: true
 
-  obuf@1.1.2: {}
-
   obug@3.0.0: {}
 
   on-change@4.0.2: {}
@@ -18142,8 +18091,6 @@ snapshots:
 
   pg-int8@1.0.1: {}
 
-  pg-numeric@1.0.2: {}
-
   pg-pool@3.14.0(pg@8.23.1):
     dependencies:
       pg: 8.23.1
@@ -18159,16 +18106,6 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
-
-  pg-types@4.1.0:
-    dependencies:
-      pg-int8: 1.0.1
-      pg-numeric: 1.0.2
-      postgres-array: 3.0.4
-      postgres-bytea: 3.0.0
-      postgres-date: 2.1.0
-      postgres-interval: 3.0.0
-      postgres-range: 1.1.4
 
   pg@8.23.1:
     dependencies:
@@ -18279,25 +18216,13 @@ snapshots:
 
   postgres-array@2.0.0: {}
 
-  postgres-array@3.0.4: {}
-
   postgres-bytea@1.0.1: {}
 
-  postgres-bytea@3.0.0:
-    dependencies:
-      obuf: 1.1.2
-
   postgres-date@1.0.7: {}
-
-  postgres-date@2.1.0: {}
 
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
-
-  postgres-interval@3.0.0: {}
-
-  postgres-range@1.1.4: {}
 
   prelude-ls@1.2.1: {}
 
@@ -19763,11 +19688,6 @@ snapshots:
   uuid@13.0.2: {}
 
   v8n@1.5.1: {}
-
-  valibot@1.4.2(@typescript/typescript6@6.0.2):
-    optionalDependencies:
-      typescript: '@typescript/typescript6@6.0.2'
-    optional: true
 
   valibot@1.4.2(typescript@6.0.3):
     optionalDependencies:
