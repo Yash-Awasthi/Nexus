@@ -30,14 +30,14 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
       - name: Create Release PR or publish
-        uses: changesets/action@v1
+        uses: changesets/action@v2.1.2
         with:
-          publish: ${{ secrets.NPM_TOKEN && 'pnpm release' || '' }}
-          version: pnpm version-packages
-          commit: "chore(release): version packages"
-          title: "chore(release): version packages"
+          publish-script: ${{ secrets.NPM_TOKEN && 'pnpm release' || '' }}
+          version-script: pnpm version-packages
+          commit-message: "chore(release): version packages"
+          pr-title: "chore(release): version packages"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || '' }}
 
   # docker-release runs independently — does not block on / wait for changesets
@@ -91,7 +91,7 @@ jobs:
           provenance: true
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign image (keyless OIDC)
         run: |
@@ -99,7 +99,7 @@ jobs:
             ${{ matrix.image }}@${{ steps.build.outputs.digest }}
 
       - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: spdx-json
