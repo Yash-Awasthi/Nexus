@@ -121,8 +121,9 @@ stay in the OS keychain.
 
 ## Security posture
 
-`contextIsolation` is on and `nodeIntegration` is off, so the renderer holds no
-Node handle. `sandbox` is off only because the preload resolves a sibling module;
-bundling the preload is the upgrade path, marked in `src/main.ts`. External
+`contextIsolation` is on, `nodeIntegration` is off and the renderer runs in the
+Chromium `sandbox`, so it holds no Node handle. `pnpm build` bundles the preload
+and its bridge into one file with rolldown, since a sandboxed preload can require
+only `electron` and a few Node builtins. External
 navigation and `window.open` both hand the URL to the user's own browser rather
 than to a privileged window.
