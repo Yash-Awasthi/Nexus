@@ -247,8 +247,8 @@ describe("HNSWIndex matches the brute-force reference", () => {
     expect(recallAt(200)).toBe(1); // ef bump restores full recall
   });
 
-  // Building a 1,500-vector graph at efConstruction 200 takes about 5 s of CPU.
-  it("approximation still holds recall at larger scale", { timeout: 30_000 }, () => {
+  // The 1,500-vector build takes about 5 s plain but over 40 s under CI coverage.
+  it("approximation still holds recall at larger scale", { timeout: 120_000 }, () => {
     const n = 1500;
     const dim = 16;
     const vectors = seededVectors(n, dim, 31337);
