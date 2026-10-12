@@ -99,7 +99,7 @@ interface KVEntry<T> {
  * Expired entries are lazily evicted on access.
  */
 export class MemoryKVStore implements KVStore {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly store = new Map<string, KVEntry<any>>();
   private readonly now: () => number;
 

@@ -27,7 +27,7 @@
  *                        satisfies the budget.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// oxlint-disable-next-line @typescript-eslint/no-unused-vars
 
 // ── Error ──────────────────────────────────────────────────────────────────────
 

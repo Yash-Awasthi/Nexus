@@ -332,7 +332,7 @@ export async function workflowsRoutes(
                 // Intentional dynamic expression eval: the stored workflow
                 // 'transform' is authored by the workflow owner (same trust
                 // boundary as the steps themselves).
-                // eslint-disable-next-line @typescript-eslint/no-implied-eval
+                // oxlint-disable-next-line @typescript-eslint/no-implied-eval
                 const fn = new Function("data", `return (${s.transform});`);
                 return fn(data);
               } catch {

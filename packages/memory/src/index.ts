@@ -2093,7 +2093,7 @@ export interface StreamSetInput {
   stream_name: string;
   group_id: string;
   item_id: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
 }
 
@@ -2138,7 +2138,7 @@ export interface StreamUpdateResult<TData> {
 }
 
 export interface DeleteResult {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   old_value?: any;
 }
 
@@ -2149,7 +2149,7 @@ export type UpdateSet = {
   type: "set";
   /** First-level field path. Empty string targets root. */
   path: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
 };
 
@@ -2182,7 +2182,7 @@ export type MergePath = string | string[];
 export type UpdateAppend = {
   type: "append";
   path?: MergePath;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
 };
 
@@ -2200,7 +2200,7 @@ export type UpdateRemove = {
 export type UpdateMerge = {
   type: "merge";
   path?: MergePath;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
 };
 

@@ -54,7 +54,7 @@
 // Matches any python invocation: python, python3, python3.11, .venv/bin/python3...
 const PYTHON_CMD = String.raw`(?:[^\s/]+/)?python[23]?(?:\.\d+)?`;
 
-// eslint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex
 const ANSI_CLEAN_RE = /\u001b\[[0-9;]*[a-zA-Z]|\u001b\].*?\u0007/g;
 
 // Normalize numbers/percentages for fuzzy matching.

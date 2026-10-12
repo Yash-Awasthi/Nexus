@@ -7,7 +7,6 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.ts",
-    "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist coverage",

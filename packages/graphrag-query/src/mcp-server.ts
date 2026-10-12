@@ -33,7 +33,6 @@
 import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
 
 import type { IndexedEntity, IndexedRelation } from "./index-graphrag.ts";
-
 import {
   GraphRAGQueryEngine,
   LocalSearchEngine,

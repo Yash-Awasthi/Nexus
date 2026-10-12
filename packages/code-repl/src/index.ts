@@ -281,7 +281,7 @@ export class InterpreterProcess implements ReplProcess {
 
 // ── JupyterMode ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+// oxlint-disable-next-line @typescript-eslint/no-extraneous-class
 export class JupyterMode {
   /** A program that runs `code` and echoes its last statement when Python's parser says it is an expression. */
   static wrapPython(code: string): string {

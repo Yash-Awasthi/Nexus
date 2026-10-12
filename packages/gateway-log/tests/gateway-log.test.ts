@@ -62,7 +62,7 @@ function makeRequest(overrides: Partial<LLMRequest> = {}): LLMRequest {
 }
 
 function makeKVStore(): KVStoreLike {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   const store = new Map<string, any>();
   return {
     async get<T>(key: string): Promise<T | undefined> {

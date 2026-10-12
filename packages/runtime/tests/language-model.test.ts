@@ -12,7 +12,7 @@ interface RecordedRequest {
 const mockState = vi.hoisted(() => ({
   request: vi.fn(),
   requests: [] as RecordedRequest[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   handler: undefined as undefined | ((opts: RecordedRequest["opts"]) => string | string[]),
 }));
 

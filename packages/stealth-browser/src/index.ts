@@ -254,9 +254,9 @@ export async function isPatchrightAvailable(): Promise<boolean> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line @typescript-eslint/no-explicit-any
 type PatchrightPageType = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line @typescript-eslint/no-explicit-any
 type PatchrightBrowserType = any;
 
 /**
@@ -268,43 +268,43 @@ class PatchrightPage implements BrowserPage {
   private _closed = false;
 
   constructor(page: PatchrightPageType) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._page = page;
   }
 
   get url(): string {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return (this._page.url?.() as string | undefined) ?? "about:blank";
   }
   get isClosed(): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._closed || (this._page.isClosed?.() as boolean | undefined) === true;
   }
 
   async navigate(url: string): Promise<NavigateResult> {
     const t0 = Date.now();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const response = await (this._page.goto(url, { waitUntil: "domcontentloaded" }) as Promise<{
       status(): number;
     } | null>);
     const status = response?.status() ?? 200;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const pageTitle = (await this._page.title()) as string;
     return { url, status, title: pageTitle, loadTimeMs: Date.now() - t0 };
   }
 
   async content(): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.content() as Promise<string>;
   }
 
   async title(): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.title() as Promise<string>;
   }
 
   async click(selector: string, opts?: ClickOptions): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.click(selector, {
       delay: opts?.delay,
       button: opts?.button ?? "left",
@@ -314,21 +314,21 @@ class PatchrightPage implements BrowserPage {
   async type(selector: string, text: string, opts?: TypeOptions): Promise<void> {
     if (opts?.delay) {
       // Key-by-key typing for delay simulation
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this._page.locator(selector).pressSequentially(text, { delay: opts.delay });
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this._page.fill(selector, text);
     }
   }
 
   async evaluate<T>(fn: string | (() => T)): Promise<T> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.evaluate(fn) as Promise<T>;
   }
 
   async screenshot(opts?: ScreenshotOptions): Promise<Buffer> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.screenshot({
       fullPage: opts?.fullPage ?? false,
       type: opts?.format ?? "png",
@@ -337,13 +337,13 @@ class PatchrightPage implements BrowserPage {
   }
 
   async waitForSelector(selector: string, timeoutMs = 30_000): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.waitForSelector(selector, { timeout: timeoutMs });
   }
 
   async close(): Promise<void> {
     this._closed = true;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.close();
   }
 }
@@ -532,7 +532,7 @@ export class PatchrightDriver implements BrowserDriver {
     if (this._browser) return this._browser;
 
     // Resolve a browser client lib: patchright (preferred) → playwright-core.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-explicit-any
     let lib: any;
     try {
       lib = await import("patchright");
@@ -546,7 +546,7 @@ export class PatchrightDriver implements BrowserDriver {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const chromium = (lib.chromium ?? lib.default?.chromium) as
       | {
           launch(opts: Record<string, unknown>): Promise<PatchrightBrowserType>;
@@ -560,13 +560,13 @@ export class PatchrightDriver implements BrowserDriver {
 
     // Remote CDP path — connect to a hosted browser (no local chromium needed).
     if (this.cdpUrl) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this._browser = await chromium.connectOverCDP(this.cdpUrl);
       this._open = true;
       return this._browser;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._browser = await chromium.launch({
       headless: this.headless,
       args: [
@@ -583,13 +583,13 @@ export class PatchrightDriver implements BrowserDriver {
   }
 
   async newPage(profile?: StealthProfile): Promise<BrowserPage> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const browser = await this.ensureOpen();
 
     // Service workers fetch outside page routing, so they are blocked.
     const contextOptions = { ...buildContextOptions(profile), serviceWorkers: "block" };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const context = await (browser as any).newContext(contextOptions);
 
     const guarded = context as {
@@ -604,7 +604,7 @@ export class PatchrightDriver implements BrowserDriver {
     );
     await guarded.routeWebSocket?.(/.*/, (ws) => ws.close());
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const page = await (context as any).newPage();
 
     // ── Fingerprint-hardening init scripts ────────────────────────────────────
@@ -678,7 +678,7 @@ export class PatchrightDriver implements BrowserDriver {
 
   async close(): Promise<void> {
     if (this._browser) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       await (this._browser as any).close();
       this._browser = null;
       this._open = false;

@@ -8,8 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "lint": "eslint src/"
+    "test": "vitest run"
   },
   "dependencies": {
     "@nexus/agent-runtime": "workspace:*",

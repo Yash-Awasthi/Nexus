@@ -52,7 +52,7 @@ if (pgWiki) {
     .init()
     .then(async () => {
       const articles = await pgWiki.getAll();
-      // eslint-disable-next-line promise/always-return
+      // oxlint-disable-next-line promise/always-return
       for (const a of articles) wikiStore.set(a);
     })
     .catch(() => {

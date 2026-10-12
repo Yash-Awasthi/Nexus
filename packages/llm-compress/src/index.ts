@@ -76,7 +76,7 @@ export interface CompressFilter {
 // ── Lossless filters ──────────────────────────────────────────────────────────────
 
 // CSI / SGR ANSI escape sequences (colors, cursor moves). Pure terminal noise to an LLM.
-// eslint-disable-next-line no-control-regex
+
 const ANSI_RE = /\[[0-9;?]*[ -/]*[@-~]/g;
 
 /** Strip ANSI escape codes (color/cursor sequences). Lossless. */
@@ -239,7 +239,6 @@ export function compressPreset(input: string, preset: PresetName = "lossless"): 
 /** Structural traits a chunk of tool output can exhibit. A chunk may have several. */
 export type OutputTrait = "ansi" | "trailing-ws" | "blank-runs" | "repeat-runs";
 
-// eslint-disable-next-line no-control-regex
 const ANSI_DETECT = /\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
 const TRAILING_WS_DETECT = /[ \t]\r?(?:\n|$)/;
 const BLANK_RUNS_DETECT = /(\r?\n)[ \t]*(\r?\n)[ \t]*(\r?\n)/;

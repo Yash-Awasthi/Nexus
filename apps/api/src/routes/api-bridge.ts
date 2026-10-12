@@ -5047,7 +5047,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     },
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   function _btRow(row: any) {
     return {
       id: row.id,
@@ -5232,7 +5232,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   // Endpoints: GET/POST /api/prompts, GET/DELETE /api/prompts/:id,
   //            POST /api/prompts/:id/versions
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   function _promptRow(p: any, versions: any[]) {
     return {
       id: p.id,

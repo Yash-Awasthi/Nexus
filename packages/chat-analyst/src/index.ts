@@ -101,7 +101,7 @@ export type AnalystDomain =
   | "general";
 
 /** Domain system prompt. */
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+// oxlint-disable-next-line @typescript-eslint/no-extraneous-class
 export class DomainSystemPrompt {
   private static readonly PROMPTS: Record<AnalystDomain, string> = {
     aviation:
@@ -254,7 +254,7 @@ export type StreamingLlmFn = (
  * Extracts in-app action directives from streamed text.
  * Syntax: [ACTION:type target param=val param2=val2]
  */
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+// oxlint-disable-next-line @typescript-eslint/no-extraneous-class
 export class InAppActionExtractor {
   static extract(text: string): InAppAction[] {
     if (text.length > 100_000) return [];

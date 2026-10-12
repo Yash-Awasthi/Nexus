@@ -105,15 +105,15 @@ function promptFor(
 export async function runCritique(opts: CritiqueOptions): Promise<CritiqueResult> {
   const { question, targets, critics, transport, mode = "critique", anonymize = false } = opts;
   const responses: ILLMResponse[] = await Promise.all(
-    critics.map((critic) => {
+    critics.map(async (critic) => {
       const others = targets.filter((t) => t.label !== critic);
       if (others.length === 0) {
-        return Promise.resolve({
+        return {
           content: "",
           model: "skipped",
           usage: { promptTokens: 0, completionTokens: 0 },
           latencyMs: 0,
-        });
+        };
       }
       return transport.chat(
         [

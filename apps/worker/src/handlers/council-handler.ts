@@ -21,8 +21,9 @@ import {
   type ILLMMessage,
   type ILLMResponse,
   type CouncilPersistPayload,
+  buildCouncilRunTranscript,
+  councilTranscriptEvent,
 } from "@nexus/council";
-import { buildCouncilRunTranscript, councilTranscriptEvent } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts, signals } from "@nexus/db/schema";
 import {

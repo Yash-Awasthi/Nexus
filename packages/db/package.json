@@ -14,7 +14,6 @@
     "./secret-crypto": "./src/secret-crypto.ts"
   },
   "scripts": {
-    "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist coverage",

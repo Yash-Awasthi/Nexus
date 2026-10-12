@@ -407,10 +407,10 @@ abstract class BaseDriver implements LlmDriver {
 
     try {
       while (true) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const { done, value } = await reader.read();
         if (done) break;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-argument
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -463,10 +463,10 @@ abstract class BaseDriver implements LlmDriver {
 
     try {
       while (true) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const { done, value } = await reader.read();
         if (done) break;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-argument
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -1193,7 +1193,7 @@ export class GeminiDriver extends BaseDriver {
     )) {
       let event: Record<string, unknown>;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         event = JSON.parse(line);
       } catch {
         continue;
@@ -1338,7 +1338,7 @@ export class OllamaDriver extends BaseDriver {
     for await (const line of this.ndjsonLines(`${this.baseUrl}/api/chat`, body, {})) {
       let chunk: Record<string, unknown>;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // oxlint-disable-next-line @typescript-eslint/no-unsafe-assignment
         chunk = JSON.parse(line);
       } catch {
         continue;
