@@ -4,7 +4,7 @@
  * Reads NEXUS_API_URL and NEXUS_API_KEY from env.
  */
 
-import chalk from "chalk";
+import { styleText } from "node:util";
 
 const BASE_URL = (process.env.NEXUS_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const API_KEY = process.env.NEXUS_API_KEY ?? "";
@@ -59,6 +59,6 @@ export const api = {
 
 /** Report a failed command. Not `process.exit`: on Windows it crashes while a socket is closing. */
 export function fail(err: unknown): void {
-  console.error(chalk.red("✗"), err instanceof Error ? err.message : String(err));
+  console.error(styleText("red", "✗"), err instanceof Error ? err.message : String(err));
   process.exitCode = 1;
 }

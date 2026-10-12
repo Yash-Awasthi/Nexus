@@ -23,9 +23,9 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
-      # Render's proxy is the only hop in front of the service.
+      # Render's proxy reaches the service from its private network.
       - key: NEXUS_TRUST_PROXY
-        value: "1"
+        value: uniquelocal
       - key: NEXUS_API_KEY
         generateValue: true
       - key: NEXUS_JWT_SECRET

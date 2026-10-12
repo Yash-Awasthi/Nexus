@@ -15,7 +15,7 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "fast-check": "^3.23.2",
+    "fast-check": "catalog:",
     "vitest": "catalog:"
   },
   "publishConfig": {

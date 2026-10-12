@@ -15,15 +15,15 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "fast-check": "^3.23.2",
+    "fast-check": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
-    "@opentelemetry/resources": "^2.11.0",
-    "@opentelemetry/sdk-trace-base": "^2.11.0",
-    "@opentelemetry/sdk-trace-node": "^2.11.0"
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.223.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "^2.12.0"
   },
   "publishConfig": {
     "main": "./dist/index.js",

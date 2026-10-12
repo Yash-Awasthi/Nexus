@@ -16,7 +16,7 @@ export default defineConfig({
     // of null (reading 'useRef'/'useContext')" on render.
     dedupe: ["react", "react-dom", "react-is", "react-router"],
     alias: {
-      "~": resolve(__dirname, "./app"),
+      "~": resolve(import.meta.dirname, "./app"),
       // Force any react-router-dom resolution to react-router v7. A transitive
       // (Docusaurus-era) react-router-dom@5 otherwise gets pulled in and explodes
       // on missing v5 exports. The UI never uses the v5 API.

@@ -9,13 +9,16 @@ process.env.NEXUS_TRUST_PROXY = "loopback";
 const { buildServer } = await import("../../src/server.ts");
 const { parseTrustProxy } = await import("../../src/lib/trust-proxy.ts");
 
-it("reads hop counts, true/false and address lists", () => {
+it("reads true/false and address lists", () => {
   expect(parseTrustProxy(undefined)).toBe(false);
   expect(parseTrustProxy("")).toBe(false);
   expect(parseTrustProxy("true")).toBe(true);
   expect(parseTrustProxy("false")).toBe(false);
-  expect(parseTrustProxy("1")).toBe(1);
   expect(parseTrustProxy("loopback, uniquelocal")).toEqual(["loopback", "uniquelocal"]);
+});
+
+it("rejects hop counts, which Fastify would silently treat as trusting nothing", () => {
+  expect(() => parseTrustProxy("1")).toThrow(/hop counts are not supported/);
 });
 
 const app = await buildServer();
