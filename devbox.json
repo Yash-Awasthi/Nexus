@@ -3,7 +3,7 @@
   "name": "nexus",
   "description": "Nexus monorepo — reproducible development environment",
   "packages": {
-    "nodejs_20": "latest",
+    "nodejs_26": "latest",
     "nodePackages.pnpm": "latest",
     "python311": "latest",
     "git": "latest",

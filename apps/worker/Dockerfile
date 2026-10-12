@@ -10,7 +10,7 @@ WORKDIR /app
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ \
  && rm -rf /var/lib/apt/lists/* \
- && npm install -g pnpm@9.14.4 --no-fund --no-audit
+ && npm install -g pnpm@12.11.2 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY turbo.json ./

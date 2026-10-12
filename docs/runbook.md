@@ -29,8 +29,8 @@
 ### Prerequisites
 
 - Docker 25+ and Docker Compose v2
-- Node 20 LTS (`nvm use 20`)
-- pnpm 9 (`npm i -g pnpm@9`)
+- Node 26 (`nvm use 26`)
+- pnpm 12 (`npm i -g pnpm@12`)
 - Python 3.11 (`pyenv install 3.11`)
 
 ### Start everything
