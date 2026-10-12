@@ -7,13 +7,15 @@ packages:
 # One version per tool across all workspace packages: `"typescript": "catalog:"`.
 catalog:
   "@types/node": ^26.6.5
-  "@vitest/coverage-v8": ^2.1.9
+  "@playwright/test": 1.64.0
+  "@vitest/coverage-v8": 5.0.4
   # TypeScript 7 provides `tsc`; tools that import the compiler API
   # (typescript-eslint, openapi-typescript, knip) get the 6.0 API under the
   # `typescript` name, as the TypeScript 7 release recommends.
   "@typescript/native": npm:typescript@7.0.2
   typescript: npm:@typescript/typescript6@^6.0.2
-  vitest: ^2.1.9
+  playwright-core: 1.64.0
+  vitest: 5.0.4
 
 engineStrict: true
 strictPeerDependencies: false
@@ -50,3 +52,7 @@ minimumReleaseAgeExclude:
   - "@typescript-eslint/utils@8.71.2"
   - "@typescript-eslint/visitor-keys@8.71.2"
   - typescript-eslint@8.71.2
+  - "@vitest/coverage-v8@5.0.4"
+  - "@vitest/mocker@5.0.4"
+  - "@vitest/spy@5.0.4"
+  - vitest@5.0.4

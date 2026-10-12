@@ -41,10 +41,9 @@ const poolEnd = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("pg", () => {
   // pg has both a default export and named Pool export — both used in the codebase.
-  const MockPool = vi.fn(() => ({
-    query: poolQuery,
-    end: poolEnd,
-  }));
+  const MockPool = vi.fn(function () {
+    return { query: poolQuery, end: poolEnd };
+  });
   return {
     default: {
       Pool: MockPool,

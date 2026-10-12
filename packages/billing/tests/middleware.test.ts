@@ -15,10 +15,9 @@ vi.mock("../src/api-keys.ts", () => ({
 }));
 
 vi.mock("../src/quota.ts", () => ({
-  QuotaChecker: vi.fn(() => ({
-    check: mockQuotaCheck,
-    recordUsage: mockRecordUsage,
-  })),
+  QuotaChecker: vi.fn(function () {
+    return { check: mockQuotaCheck, recordUsage: mockRecordUsage };
+  }),
 }));
 
 // ── Imports (after mocks) ──────────────────────────────────────────────────────

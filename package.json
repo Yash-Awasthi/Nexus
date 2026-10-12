@@ -45,7 +45,7 @@
     "@changesets/cli": "^2.31.1",
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
     "@vitest/coverage-v8": "catalog:",

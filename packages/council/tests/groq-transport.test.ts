@@ -8,9 +8,10 @@ vi.mock("groq-sdk", () => {
     model: "openai/gpt-oss-120b",
     usage: { prompt_tokens: 80, completion_tokens: 40 },
   });
-  const MockGroq = vi.fn().mockImplementation(() => ({
-    chat: { completions: { create: mockCreate } },
-  }));
+  // A constructor mock needs a function implementation; arrows cannot be `new`-ed.
+  const MockGroq = vi.fn(function () {
+    return { chat: { completions: { create: mockCreate } } };
+  });
   return { default: MockGroq };
 });
 
