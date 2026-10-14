@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// Access-token revocation that survives restarts and reaches every replica, kept in the
-// shared KV for one token lifetime: after that every token it could reject has expired.
+// Access-token revocation that survives restarts and reaches every replica, kept in the security
+// KV for one token lifetime: after that every token it could reject has expired.
 
 import { db } from "@nexus/db";
 import { refreshTokens } from "@nexus/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { ACCESS_TOKEN_TTL_SEC } from "./issue-access-token.ts";
-import { getSharedKV } from "./shared-kv.ts";
+import { getSecurityKV } from "./shared-kv.ts";
 
 const TTL_MS = (ACCESS_TOKEN_TTL_SEC + 60) * 1000;
 /** Other replicas may accept a revoked token for at most this long. */
@@ -17,7 +17,7 @@ const memo = new Map<string, { value: number | null; at: number }>();
 async function mark(key: string): Promise<void> {
   const now = Date.now();
   memo.set(key, { value: now, at: now });
-  await getSharedKV().set(`auth:revoked:${key}`, now, TTL_MS);
+  await getSecurityKV().set(`auth:revoked:${key}`, now, TTL_MS);
 }
 
 async function read(key: string): Promise<number | null> {
@@ -25,7 +25,7 @@ async function read(key: string): Promise<number | null> {
   if (hit && Date.now() - hit.at < MEMO_MS) return hit.value;
   let value: number | null = null;
   try {
-    value = (await getSharedKV().get<number>(`auth:revoked:${key}`)) ?? null;
+    value = (await getSecurityKV().get<number>(`auth:revoked:${key}`)) ?? null;
   } catch {
     // ponytail: fails open when the KV is down; the 15-minute token lifetime stays the bound
     return hit?.value ?? null;

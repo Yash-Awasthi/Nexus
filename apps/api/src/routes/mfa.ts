@@ -22,7 +22,7 @@ import type { FastifyInstance } from "fastify";
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.ts";
-import { getSharedKV } from "../lib/shared-kv.ts";
+import { getSecurityKV } from "../lib/shared-kv.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
@@ -144,7 +144,7 @@ export async function acceptLoginCode(
   const step = matchTotpStep(decryptSecret(storedSecret), code);
   if (step === null) return false;
   // One sign-in per code: a code read over a shoulder or from a proxy log is already spent.
-  return (await getSharedKV().incr(`mfa:used:${userId}:${step}`, 120_000)) === 1;
+  return (await getSecurityKV().incr(`mfa:used:${userId}:${step}`, 120_000)) === 1;
 }
 
 function getEncKey(): Buffer | null {

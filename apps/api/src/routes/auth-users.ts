@@ -46,7 +46,7 @@ import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-toke
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
 import { endAllSessions, revokeSession } from "../lib/session-revocation.ts";
-import { getSharedKV } from "../lib/shared-kv.ts";
+import { getSecurityKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -208,7 +208,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
   // A rotated-away refresh token coming back later was copied, so every session ends;
   // one coming back within the grace window is two tabs refreshing at once.
   const endSessionsOnReplay = async (tokenHash: string): Promise<void> => {
-    const mark = await getSharedKV()
+    const mark = await getSecurityKV()
       .get<RotatedMark>(`auth:rotated:${tokenHash}`)
       .catch(() => undefined);
     const grace = Number(process.env.NEXUS_REFRESH_REUSE_GRACE_MS ?? 30_000);
@@ -374,12 +374,10 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const throttleKey = loginThrottleKey(normalEmail, request.ip);
       assertLoginAllowed(throttleKey);
       if (await accountLocked(normalEmail)) {
-        return reply
-          .code(429)
-          .send({
-            error: "too_many_attempts",
-            message: "Too many failed sign-ins; try again later",
-          });
+        return reply.code(429).send({
+          error: "too_many_attempts",
+          message: "Too many failed sign-ins; try again later",
+        });
       }
 
       const [user] = await db
@@ -506,7 +504,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
           message: "Refresh token is invalid, expired, or already used",
         });
       }
-      await getSharedKV().set<RotatedMark>(
+      await getSecurityKV().set<RotatedMark>(
         `auth:rotated:${tokenHash}`,
         { userId: stored.userId, at: Date.now() },
         REFRESH_TOKEN_TTL_MS,

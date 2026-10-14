@@ -5,7 +5,7 @@
  */
 import { LoginThrottle } from "@nexus/auth";
 
-import { getSharedKV } from "./shared-kv.ts";
+import { getSecurityKV } from "./shared-kv.ts";
 
 const loginThrottle = new LoginThrottle();
 
@@ -37,7 +37,7 @@ const accountKey = (email: string) => `auth:login-fail:${email.trim().toLowerCas
 
 /** Whether `email` has used up its failed sign-ins for the current window (fails open). */
 export async function accountLocked(email: string): Promise<boolean> {
-  const n = await getSharedKV()
+  const n = await getSecurityKV()
     .get<number>(accountKey(email))
     .catch(() => 0);
   return (n ?? 0) >= ACCOUNT_FAILURES;
@@ -45,7 +45,7 @@ export async function accountLocked(email: string): Promise<boolean> {
 
 /** Count one failed sign-in against `email` across every address. */
 export async function recordAccountFailure(email: string): Promise<void> {
-  await getSharedKV()
+  await getSecurityKV()
     .incr(accountKey(email), ACCOUNT_WINDOW_MS)
     .catch(() => undefined);
 }

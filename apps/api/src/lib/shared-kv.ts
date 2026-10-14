@@ -340,3 +340,24 @@ export function getSharedKV(): KVStore {
 
   return _sharedKv!;
 }
+
+let _securityKv: KVStore | null = null;
+
+/** Security state (revocations, spent codes, lockouts) must outlive the process: the shared KV,
+ *  or Postgres when the shared KV is only process memory. */
+export function getSecurityKV(): KVStore {
+  const shared = getSharedKV();
+  if (!(shared instanceof MemoryKVStore)) return shared;
+  const pool = getPgPool();
+  return pool ? (_securityKv ??= new PgKVStore(pool)) : shared;
+}
+
+/** Which store backs the shared KV, for the security check. */
+export function sharedKvBackend(): "redis" | "upstash" | "postgres" | "memory" | "cloudflare" {
+  const kv = getSharedKV();
+  if (kv instanceof RedisKVStore) return "redis";
+  if (kv instanceof UpstashKVStore) return "upstash";
+  if (kv instanceof PgKVStore) return "postgres";
+  if (kv instanceof MemoryKVStore) return "memory";
+  return "cloudflare";
+}
