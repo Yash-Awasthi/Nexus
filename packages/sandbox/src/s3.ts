@@ -16,22 +16,24 @@ export interface S3Config {
   prefix: string;
 }
 
-/** The bucket named by DRIVE_BACKUP_S3_*, or null when it is not configured. */
-export function s3ConfigFromEnv(env: NodeJS.ProcessEnv = process.env): S3Config | null {
-  const { DRIVE_BACKUP_S3_BUCKET: bucket, DRIVE_BACKUP_S3_ACCESS_KEY_ID: accessKeyId } = env;
-  const secretAccessKey = env.DRIVE_BACKUP_S3_SECRET_ACCESS_KEY;
+/** The bucket named by `<name>_BUCKET`, `<name>_ACCESS_KEY_ID` and the rest, or null when unset. */
+export function s3ConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  name = "DRIVE_BACKUP_S3",
+  defaultPrefix = "drives/",
+): S3Config | null {
+  const bucket = env[`${name}_BUCKET`];
+  const accessKeyId = env[`${name}_ACCESS_KEY_ID`];
+  const secretAccessKey = env[`${name}_SECRET_ACCESS_KEY`];
   if (!bucket || !accessKeyId || !secretAccessKey) return null;
-  const region = env.DRIVE_BACKUP_S3_REGION ?? "auto";
+  const region = env[`${name}_REGION`] ?? "auto";
   return {
-    endpoint: (env.DRIVE_BACKUP_S3_ENDPOINT ?? `https://s3.${region}.amazonaws.com`).replace(
-      /\/$/,
-      "",
-    ),
+    endpoint: (env[`${name}_ENDPOINT`] ?? `https://s3.${region}.amazonaws.com`).replace(/\/$/, ""),
     bucket,
     region,
     accessKeyId,
     secretAccessKey,
-    prefix: env.DRIVE_BACKUP_S3_PREFIX ?? "drives/",
+    prefix: env[`${name}_PREFIX`] ?? defaultPrefix,
   };
 }
 

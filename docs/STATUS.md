@@ -392,6 +392,9 @@ every setting below that still needs attention.
   ingest service refuses requests without its key outside `APP_ENV=development`.
 - **Brief share links** are signed with `BRIEF_SIGNING_KEY` or a key derived from `NEXUS_API_KEY`;
   links made with the old default no longer open.
+- **The audit log can leave the database.** Set `AUDIT_EXPORT_S3_*` (see `.env.example`) to copy
+  new entries every 10 minutes to a bucket with object lock; with `NEXUS_AUDIT_KEY` set, a
+  database edit then no longer goes unnoticed.
 - **Content-Security-Policy violations are reported** to `POST /api/v1/csp-report` and logged as
   `csp violation` warnings. `NEXUS_CSP_REPORT_ONLY=true` reports without blocking, to try a policy.
 - **Billing keys (`/api/v1/billing/keys`), the translation catalogue (`POST /api/v1/i18n/catalog`)
