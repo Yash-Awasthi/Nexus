@@ -20,7 +20,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page                | P2       | done   | —      |
 | NX-FEAT-011 | Audit-log export to object storage with object lock (threat model T3)  | P3       | open   | —      |
 | NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI  | P2       | done   | —      |
-| NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                   | P3       | open   | —      |
+| NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                   | P3       | done   | —      |
 | NX-FEAT-014 | Warm pool for the Python sandbox (removes the ~2 s cold boot)          | P2       | open   | —      |
 | NX-FEAT-015 | Transactional email (SMTP or API) for reset, verification, invitations | P1       | done   | FR-3   |
 
@@ -39,6 +39,9 @@ P1 items is in [design.md](design.md).
   Admin → Users; tests in `tests/routes/admin-sessions.test.ts` and `e2e/sessions.spec.ts`.
 - **NX-FEAT-014.** Measured 2026-10-14: ~2.2 s per run, almost all of it Pyodide start-up; one
   pre-booted child holds ~136 MB idle. Deferred while the deployment is a 512 MB free instance.
+- **NX-FEAT-013.** Done as `POST /api/v1/csp-report` (`routes/csp-report.ts`): `report-uri` and
+  `report-to` in the policy, both report formats, 16 KB bodies, 60 a minute per address, one log
+  line per violation with query strings dropped.
 - **NX-FEAT-015.** Resend's HTTP API over `fetch`, so no new dependency; SMTP waits until an
   operator needs it. Mails reset links, verification links (sent after sign-up), workspace
   invitations and every security notice (an email change tells the old address). UI pages:

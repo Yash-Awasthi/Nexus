@@ -45,6 +45,8 @@ const PUBLIC_V1 = new Set<string>([
   "GET /api/v1/llm-oauth/providers",
   "GET /api/v1/llm-oauth/:provider/callback",
   "GET /api/v1/connectors/:id/oauth/callback",
+  // Browsers send CSP violation reports without credentials.
+  "POST /api/v1/csp-report",
   // SCIM discovery documents (RFC 7644 lets these be public).
   "GET /api/v1/scim/v2/ServiceProviderConfig",
   "GET /api/v1/scim/v2/Schemas",
