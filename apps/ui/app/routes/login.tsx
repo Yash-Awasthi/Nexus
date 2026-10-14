@@ -158,14 +158,13 @@ export default function LoginPage() {
           </div>
           {mfaCode !== null && (
             <div className="space-y-1.5">
-              <Label htmlFor="mfa-code">Authenticator code</Label>
+              <Label htmlFor="mfa-code">Authenticator code or recovery code</Label>
               <Input
                 id="mfa-code"
-                inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={11}
                 value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9A-Za-z-]/g, ""))}
                 className="h-10 font-mono tracking-widest"
                 autoFocus
                 required

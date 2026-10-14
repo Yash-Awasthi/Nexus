@@ -4354,6 +4354,25 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/mfa/recovery-codes:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
+      responses:
+        "200":
+          description: Default Response
   /api/v1/libertas:
     get:
       tags:

@@ -3,7 +3,7 @@
  * Two-factor sign-in: set up with an authenticator app, confirm with its
  * first code, and turn off with a current one.
  *
- * API: GET /api/v1/mfa/status · POST /api/v1/mfa/setup | verify | disable
+ * API: GET /api/v1/mfa/status · POST /api/v1/mfa/setup | verify | disable | recovery-codes
  */
 import { Loader2, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
@@ -15,7 +15,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { apiFetch } from "~/lib/api";
 
-type Step = "loading" | "off" | "setup" | "on" | "disabling" | "unavailable";
+type Step = "loading" | "off" | "setup" | "on" | "disabling" | "renewing" | "unavailable";
 
 export function MfaSection() {
   const [step, setStep] = useState<Step>("loading");
@@ -24,6 +24,8 @@ export function MfaSection() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Shown once, right after they are made; the server keeps only hashes.
+  const [recovery, setRecovery] = useState<string[]>([]);
 
   useEffect(() => {
     apiFetch<{ mfaEnabled: boolean }>("/api/v1/mfa/status")
@@ -55,9 +57,24 @@ export function MfaSection() {
 
   const confirm = () =>
     run(async () => {
-      await apiFetch("/api/v1/mfa/verify", { method: "POST", json: { code } });
+      const r = await apiFetch<{ recoveryCodes?: string[] }>("/api/v1/mfa/verify", {
+        method: "POST",
+        json: { code },
+      });
+      setRecovery(r.recoveryCodes ?? []);
       setSecret("");
       setQr("");
+      setCode("");
+      setStep("on");
+    });
+
+  const renew = () =>
+    run(async () => {
+      const r = await apiFetch<{ recoveryCodes: string[] }>("/api/v1/mfa/recovery-codes", {
+        method: "POST",
+        json: { code },
+      });
+      setRecovery(r.recoveryCodes);
       setCode("");
       setStep("on");
     });
@@ -108,10 +125,39 @@ export function MfaSection() {
             <p className="flex items-center gap-2 text-sm">
               <ShieldCheck className="size-4 text-success" /> Two-factor sign-in is on
             </p>
-            <Button variant="outline" size="sm" onClick={() => setStep("disabling")}>
-              Turn off
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setStep("renewing")}>
+                New recovery codes
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setStep("disabling")}>
+                Turn off
+              </Button>
+            </div>
           </div>
+        )}
+        {step === "on" && recovery.length > 0 && (
+          <div className="space-y-2 rounded-md border p-3">
+            <p className="text-sm">
+              Recovery codes: each signs you in once if you lose your authenticator. Save them now;
+              they will not be shown again.
+            </p>
+            <ul
+              data-testid="mfa-recovery-codes"
+              className="grid grid-cols-2 gap-1 font-mono text-sm"
+            >
+              {recovery.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {step === "renewing" && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Enter a current code. Your old recovery codes stop working.
+            </p>
+            {codeField(renew, "Make new codes")}
+          </>
         )}
         {step === "disabling" && (
           <>

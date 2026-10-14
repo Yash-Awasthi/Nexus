@@ -119,3 +119,39 @@ it("has no unauthenticated code-check endpoint (NX-SEC-012)", async () => {
   });
   expect(res.statusCode).toBe(404);
 });
+
+it("signs in once with each recovery code and can replace them (NX-FEAT-004)", async () => {
+  const creds = { email: "mfa-recovery@example.com", password: "Mfa-recovery-12!" };
+  const reg = await app.inject({ method: "POST", url: "/api/v1/auth/register", payload: creds });
+  const auth = { authorization: `Bearer ${reg.json<{ accessToken: string }>().accessToken}` };
+  const setup = await app.inject({ method: "POST", url: "/api/v1/mfa/setup", headers: auth });
+  const { secret } = setup.json<{ secret: string }>();
+  const on = await app.inject({
+    method: "POST",
+    url: "/api/v1/mfa/verify",
+    headers: auth,
+    payload: { code: totp(secret) },
+  });
+  const { recoveryCodes } = on.json<{ recoveryCodes: string[] }>();
+  expect(recoveryCodes).toHaveLength(10);
+  expect(new Set(recoveryCodes).size).toBe(10);
+
+  const login = (code: string) =>
+    app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { ...creds, code } });
+  expect((await login(recoveryCodes[0]!)).statusCode).toBe(200);
+  expect((await login(recoveryCodes[0]!)).statusCode).toBe(401);
+  // Case and the dash are forgiven; the code is what matters.
+  expect((await login(recoveryCodes[1]!.toLowerCase().replace("-", ""))).statusCode).toBe(200);
+
+  const renewed = await app.inject({
+    method: "POST",
+    url: "/api/v1/mfa/recovery-codes",
+    headers: auth,
+    payload: { code: totp(secret) },
+  });
+  expect(renewed.statusCode, renewed.body).toBe(200);
+  const fresh = renewed.json<{ recoveryCodes: string[] }>().recoveryCodes;
+  expect(fresh).toHaveLength(10);
+  expect((await login(recoveryCodes[2]!)).statusCode).toBe(401);
+  expect((await login(fresh[0]!)).statusCode).toBe(200);
+});

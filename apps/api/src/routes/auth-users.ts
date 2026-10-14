@@ -52,7 +52,7 @@ import { getSecurityKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { acceptLoginCode } from "./mfa.ts";
+import { acceptLoginCode, acceptRecoveryCode } from "./mfa.ts";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,
@@ -413,7 +413,15 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
             .code(401)
             .send({ error: "mfa_required", message: "Enter the code from your authenticator app" });
         }
-        if (!(await acceptLoginCode(user.id, user.totpSecret, code.trim()))) {
+        const entered = code.trim();
+        const recoveryLeft = /^[0-9]{6}$/.test(entered)
+          ? null
+          : await acceptRecoveryCode(user.id, entered);
+        if (recoveryLeft !== null) {
+          await securityEvent(user.id, "mfa.recovery_used", {
+            message: `${recoveryLeft} recovery codes are left.`,
+          });
+        } else if (!(await acceptLoginCode(user.id, user.totpSecret, entered))) {
           recordLoginFailure(throttleKey);
           await recordAccountFailure(normalEmail);
           return reply

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { sql } from "drizzle-orm";
 import { pgTable, uuid, text, boolean, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 // ── users ─────────────────────────────────────────────────────────────────────
@@ -31,6 +32,11 @@ export const users = pgTable(
     totpSecret: text("totp_secret"),
     /** Whether TOTP MFA is active */
     mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+    /** SHA-256 hashes of unused single-use MFA recovery codes */
+    mfaRecoveryCodes: text("mfa_recovery_codes")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     /** Stripe customer ID — set on first checkout */
     stripeCustomerId: text("stripe_customer_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

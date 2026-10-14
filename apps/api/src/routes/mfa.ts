@@ -12,11 +12,11 @@
  * No external TOTP library — pure Node.js crypto.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { db } from "@nexus/db";
 import { users } from "@nexus/db/schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
@@ -134,6 +134,34 @@ function decryptSecret(stored: string): string {
   }
 }
 
+const RECOVERY_CODES = 10;
+
+/** Ten single-use codes like `K7QM2-XF4PA` (50 bits each), for when the authenticator is lost. */
+function newRecoveryCodes(): string[] {
+  return Array.from({ length: RECOVERY_CODES }, () => {
+    const raw = base32Encode(randomBytes(7)).slice(0, 10);
+    return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+  });
+}
+
+/** Case and separators are forgiven: people type these from paper. */
+function hashRecoveryCode(code: string): string {
+  return createHash("sha256")
+    .update(code.toUpperCase().replace(/[^A-Z2-7]/g, ""))
+    .digest("hex");
+}
+
+/** Spend one of `userId`'s recovery codes; the number left, or null when `code` is not one. */
+export async function acceptRecoveryCode(userId: string, code: string): Promise<number | null> {
+  const hash = hashRecoveryCode(code);
+  const [row] = await db
+    .update(users)
+    .set({ mfaRecoveryCodes: sql`array_remove(${users.mfaRecoveryCodes}, ${hash})` })
+    .where(and(eq(users.id, userId), sql`${hash} = ANY(${users.mfaRecoveryCodes})`))
+    .returning({ left: users.mfaRecoveryCodes });
+  return row ? row.left.length : null;
+}
+
 /** Whether `code` signs `userId` in: a current TOTP code that has not signed anyone in before. */
 export async function acceptLoginCode(
   userId: string,
@@ -165,6 +193,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
     app.post("/mfa/setup", na);
     app.post("/mfa/verify", na);
     app.post("/mfa/disable", na);
+    app.post("/mfa/recovery-codes", na);
     return;
   }
 
@@ -271,11 +300,20 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: "invalid_code", message: "Invalid or expired TOTP code" });
       }
 
-      await db.update(users).set({ mfaEnabled: true }).where(eq(users.id, userId));
+      const codes = newRecoveryCodes();
+      await db
+        .update(users)
+        .set({ mfaEnabled: true, mfaRecoveryCodes: codes.map(hashRecoveryCode) })
+        .where(eq(users.id, userId));
 
       await securityEvent(userId, "mfa.enabled", {}, app.log);
 
-      return reply.send({ mfaEnabled: true, message: "MFA activated successfully" });
+      return reply.send({
+        mfaEnabled: true,
+        message: "MFA activated successfully",
+        // Shown once: only hashes are kept.
+        recoveryCodes: codes,
+      });
     },
   );
 
@@ -319,12 +357,49 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
 
       await db
         .update(users)
-        .set({ mfaEnabled: false, totpSecret: null })
+        .set({ mfaEnabled: false, totpSecret: null, mfaRecoveryCodes: [] })
         .where(eq(users.id, userId));
 
       await securityEvent(userId, "mfa.disabled", {}, app.log);
 
       return reply.send({ mfaEnabled: false, message: "MFA disabled successfully" });
+    },
+  );
+
+  /** POST /mfa/recovery-codes — replace every recovery code; needs a current authenticator code. */
+  app.post<{ Body: { code: string } }>(
+    "/mfa/recovery-codes",
+    {
+      preHandler: [requireAuthWithTier, mfaRateLimit],
+      schema: {
+        body: {
+          type: "object",
+          required: ["code"],
+          properties: { code: { type: "string", pattern: "^[0-9]{6}$" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+      const [user] = await db
+        .select({ totpSecret: users.totpSecret, mfaEnabled: users.mfaEnabled })
+        .from(users)
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+        .limit(1);
+      if (!user?.mfaEnabled || !user.totpSecret) {
+        return reply.code(400).send({ error: "mfa_not_enabled" });
+      }
+      if (!verifyTotp(decryptSecret(user.totpSecret), request.body.code)) {
+        return reply.code(401).send({ error: "invalid_code" });
+      }
+      const codes = newRecoveryCodes();
+      await db
+        .update(users)
+        .set({ mfaRecoveryCodes: codes.map(hashRecoveryCode) })
+        .where(eq(users.id, userId));
+      await securityEvent(userId, "mfa.recovery_regenerated", {}, app.log);
+      return reply.send({ recoveryCodes: codes });
     },
   );
 }

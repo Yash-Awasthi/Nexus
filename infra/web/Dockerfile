@@ -28,4 +28,5 @@ ENV NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=384
 EXPOSE 10000
 WORKDIR /app/apps/api
-CMD ["node", "src/index.ts"]
+# Additive migrations first (ledger-tracked, idempotent); the API still starts if the database is down.
+CMD ["sh", "-c", "node src/migrate.ts; exec node src/index.ts"]

@@ -23,6 +23,7 @@ export async function claimForSso(
       passwordHash: `oauth:${provider}:no-password`,
       mfaEnabled: false,
       totpSecret: null,
+      mfaRecoveryCodes: [],
       emailVerified: true,
     })
     .where(and(eq(users.id, user.id), eq(users.emailVerified, false)))
