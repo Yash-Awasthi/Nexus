@@ -20,6 +20,7 @@ import type { FastifyInstance } from "fastify";
 import { guardExec } from "../lib/exec-guard.ts";
 import { ownerIdFor } from "../lib/owner.ts";
 import { runUntrustedJs } from "../lib/untrusted-js.ts";
+import { runUntrustedPython } from "../lib/untrusted-python.ts";
 
 /** In-process execution history for GET /sandbox/status/:id. */
 const _sandboxResults = new Map<
@@ -108,52 +109,13 @@ export async function runViaPiston(
   };
 }
 
-// Lazy Pyodide — local Python via WASM. No Docker, no external Piston, no cost.
-let _pyodidePromise: Promise<unknown> | null = null;
-async function _getPyodide(): Promise<{
-  setStdout: (o: { batched: (s: string) => void }) => void;
-  setStderr: (o: { batched: (s: string) => void }) => void;
-  runPythonAsync: (c: string) => Promise<unknown>;
-}> {
-  if (!_pyodidePromise) {
-    _pyodidePromise = (async () => {
-      const mod = (await import("pyodide")) as { loadPyodide: () => Promise<unknown> };
-      return mod.loadPyodide();
-    })();
-  }
-  return _pyodidePromise as Promise<{
-    setStdout: (o: { batched: (s: string) => void }) => void;
-    setStderr: (o: { batched: (s: string) => void }) => void;
-    runPythonAsync: (c: string) => Promise<unknown>;
-  }>;
-}
-
+/** Local Python via Pyodide (WASM), each run in its own restricted child process. */
 export async function runViaPyodide(
   code: string,
+  timeoutMs?: number,
 ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-  const t0 = Date.now();
-  const py = await _getPyodide();
-  const out: string[] = [];
-  const err: string[] = [];
-  py.setStdout({ batched: (s: string) => out.push(s) });
-  py.setStderr({ batched: (s: string) => err.push(s) });
-  try {
-    await py.runPythonAsync(code);
-    return {
-      stdout: out.join("\n"),
-      stderr: err.join("\n"),
-      exitCode: 0,
-      durationMs: Date.now() - t0,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return {
-      stdout: out.join("\n"),
-      stderr: `${err.join("\n")}\n${msg}`.trim(),
-      exitCode: 1,
-      durationMs: Date.now() - t0,
-    };
-  }
+  const r = await runUntrustedPython(code, timeoutMs);
+  return { stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, durationMs: r.durationMs };
 }
 
 /**

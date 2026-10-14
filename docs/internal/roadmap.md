@@ -16,7 +16,7 @@ decision.
 
 ## Phase 1 — Critical and high
 
-- [ ] NX-SEC-001 Python sandbox in a child process (`lib/untrusted-python.ts`)
+- [x] NX-SEC-001 Python sandbox in a child process (`lib/untrusted-python.ts`)
 - [ ] NX-SEC-002 Reset and verification tokens out of logs
 - [ ] NX-SEC-003 Safe SSO linking (`lib/sso-link.ts`), all three SSO paths
 - [ ] NX-SEC-004 GitHub identity from verified emails

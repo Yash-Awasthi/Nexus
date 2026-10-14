@@ -14,7 +14,7 @@ import { spawn } from "node:child_process";
 
 import { SANDBOX_PRELUDE } from "@nexus/agent-runtime";
 
-interface JsRunResult {
+export interface SandboxRunResult {
   stdout: string;
   stderr: string;
   exitCode: number;
@@ -25,7 +25,7 @@ interface JsRunResult {
 
 const MAX_OUTPUT = 200_000;
 /** Written by the child to stderr just before the code runs; the time limit starts there. */
-const STARTED = "\u0001nexus-run-start\u0001\n";
+export const STARTED = "\u0001nexus-run-start\u0001\n";
 /** How long the child Node may take to start, which a busy machine can stretch. */
 const BOOT_MS = 30_000;
 
@@ -47,18 +47,32 @@ process.stdin.on("end", () => {
 });
 `;
 
-export function runUntrustedJs(code: string, timeoutMs = 5_000): Promise<JsRunResult> {
+export function runUntrustedJs(code: string, timeoutMs = 5_000): Promise<SandboxRunResult> {
+  return runSandboxedNode(
+    ["--max-old-space-size=64", "--disallow-code-generation-from-strings"],
+    RUNNER,
+    code,
+    timeoutMs,
+  );
+}
+
+/**
+ * Run `runner` in a child Node under the permission model with no environment,
+ * feeding `code` on stdin. `nodeArgs` may widen what the child can read; the
+ * deadline starts when the runner writes {@link STARTED} to stderr.
+ */
+export function runSandboxedNode(
+  nodeArgs: string[],
+  runner: string,
+  code: string,
+  timeoutMs: number,
+  runnerArgs: string[] = [],
+): Promise<SandboxRunResult> {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(
       process.execPath,
-      [
-        "--permission",
-        "--max-old-space-size=64",
-        "--disallow-code-generation-from-strings",
-        "-e",
-        RUNNER,
-      ],
+      ["--permission", ...nodeArgs, "-e", runner, ...runnerArgs],
       // Inside the desktop app execPath is Electron, which runs as Node only when told to.
       {
         env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},

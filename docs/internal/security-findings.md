@@ -37,7 +37,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
-| Critical | 1    | 0     | 0        |
+| Critical | 0    | 1     | 0        |
 | High     | 5    | 0     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
@@ -46,7 +46,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-001 — Python sandbox runs inside the API process
 
-- **Severity:** critical · **Status:** open
+- **Severity:** critical · **Status:** fixed
 - **Evidence:** `apps/api/src/routes/sandbox.ts:131` `runViaPyodide` loads Pyodide with
   `loadPyodide()` in the API process and keeps one interpreter for every caller; used by
   `POST /api/sandbox/execute` (Python, the default when `PISTON_URL` is unset) and by the code
@@ -60,7 +60,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 - **Fix:** run each Python execution in a child Node under the permission model, reading only the
   Pyodide package directory, with an empty environment, the network prelude, a memory cap and a
   deadline — the model `lib/untrusted-js.ts` already uses. See [design.md](design.md#nx-sec-001).
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/lib/untrusted-python.test.ts`
 
 ### NX-SEC-002 — Reset and verification tokens are written to the log
 
