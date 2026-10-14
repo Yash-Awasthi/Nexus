@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
@@ -11,6 +11,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { refreshSession, useAuth, type HostSession } from "~/context/AuthContext";
 import { hostCan, hostInvoke } from "~/lib/host";
+import { passkeysSupported, signInWithPasskey } from "~/lib/passkeys";
 import { getSessionToken, setSessionToken } from "~/lib/session-token";
 
 export function meta(_: Route.MetaArgs) {
@@ -40,6 +41,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [passkeys, setPasskeys] = useState(false);
+  useEffect(() => setPasskeys(passkeysSupported()), []);
 
   const next = searchParams.get("next");
   const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
@@ -87,6 +90,23 @@ export default function LoginPage() {
     } catch (err) {
       if ((err as { code?: string }).code === "mfa_required") setMfaCode("");
       else setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const passkeySignIn = async () => {
+    setError("");
+    setIsLoading(true);
+    try {
+      const session = await signInWithPasskey<Parameters<typeof setUser>[0]>();
+      setSessionToken(session.accessToken);
+      setUser(session.user);
+      navigate(destination);
+    } catch (err) {
+      // Closing the browser's passkey prompt is a choice, not a failure.
+      if ((err as Error).name !== "NotAllowedError")
+        setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +206,17 @@ export default function LoginPage() {
             {mfaCode !== null ? "Verify" : "Sign in"}
           </Button>
         </form>
+        {passkeys && (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 w-full"
+            disabled={isLoading}
+            onClick={() => void passkeySignIn()}
+          >
+            <KeyRound /> Sign in with a passkey
+          </Button>
+        )}
         <OAuthButtons onPick={(p) => void oauthSignIn(p)} />
       </div>
     </AuthShell>

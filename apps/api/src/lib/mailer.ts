@@ -20,7 +20,7 @@ export function mailConfigured(env: Record<string, string | undefined> = process
 }
 
 // Links come from configuration only: a Host header would let a caller point a reset link at itself.
-function publicOrigin(env: Record<string, string | undefined>): string | null {
+export function publicOrigin(env: Record<string, string | undefined>): string | null {
   const raw = env.NEXUS_PUBLIC_URL ?? env.OAUTH_REDIRECT_BASE;
   if (!raw) return null;
   try {

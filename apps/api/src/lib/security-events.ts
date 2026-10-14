@@ -23,6 +23,8 @@ const EVENTS = {
   "sessions.revoked": "You were signed out everywhere",
   "signin.locked": "Sign-ins paused after repeated failed passwords",
   "role.changed": "Your account role was changed",
+  "passkey.added": "A passkey was added to your account",
+  "passkey.removed": "A passkey was removed from your account",
 } as const;
 
 export type SecurityEventKind = keyof typeof EVENTS;

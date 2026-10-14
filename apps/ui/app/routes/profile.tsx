@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/profile";
 
 import { MfaSection } from "~/components/mfa-section";
+import { PasskeysSection } from "~/components/passkeys-section";
 import { SessionsList } from "~/components/sessions-list";
 import { Page, PageHeader, Section, SettingRow } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
@@ -266,6 +267,8 @@ export default function ProfilePage() {
       </Section>
 
       <MfaSection />
+
+      <PasskeysSection />
 
       <SessionsList />
 

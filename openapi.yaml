@@ -3757,6 +3757,88 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/auth/passkeys:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/register/options:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/register:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - response
+              properties:
+                name:
+                  type: string
+                  maxLength: 64
+                response:
+                  type: object
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/login/options:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/login:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challengeId
+                - response
+              properties:
+                challengeId:
+                  type: string
+                  maxLength: 64
+                response:
+                  type: object
+                  required:
+                    - id
+                  properties:
+                    id:
+                      type: string
+      responses:
+        "200":
+          description: Default Response
   /api/v1/auth/register:
     post:
       tags:

@@ -32,6 +32,8 @@ export function createServerEnvironment(parent) {
     NEXUS_ORG_APPROVAL_STALE_HOURS: "0",
     NEXUS_EMBED_PROVIDER: "fixed",
     OLLAMA_BASE_URL: "http://127.0.0.1:9",
+    // Passkeys need a domain for their relying party; an IP address cannot be one.
+    NEXUS_PUBLIC_URL: "http://localhost:3999",
   };
 }
 

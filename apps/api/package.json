@@ -118,6 +118,7 @@
     "@nexus/workflow-chain": "workspace:*",
     "@node-saml/node-saml": "^5.1.0",
     "@opentelemetry/api": "catalog:",
+    "@simplewebauthn/server": "14.0.3",
     "bullmq": "catalog:",
     "cross-spawn": "7.0.6",
     "drizzle-orm": "catalog:",

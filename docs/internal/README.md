@@ -48,6 +48,6 @@ these describe the work.
   events, MFA recovery codes and the CI advisory gate shipped.
 - Phase 6 (account email, NX-FEAT-015) is done; mail goes out once the operator sets
   `RESEND_API_KEY` and `NEXUS_MAIL_FROM`.
-- P2 is done except the Python warm pool (NX-FEAT-014), deferred while the deployment is a 512 MB
-  free instance. Next: P3 in [enrichment.md](enrichment.md).
+- P2 and P3 are done except the Python warm pool (NX-FEAT-014), deferred while the deployment is
+  a 512 MB free instance.
 - Coverage of each audit pass is listed in [security-findings.md](security-findings.md).

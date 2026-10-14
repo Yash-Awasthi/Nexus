@@ -3,7 +3,7 @@
 // identity provider strips the account of every credential its registrant set.
 
 import { db } from "@nexus/db";
-import { users } from "@nexus/db/schema";
+import { passkeys, users } from "@nexus/db/schema";
 import { and, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
@@ -29,6 +29,7 @@ export async function claimForSso(
     .where(and(eq(users.id, user.id), eq(users.emailVerified, false)))
     .returning({ id: users.id });
   if (claimed.length === 0) return;
+  await db.delete(passkeys).where(eq(passkeys.userId, user.id));
   await endAllSessions(user.id);
   void emitAuditEvent(
     {

@@ -357,7 +357,8 @@ erased account is no longer revived by signing in.
 Run the security check after deploying: `nexus security check` (or Admin → System). It lists
 every setting below that still needs attention.
 
-- **Migrations 0019 and 0020** add `users.mfa_recovery_codes` and `api_keys.last_used_ip`. The
+- **Migrations 0019 to 0021** add `users.mfa_recovery_codes`, `api_keys.last_used_ip` and the
+  `passkeys` table. The
   single-origin image (`infra/web`) now
   applies migrations before the API starts; other deployments must run `node src/migrate.ts` (or
   `pnpm db:migrate`) before the new API serves sign-ins.
@@ -392,6 +393,9 @@ every setting below that still needs attention.
   ingest service refuses requests without its key outside `APP_ENV=development`.
 - **Brief share links** are signed with `BRIEF_SIGNING_KEY` or a key derived from `NEXUS_API_KEY`;
   links made with the old default no longer open.
+- **Passkeys** sign in without a password (Profile → Passkeys to add one). They need
+  `NEXUS_PUBLIC_URL` (the address users open Nexus at); without it they are not offered. Single
+  sign-on into an unverified account removes its passkeys along with its password.
 - **The audit log can leave the database.** Set `AUDIT_EXPORT_S3_*` (see `.env.example`) to copy
   new entries every 10 minutes to a bucket with object lock; with `NEXUS_AUDIT_KEY` set, a
   database edit then no longer goes unnoticed.
