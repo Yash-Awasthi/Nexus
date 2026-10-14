@@ -220,6 +220,22 @@ nexus audit verify
 
 ---
 
+## `nexus security check [--all]`
+
+Run the deployment's security check (admin account required). Lists every setting that leaves a
+gap, with what to change; `--all` also lists the checks that pass. Exits with code 1 when any
+check fails, so it can gate a deploy.
+
+```bash
+nexus security check
+# ✗ The audit chain has its own HMAC key
+#     Without NEXUS_AUDIT_KEY the chain is signed with a key published in the source, ...
+#     fix: Set NEXUS_AUDIT_KEY (openssl rand -hex 32) before the first audit entry; ...
+# 15 passed, 1 warnings, 1 failed
+```
+
+---
+
 ## `nexus org`
 
 Run a company of agents from the terminal. Commands that act on one company take

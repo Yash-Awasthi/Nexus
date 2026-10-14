@@ -30,6 +30,7 @@ import { api, fail } from "./lib/client.ts";
 import { runLocalAgent } from "./lib/local-agent.ts";
 import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.ts";
 import { registerOrgCommands } from "./lib/org.ts";
+import { registerSecurityCommands } from "./lib/security.ts";
 import { streamSse } from "./lib/sse-stream.ts";
 
 const program = new Command();
@@ -772,6 +773,7 @@ models
   });
 
 registerOrgCommands(program);
+registerSecurityCommands(program);
 
 // ── Run ───────────────────────────────────────────────────────────────────────
 
