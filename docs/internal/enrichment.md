@@ -45,7 +45,8 @@ P1 items is in [design.md](design.md).
   `AUDIT_EXPORT_S3_*` every 10 minutes as JSONL, with a per-object COMPLIANCE lock when
   `AUDIT_EXPORT_RETAIN_DAYS` is set. It runs in the API so it works without a worker or Redis.
 - **NX-FEAT-013.** Done as `POST /api/v1/csp-report` (`routes/csp-report.ts`): `report-uri` and
-  `report-to` in the policy, both report formats, 16 KB bodies, 60 a minute per address, one log
+  no `report-to`, because Chrome then ignores `report-uri` and its Reporting API uploads never arrived;
+  both report formats are still parsed, 16 KB bodies, 60 a minute per address, one log
   line per violation with query strings dropped.
 - **NX-FEAT-015.** Resend's HTTP API over `fetch`, so no new dependency; SMTP waits until an
   operator needs it. Mails reset links, verification links (sent after sign-up), workspace
