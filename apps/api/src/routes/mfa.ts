@@ -4,7 +4,6 @@
  *
  * POST /api/v1/mfa/setup    — generate TOTP secret + QR URL (not yet active)
  * POST /api/v1/mfa/verify   — verify first code to activate MFA
- * POST /api/v1/mfa/validate — validate a TOTP code (called on each login if mfaEnabled)
  * POST /api/v1/mfa/disable  — disable MFA (requires valid TOTP code)
  * GET  /api/v1/mfa/status   — return { mfaEnabled } for current user
  *
@@ -23,6 +22,7 @@ import type { FastifyInstance } from "fastify";
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
@@ -89,8 +89,8 @@ function hotp(secretBase32: string, counter: bigint): string {
   return String(code % 1_000_000).padStart(6, "0");
 }
 
-/** Verify a 6-digit TOTP code. Accepts a ±1 step window to handle clock drift. */
-function verifyTotp(secretBase32: string, code: string, windowSteps = 1): boolean {
+/** The time step a 6-digit TOTP code belongs to, within ±1 step of now for clock drift. */
+function matchTotpStep(secretBase32: string, code: string, windowSteps = 1): bigint | null {
   const step = 30n;
   const counter = BigInt(Math.floor(Date.now() / 1000)) / step;
   for (let i = -windowSteps; i <= windowSteps; i++) {
@@ -99,10 +99,14 @@ function verifyTotp(secretBase32: string, code: string, windowSteps = 1): boolea
       expected.length === code.length &&
       timingSafeEqual(Buffer.from(expected), Buffer.from(code))
     ) {
-      return true;
+      return counter + BigInt(i);
     }
   }
-  return false;
+  return null;
+}
+
+function verifyTotp(secretBase32: string, code: string): boolean {
+  return matchTotpStep(secretBase32, code) !== null;
 }
 
 /** Generate a random 20-byte TOTP secret encoded as base32 (160 bits — RFC 4226 §4). */
@@ -130,9 +134,17 @@ function decryptSecret(stored: string): string {
   }
 }
 
-/** Whether `code` is the current TOTP code for a user's stored (encrypted) secret. */
-export function totpMatches(storedSecret: string, code: string): boolean {
-  return /^[0-9]{6}$/.test(code) && verifyTotp(decryptSecret(storedSecret), code);
+/** Whether `code` signs `userId` in: a current TOTP code that has not signed anyone in before. */
+export async function acceptLoginCode(
+  userId: string,
+  storedSecret: string,
+  code: string,
+): Promise<boolean> {
+  if (!/^[0-9]{6}$/.test(code)) return false;
+  const step = matchTotpStep(decryptSecret(storedSecret), code);
+  if (step === null) return false;
+  // One sign-in per code: a code read over a shoulder or from a proxy log is already spent.
+  return (await getSharedKV().incr(`mfa:used:${userId}:${step}`, 120_000)) === 1;
 }
 
 function getEncKey(): Buffer | null {
@@ -152,7 +164,6 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
     app.get("/mfa/status", na);
     app.post("/mfa/setup", na);
     app.post("/mfa/verify", na);
-    app.post("/mfa/validate", na);
     app.post("/mfa/disable", na);
     return;
   }
@@ -268,57 +279,6 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
       );
 
       return reply.send({ mfaEnabled: true, message: "MFA activated successfully" });
-    },
-  );
-
-  /**
-   * POST /mfa/validate
-   *
-   * Validate a TOTP code during login (when mfaEnabled = true).
-   * Called after password auth passes — caller provides userId + code.
-   * Body: { userId: string, code: string }
-   */
-  app.post<{ Body: { userId: string; code: string } }>(
-    "/mfa/validate",
-    {
-      preHandler: mfaRateLimit,
-      schema: {
-        body: {
-          type: "object",
-          required: ["userId", "code"],
-          properties: {
-            userId: { type: "string" },
-            code: { type: "string", pattern: "^[0-9]{6}$" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const { userId, code } = request.body;
-
-      const [user] = await db
-        .select({ totpSecret: users.totpSecret, mfaEnabled: users.mfaEnabled })
-        .from(users)
-        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-        .limit(1);
-
-      if (!user) {
-        // Timing-safe: still do a dummy verify to prevent user enumeration
-        verifyTotp("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", code);
-        return reply.code(401).send({ error: "invalid" });
-      }
-
-      if (!user.mfaEnabled || !user.totpSecret) {
-        return reply.code(400).send({ error: "mfa_not_enabled" });
-      }
-
-      const secret = decryptSecret(user.totpSecret);
-      const valid = verifyTotp(secret, code);
-      if (!valid) {
-        return reply.code(401).send({ error: "invalid_code" });
-      }
-
-      return reply.send({ valid: true });
     },
   );
 

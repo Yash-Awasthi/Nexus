@@ -82,3 +82,40 @@ it("asks for the authenticator code at sign-in once MFA is on", async () => {
   expect(ok.statusCode, ok.body).toBe(200);
   expect(ok.json<{ accessToken: string }>().accessToken).toBeTruthy();
 });
+
+it("accepts a sign-in code once (NX-SEC-012)", async () => {
+  const creds = { email: "mfa-replay@example.com", password: "Mfa-replay-12!" };
+  const reg = await app.inject({ method: "POST", url: "/api/v1/auth/register", payload: creds });
+  const auth = { authorization: `Bearer ${reg.json<{ accessToken: string }>().accessToken}` };
+  const setup = await app.inject({ method: "POST", url: "/api/v1/mfa/setup", headers: auth });
+  const { secret } = setup.json<{ secret: string }>();
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/mfa/verify",
+    headers: auth,
+    payload: { code: totp(secret) },
+  });
+
+  const code = totp(secret);
+  const first = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/login",
+    payload: { ...creds, code },
+  });
+  expect(first.statusCode, first.body).toBe(200);
+  const replay = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/login",
+    payload: { ...creds, code },
+  });
+  expect(replay.statusCode).toBe(401);
+});
+
+it("has no unauthenticated code-check endpoint (NX-SEC-012)", async () => {
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/v1/mfa/validate",
+    payload: { userId: "00000000-0000-0000-0000-000000000000", code: "123456" },
+  });
+  expect(res.statusCode).toBe(404);
+});

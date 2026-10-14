@@ -48,7 +48,7 @@ import { getSharedKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
-import { totpMatches } from "./mfa.ts";
+import { acceptLoginCode } from "./mfa.ts";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,
@@ -394,7 +394,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
             .code(401)
             .send({ error: "mfa_required", message: "Enter the code from your authenticator app" });
         }
-        if (!totpMatches(user.totpSecret, code.trim())) {
+        if (!(await acceptLoginCode(user.id, user.totpSecret, code.trim()))) {
           recordLoginFailure(throttleKey);
           return reply
             .code(401)

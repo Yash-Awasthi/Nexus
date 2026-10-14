@@ -56,8 +56,6 @@ const PUBLIC_V1 = new Set<string>([
   // Signed links.
   "GET /api/v1/drive/file",
   "GET /api/v1/brief/:domain/share/:digest",
-  // Unauthenticated TOTP check, slated for removal (NX-SEC-012).
-  "POST /api/v1/mfa/validate",
   // Deliberately public, bounded by their own limits.
   "GET /api/v1/libertas",
   "POST /api/v1/libertas/complete",
