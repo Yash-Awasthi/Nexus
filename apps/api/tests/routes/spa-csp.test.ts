@@ -46,8 +46,8 @@ describe("SPA content security policy", () => {
     const res = await app.inject({ method: "GET", url: "/some/client/route" });
     const csp = String(res.headers["content-security-policy"]);
     expect(csp).toContain("report-uri /api/v1/csp-report");
-    expect(csp).toContain("report-to csp");
-    expect(res.headers["reporting-endpoints"]).toBe('csp="/api/v1/csp-report"');
+    // With report-to present Chrome ignores report-uri and queues reports it never delivered.
+    expect(csp).not.toContain("report-to");
   });
 
   it("serves client routes that merely start with /api, and 404s real API paths", async () => {
