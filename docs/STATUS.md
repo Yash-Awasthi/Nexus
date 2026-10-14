@@ -368,13 +368,17 @@ every setting below that still needs attention.
   `NEXUS_LIBERTAS_GLOBAL_PER_MIN` (default 30); prompts are capped at 4 000 characters.
 - **Single sign-on into an unverified account** removes that account's password, MFA and sessions
   before signing in, so whoever registered an address without proving it cannot keep a way in.
-  Production has no email delivery yet, so password accounts there are unverified: their owners'
-  first Google/GitHub/OIDC/SAML sign-in turns them into SSO accounts.
+  Until mail is configured, password accounts stay unverified: their owners' first
+  Google/GitHub/OIDC/SAML sign-in turns them into SSO accounts.
 - **Sign-out is real.** Password reset, admin suspend/delete/role change, SCIM deprovisioning,
   account erasure and `POST /api/v1/auth/sessions/revoke-all` end access tokens within seconds,
   not 15 minutes later. Revocations persist in Redis/Upstash, or Postgres when neither is set.
-- **Reset and verification tokens are no longer logged.** With no email delivery, production
-  password reset is unavailable until one is configured.
+- **Reset and verification tokens are no longer logged; they are emailed.** Set
+  `RESEND_API_KEY` and `NEXUS_MAIL_FROM` (and `NEXUS_PUBLIC_URL` when it differs from
+  `OAUTH_REDIRECT_BASE`). Without them production password reset is unavailable. The same mail
+  carries workspace invitations and security notices.
+- **Changing the sign-in email needs the current password** (`currentPassword` in
+  `PATCH /api/v1/auth/me`), and the old address is told.
 - **Sign-in codes are spent once**, ten recovery codes are issued when MFA is turned on, and
   `POST /api/v1/mfa/validate` is gone. Thirty failed passwords in five minutes pause an account's
   sign-ins until the window ends.

@@ -51,7 +51,7 @@ it("does not verify a changed email with the old address's token", async () => {
     method: "PATCH",
     url: "/api/v1/auth/me",
     headers: auth,
-    payload: { email: "new@example.com" },
+    payload: { email: "new@example.com", currentPassword: "Verify-pass-1!" },
   });
   expect(moved.statusCode, moved.body).toBe(200);
 

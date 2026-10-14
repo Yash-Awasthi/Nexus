@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-// A change to how someone gets into an account is told to its owner (bell + activity feed) and
-// written to the hash-chained audit log, so a change they did not make is noticed (NX-FEAT-003/005).
+// A change to how someone gets into an account is told to its owner (bell, activity feed and
+// email) and written to the hash-chained audit log, so a change they did not make is noticed.
 
+import { db } from "@nexus/db";
+import { users } from "@nexus/db/schema";
+import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
 import { emitAuditEvent } from "./audit-emitter.ts";
+import { appLink, mailConfigured, sendMail } from "./mailer.ts";
 import { createNotification } from "./notifications-store.ts";
 
 const EVENTS = {
@@ -23,11 +27,19 @@ const EVENTS = {
 
 export type SecurityEventKind = keyof typeof EVENTS;
 
-/** Tell `userId` about `kind` and record it; `actor` is who did it when that is someone else. */
+/**
+ * Tell `userId` about `kind` and record it; `actor` is who did it when that is someone else.
+ * `mailTo` overrides the address the email goes to (an email change tells the old address).
+ */
 export async function securityEvent(
   userId: string,
   kind: SecurityEventKind,
-  detail: { message?: string; actor?: string; payload?: Record<string, unknown> } = {},
+  detail: {
+    message?: string;
+    actor?: string;
+    payload?: Record<string, unknown>;
+    mailTo?: string;
+  } = {},
   logger?: FastifyBaseLogger,
 ): Promise<void> {
   void emitAuditEvent(
@@ -40,10 +52,32 @@ export async function securityEvent(
     },
     logger,
   );
+  const message = `${detail.message ? `${detail.message} ` : ""}If this was not you, change your password and sign out everywhere.`;
   await createNotification(userId, {
     type: "security",
     title: EVENTS[kind],
-    message: `${detail.message ? `${detail.message} ` : ""}If this was not you, change your password and sign out everywhere.`,
+    message,
     link: "/settings",
   });
+  if (mailConfigured()) void mailOwner(userId, EVENTS[kind], message, detail.mailTo, logger);
+}
+
+async function mailOwner(
+  userId: string,
+  subject: string,
+  message: string,
+  mailTo: string | undefined,
+  logger?: FastifyBaseLogger,
+): Promise<void> {
+  try {
+    const to =
+      mailTo ??
+      (await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1))[0]
+        ?.email;
+    // Accounts without a real inbox (Slack identities) are skipped.
+    if (!to || to.endsWith(".invalid")) return;
+    await sendMail({ to, subject, text: `${message}\n\n${appLink("/settings")}` }, logger);
+  } catch (err) {
+    logger?.warn({ err: (err as Error).message }, "security-mail-failed");
+  }
 }

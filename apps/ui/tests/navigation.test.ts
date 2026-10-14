@@ -90,7 +90,15 @@ const SUBROUTES = [
   "/profile",
   "/setup",
 ];
-const PUBLIC = ["/", "/login", "/register", "/status"];
+const PUBLIC = [
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/status",
+];
 
 /** Paths the sidebar links to, read out of the navGroups literal in root.tsx. */
 function sidebarPaths(): string[] {

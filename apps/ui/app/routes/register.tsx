@@ -44,6 +44,7 @@ export default function RegisterPage() {
         throw new Error(body.message ?? body.error ?? `Registration failed (${res.status})`);
       }
       await login(email, password);
+      void fetch("/api/v1/auth/send-verification", { method: "POST" }).catch(() => undefined);
       // A new account goes through the first-run wizard once.
       navigate(localStorage.getItem("nexus_setup_done") === "1" ? "/dashboard" : "/setup", {
         replace: true,

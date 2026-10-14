@@ -36,8 +36,8 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 14    | 0        |
-| Low      | 0    | 9     | 3        |
+| Medium   | 0    | 15    | 0        |
+| Low      | 0    | 10    | 2        |
 
 ## Findings
 
@@ -356,14 +356,18 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-031 — No email delivery in production
 
-- **Severity:** low · **Status:** accepted
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `/auth/forgot-password` and `/auth/send-verification` only return their tokens
   outside production; nothing sends them. Since NX-SEC-002 the tokens are not in the log either.
 - **Impact:** on a production server nobody can reset a password or verify an address; workspace
   invitations therefore cannot require a verified address, and the first single sign-on to a
   password account takes it over (NX-SEC-003) as designed.
-- **Reason:** delivering mail needs an outside account (SMTP or an email API) — an operator choice.
-  Tracked as NX-FEAT-015.
+- **Fix:** NX-FEAT-015. `lib/mailer.ts` sends through Resend's HTTP API when `RESEND_API_KEY`,
+  `NEXUS_MAIL_FROM` and a public origin (`NEXUS_PUBLIC_URL`, else `OAUTH_REDIRECT_BASE`) are set;
+  links are built from that origin only, never the request's Host. Reset mail is not awaited so the
+  answer time does not reveal which addresses exist. The security check warns (`email-delivery`)
+  in production without it. The operator still has to create the Resend account.
+- **Test:** `apps/api/tests/lib/mailer.test.ts`, `apps/api/tests/routes/account-email.test.ts`
 
 ### NX-SEC-032 — Unauthenticated Redis lets anyone act as any account
 
@@ -373,6 +377,17 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Fix:** the trust boundary is Redis itself: the dev compose binds it to loopback (NX-SEC-014) and
   the security check fails a remote `REDIS_URL` without a password (`redis-auth`).
 - **Test:** `apps/api/tests/lib/security-posture.test.ts`
+
+### NX-SEC-033 — The sign-in email changes without the current password
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `PATCH /api/v1/auth/me` accepted `{ email }` with only an access token.
+- **Impact:** once reset links are mailed, anyone holding a session for 15 minutes can move the
+  address to their own inbox and reset the password, keeping the account after the owner signs out
+  everywhere. The old address was never told.
+- **Fix:** an email change needs `currentPassword` (wrong ones count toward the account lockout);
+  accounts without a password cannot change it; the security notice goes to the old address.
+- **Test:** `apps/api/tests/routes/account-email.test.ts`
 
 ## Audit pass 2 (2026-10-14)
 

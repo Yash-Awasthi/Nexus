@@ -63,6 +63,7 @@ running the desktop app (the owner is the operator there).
 | Account takeover through SSO      | Verified email (Google, OIDC, SAML) or immutable id (GitHub, Slack team+user); first SSO sign-in strips an unverified account's other credentials; state bound to the browser by cookie |
 | Spend abuse on public completions | Per-client (IPv6 /64) and global ceilings keyed on `request.ip`                                                                                                                         |
 | Forged webhooks                   | Slack HMAC over raw bytes, Bot Framework JWT for Teams, secret token for Telegram; each refuses when unconfigured; replies only to the verified service URL                             |
+| Session thief moving the account  | Changing the sign-in email needs the current password; security notices are emailed, an email change to the old address                                                                 |
 | Forged signed links               | Drive and brief links HMAC-signed with server-derived keys, never a constant                                                                                                            |
 
 ### 4.2 User or model input → execution
@@ -114,10 +115,10 @@ the failing ones.
 
 ## 6. Residual risks
 
-| Risk                                               | Why accepted                                                                                |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| No email delivery in production                    | Needs an outside account; reset and verification unavailable until configured (NX-FEAT-015) |
-| Prompt injection steering an agent                 | Inherent to LLMs; execution and spend are bounded by §4.2 and budgets                       |
-| Per-process rate limits without Redis/Upstash      | Security state still persists in Postgres; the security check warns                         |
-| `katex` (low) and `sprintf-js` (no fix) advisories | UI-only / unpatched upstream                                                                |
-| Registration reveals existing addresses            | Rate-limited; usual sign-up trade-off                                                       |
+| Risk                                               | Why accepted                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| Mail depends on the operator's Resend account      | Without it reset and verification are unavailable; the security check warns |
+| Prompt injection steering an agent                 | Inherent to LLMs; execution and spend are bounded by §4.2 and budgets       |
+| Per-process rate limits without Redis/Upstash      | Security state still persists in Postgres; the security check warns         |
+| `katex` (low) and `sprintf-js` (no fix) advisories | UI-only / unpatched upstream                                                |
+| Registration reveals existing addresses            | Rate-limited; usual sign-up trade-off                                       |

@@ -71,7 +71,7 @@ it("tells the owner when the password, email or sessions change", async () => {
     method: "PATCH",
     url: "/api/v1/auth/me",
     headers: auth,
-    payload: { email: "changed@example.com" },
+    payload: { email: "changed@example.com", currentPassword: creds.password },
   });
   await app.inject({ method: "POST", url: "/api/v1/auth/sessions/revoke-all", headers: auth });
   const forgot = await app.inject({

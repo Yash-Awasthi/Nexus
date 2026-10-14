@@ -44,6 +44,7 @@ import {
 } from "../lib/auth-hardening.ts";
 import { sha256hex } from "../lib/crypto-utils.ts";
 import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.ts";
+import { appLink, sendMail } from "../lib/mailer.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
 import { securityEvent } from "../lib/security-events.ts";
@@ -642,10 +643,10 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * PATCH /auth/me
    *
    * Update own profile (name, email).
-   * Email change marks emailVerified = false (re-verification needed).
+   * Email change needs the current password and marks emailVerified = false.
    */
   app.patch<{
-    Body: { name?: string; email?: string };
+    Body: { name?: string; email?: string; currentPassword?: string };
   }>(
     "/auth/me",
     {
@@ -656,6 +657,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             name: { type: "string", maxLength: 100 },
             email: { type: "string", format: "email", maxLength: 320 },
+            currentPassword: { type: "string", maxLength: 128 },
           },
         },
       },
@@ -669,8 +671,31 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       if (request.body.name !== undefined) {
         updates.name = request.body.name.trim();
       }
+      let previousEmail: string | undefined;
       if (request.body.email !== undefined) {
         const normalEmail = request.body.email.trim().toLowerCase();
+        // The email receives reset links, so a stolen session alone must not be able to move it.
+        const [me] = await db
+          .select({ email: users.email, passwordHash: users.passwordHash })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+        if (!me) return reply.code(404).send({ error: "user_not_found" });
+        const currentPassword = request.body.currentPassword;
+        if (!me.passwordHash || !currentPassword) {
+          return reply.code(400).send({
+            error: "current_password_required",
+            message: "Changing the sign-in email needs the current password",
+          });
+        }
+        if (
+          (await accountLocked(me.email)) ||
+          !(await verifyPassword(currentPassword, me.passwordHash))
+        ) {
+          await recordAccountFailure(me.email);
+          return reply.code(401).send({ error: "invalid_credentials" });
+        }
+        previousEmail = me.email;
         // Check not already taken by another user
         const [conflict] = await db
           .select({ id: users.id })
@@ -692,7 +717,10 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
       if (updates.email) {
-        await securityEvent(userId, "email.changed", { message: `It is now ${updates.email}.` });
+        await securityEvent(userId, "email.changed", {
+          message: `It is now ${updates.email}.`,
+          ...(previousEmail ? { mailTo: previousEmail } : {}),
+        });
       }
       return reply.send(safeUser(updated));
     },
@@ -708,9 +736,8 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * Request a password reset link. Always returns 204 regardless of whether
    * the email exists — prevents user-enumeration.
    *
-   * In production a transactional email service should deliver the token;
-   * here the token is emitted to the server log (dev mode) and the response
-   * includes it only when NODE_ENV !== "production" for test convenience.
+   * The link goes out by email (lib/mailer.ts) when mail is configured; outside
+   * production the response also carries the token so tests need no inbox.
    */
   app.post<{
     Body: { email: string };
@@ -761,6 +788,20 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         });
 
         app.log.info({ userId: user.id }, "password-reset-token-issued");
+        const link = appLink(`/reset-password?token=${rawToken}`);
+        // Not awaited: a slower answer for real addresses would reveal which ones exist.
+        if (link)
+          void sendMail(
+            {
+              to: user.email,
+              subject: "Reset your Nexus password",
+              text:
+                `Someone asked to reset the password for this Nexus account.\n\n` +
+                `Choose a new password within an hour: ${link}\n\n` +
+                `If it wasn't you, ignore this message; your password stays the same.`,
+            },
+            app.log,
+          );
 
         if (process.env.NODE_ENV !== "production") {
           // Non-production: return token directly so integration tests don't need SMTP
@@ -975,8 +1016,8 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * POST /auth/send-verification
    *
    * Issue (or re-issue) an email verification token for the authenticated user.
-   * In production: send token via transactional email service.
-   * In dev/test: return token in response body (no SMTP needed).
+   * The link goes out by email when mail is configured; outside production the
+   * response also carries the token.
    */
   app.post(
     "/auth/send-verification",
@@ -1025,6 +1066,16 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       });
 
       app.log.info({ userId }, "email-verification-token-issued");
+      const link = appLink(`/verify-email?token=${rawToken}`);
+      if (link)
+        await sendMail(
+          {
+            to: user.email,
+            subject: "Confirm your email for Nexus",
+            text: `Confirm this address for your Nexus account within a day: ${link}`,
+          },
+          app.log,
+        );
 
       if (process.env.NODE_ENV !== "production") {
         return reply.code(200).send({

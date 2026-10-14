@@ -22,7 +22,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI  | P2       | open   | —      |
 | NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                   | P3       | open   | —      |
 | NX-FEAT-014 | Warm pool for the Python sandbox (removes the ~2 s cold boot)          | P2       | open   | —      |
-| NX-FEAT-015 | Transactional email (SMTP or API) for reset, verification, invitations | P1       | open   | —      |
+| NX-FEAT-015 | Transactional email (SMTP or API) for reset, verification, invitations | P1       | done   | FR-3   |
 
 ## Notes per item
 
@@ -37,3 +37,7 @@ P1 items is in [design.md](design.md).
 - **NX-FEAT-010.** `api_keys` already has the row; add `last_used_at`, `last_used_ip`, update at
   most once a minute per key.
 - **NX-FEAT-014.** Only after measuring that users notice the boot.
+- **NX-FEAT-015.** Resend's HTTP API over `fetch`, so no new dependency; SMTP waits until an
+  operator needs it. Mails reset links, verification links (sent after sign-up), workspace
+  invitations and every security notice (an email change tells the old address). UI pages:
+  `/forgot-password`, `/reset-password`, `/verify-email`.

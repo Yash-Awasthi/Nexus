@@ -2,6 +2,8 @@
 // The security check (NX-FEAT-001): what this deployment's settings leave open, and the setting
 // that closes each gap. Pure over env and a few runtime facts so every rule is tested directly.
 
+import { mailConfigured } from "./mailer.ts";
+
 export type PostureStatus = "pass" | "warn" | "fail";
 
 export interface PostureCheck {
@@ -170,6 +172,16 @@ export function checkPosture(env: Env, facts: PostureFacts): PostureCheck[] {
     "warn",
     "Auto-provisioning is on but no domain is allowed, so it creates no accounts.",
     "Set NEXUS_SSO_ALLOWED_DOMAINS, or turn NEXUS_SSO_AUTO_PROVISION off.",
+  );
+
+  add(
+    "email-delivery",
+    "Account email can be delivered",
+    !prod || desktop || mailConfigured(env),
+    "warn",
+    "Without mail, password reset and email verification cannot reach users, and security " +
+      "notices stay in the app where someone who took over the account can dismiss them.",
+    "Set RESEND_API_KEY, NEXUS_MAIL_FROM and NEXUS_PUBLIC_URL (the address users open Nexus at).",
   );
 
   const unverifiedBots = [

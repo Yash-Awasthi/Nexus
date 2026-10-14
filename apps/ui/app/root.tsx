@@ -98,7 +98,15 @@ import "./app.css";
 installAuthFetch();
 bootstrapSession();
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/status"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/status",
+]);
 
 function isPublicPath(pathname: string) {
   // A watch link carries its own key, so a viewer needs no account.

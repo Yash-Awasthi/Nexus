@@ -46,3 +46,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # Account email through Resend; links use OAUTH_REDIRECT_BASE.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NEXUS_MAIL_FROM
+        sync: false

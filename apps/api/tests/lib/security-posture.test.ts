@@ -16,6 +16,9 @@ const HARDENED = {
   RENDER: "true",
   NEXUS_TRUST_PROXY: "uniquelocal",
   DATABASE_URL: "postgresql://u:p@ep-x.neon.tech/db?sslmode=require",
+  RESEND_API_KEY: "re_x",
+  NEXUS_MAIL_FROM: "Nexus <no-reply@nexus.example>",
+  NEXUS_PUBLIC_URL: "https://nexus.example",
 };
 
 const status = (env: Record<string, string>, id: string, sharedKv = "redis" as const) =>
@@ -45,6 +48,7 @@ describe("checkPosture", () => {
     ["cors-origins", { ALLOWED_ORIGINS: "" }],
     ["secrets-key", { NEXUS_SECRETS_KEY: "" }],
     ["exec-mode", { NEXUS_EXEC_MODE: "trusted" }],
+    ["email-delivery", { RESEND_API_KEY: "" }],
     ["database-tls", { DATABASE_URL: "postgresql://u:p@db.example.com/db" }],
     ["bot-webhooks", { SLACK_BOT_TOKEN: "xoxb-1" }],
     ["sso-provisioning", { NEXUS_SSO_AUTO_PROVISION: "1" }],

@@ -72,7 +72,14 @@ decision.
 - [x] NX-SEC-027 Rewrite `docs/security/threat-model.md`
 - [x] `docs/STATUS.md` behaviour-change notes for operators (webhook secrets now required, Libertas
       ceilings, SSO claim of unverified accounts)
-- [ ] Push
+- [x] Push
+
+## Phase 6 — Account email
+
+- [x] NX-FEAT-015 `lib/mailer.ts`, reset/verification/invitation/security mail, UI pages
+- [x] NX-SEC-033 Email change needs the current password; old address told
+- [x] `email-delivery` security check; Render and `.env.example` settings
+- [x] Push
 
 ## Later (P2/P3 enrichment)
 

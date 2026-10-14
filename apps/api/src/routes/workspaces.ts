@@ -31,6 +31,7 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { sha256hex } from "../lib/crypto-utils.ts";
+import { appLink, sendMail } from "../lib/mailer.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -358,13 +359,23 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         })
         .returning();
 
-      // In production: send email with invitation link containing rawToken
-      // For now: return the token directly (caller sends it via their email provider)
+      const acceptUrl = appLink(`/invitations/${rawToken}`) ?? `/invitations/${rawToken}`;
+      const emailed = await sendMail(
+        {
+          to: email,
+          subject: "You're invited to a Nexus workspace",
+          text: `You've been invited to join a Nexus workspace as ${role}.\n\nAccept within 72 hours: ${acceptUrl}`,
+        },
+        app.log,
+      );
       return reply.code(201).send({
         invitation: { ...invitation, tokenHash: undefined },
         invitationToken: rawToken,
-        acceptUrl: `${process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:3001"}/invitations/${rawToken}`,
-        message: "Invitation created. Send acceptUrl to the invitee.",
+        acceptUrl,
+        emailed,
+        message: emailed
+          ? "Invitation created and emailed."
+          : "Invitation created. Send acceptUrl to the invitee.",
       });
     },
   );
