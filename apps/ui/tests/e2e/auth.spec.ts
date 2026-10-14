@@ -51,3 +51,27 @@ test("a refused provider sign-in comes back to the sign-in page with the reason"
   await page.goto("/login?error=access_denied");
   await expect(page.getByText("Sign-in was cancelled.")).toBeVisible();
 });
+
+test("signing out from the account menu lands on the sign-in page and stays signed out", async ({
+  page,
+  request,
+}) => {
+  const email = "e2e-menu-signout@example.com";
+  await signIn(request, email);
+  await page.addInitScript(() => localStorage.setItem("nexus_setup_done", "1"));
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("E2e-test-pass!1");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await page.waitForURL((url) => url.pathname.startsWith("/login"));
+
+  await page.reload();
+  await page.getByLabel("Email").waitFor();
+  expect(new URL(page.url()).pathname).toBe("/login");
+});

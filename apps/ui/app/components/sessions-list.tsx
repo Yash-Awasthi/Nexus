@@ -8,7 +8,6 @@
  */
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 
 import { Section } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
@@ -26,11 +25,6 @@ interface Session {
 
 export function SessionsList({ userId }: { userId?: string }) {
   const { logout } = useAuth();
-  const navigate = useNavigate();
-  const signOut = () => {
-    logout();
-    void navigate("/login", { replace: true });
-  };
   const base = userId
     ? `/api/v1/admin/users/${encodeURIComponent(userId)}/sessions`
     : "/api/v1/auth/sessions";
@@ -63,7 +57,7 @@ export function SessionsList({ userId }: { userId?: string }) {
   const end = (s: Session) =>
     run(async () => {
       await apiFetch(`${base}/${s.id}`, { method: "DELETE" });
-      if (s.current) signOut();
+      if (s.current) logout();
       else await load();
     });
 
@@ -74,7 +68,7 @@ export function SessionsList({ userId }: { userId?: string }) {
         await load();
       } else {
         await apiFetch(`${base}/revoke-all`, { method: "POST" });
-        signOut();
+        logout();
       }
     });
 

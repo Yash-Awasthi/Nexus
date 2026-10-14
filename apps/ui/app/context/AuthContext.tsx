@@ -265,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
     setUser(null);
+    navigate("/login", { replace: true });
   };
 
   const login = async (email: string, password: string, code?: string) => {
