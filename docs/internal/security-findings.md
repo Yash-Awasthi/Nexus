@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 2    | 11    | 0        |
+| Medium   | 1    | 12    | 0        |
 | Low      | 3    | 5     | 2        |
 
 ## Findings
@@ -225,13 +225,14 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-016 — Production dependencies with high advisories
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `pnpm audit --prod` at baseline: `fast-uri` (SSRF / host confusion, used by
   Fastify's schema formats), `sharp` (libvips/libheif/librsvg), `adm-zip`, `brace-expansion`,
   `js-yaml`, `dompurify`, `protobufjs`, `katex`, `colord`.
-- **Fix:** bump direct dependencies where they pin the old version; otherwise `pnpm.overrides` to
-  the first patched release in the same major. Re-run the audit.
-- **Test:** `pnpm audit --prod --audit-level high` exits 0.
+- **Fix:** scoped `overrides` in `pnpm-workspace.yaml` lift each package to its first patched release
+  in the same major (done; 51 advisories down to 2). Left: `katex` (low, UI-only, fix needs a minor
+  jump in a 0.x package) and `sprintf-js` (no patched release).
+- **Test:** `pnpm audit --prod (2 left: katex low, sprintf-js unpatched)`
 
 ### NX-SEC-017 — One-time token races and no refresh-token reuse detection
 
