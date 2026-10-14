@@ -83,5 +83,5 @@ decision.
 
 ## Later (P2/P3 enrichment)
 
-NX-FEAT-006, 010 and 012 are done (006 found NX-SEC-034 to NX-SEC-036); 014 is measured and deferred.
+NX-FEAT-006, 010 and 012 are done (006 found NX-SEC-034 to NX-SEC-037); 014 is measured and deferred.
 P3: 009, 011, 013. See [enrichment.md](enrichment.md).

@@ -28,7 +28,7 @@ P1 items is in [design.md](design.md).
 
 - **NX-FEAT-006.** Done as `apps/api/tests/security/cross-account.test.ts`: every collection with a
   create route and item routes gets a fixture or a written reason to skip, and a new one fails the
-  test until it does. Found NX-SEC-034 to NX-SEC-036.
+  test until it does. Found NX-SEC-034 to NX-SEC-037.
 - **NX-FEAT-007.** Done as `apps/api/tests/security/public-routes.test.ts`: a test rather than a
   script, so CI runs it with the API suite and no new pipeline step is needed.
 - **NX-FEAT-009.** Worth it once recovery codes exist; needs a WebAuthn verifier, which means a

@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 17    | 0        |
+| Medium   | 0    | 18    | 0        |
 | Low      | 0    | 11    | 2        |
 
 ## Findings
@@ -422,6 +422,19 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Fix:** `requireAdminRole`.
 - **Test:** `apps/api/tests/security/cross-account.test.ts`
 
+### NX-SEC-037 — Any account rewrote or deleted the shared wiki
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `apps/api/src/routes/wiki.ts`: `POST /wiki/update`, `DELETE /wiki/articles/:id` and
+  `POST /wiki/reindex` needed only a session; comment edit, resolve and delete matched on the
+  comment id alone (ids are a timestamp and a counter); the first access grant on any page id made
+  its granter the owner, though nothing enforces the access list.
+- **Impact:** any account could replace or erase every article and every comment.
+- **Fix:** article writes and access grants are admin only; reads stay open to every account. A
+  comment answers only its author.
+- **Test:** `apps/api/tests/security/cross-account.test.ts`,
+  `apps/api/tests/routes/wiki-identity.test.ts`
+
 ## Audit pass 2 (2026-10-14)
 
 Org layer (share guard, CLI runtimes with an allow-listed environment, HTTP runtime through the
@@ -433,7 +446,7 @@ skills still go through the exec gate), session sync (owner-scoped) and workspac
 ## Cross-account test (2026-10-14)
 
 NX-FEAT-006 runs every collection with a create route and item routes as two accounts. It found
-NX-SEC-034 to NX-SEC-036; a build-task delete that answered `ok` for another account's id (it
+NX-SEC-034 to NX-SEC-037; a build-task delete that answered `ok` for another account's id (it
 deleted nothing) now answers 404.
 
 ## Strengths worth keeping

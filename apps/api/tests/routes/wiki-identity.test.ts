@@ -8,6 +8,15 @@ vi.mock("../../src/middleware/auth.ts", () => ({
     req.nexusUserId = req.headers["x-user"];
   },
 }));
+vi.mock("../../src/routes/admin-users.ts", () => ({
+  requireAdminRole: async (
+    req: { headers: Record<string, string>; nexusUserId?: string },
+    reply: { sent: boolean; code: (n: number) => { send: (b: object) => Promise<void> } },
+  ) => {
+    req.nexusUserId = req.headers["x-user"];
+    if (req.nexusUserId !== "admin") await reply.code(403).send({ error: "admin_required" });
+  },
+}));
 delete process.env.DATABASE_URL;
 
 const { wikiRoutes } = await import("../../src/routes/wiki.ts");
@@ -37,18 +46,18 @@ it("ties drafts, comments and grants to the caller", async () => {
   });
   expect(comment.json<{ authorId: string }>().authorId).toBe("alice");
 
-  // The first grant on a page makes its granter the owner; after that only owners grant.
-  const first = await as("alice", "POST", "/wiki/articles/p1/acl", {
+  // Pages are shared by the whole server, so only an admin grants, and always as themself.
+  const first = await as("admin", "POST", "/wiki/articles/p1/acl", {
     userId: "carol",
     role: "viewer",
     grantedBy: "bob",
   });
-  expect(first.json<{ grantedBy: string }>().grantedBy).toBe("alice");
+  expect(first.json<{ grantedBy: string }>().grantedBy).toBe("admin");
   const stolen = await as("mallory", "POST", "/wiki/articles/p1/acl", {
     userId: "mallory",
     role: "owner",
     grantedBy: "alice",
   });
   expect(stolen.statusCode).toBe(403);
-  expect((await as("mallory", "DELETE", "/wiki/articles/p1/acl/alice")).statusCode).toBe(403);
+  expect((await as("mallory", "DELETE", "/wiki/articles/p1/acl/carol")).statusCode).toBe(403);
 });
