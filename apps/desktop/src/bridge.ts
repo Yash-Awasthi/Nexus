@@ -144,3 +144,12 @@ export function createHostApi(
     invoke: (method, ...args) => transport.invoke(method, args),
   };
 }
+
+/** Schemes the renderer may hand to the operating system; file:, smb: and custom handlers are not. */
+export function isOpenableExternally(url: string): boolean {
+  try {
+    return ["http:", "https:", "mailto:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}

@@ -22,7 +22,7 @@ import { OsKeychainVault } from "./auth/keychain";
 import { createSessionFile, fetchJsonHttp } from "./auth/ports";
 import { createDesktopAuth, type DesktopAuth } from "./auth/session";
 import { clearSignInSession, openSignInWindow } from "./auth/sign-in-window";
-import { createInvokeHandler, INVOKE_CHANNEL, type RunMode } from "./bridge";
+import { createInvokeHandler, INVOKE_CHANNEL, isOpenableExternally, type RunMode } from "./bridge";
 import { startLocalApi, type LocalApi } from "./local-api";
 import { freePort, nodeLocalApiPorts } from "./local-api-node";
 import { syncOnce } from "./sync";
@@ -101,7 +101,7 @@ function createWindow(rendererUrl: string): BrowserWindow {
 
   // The renderer may open links, but never a second Nexus window it controls.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (isOpenableExternally(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
 
@@ -120,7 +120,7 @@ function createWindow(rendererUrl: string): BrowserWindow {
     }
     if (origin !== rendererOrigin) {
       event.preventDefault();
-      void shell.openExternal(url);
+      if (isOpenableExternally(url)) void shell.openExternal(url);
     }
   });
 

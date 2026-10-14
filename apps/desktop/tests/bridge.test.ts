@@ -15,8 +15,23 @@ import {
   UnsupportedMethodError,
   createHostApi,
   createInvokeHandler,
+  isOpenableExternally,
   type HostImplementation,
 } from "../src/bridge";
+
+describe("isOpenableExternally (NX-SEC-013)", () => {
+  it.each(["https://example.com/a", "http://example.com", "mailto:a@example.com"])(
+    "opens %s",
+    (url) => expect(isOpenableExternally(url)).toBe(true),
+  );
+  it.each([
+    "file:///C:/Windows/System32/calc.exe",
+    "smb://attacker/share",
+    "ms-msdt:/id PCWDiagnostic",
+    "javascript:alert(1)",
+    "not a url",
+  ])("refuses %s", (url) => expect(isOpenableExternally(url)).toBe(false));
+});
 
 const SESSION = { user: { id: "u1" }, accessToken: "jwt" };
 

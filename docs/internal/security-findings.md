@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 4    | 9     | 0        |
+| Medium   | 3    | 10    | 0        |
 | Low      | 4    | 4     | 2        |
 
 ## Findings
@@ -192,13 +192,13 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-013 — Desktop shell opens any URL scheme from the renderer
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `apps/desktop/src/main.ts:103-124` passes every `window.open` target and foreign
   navigation to `shell.openExternal`.
 - **Impact:** content that reaches the renderer (model output, a malicious page) can hand
   `file:`, `smb:` or OS protocol-handler URLs to the operating system.
 - **Fix:** allow only `http:`, `https:` and `mailto:`.
-- **Test:** _to be named_
+- **Test:** `apps/desktop/tests/bridge.test.ts`
 
 ### NX-SEC-014 — Development stack exposes data stores and disables ingest auth
 
