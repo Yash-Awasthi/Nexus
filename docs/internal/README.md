@@ -40,8 +40,12 @@ these describe the work.
 
 ## Current state
 
-- Baseline audit: 2026-10-14, against `main` at `c9d4a19`.
-- Working branch: `security/hardening`.
-- Coverage of the audit so far, and what still needs a pass, is listed at the top of
-  [security-findings.md](security-findings.md).
-- The next item to work on is the first unchecked line in [roadmap.md](roadmap.md).
+- Baseline audit: 2026-10-14, against `main` at `c9d4a19`; second pass the same day.
+- Working branch: `security/hardening`, pushed. Not merged: merging to `main` deploys to Render,
+  and the operator notes in `docs/STATUS.md` say what to set first.
+- Phases 0–5 of [roadmap.md](roadmap.md) are done: every critical, high and medium finding is
+  fixed with a test; the security check, sign-out everywhere, security notifications, audit
+  events, MFA recovery codes and the CI advisory gate shipped.
+- Next: NX-FEAT-015 (transactional email), then the P2 items in [enrichment.md](enrichment.md)
+  (cross-account isolation test, PAT last-used, admin session viewer, Python warm pool).
+- Coverage of each audit pass is listed in [security-findings.md](security-findings.md).
