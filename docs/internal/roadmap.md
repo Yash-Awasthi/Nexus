@@ -19,7 +19,7 @@ decision.
 - [x] NX-SEC-001 Python sandbox in a child process (`lib/untrusted-python.ts`)
 - [x] NX-SEC-002 Reset and verification tokens out of logs
 - [x] NX-SEC-003 Safe SSO linking (`lib/sso-link.ts`), all three SSO paths
-- [ ] NX-SEC-004 GitHub identity from verified emails
+- [x] NX-SEC-004 GitHub identity from verified emails
 - [ ] NX-SEC-005 Teams webhook verifies the Bot Framework JWT; replies only to verified service URL
 - [ ] NX-SEC-007 Libertas ceilings
 - [ ] NX-FEAT-007 Route census script and allowlist

@@ -38,7 +38,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
-| High     | 3    | 2     | 0        |
+| High     | 2    | 3     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
 
@@ -89,7 +89,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-004 — GitHub sign-in keyed on a renamable login
 
-- **Severity:** high · **Status:** open
+- **Severity:** high · **Status:** fixed
 - **Evidence:** `routes/oauth.ts:327` uses the public profile email, else
   `${login}@users.noreply.github.com`.
 - **Impact:** a user without a public email is identified by login. GitHub logins can be released
@@ -97,7 +97,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 - **Fix:** read `GET /user/emails` (the `user:email` scope is already requested) and use the
   primary verified address; fall back to GitHub's id-bearing noreply form
   `${id}+${login}@users.noreply.github.com`, which never transfers between people.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/oauth-github-identity.test.ts`
 
 ### NX-SEC-005 — Teams bot webhook is unauthenticated and sends the bot token to a caller-chosen URL
 

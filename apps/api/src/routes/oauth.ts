@@ -58,6 +58,7 @@ const GOOGLE_SCOPE = "openid email profile";
 const GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const GITHUB_USERINFO = "https://api.github.com/user";
+const GITHUB_EMAILS = "https://api.github.com/user/emails";
 
 const _redirectBase = (): string => process.env.OAUTH_REDIRECT_BASE ?? "http://localhost:3000";
 
@@ -323,10 +324,26 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         const user = (await userRes.json()) as {
           id?: number;
           login?: string;
-          email?: string;
           name?: string;
         };
-        const email = user.email ?? `${user.login ?? "unknown"}@users.noreply.github.com`;
+        if (typeof user.id !== "number" || !user.login) {
+          return failSignIn(request, reply, 502, { error: "github_profile_invalid" });
+        }
+        const emailsRes = await fetch(GITHUB_EMAILS, {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+            "User-Agent": "nexus-api/1.0",
+          },
+        });
+        const emails: unknown = emailsRes.ok ? await emailsRes.json() : [];
+        // GitHub logins can be released and re-registered; the numeric id never moves.
+        const verified = (Array.isArray(emails) ? emails : []).filter(
+          (e): e is { email: string; primary: boolean } =>
+            e?.verified === true && typeof e.email === "string",
+        );
+        const email =
+          (verified.find((e) => e.primary) ?? verified[0])?.email ??
+          `${user.id}+${user.login}@users.noreply.github.com`;
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
           email,
           user.name ?? user.login,

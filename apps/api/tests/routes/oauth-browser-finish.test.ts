@@ -48,7 +48,9 @@ function stubGitHub(login: string) {
     vi.fn(async (url: string) =>
       String(url).includes("access_token")
         ? Response.json({ access_token: "gh-token" })
-        : Response.json({ id: 1, login, email: `${login}@example.com`, name: login }),
+        : String(url).endsWith("/user/emails")
+          ? Response.json([{ email: `${login}@example.com`, primary: true, verified: true }])
+          : Response.json({ id: 1, login, name: login }),
     ),
   );
 }
