@@ -60,8 +60,8 @@ decision.
 - [x] NX-FEAT-005 Audit events for security changes
 - [x] NX-FEAT-003 Account security notifications
 - [x] NX-FEAT-004 MFA recovery codes (migration, routes, login, UI)
-- [ ] NX-FEAT-008 CI advisory gate
-- [ ] Push
+- [x] NX-FEAT-008 CI advisory gate
+- [x] Push
 
 ## Phase 5 — Second audit pass and documents
 
