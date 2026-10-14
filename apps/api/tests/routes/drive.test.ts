@@ -55,6 +55,30 @@ describe("Nexus Drive — safeResolve path guard", () => {
     }
     await expect(safeResolve(root, "evil-link")).rejects.toThrow(/escapes drive/);
   });
+
+  it("rejects a new file under a linked folder that points outside the drive", async (ctx) => {
+    const outside = await mkdtemp(path.join(tmpdir(), "drive-outside-"));
+    try {
+      await symlink(outside, path.join(root, "dir-link"), "junction");
+    } catch {
+      return ctx.skip();
+    }
+    await expect(safeResolve(root, "dir-link/new.txt")).rejects.toThrow(/escapes drive/);
+    await rm(outside, { recursive: true, force: true });
+  });
+
+  it("rejects a dangling link, whose target a write would create", async (ctx) => {
+    try {
+      await symlink(path.join(tmpdir(), "drive-missing-target"), path.join(root, "dangling"));
+    } catch {
+      return ctx.skip();
+    }
+    await expect(safeResolve(root, "dangling")).rejects.toThrow(/escapes drive/);
+  });
+
+  it("still resolves a new file inside the drive", async () => {
+    await expect(safeResolve(root, "sub/new.txt")).resolves.toMatch(/new.txt$/);
+  });
 });
 
 describe("Per-user rate limiting", () => {

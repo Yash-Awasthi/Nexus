@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 18    | 0        |
+| Medium   | 0    | 19    | 0        |
 | Low      | 0    | 11    | 2        |
 
 ## Findings
@@ -434,6 +434,18 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
   comment answers only its author.
 - **Test:** `apps/api/tests/security/cross-account.test.ts`,
   `apps/api/tests/routes/wiki-identity.test.ts`
+
+### NX-SEC-038 — Drive writes followed links out of the drive when the target was missing
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `safeResolve` in `apps/api/src/routes/drive.ts` fell back to the unresolved path
+  whenever `realpath` failed, which it does for every path that does not exist yet.
+- **Impact:** a link the drive shell made (`ln -s`) could steer an API write outside the drive: a
+  dangling link creates its target, and a new file under a linked folder lands in that folder.
+  Found because the existing symlink test failed on Windows, where `/etc/passwd` does not exist.
+- **Fix:** a dangling link is refused, and a missing path is accepted only if its parent resolves
+  inside the drive.
+- **Test:** `apps/api/tests/routes/drive.test.ts`
 
 ## Audit pass 2 (2026-10-14)
 
