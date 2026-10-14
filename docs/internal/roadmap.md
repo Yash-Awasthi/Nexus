@@ -43,7 +43,7 @@ decision.
 - [ ] NX-SEC-008 Slack raw-body verification; Slack/Telegram refuse without secrets; forwarder key
 - [x] NX-SEC-015 Catalogue probe through `callerFetch`
 - [ ] NX-SEC-018 PTY sessions owner-scoped
-- [ ] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard
+- [x] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard
 - [ ] NX-SEC-026 GeoIP uses `request.ip`
 - [ ] NX-SEC-024 Upstash counter in one pipeline
 - [x] NX-SEC-028 Brief share key derived from the API key, never a constant

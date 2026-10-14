@@ -302,3 +302,25 @@ describe("makeSafeLookup (resolve-then-pin)", () => {
       });
     }));
 });
+
+describe("IPv6 addresses that embed IPv4 (NX-SEC-023)", () => {
+  it.each([
+    "64:ff9b::7f00:1", // NAT64 → 127.0.0.1
+    "64:ff9b::a9fe:a9fe", // NAT64 → 169.254.169.254
+    "64:ff9b::10.0.0.1",
+    "2002:7f00:1::", // 6to4 → 127.0.0.1
+    "2002:a9fe:a9fe::1", // 6to4 → 169.254.169.254
+    "::127.0.0.1", // IPv4-compatible
+    "::a9fe:a9fe",
+  ])("treats %s as private", (ip) => {
+    expect(isPrivateAddress(ip)).toBe(true);
+    expect(isSafeUrl(`http://[${ip}]/`)).toBe(false);
+  });
+
+  it.each(["64:ff9b::808:808", "2002:808:808::1", "2606:4700:4700::1111"])(
+    "keeps %s public",
+    (ip) => {
+      expect(isPrivateAddress(ip)).toBe(false);
+    },
+  );
+});

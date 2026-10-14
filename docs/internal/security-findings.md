@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 6    | 7     | 0        |
-| Low      | 7    | 2     | 1        |
+| Low      | 6    | 3     | 1        |
 
 ## Findings
 
@@ -281,11 +281,11 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-023 — SSRF guard misses IPv6 ranges that embed IPv4
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `packages/runtime/src/security-utils.ts` `isPrivateIPv6` handles `::ffff:` but not
   NAT64 `64:ff9b::/96`, 6to4 `2002::/16` or IPv4-compatible `::a.b.c.d`.
 - **Fix:** extract the embedded IPv4 for those prefixes and apply the IPv4 check.
-- **Test:** _to be named_
+- **Test:** `packages/runtime/tests/security-utils.test.ts`
 
 ### NX-SEC-024 — Upstash rate-limit counter can lose its expiry
 

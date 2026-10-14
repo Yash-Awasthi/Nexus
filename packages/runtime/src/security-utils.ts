@@ -88,8 +88,42 @@ function isPrivateIPv4([a, b]: [number, number, number, number]): boolean {
   return false;
 }
 
+/** An IPv6 literal as eight 16-bit groups, or null when it does not parse. */
+function ipv6Groups(host: string): number[] | null {
+  let h = host.toLowerCase();
+  const dotted = /(\d+\.\d+\.\d+\.\d+)$/.exec(h);
+  if (dotted) {
+    const o = parseIPv4ToOctets(dotted[1]!);
+    if (!o) return null;
+    h = `${h.slice(0, -dotted[1]!.length)}${((o[0] << 8) | o[1]).toString(16)}:${((o[2] << 8) | o[3]).toString(16)}`;
+  }
+  const [head = "", tail] = h.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const fill = tail === undefined ? 0 : 8 - left.length - right.length;
+  const parts = [...left, ...Array<string>(Math.max(fill, 0)).fill("0"), ...right];
+  if (parts.length !== 8 || !parts.every((p) => /^[0-9a-f]{1,4}$/.test(p))) return null;
+  return parts.map((p) => parseInt(p, 16));
+}
+
+const octetsOf = (hi: number, lo: number): [number, number, number, number] => [
+  hi >> 8,
+  hi & 0xff,
+  lo >> 8,
+  lo & 0xff,
+];
+
 /** True if an IPv6 literal (brackets stripped) is loopback/unspecified/ULA/link-local/mapped. */
 function isPrivateIPv6(host: string): boolean {
+  const g = ipv6Groups(host);
+  // NAT64 (64:ff9b::/96), 6to4 (2002::/16) and IPv4-compatible (::/96) carry an IPv4 address.
+  if (g) {
+    if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0))
+      return isPrivateIPv4(octetsOf(g[6]!, g[7]!));
+    if (g[0] === 0x2002) return isPrivateIPv4(octetsOf(g[1]!, g[2]!));
+    if (g.slice(0, 6).every((x) => x === 0) && (g[6] !== 0 || g[7]! > 1))
+      return isPrivateIPv4(octetsOf(g[6]!, g[7]!));
+  }
   const h = host.toLowerCase();
   if (h === "::1" || h === "::") return true; // loopback / unspecified
   // Unique-local fc00::/7 (fc.. / fd..) and link-local fe80::/10 (fe8.–feb.).
