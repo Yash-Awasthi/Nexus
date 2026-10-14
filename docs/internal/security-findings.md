@@ -38,7 +38,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
-| High     | 4    | 1     | 0        |
+| High     | 3    | 2     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
 
@@ -75,7 +75,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-003 — Single sign-on takes over unverified accounts
 
-- **Severity:** high · **Status:** open
+- **Severity:** high · **Status:** fixed
 - **Evidence:** `upsertOAuthUser` (`routes/oauth.ts:87`), `upsertOidcUser` (`routes/oidc.ts:277`),
   `upsertSamlUser` (`routes/saml.ts:180`) match an existing account by email and sign in to it
   whatever `users.emailVerified` says. `POST /auth/register` needs no verification and
@@ -85,7 +85,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
   in that account, and the first party keeps a working password (and any MFA it set).
 - **Fix:** one shared linking helper: when the matched account is unverified, remove its password
   and MFA secret, revoke its sessions, then mark it verified. See design.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/sso-claim-unverified.test.ts`
 
 ### NX-SEC-004 — GitHub sign-in keyed on a renamable login
 

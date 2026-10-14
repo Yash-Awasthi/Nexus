@@ -43,6 +43,7 @@ import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import { claimForSso } from "../lib/sso-link.ts";
 
 // IP-keyed limiter for unauthenticated OAuth callback routes (no user yet).
 const oauthRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "oauth" });
@@ -106,6 +107,7 @@ async function upsertOAuthUser(
       .limit(1);
 
     if (existing) {
+      await claimForSso(existing, provider);
       userId = existing.id;
       role = existing.role;
       tier = existing.tier;

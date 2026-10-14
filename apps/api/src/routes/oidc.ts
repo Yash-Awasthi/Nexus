@@ -34,6 +34,7 @@ import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import { claimForSso } from "../lib/sso-link.ts";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.ts";
 
 // 20 OIDC callback attempts per 15 minutes per IP — prevents code replay attacks
@@ -316,6 +317,7 @@ async function upsertOidcUser(
       .limit(1);
 
     if (existing) {
+      await claimForSso(existing, provider);
       userId = existing.id;
       role = existing.role;
       tier = existing.tier;

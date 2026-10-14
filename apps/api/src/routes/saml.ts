@@ -35,6 +35,7 @@ import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import { claimForSso } from "../lib/sso-link.ts";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.ts";
 
 // 30 SAML initiations per 15 min per IP — prevents SSO redirect spam
@@ -187,7 +188,13 @@ async function upsertSamlUser(
   // Erased and deactivated accounts stay gone: without the deletedAt filter an
   // SSO sign-in revives a row the user asked to have deleted.
   const [existing] = await db
-    .select({ id: users.id, name: users.name, role: users.role, tier: users.tier })
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      tier: users.tier,
+      emailVerified: users.emailVerified,
+    })
     .from(users)
     .where(and(eq(users.email, identity.email), isNull(users.deletedAt)))
     .limit(1);
@@ -199,13 +206,9 @@ async function upsertSamlUser(
     userId = existing.id;
     role = existing.role;
     tier = existing.tier;
-    await db
-      .update(users)
-      .set({
-        emailVerified: true,
-        ...(!existing.name && identity.name ? { name: identity.name } : {}),
-      })
-      .where(eq(users.id, userId));
+    await claimForSso(existing, "saml");
+    if (!existing.name && identity.name)
+      await db.update(users).set({ name: identity.name }).where(eq(users.id, userId));
   } else {
     assertMayProvision(identity.email);
     const [newUser] = await db
