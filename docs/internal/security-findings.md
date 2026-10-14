@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 10   | 3     | 0        |
+| Medium   | 9    | 4     | 0        |
 | Low      | 7    | 2     | 1        |
 
 ## Findings
@@ -162,12 +162,14 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-010 — Google ignores `email_verified`; Slack sign-in mints accounts for any Slack user
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/oauth.ts:228`; Slack callback builds `${authed_user.id}@slack.workspace`
   and always creates an account.
-- **Fix:** require `email_verified === true` from Google; route Slack sign-in through the SSO
-  provisioning policy (`assertMayProvision`) and key it on team id plus user id.
-- **Test:** _to be named_
+- **Fix:** require `email_verified === true` from Google; key Slack identities on team id plus
+  user id (`<team>.<user>@slack.invalid`, legacy accounts adopted on next sign-in) and refuse an
+  answer that names no user, which previously mapped every such sign-in to one shared account.
+  Slack stays a consumer-style sign-in like Google and GitHub, so it creates accounts.
+- **Test:** `apps/api/tests/routes/oauth-identity-checks.test.ts`
 
 ### NX-SEC-011 — Password guessing is limited per address, not per account
 

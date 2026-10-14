@@ -152,6 +152,14 @@ async function upsertOAuthUser(
   return { accessToken, refreshToken: rawRefresh, userId };
 }
 
+/** Accounts from before team-scoped Slack identities move to the new address on next sign-in. */
+async function adoptLegacySlackAccount(legacy: string, email: string): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  const [current] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  if (current) return;
+  await db.update(users).set({ email }).where(eq(users.email, legacy));
+}
+
 export async function oauthRoutes(app: FastifyInstance): Promise<void> {
   // ── Google ──────────────────────────────────────────────────────────────────
 
@@ -231,8 +239,16 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         const userRes = await fetch(GOOGLE_USERINFO, {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
-        const user = (await userRes.json()) as { sub?: string; email?: string; name?: string };
-        const email = user.email ?? user.sub ?? "unknown@google.com";
+        const user = (await userRes.json()) as {
+          sub?: string;
+          email?: string;
+          email_verified?: boolean;
+          name?: string;
+        };
+        if (!user.email || user.email_verified !== true) {
+          return failSignIn(request, reply, 403, { error: "email_not_verified" });
+        }
+        const email = user.email;
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
           email,
           user.name,
@@ -422,14 +438,21 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         const data = (await tokenRes.json()) as {
           ok: boolean;
           access_token?: string;
-          team?: { name?: string };
+          team?: { id?: string; name?: string };
           authed_user?: { id?: string };
           error?: string;
         };
         if (!data.ok || !data.access_token) {
           return failSignIn(request, reply, 401, { error: data.error ?? "token_exchange_failed" });
         }
-        const email = `${data.authed_user?.id ?? "slack_user"}@slack.workspace`;
+        const slackUser = data.authed_user?.id;
+        const team = data.team?.id;
+        if (!slackUser || !team) {
+          return failSignIn(request, reply, 502, { error: "slack_identity_missing" });
+        }
+        // A Slack user id is only unique within its workspace.
+        const email = `${team}.${slackUser}@slack.invalid`.toLowerCase();
+        await adoptLegacySlackAccount(`${slackUser}@slack.workspace`.toLowerCase(), email);
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
           email,
           data.team?.name,
