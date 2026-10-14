@@ -688,8 +688,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
           expiresAt,
         });
 
-        // Dev: surface token in log + response body for easy testing
-        app.log.info({ resetToken: rawToken, email: normalEmail }, "password-reset-token-issued");
+        app.log.info({ userId: user.id }, "password-reset-token-issued");
 
         if (process.env.NODE_ENV !== "production") {
           // Non-production: return token directly so integration tests don't need SMTP
@@ -931,7 +930,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         expiresAt,
       });
 
-      app.log.info({ verifyToken: rawToken, email: user.email }, "email-verification-token-issued");
+      app.log.info({ userId }, "email-verification-token-issued");
 
       if (process.env.NODE_ENV !== "production") {
         return reply.code(200).send({

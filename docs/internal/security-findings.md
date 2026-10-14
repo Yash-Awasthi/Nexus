@@ -38,7 +38,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
-| High     | 5    | 0     | 0        |
+| High     | 4    | 1     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
 
@@ -64,14 +64,14 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-002 — Reset and verification tokens are written to the log
 
-- **Severity:** high · **Status:** open
+- **Severity:** high · **Status:** fixed
 - **Evidence:** `apps/api/src/routes/auth-users.ts:692` logs `{ resetToken }` and `:934` logs
   `{ verifyToken }` at `info`, in every environment including production.
 - **Impact:** anyone with log access (hosting dashboard, log drain, Sentry breadcrumbs) can reset
   any user's password within the hour the token lives.
 - **Fix:** drop the token from the log line; keep the event. Non-production still returns it in
   the response body for tests.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/auth-token-logging.test.ts`
 
 ### NX-SEC-003 — Single sign-on takes over unverified accounts
 
