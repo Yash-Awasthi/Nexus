@@ -33,11 +33,15 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { loadApprovalStore } from "../lib/exec-approvals.ts";
 import { guardExec } from "../lib/exec-guard.ts";
+import { ownerIdFor } from "../lib/owner.ts";
 import { peerIsLoopback } from "../lib/rate-limiter.ts";
 
 // ── Singleton ────────────────────────────────────────────────────────────────
 
 const ptyManager = new PtyManager();
+/** Session id → the account that started it; every other account sees nothing of it. */
+const owners = new Map<string, string>();
+const mine = (request: FastifyRequest, id: string) => owners.get(id) === ownerIdFor(request);
 
 // ── Localhost gate ───────────────────────────────────────────────────────────
 
@@ -118,8 +122,8 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /local/pty — list live sessions (tail included for context). */
-  app.get("/local/pty", requireLocal, async (_req, reply) => {
-    return reply.send({ sessions: ptyManager.list() });
+  app.get("/local/pty", requireLocal, async (request, reply) => {
+    return reply.send({ sessions: ptyManager.list().filter((s) => mine(request, s.id)) });
   });
 
   /** POST /local/pty — spawn a PTY session. */
@@ -156,8 +160,10 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
     if ((await guardExec(request, reply, action, request.body.approvalId)) === "handled") return;
 
     try {
+      const id = `pty-${randomUUID().slice(0, 12)}`;
+      owners.set(id, ownerIdFor(request));
       const session = ptyManager.spawn({
-        id: `pty-${randomUUID().slice(0, 12)}`,
+        id,
         command,
         args,
         cwd: request.body.cwd,
@@ -179,7 +185,7 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
       const id = request.params.id;
       let session;
       try {
-        session = ptyManager.list().find((s) => s.id === id);
+        session = mine(request, id) ? ptyManager.list().find((s) => s.id === id) : undefined;
         if (!session)
           return reply.code(404).send({ error: "not_found", message: `no pty session ${id}` });
       } catch {
@@ -218,6 +224,7 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
     "/local/pty/:id/write",
     requireLocal,
     async (request, reply) => {
+      if (!mine(request, request.params.id)) return reply.code(404).send({ error: "not_found" });
       const data = request.body.data ?? "";
       if (typeof data !== "string" || data.length > 64_000) {
         return reply
@@ -239,6 +246,7 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
     "/local/pty/:id/resize",
     requireLocal,
     async (request, reply) => {
+      if (!mine(request, request.params.id)) return reply.code(404).send({ error: "not_found" });
       const cols = Math.min(500, Math.max(10, Math.round(request.body.cols ?? 80)));
       const rows = Math.min(200, Math.max(5, Math.round(request.body.rows ?? 24)));
       try {
@@ -253,7 +261,9 @@ export async function localPtyRoutes(app: FastifyInstance): Promise<void> {
 
   /** DELETE /local/pty/:id — kill AND remove a session (gone from the list). */
   app.delete<{ Params: { id: string } }>("/local/pty/:id", requireLocal, async (request, reply) => {
+    if (!mine(request, request.params.id)) return reply.code(404).send({ error: "not_found" });
     ptyManager.remove(request.params.id);
+    owners.delete(request.params.id);
     return reply.send({ ok: true });
   });
 }

@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 5    | 8     | 0        |
+| Medium   | 4    | 9     | 0        |
 | Low      | 4    | 4     | 2        |
 
 ## Findings
@@ -243,12 +243,12 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-018 — Host terminal sessions are not owner-scoped
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/local-pty.ts` list/stream/write/resize/delete look sessions up by id only.
 - **Impact:** where the PTY plane is reachable by more than one account (`NEXUS_LOCAL_PTY_FORCE`,
   or several accounts on one desktop API), one account can read and type into another's shell.
 - **Fix:** record the owner on spawn, filter and check on every access.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/local-pty-owner.test.ts`
 
 ### NX-SEC-019 — JWTs without `exp` never expire
 
