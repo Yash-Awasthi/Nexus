@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { Pencil, Check, X, Loader2 } from "lucide-react";
+import { Pencil, Check, X, Loader2, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { Page, PageHeader } from "~/components/page";
@@ -12,6 +12,73 @@ interface ConfigEntry {
   key: string;
   value: string;
   type: string;
+}
+
+interface PostureCheck {
+  id: string;
+  title: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+  fix: string;
+}
+
+const STATUS_ICON = {
+  pass: <ShieldCheck className="size-4 shrink-0 text-success" aria-label="passes" />,
+  warn: <TriangleAlert className="size-4 shrink-0 text-warning" aria-label="warning" />,
+  fail: <ShieldAlert className="size-4 shrink-0 text-destructive" aria-label="fails" />,
+};
+
+/** The deployment's security check: every gap first, with the setting that closes it. */
+function SecurityCheckCard() {
+  const [checks, setChecks] = useState<PostureCheck[] | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    fetch("/api/v1/admin/security/posture")
+      .then((r) =>
+        r.ok ? (r.json() as Promise<{ checks: PostureCheck[] }>) : Promise.reject(r.status),
+      )
+      .then((data) => {
+        setChecks(data.checks);
+        return undefined;
+      })
+      .catch(() => setError("Could not run the security check."));
+  }, []);
+  const order = { fail: 0, warn: 1, pass: 2 };
+  const sorted = [...(checks ?? [])].sort((a, b) => order[a.status] - order[b.status]);
+  const count = (s: PostureCheck["status"]) => sorted.filter((c) => c.status === s).length;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Security check</CardTitle>
+        <CardDescription>
+          {checks
+            ? `${count("fail")} failing, ${count("warn")} warnings, ${count("pass")} passing.`
+            : "Settings that leave this deployment open, and what to change."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {!checks && !error && <Loader2 className="size-5 animate-spin text-muted-foreground" />}
+        <ul className="space-y-3">
+          {sorted.map((c) => (
+            <li key={c.id} className="flex gap-3">
+              {STATUS_ICON[c.status]}
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{c.title}</p>
+                {c.status !== "pass" && (
+                  <>
+                    <p className="text-sm text-muted-foreground">{c.detail}</p>
+                    <p className="text-sm">{c.fix}</p>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function AdminSystemPage() {
@@ -171,6 +238,7 @@ export default function AdminSystemPage() {
           )}
         </CardContent>
       </Card>
+      <SecurityCheckCard />
     </Page>
   );
 }
