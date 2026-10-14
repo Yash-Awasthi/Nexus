@@ -26,12 +26,9 @@ Baseline: `main` at `c9d4a19`, 2026-10-14. Conventions are in [README.md](README
 | CI workflows, compose files, Dockerfiles                    | Partial           |                                                                           |
 | Dependencies (`pnpm audit --prod`)                          | Full              | 51 advisories: 21 high, 23 moderate, 7 low                                |
 
-Route census command (prints `/api/v1` routes with no `preHandler`; every line must be a
-deliberate public endpoint):
-
-```bash
-node scripts/security/route-census.mjs   # added in phase 1; see roadmap
-```
+Route census: `apps/api/tests/security/public-routes.test.ts` builds the server, lists every
+`/api/v1` route without a `require*` preHandler and fails unless it is on the test's allowlist
+(and fails when a listed route gains a guard, so the list stays exact). It runs with the API suite.
 
 ## Summary
 
@@ -39,8 +36,8 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 12   | 0     | 0        |
-| Low      | 8    | 0     | 1        |
+| Medium   | 13   | 0     | 0        |
+| Low      | 9    | 0     | 1        |
 
 ## Findings
 
@@ -311,6 +308,28 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 - **Evidence:** `docs/security/threat-model.md` lists removed packages (`packages/adapters`),
   "planned" controls that exist (rate limiting, SSRF guard) and none of the exec surfaces.
 - **Fix:** rewrite against [architecture.md](architecture.md) at the end of the program.
+
+### NX-SEC-028 — Brief share links are signed with a public default key
+
+- **Severity:** medium · **Status:** open
+- **Evidence:** `packages/brief-engine/src/index.ts:87` and `apps/api/src/routes/brief.ts` sign and
+  verify share URLs with `BRIEF_SIGNING_KEY`, falling back to the literal `"dev-key"`; the Render
+  blueprint does not set it. `GET /api/v1/brief/:domain/share/:digest` is public (found by the
+  route census).
+- **Impact:** anyone can mint a valid share URL for any user id and date and read that brief.
+- **Fix:** when `BRIEF_SIGNING_KEY` is unset, derive the key from `NEXUS_API_KEY` (always present,
+  checked at start-up) with a fixed label; never fall back to a constant.
+- **Test:** _to be named_
+
+### NX-SEC-029 — Audit chain falls back to a public HMAC key
+
+- **Severity:** low · **Status:** open
+- **Evidence:** `apps/api/src/lib/audit-emitter.ts:62` and `routes/audit.ts:86` use
+  `"nexus-dev-audit-key"` when `NEXUS_AUDIT_KEY` is unset; production start-up only warns.
+- **Impact:** someone with database write access can rebuild a valid chain after editing entries,
+  defeating the tamper evidence (threat model T3).
+- **Fix:** changing the fallback would break verification of existing chains, so the security check
+  (NX-FEAT-001) fails on it in production and the start-up warning names the consequence.
 
 ## Strengths worth keeping
 

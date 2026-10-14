@@ -14,7 +14,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-004 | MFA recovery codes                                                    | P1       | open   | FR-4   |
 | NX-FEAT-005 | Security events in the hash-chained audit log                         | P1       | open   | FR-5   |
 | NX-FEAT-006 | Cross-account isolation test over the live route table                | P2       | open   | —      |
-| NX-FEAT-007 | Route census script in CI (public `/api/v1` routes must be listed)    | P1       | open   | —      |
+| NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)      | P1       | done   | —      |
 | NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)             | P1       | open   | FR-6   |
 | NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in       | P3       | open   | —      |
 | NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page               | P2       | open   | —      |
@@ -29,10 +29,8 @@ P1 items is in [design.md](design.md).
   create a resource as user A where a POST exists, and assert user B's GET/PATCH/DELETE on its id
   answer 404/403. Turns the sampled IDOR review into a regression test. Needs per-route fixtures,
   so it starts with the store-backed bridge routes.
-- **NX-FEAT-007.** `scripts/security/route-census.mjs`: builds the server, lists `/api/v1` routes
-  whose route options carry no `preHandler`, compares with an allowlist file
-  (`scripts/security/public-routes.txt`), exits 1 on a difference. Catches the most likely future
-  mistake given how `/api/v1` is mounted (see architecture).
+- **NX-FEAT-007.** Done as `apps/api/tests/security/public-routes.test.ts`: a test rather than a
+  script, so CI runs it with the API suite and no new pipeline step is needed.
 - **NX-FEAT-009.** Worth it once recovery codes exist; needs a WebAuthn verifier, which means a
   dependency or a careful CBOR/COSE implementation. Not this program.
 - **NX-FEAT-010.** `api_keys` already has the row; add `last_used_at`, `last_used_ip`, update at

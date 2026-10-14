@@ -22,7 +22,7 @@ decision.
 - [x] NX-SEC-004 GitHub identity from verified emails
 - [x] NX-SEC-005 Teams webhook verifies the Bot Framework JWT; replies only to verified service URL
 - [x] NX-SEC-007 Libertas ceilings
-- [ ] NX-FEAT-007 Route census script and allowlist
+- [x] NX-FEAT-007 Route census test and allowlist
 - [ ] Push branch
 
 ## Phase 2 — Sessions and sign-in
@@ -46,6 +46,7 @@ decision.
 - [ ] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard
 - [ ] NX-SEC-026 GeoIP uses `request.ip`
 - [ ] NX-SEC-024 Upstash counter in one pipeline
+- [ ] NX-SEC-028 Brief share key derived from the API key, never a constant
 - [ ] NX-SEC-013 Desktop external links limited to http/https/mailto
 - [ ] NX-SEC-014 Compose binds to loopback; ingest key wired; ingest auth fails closed; scrape router behind key
 - [ ] NX-SEC-016 Dependency advisories cleared (overrides / bumps)
@@ -55,6 +56,7 @@ decision.
 ## Phase 4 — Security features
 
 - [ ] NX-FEAT-001 Security check: `lib/security-posture.ts`, admin endpoint, CLI command, admin panel
+- [ ] NX-SEC-029 Audit key fallback reported by the security check
 - [ ] NX-FEAT-005 Audit events for security changes
 - [ ] NX-FEAT-003 Account security notifications
 - [ ] NX-FEAT-004 MFA recovery codes (migration, routes, login, UI)

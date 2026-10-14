@@ -25,7 +25,8 @@ these describe the work.
   its `NX-FEAT-NNN`. Never renumber. New items take the next free number.
 - **Status values:** `open`, `in-progress`, `fixed` (code merged on the working branch, test
   present), `verified` (fix exercised end to end), `accepted` (risk knowingly kept, reason
-  written), `wontfix` (not a problem after all, reason written).
+  written), `wontfix` (not a problem after all, reason written). Features use `open`,
+  `in-progress` and `done`.
 - **Every fix names its test.** A finding moves to `fixed` only when a test that failed before
   the change passes after it, and the register names that test file.
 - **Evidence is a path and line.** `apps/api/src/routes/sandbox.ts:150` style, as of the commit
