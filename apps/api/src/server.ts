@@ -42,6 +42,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 
+import { startAuditExport } from "./lib/audit-export.ts";
 import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-maturity.ts";
 import { attachChannels } from "./lib/channels.ts";
 import { costLogStore } from "./lib/cost-log.ts";
@@ -455,8 +456,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   // restart would lose. Bounded + best-effort inside the store — an unclean
   // kill (tsx-watch) never reaches here and stays within the documented
   // few-seconds loss.
+  // Audit entries go to a write-once bucket when AUDIT_EXPORT_S3_* names one (NX-FEAT-011).
+  const stopAuditExport = startAuditExport(app.log);
+
   app.addHook("onClose", async () => {
     // Runs that outlast the wait are failed by the boot sweep on the next start.
+    stopAuditExport();
     await idleOrgRuns(5_000).catch(() => {});
     await flushTraces();
     await costLogStore.close();
