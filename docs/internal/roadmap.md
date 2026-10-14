@@ -40,7 +40,7 @@ decision.
 
 ## Phase 3 — Platform
 
-- [ ] NX-SEC-008 Slack raw-body verification; Slack/Telegram refuse without secrets; forwarder key
+- [x] NX-SEC-008 Slack raw-body verification; Slack/Telegram refuse without secrets; forwarder key
 - [x] NX-SEC-015 Catalogue probe through `callerFetch`
 - [ ] NX-SEC-018 PTY sessions owner-scoped
 - [x] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard

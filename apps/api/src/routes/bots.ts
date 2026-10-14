@@ -24,6 +24,7 @@
  */
 
 import {
+  BotError,
   SlackBotAdapter,
   TeamsBotAdapter,
   TelegramBotAdapter,
@@ -40,7 +41,7 @@ import type { FastifyInstance } from "fastify";
  */
 const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
   const apiBase = `http://127.0.0.1:${process.env.PORT ?? "3000"}`;
-  const apiKey = process.env.API_KEY ?? process.env.NEXUS_INTERNAL_KEY ?? "dev";
+  const apiKey = process.env.NEXUS_API_KEY ?? "";
 
   try {
     const resp = await fetch(`${apiBase}/api/v1/gateway/messages`, {
@@ -106,30 +107,46 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
    * Slack signature verification is performed by SlackBotAdapter when
    * SLACK_SIGNING_SECRET is configured.
    */
-  app.post<{
-    Body: Record<string, unknown>;
-    Headers: { "x-slack-request-timestamp"?: string; "x-slack-signature"?: string };
-  }>("/bots/slack/events", async (request, reply) => {
-    const body = request.body;
-    const rawBody = JSON.stringify(body); // signature verification uses raw body
+  // Slack signs the exact bytes it sent, so this route keeps the body as a string.
+  await app.register(async (slackScope) => {
+    slackScope.addContentTypeParser(
+      "application/json",
+      { parseAs: "string", bodyLimit: 1024 * 1024 },
+      (_req, body, done) => done(null, body),
+    );
+    slackScope.post<{
+      Body: string;
+      Headers: { "x-slack-request-timestamp"?: string; "x-slack-signature"?: string };
+    }>("/bots/slack/events", async (request, reply) => {
+      if (!process.env.SLACK_SIGNING_SECRET) {
+        return reply.code(503).send({ error: "slack_not_configured" });
+      }
+      let result: Awaited<ReturnType<typeof _slackAdapter.handleEvent>>;
+      try {
+        // A string body is verified as-is, then parsed by the adapter.
+        result = await _slackAdapter.handleEvent(request.body, {
+          "x-slack-request-timestamp": request.headers["x-slack-request-timestamp"] ?? "",
+          "x-slack-signature": request.headers["x-slack-signature"] ?? "",
+        });
+      } catch (err) {
+        if (err instanceof BotError && err.code === "SIGNATURE_INVALID") {
+          return reply.code(401).send({ error: "unauthorized" });
+        }
+        if (err instanceof SyntaxError) return reply.code(400).send({ error: "invalid_json" });
+        throw err;
+      }
 
-    // handleEvent(body, headers) — flat header map
-    const result = await _slackAdapter.handleEvent(body, {
-      "x-slack-request-timestamp": request.headers["x-slack-request-timestamp"] ?? "",
-      "x-slack-signature": request.headers["x-slack-signature"] ?? "",
-      "x-slack-raw-body": rawBody,
+      if (result.challenge) {
+        return reply.send({ challenge: result.challenge });
+      }
+
+      if (result.error) {
+        return reply.code(400).send({ error: result.error });
+      }
+
+      // Slack expects a 200 within 3 s.
+      return reply.code(200).send({ ok: true });
     });
-
-    if (result.challenge) {
-      return reply.send({ challenge: result.challenge });
-    }
-
-    if (result.error) {
-      return reply.code(400).send({ error: result.error });
-    }
-
-    // Slack expects a 200 within 3 s; reply immediately and process asynchronously
-    reply.code(200).send({ ok: true });
   });
 
   /**
@@ -173,6 +190,9 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
     Body: Record<string, unknown>;
     Headers: { "x-telegram-bot-api-secret-token"?: string };
   }>("/bots/telegram/webhook", async (request, reply) => {
+    if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
+      return reply.code(503).send({ error: "telegram_webhook_secret_not_configured" });
+    }
     try {
       const result = await _telegramAdapter.handleUpdate(request.body, {
         "x-telegram-bot-api-secret-token": request.headers["x-telegram-bot-api-secret-token"] ?? "",

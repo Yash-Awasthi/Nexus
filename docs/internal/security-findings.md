@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 6    | 7     | 0        |
+| Medium   | 5    | 8     | 0        |
 | Low      | 4    | 4     | 2        |
 
 ## Findings
@@ -138,7 +138,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-008 — Slack and Telegram webhooks are unauthenticated unless configured, and Slack verification cannot pass
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/bots.ts:114` verifies the Slack signature over `JSON.stringify(body)`
   instead of the raw bytes, so a configured secret rejects real Slack requests, and an unset one
   skips verification. Telegram's secret is optional (`bots.ts` → `TelegramBotAdapter`). The
@@ -147,7 +147,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Fix:** keep the raw body for the Slack route (scoped content-type parser, as
   `orgHookRoutes` does), refuse Slack and Telegram webhooks when their secret is unset, and call
   the gateway with `NEXUS_API_KEY`.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/bots-webhooks.test.ts`
 
 ### NX-SEC-009 — Sign-in callbacks are not bound to the browser that started them
 
