@@ -42,6 +42,14 @@ describe("SPA content security policy", () => {
     expect(csp.match(/'sha256-/g)).toHaveLength(1);
   });
 
+  it("tells the browser where to report violations", async () => {
+    const res = await app.inject({ method: "GET", url: "/some/client/route" });
+    const csp = String(res.headers["content-security-policy"]);
+    expect(csp).toContain("report-uri /api/v1/csp-report");
+    expect(csp).toContain("report-to csp");
+    expect(res.headers["reporting-endpoints"]).toBe('csp="/api/v1/csp-report"');
+  });
+
   it("serves client routes that merely start with /api, and 404s real API paths", async () => {
     expect((await app.inject({ method: "GET", url: "/api-tokens" })).statusCode).toBe(200);
     const miss = await app.inject({ method: "GET", url: "/api/no-such-route" });

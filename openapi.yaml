@@ -4743,6 +4743,13 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/csp-report:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/ab/run:
     post:
       tags:

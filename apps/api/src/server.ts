@@ -81,6 +81,7 @@ import { execApprovalRoutes } from "./routes/exec-approvals.ts";
 import { featureFlagsRoutes } from "./routes/feature-flags.ts";
 import { forecastRoutes } from "./routes/forecast.ts";
 import { gatewayRoutes } from "./routes/gateway.ts";
+import { cspReportRoutes } from "./routes/csp-report.ts";
 import { geoipRoutes } from "./routes/geoip.ts";
 import { governanceRoutes } from "./routes/governance.ts";
 import { healthRoutes } from "./routes/health.ts";
@@ -238,6 +239,8 @@ export async function buildServer(): Promise<FastifyInstance> {
     baseUri: ["'self'"],
     formAction: ["'self'"],
     frameAncestors: ["'none'"],
+    reportUri: ["/api/v1/csp-report"],
+    reportTo: ["csp"],
     ...(process.env.NODE_ENV === "production" ? { upgradeInsecureRequests: [] as string[] } : {}),
   };
   await app.register(helmet, {
@@ -250,6 +253,9 @@ export async function buildServer(): Promise<FastifyInstance> {
       process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
     frameguard: { action: "deny" },
     noSniff: true,
+  });
+  app.addHook("onRequest", async (_req, reply) => {
+    reply.header("Reporting-Endpoints", 'csp="/api/v1/csp-report"');
   });
   await app.register(cors, {
     origin: process.env.ALLOWED_ORIGINS?.split(",") ?? true,
@@ -572,6 +578,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Org routine webhooks: unauthenticated, verified by per-routine HMAC.
       await api.register(orgHookRoutes);
+
+      // Browsers report CSP violations here without credentials.
+      await api.register(cspReportRoutes);
     },
     { prefix: "/api/v1" },
   );
