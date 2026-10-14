@@ -392,6 +392,8 @@ every setting below that still needs attention.
   ingest service refuses requests without its key outside `APP_ENV=development`.
 - **Brief share links** are signed with `BRIEF_SIGNING_KEY` or a key derived from `NEXUS_API_KEY`;
   links made with the old default no longer open.
+- **Billing keys (`/api/v1/billing/keys`) and the translation catalogue (`POST /api/v1/i18n/catalog`)
+  are admin only.** Both are shared by the whole server; any signed-in account could change them.
 
 ## Known caveats
 

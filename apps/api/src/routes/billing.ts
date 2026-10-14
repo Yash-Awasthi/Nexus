@@ -20,6 +20,8 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.ts";
 
+import { requireAdminRole } from "./admin-users.ts";
+
 // ── DB availability flag ──────────────────────────────────────────────────────
 
 const DB_AVAILABLE = !!process.env.DATABASE_URL;
@@ -139,7 +141,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (_req, reply) => {
       if (!DB_AVAILABLE) {
@@ -176,7 +178,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/billing/keys",
     {
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
       schema: {
         body: {
           type: "object",
@@ -227,7 +229,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
@@ -237,7 +239,8 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       }
       const { revokeApiKey } = await import("@nexus/billing");
       try {
-        await revokeApiKey(request.params.id);
+        if (!(await revokeApiKey(request.params.id, "global")))
+          return (reply as FastifyReply).code(404).send({ error: "Key not found" });
         return (reply as FastifyReply).code(204).send();
       } catch (err: unknown) {
         const e = err as { message?: string };

@@ -33,6 +33,7 @@ import {
 } from "@nexus/chat-analyst";
 import type { FastifyInstance } from "fastify";
 
+import { ownerIdFor } from "../lib/owner.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
@@ -43,9 +44,12 @@ import { requireAuth } from "../middleware/auth.ts";
 
 const SESSION_TTL = parseInt(process.env.ANALYST_SESSION_TTL_MS ?? String(4 * 60 * 60_000), 10);
 const SESSION_KEY = (id: string): string => `analyst:session:${id}`;
+/** Session id → owning account; a session answers only its owner. */
+const _owners = new Map<string, string>();
 
 interface PersistedSession {
   id: string;
+  ownerId: string;
   domain: AnalystDomain;
   history: ContextMessage[];
   createdAt: string;
@@ -57,11 +61,14 @@ async function persistSession(session: {
   createdAt: string;
   getHistory(): ContextMessage[];
 }): Promise<void> {
+  const ownerId = _owners.get(session.id);
+  if (!ownerId) return;
   try {
     await getSharedKV().set<PersistedSession>(
       SESSION_KEY(session.id),
       {
         id: session.id,
+        ownerId,
         domain: session.domain,
         history: session.getHistory(),
         createdAt: session.createdAt,
@@ -76,15 +83,17 @@ async function persistSession(session: {
 async function loadSession(
   sessionId: string,
   manager: AnalystSessionManager,
+  ownerId: string,
 ): Promise<ReturnType<AnalystSessionManager["get"]> | undefined> {
   // Return in-process session if already warm
   const warm = manager.get(sessionId);
-  if (warm) return warm;
+  if (warm) return _owners.get(sessionId) === ownerId ? warm : undefined;
   // Try to restore from KV (cross-pod scenario)
   try {
     const persisted = await getSharedKV().get<PersistedSession>(SESSION_KEY(sessionId));
-    if (!persisted) return undefined;
+    if (persisted?.ownerId !== ownerId) return undefined;
     const session = manager.create(persisted.domain);
+    _owners.set(session.id, ownerId);
     // Re-hydrate history by adding messages back
     for (const msg of persisted.history) session.addMessage(msg.role, msg.content);
     return session;
@@ -173,6 +182,12 @@ const _analyst = new StreamingAnalyst({
 
 const _sessions = new AnalystSessionManager(_analyst);
 
+function newSession(domain: AnalystDomain, ownerId: string) {
+  const session = _sessions.create(domain);
+  _owners.set(session.id, ownerId);
+  return session;
+}
+
 // ── SSE helper ────────────────────────────────────────────────────────────────
 
 function sseWrite(raw: NodeJS.WritableStream, event: AnalystEvent): void {
@@ -228,8 +243,9 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     try {
       // Use named session if provided (cross-pod KV restore), else create ephemeral
       const session = sessionId
-        ? ((await loadSession(sessionId, _sessions)) ?? _sessions.create(domain))
-        : _sessions.create(domain);
+        ? ((await loadSession(sessionId, _sessions, ownerIdFor(request))) ??
+          newSession(domain, ownerIdFor(request)))
+        : newSession(domain, ownerIdFor(request));
 
       for await (const event of session.ask(query.trim(), { domainData, geo })) {
         sseWrite(reply.raw, event as AnalystEvent);
@@ -273,7 +289,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const domain = request.body.domain ?? "general";
-      const session = _sessions.create(domain);
+      const session = newSession(domain, ownerIdFor(request));
       return reply.code(201).send({
         sessionId: session.id,
         domain: session.domain,
@@ -304,7 +320,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // KV restore: handles cross-pod session lookup
-    const session = await loadSession(sessionId, _sessions);
+    const session = await loadSession(sessionId, _sessions, ownerIdFor(request));
     if (!session) {
       return reply.code(404).send({ error: `Session "${sessionId}" not found` });
     }
@@ -359,7 +375,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const session = _sessions.get(request.params.sessionId);
-      if (!session) {
+      if (!session || _owners.get(session.id) !== ownerIdFor(request)) {
         return reply.code(404).send({ error: "Session not found" });
       }
       return reply.send({
@@ -386,10 +402,11 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { sessionId } = request.params;
-      if (!_sessions.has(sessionId)) {
+      if (!_sessions.has(sessionId) || _owners.get(sessionId) !== ownerIdFor(request)) {
         return reply.code(404).send({ error: "Session not found" });
       }
       _sessions.destroy(sessionId);
+      _owners.delete(sessionId);
       return reply.code(204).send();
     },
   );

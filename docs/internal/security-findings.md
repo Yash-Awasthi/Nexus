@@ -15,7 +15,7 @@ Baseline: `main` at `c9d4a19`, 2026-10-14. Conventions are in [README.md](README
 | Exec surfaces: sandbox, PTC, drive, PTY, skills, workflows  | Full              | Org CLI runtimes read for env handling only                               |
 | SSRF guard and outbound fetch call sites in api and worker  | Full              | Packages' own fetches only where a user URL reaches them                  |
 | Bots (Slack, Teams, Telegram), Libertas                     | Full              |                                                                           |
-| IDOR in `api-bridge.ts` (sampled ~40 id-param handlers)     | Sampled           | Consistent owner checks; a full automated pass is NX-FEAT-006             |
+| IDOR across every create/item route pair                    | Full (test)       | `tests/security/cross-account.test.ts` (NX-FEAT-006)                      |
 | Org layer (`org-*.ts`), workspaces sharing                  | Not yet           | Next audit pass                                                           |
 | Worker job handlers, BullMQ payload trust                   | Not yet           | Next audit pass                                                           |
 | Connectors, MCP client/servers, plugin registry/run         | Partial           | MCP servers SSRF checked; plugin publish/run not yet                      |
@@ -36,8 +36,8 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 15    | 0        |
-| Low      | 0    | 10    | 2        |
+| Medium   | 0    | 17    | 0        |
+| Low      | 0    | 11    | 2        |
 
 ## Findings
 
@@ -389,6 +389,39 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
   accounts without a password cannot change it; the security notice goes to the old address.
 - **Test:** `apps/api/tests/routes/account-email.test.ts`
 
+### NX-SEC-034 — Analyst sessions answered any account
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `apps/api/src/routes/chat-analyst.ts` looked sessions up by id alone in
+  `GET`/`DELETE /analyst/session/:sessionId`, `POST /analyst/session/:sessionId/message` and
+  `POST /analyst/query`; ids are sequential (`analyst-1`, `analyst-2`, ...).
+- **Impact:** any signed-in account could continue another account's analyst conversation, with
+  its history in the model's context, or inspect and delete it.
+- **Fix:** each session records its owner (in memory and in the persisted KV copy); a lookup by
+  anyone else finds nothing.
+- **Test:** `apps/api/tests/security/cross-account.test.ts`
+
+### NX-SEC-035 — Any account managed the instance's billing keys
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `/billing/keys` routes in `apps/api/src/routes/billing.ts` needed only a session;
+  keys share one `global` owner and `revokeApiKey` in `packages/billing` matched on id alone.
+- **Impact:** any account could list every key, mint keys on any plan, and revoke any `api_keys`
+  row whose id it knew, personal access tokens included.
+- **Fix:** the routes are admin only, and a revoke matches the owner as well as the id.
+- **Test:** `apps/api/tests/security/cross-account.test.ts`,
+  `packages/billing/tests/api-keys-crud.test.ts`
+
+### NX-SEC-036 — Any account rewrote the shared translation catalogue
+
+- **Severity:** low · **Status:** fixed
+- **Evidence:** `POST /i18n/catalog` in `apps/api/src/routes/i18n.ts` is documented as admin only
+  but was guarded by `requireAuth`.
+- **Impact:** any account could replace strings every caller of the i18n API receives, and grow
+  the in-memory catalogue without bound.
+- **Fix:** `requireAdminRole`.
+- **Test:** `apps/api/tests/security/cross-account.test.ts`
+
 ## Audit pass 2 (2026-10-14)
 
 Org layer (share guard, CLI runtimes with an allow-listed environment, HTTP runtime through the
@@ -396,6 +429,12 @@ pinned fetch), worker coding runs (gated at the API as host shells, so admin-app
 servers), plugin registry and marketplace (installs create content in the caller's own space;
 skills still go through the exec gate), session sync (owner-scoped) and workspace invitations
 (secret token plus matching email) were read. New items: NX-SEC-030 to NX-SEC-032.
+
+## Cross-account test (2026-10-14)
+
+NX-FEAT-006 runs every collection with a create route and item routes as two accounts. It found
+NX-SEC-034 to NX-SEC-036; a build-task delete that answered `ok` for another account's id (it
+deleted nothing) now answers 404.
 
 ## Strengths worth keeping
 

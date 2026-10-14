@@ -10,6 +10,7 @@ const {
   mockSelectWhere,
   mockSelect,
   mockUpdateWhere,
+  mockUpdateReturning,
   mockUpdateSet,
   mockUpdate,
 } = vi.hoisted(() => {
@@ -22,7 +23,8 @@ const {
   const mockSelectFrom = vi.fn(() => ({ where: mockSelectWhere }));
   const mockSelect = vi.fn(() => ({ from: mockSelectFrom }));
 
-  const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
+  const mockUpdateReturning = vi.fn().mockResolvedValue([]);
+  const mockUpdateWhere = vi.fn(() => ({ returning: mockUpdateReturning }));
   const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
   const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
 
@@ -34,6 +36,7 @@ const {
     mockSelectWhere,
     mockSelect,
     mockUpdateWhere,
+    mockUpdateReturning,
     mockUpdateSet,
     mockUpdate,
   };
@@ -47,7 +50,10 @@ vi.mock("@nexus/db/schema", () => ({
   apiKeys: { keyHash: "keyHash", ownerId: "ownerId", id: "id" },
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
+vi.mock("drizzle-orm", () => ({
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  eq: vi.fn((col: unknown, val: unknown) => ({ eq: [col, val] })),
+}));
 
 // ── Imports (after mocks) ──────────────────────────────────────────────────────
 
@@ -128,11 +134,16 @@ describe("lookupApiKey", () => {
 describe("revokeApiKey", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("calls db.update to set revokedAt on the given id", async () => {
-    await revokeApiKey("uuid-1");
-    expect(mockUpdate).toHaveBeenCalledOnce();
+  it("revokes only a key the owner holds", async () => {
+    mockUpdateReturning.mockResolvedValueOnce([{ id: "uuid-1" }]);
+    expect(await revokeApiKey("uuid-1", "global")).toBe(true);
     expect(mockUpdateSet).toHaveBeenCalledOnce();
-    expect(mockUpdateWhere).toHaveBeenCalledOnce();
+    expect(JSON.stringify(mockUpdateWhere.mock.calls[0])).toContain("global");
+  });
+
+  it("reports false when the owner has no key with that id", async () => {
+    mockUpdateReturning.mockResolvedValueOnce([]);
+    expect(await revokeApiKey("someone-elses", "global")).toBe(false);
   });
 });
 

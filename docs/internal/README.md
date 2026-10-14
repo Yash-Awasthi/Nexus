@@ -41,13 +41,13 @@ these describe the work.
 ## Current state
 
 - Baseline audit: 2026-10-14, against `main` at `c9d4a19`; second pass the same day.
-- Working branch: `security/hardening`, pushed. Not merged: merging to `main` deploys to Render,
-  and the operator notes in `docs/STATUS.md` say what to set first.
+- `security/hardening` is merged into `main`. P2 work is on `feat/p2-enrichment`; merging it
+  deploys to Render, and the operator notes in `docs/STATUS.md` say what to set first.
 - Phases 0–6 of [roadmap.md](roadmap.md) are done: every critical, high and medium finding is
   fixed with a test; the security check, sign-out everywhere, security notifications, audit
   events, MFA recovery codes and the CI advisory gate shipped.
 - Phase 6 (account email, NX-FEAT-015) is done; mail goes out once the operator sets
   `RESEND_API_KEY` and `NEXUS_MAIL_FROM`.
-- Next: the P2 items in [enrichment.md](enrichment.md)
-  (cross-account isolation test, PAT last-used, admin session viewer, Python warm pool).
+- P2 is done except the Python warm pool (NX-FEAT-014), deferred while the deployment is a 512 MB
+  free instance. Next: P3 in [enrichment.md](enrichment.md).
 - Coverage of each audit pass is listed in [security-findings.md](security-findings.md).

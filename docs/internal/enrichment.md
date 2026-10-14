@@ -13,7 +13,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-003 | Account security notifications                                         | P1       | done   | FR-3   |
 | NX-FEAT-004 | MFA recovery codes                                                     | P1       | done   | FR-4   |
 | NX-FEAT-005 | Security events in the hash-chained audit log                          | P1       | done   | FR-5   |
-| NX-FEAT-006 | Cross-account isolation test over the live route table                 | P2       | open   | —      |
+| NX-FEAT-006 | Cross-account isolation test over the live route table                 | P2       | done   | —      |
 | NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)       | P1       | done   | —      |
 | NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)              | P1       | done   | FR-6   |
 | NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in        | P3       | open   | —      |
@@ -26,10 +26,9 @@ P1 items is in [design.md](design.md).
 
 ## Notes per item
 
-- **NX-FEAT-006.** Boot the app with two users, walk `app.printRoutes()` / the OpenAPI document,
-  create a resource as user A where a POST exists, and assert user B's GET/PATCH/DELETE on its id
-  answer 404/403. Turns the sampled IDOR review into a regression test. Needs per-route fixtures,
-  so it starts with the store-backed bridge routes.
+- **NX-FEAT-006.** Done as `apps/api/tests/security/cross-account.test.ts`: every collection with a
+  create route and item routes gets a fixture or a written reason to skip, and a new one fails the
+  test until it does. Found NX-SEC-034 to NX-SEC-036.
 - **NX-FEAT-007.** Done as `apps/api/tests/security/public-routes.test.ts`: a test rather than a
   script, so CI runs it with the API suite and no new pipeline step is needed.
 - **NX-FEAT-009.** Worth it once recovery codes exist; needs a WebAuthn verifier, which means a

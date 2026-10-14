@@ -5223,10 +5223,11 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       if (!pool) return reply.code(503).send({ error: "DB unavailable" });
       const id = _btId(request.params.id);
       if (id === null) return reply.code(404).send({ error: "not found" });
-      await pool.query(`DELETE FROM build_tasks WHERE id=$1 AND ${_mine(request, "$2")}`, [
-        id,
-        request.nexusUserId ?? null,
-      ]);
+      const { rowCount } = await pool.query(
+        `DELETE FROM build_tasks WHERE id=$1 AND ${_mine(request, "$2")}`,
+        [id, request.nexusUserId ?? null],
+      );
+      if (!rowCount) return reply.code(404).send({ error: "not found" });
       return reply.send({ ok: true });
     },
   );

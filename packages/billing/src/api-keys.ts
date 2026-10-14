@@ -11,7 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { db } from "@nexus/db";
 import type { ApiKey, NewApiKey } from "@nexus/db/schema";
 import { apiKeys } from "@nexus/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
 
@@ -80,8 +80,14 @@ export async function lookupApiKey(rawKey: string): Promise<ApiKey | undefined> 
 
 // ── Revoke ────────────────────────────────────────────────────────────────────
 
-export async function revokeApiKey(id: string): Promise<void> {
-  await db.update(apiKeys).set({ revokedAt: new Date() }).where(eq(apiKeys.id, id));
+/** Revoke one of `ownerId`'s keys; false when it has no key with that id. */
+export async function revokeApiKey(id: string, ownerId: string): Promise<boolean> {
+  const rows = await db
+    .update(apiKeys)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(apiKeys.id, id), eq(apiKeys.ownerId, ownerId)))
+    .returning({ id: apiKeys.id });
+  return rows.length > 0;
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
