@@ -102,6 +102,12 @@ describe("JWT (signJwt + verifyJwt)", () => {
     exp: Math.floor(Date.now() / 1000) + 3600,
   };
 
+  it("refuses a token without an expiry (NX-SEC-019)", () => {
+    const { exp: _exp, ...forever } = PAYLOAD;
+    const token = signJwt(forever as typeof PAYLOAD, SECRET);
+    expect(() => verifyJwt(token, SECRET)).toThrow(AuthError);
+  });
+
   it("signs and verifies a valid JWT", () => {
     const token = signJwt(PAYLOAD, SECRET);
     const decoded = verifyJwt(token, SECRET);

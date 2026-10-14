@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 10   | 3     | 0        |
-| Low      | 9    | 0     | 1        |
+| Low      | 7    | 2     | 1        |
 
 ## Findings
 
@@ -250,18 +250,18 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-019 — JWTs without `exp` never expire
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `packages/auth/src/index.ts` `verifyJwt` / `verifyJwtRS256` and
   `middleware/auth.ts:36` `_verifyHs256` skip the expiry check when `exp` is absent.
 - **Fix:** reject tokens without a numeric `exp`.
-- **Test:** _to be named_
+- **Test:** `packages/auth/tests/auth.test.ts, apps/api/tests/middleware/auth-with-tier.test.ts`
 
 ### NX-SEC-020 — SCIM token comparison is not constant-time; deprovisioning leaves access tokens live
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `routes/scim.ts:53` uses `!==`; deactivate and delete do not revoke sessions.
 - **Fix:** `timingSafeEqual` on SHA-256 digests; call subject revocation (NX-SEC-006).
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/scim-auth.test.ts`
 
 ### NX-SEC-021 — CORS reflects every origin when `ALLOWED_ORIGINS` is unset
 

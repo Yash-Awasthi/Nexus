@@ -47,8 +47,9 @@ function _verifyHs256(token: string, secret: string): JwtPayload | null {
   if (expected.length !== sig.length || !timingSafeEqual(expected, sig)) return null;
   try {
     const payload = JSON.parse(Buffer.from(p, "base64url").toString()) as JwtPayload;
-    // RFC 7519: a token is invalid at its exp second, not one second after.
-    if (payload.exp !== undefined && payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    // RFC 7519: a token is invalid at its exp second; one with no exp is never valid.
+    if (typeof payload.exp !== "number" || payload.exp <= Math.floor(Date.now() / 1000))
+      return null;
     return payload;
   } catch {
     return null;

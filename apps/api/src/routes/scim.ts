@@ -27,7 +27,7 @@
  * Ref: RFC 7644 (SCIM Protocol), RFC 7643 (SCIM Core Schema)
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { db } from "@nexus/db";
 import { users, workspaces, workspaceMembers } from "@nexus/db/schema";
@@ -53,7 +53,8 @@ async function requireScimAuth(request: FastifyRequest, reply: FastifyReply): Pr
     return;
   }
   const auth = request.headers.authorization;
-  if (!auth?.startsWith("Bearer ") || auth.slice(7) !== scimToken) {
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  if (!auth?.startsWith("Bearer ") || !timingSafeEqual(digest(auth.slice(7)), digest(scimToken))) {
     await reply
       .code(401)
       .header("Content-Type", SCIM_MEDIA)

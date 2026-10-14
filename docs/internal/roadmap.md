@@ -34,8 +34,8 @@ decision.
 - [ ] NX-SEC-010 Google `email_verified`; Slack identity and provisioning policy
 - [ ] NX-SEC-011 Account-wide guess ceiling in shared KV
 - [ ] NX-SEC-012 Remove `/mfa/validate`; TOTP replay guard
-- [ ] NX-SEC-019 JWT `exp` required
-- [ ] NX-SEC-020 SCIM constant-time compare; deprovision revokes
+- [x] NX-SEC-019 JWT `exp` required
+- [x] NX-SEC-020 SCIM constant-time compare; deprovision revokes
 - [ ] Push
 
 ## Phase 3 — Platform

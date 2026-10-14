@@ -167,7 +167,11 @@ export function verifyJwt(token: string, secret: string): NexusTokenPayload {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if (payload.exp && payload.exp < now) {
+  if (typeof payload.exp !== "number") {
+    throw new AuthError("INVALID_TOKEN", "JWT has no expiry");
+  }
+  // RFC 7519 §4.1.4: invalid on or after exp.
+  if (payload.exp <= now) {
     throw new AuthError(
       "EXPIRED_TOKEN",
       `JWT expired at ${new Date(payload.exp * 1000).toISOString()}`,
@@ -238,7 +242,11 @@ export function verifyJwtRS256(token: string, publicKeyPem: string): NexusTokenP
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if (payload.exp && payload.exp < now) {
+  if (typeof payload.exp !== "number") {
+    throw new AuthError("INVALID_TOKEN", "JWT has no expiry");
+  }
+  // RFC 7519 §4.1.4: invalid on or after exp.
+  if (payload.exp <= now) {
     throw new AuthError(
       "EXPIRED_TOKEN",
       `JWT expired at ${new Date(payload.exp * 1000).toISOString()}`,

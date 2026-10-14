@@ -190,9 +190,21 @@ describe("_verifyHs256 expiry boundary (via requireAuthWithTier)", () => {
     delete process.env.DATABASE_URL;
   });
 
+  it("refuses a token without an expiry (NX-SEC-019)", async () => {
+    process.env.NEXUS_JWT_SECRET = SECRET;
+    delete process.env.NEXUS_API_KEY;
+    delete process.env.DATABASE_URL;
+    const token = makeJwt({ sub: "forever", role: "admin", iat: 1 }, SECRET);
+    const req = makeRequest(`Bearer ${token}`);
+    const reply = makeReply();
+    await requireAuthWithTier(req, reply);
+
+    expect(reply._sent).toBe(true);
+    expect((req as { nexusUserId?: string }).nexusUserId).toBeUndefined();
+  });
+
   it("treats a token as expired at its exp second, not one second later", async () => {
-    // @nexus/auth accepts a token while `exp < now`, so at exp === now the
-    // request authenticates — and identity must still not resolve.
+    // RFC 7519: a token is invalid on or after its exp second, on both verification paths.
     process.env.NEXUS_JWT_SECRET = SECRET;
     delete process.env.NEXUS_API_KEY;
     delete process.env.DATABASE_URL;
@@ -202,7 +214,7 @@ describe("_verifyHs256 expiry boundary (via requireAuthWithTier)", () => {
     const reply = makeReply();
     await requireAuthWithTier(req, reply);
 
-    expect(reply._sent).toBe(false);
+    expect(reply._sent).toBe(true);
     expect((req as { nexusUserId?: string }).nexusUserId).toBeUndefined();
   });
 
