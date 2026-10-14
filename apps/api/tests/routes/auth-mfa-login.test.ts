@@ -155,3 +155,37 @@ it("signs in once with each recovery code and can replace them (NX-FEAT-004)", a
   expect((await login(recoveryCodes[2]!)).statusCode).toBe(401);
   expect((await login(fresh[0]!)).statusCode).toBe(200);
 });
+
+it("limits guesses at the code that turns MFA off, per account, whatever the address", async () => {
+  const creds = { email: "mfa-guess@example.com", password: "Mfa-pass-12!" };
+  const reg = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/register",
+    remoteAddress: "198.51.100.40",
+    payload: creds,
+  });
+  const auth = { authorization: `Bearer ${reg.json<{ accessToken: string }>().accessToken}` };
+  const { secret } = (
+    await app.inject({ method: "POST", url: "/api/v1/mfa/setup", headers: auth })
+  ).json<{ secret: string }>();
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/mfa/verify",
+    headers: auth,
+    payload: { code: totp(secret) },
+  });
+  const statuses: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/mfa/disable",
+      headers: auth,
+      remoteAddress: `203.0.113.${i + 1}`,
+      payload: { code: "000000" },
+    });
+    statuses.push(res.statusCode);
+  }
+  expect(statuses.at(-1)).toBe(429);
+  const status = await app.inject({ method: "GET", url: "/api/v1/mfa/status", headers: auth });
+  expect(status.json<{ mfaEnabled: boolean }>().mfaEnabled).toBe(true);
+});

@@ -36,8 +36,8 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 19    | 0        |
-| Low      | 0    | 11    | 2        |
+| Medium   | 0    | 20    | 0        |
+| Low      | 0    | 12    | 2        |
 
 ## Findings
 
@@ -446,6 +446,25 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Fix:** a dangling link is refused, and a missing path is accepted only if its parent resolves
   inside the drive.
 - **Test:** `apps/api/tests/routes/drive.test.ts`
+
+### NX-SEC-039 — The code that turns MFA off could be guessed without limit
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** `POST /mfa/disable` in `apps/api/src/routes/mfa.ts` had no rate limit, and the
+  limit on the other code checks was per address.
+- **Impact:** someone holding a session could try every 6-digit code, from as many addresses as
+  they liked, and switch two-factor sign-in off.
+- **Fix:** five code attempts per 15 minutes per account on verify, disable and new recovery codes.
+- **Test:** `apps/api/tests/routes/auth-mfa-login.test.ts`
+
+### NX-SEC-040 — The queue dashboard password could be guessed without limit
+
+- **Severity:** low · **Status:** fixed
+- **Evidence:** `/admin/queues` (opt-in, `NEXUS_QUEUE_DASHBOARD_PASSWORD`) checked Basic
+  credentials on every request with no limit.
+- **Impact:** a weak dashboard password could be found by guessing.
+- **Fix:** after ten wrong passwords in 15 minutes an address is refused, right password included.
+- **Test:** `apps/api/tests/routes/queue-dashboard.test.ts`
 
 ## Audit pass 2 (2026-10-14)
 

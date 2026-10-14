@@ -25,11 +25,13 @@ import { securityEvent } from "../lib/security-events.ts";
 import { getSecurityKV } from "../lib/shared-kv.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
-// 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
+// 5 code attempts per 15 minutes per account: keyed by IP alone, rotating addresses would let
+// someone holding a session guess the 6-digit code.
 const mfaRateLimit = makeRateLimitPreHandler({
   limit: 5,
   windowMs: 15 * 60 * 1000,
   keyPrefix: "auth:mfa",
+  keyBy: (request) => request.nexusUserId ?? request.ip,
 });
 
 // ── Base32 encoding/decoding (RFC 4648 — used by TOTP apps) ──────────────────
@@ -326,7 +328,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { code: string } }>(
     "/mfa/disable",
     {
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, mfaRateLimit],
       schema: {
         body: {
           type: "object",
