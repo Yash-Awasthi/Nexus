@@ -6,22 +6,23 @@ Features beyond the fixes, across the whole platform. Each has a priority (P1 do
 program, P2 next, P3 when there is a reason), a status and the requirement it serves. Design for
 P1 items is in [design.md](design.md).
 
-| ID          | Feature                                                               | Priority | Status | Serves |
-| ----------- | --------------------------------------------------------------------- | -------- | ------ | ------ |
-| NX-FEAT-001 | Security check: posture endpoint, `nexus security check`, admin panel | P1       | done   | FR-1   |
-| NX-FEAT-002 | Sign out everywhere / sign out one device ends access tokens          | P1       | done   | FR-2   |
-| NX-FEAT-003 | Account security notifications                                        | P1       | done   | FR-3   |
-| NX-FEAT-004 | MFA recovery codes                                                    | P1       | done   | FR-4   |
-| NX-FEAT-005 | Security events in the hash-chained audit log                         | P1       | done   | FR-5   |
-| NX-FEAT-006 | Cross-account isolation test over the live route table                | P2       | open   | —      |
-| NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)      | P1       | done   | —      |
-| NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)             | P1       | done   | FR-6   |
-| NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in       | P3       | open   | —      |
-| NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page               | P2       | open   | —      |
-| NX-FEAT-011 | Audit-log export to object storage with object lock (threat model T3) | P3       | open   | —      |
-| NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI | P2       | open   | —      |
-| NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                  | P3       | open   | —      |
-| NX-FEAT-014 | Warm pool for the Python sandbox (removes the ~2 s cold boot)         | P2       | open   | —      |
+| ID          | Feature                                                                | Priority | Status | Serves |
+| ----------- | ---------------------------------------------------------------------- | -------- | ------ | ------ |
+| NX-FEAT-001 | Security check: posture endpoint, `nexus security check`, admin panel  | P1       | done   | FR-1   |
+| NX-FEAT-002 | Sign out everywhere / sign out one device ends access tokens           | P1       | done   | FR-2   |
+| NX-FEAT-003 | Account security notifications                                         | P1       | done   | FR-3   |
+| NX-FEAT-004 | MFA recovery codes                                                     | P1       | done   | FR-4   |
+| NX-FEAT-005 | Security events in the hash-chained audit log                          | P1       | done   | FR-5   |
+| NX-FEAT-006 | Cross-account isolation test over the live route table                 | P2       | open   | —      |
+| NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)       | P1       | done   | —      |
+| NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)              | P1       | done   | FR-6   |
+| NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in        | P3       | open   | —      |
+| NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page                | P2       | open   | —      |
+| NX-FEAT-011 | Audit-log export to object storage with object lock (threat model T3)  | P3       | open   | —      |
+| NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI  | P2       | open   | —      |
+| NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                   | P3       | open   | —      |
+| NX-FEAT-014 | Warm pool for the Python sandbox (removes the ~2 s cold boot)          | P2       | open   | —      |
+| NX-FEAT-015 | Transactional email (SMTP or API) for reset, verification, invitations | P1       | open   | —      |
 
 ## Notes per item
 

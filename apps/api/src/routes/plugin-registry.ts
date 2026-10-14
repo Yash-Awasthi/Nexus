@@ -134,7 +134,8 @@ export async function pluginRegistryRoutes(app: FastifyInstance): Promise<void> 
       const records = Array.from(store.values()).filter((r) => r.manifest.id === request.params.id);
       if (records.length === 0) return reply.code(404).send({ error: "not found" });
       const caller = request.nexusUserId ?? "anon";
-      const foreign = records.filter((r) => r.publisher !== caller && caller !== "admin");
+      const admin = request.nexusRole === "admin";
+      const foreign = records.filter((r) => r.publisher !== caller && !admin);
       if (foreign.length > 0) {
         return reply.code(403).send({ error: "forbidden", message: "not the publisher" });
       }

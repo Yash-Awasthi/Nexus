@@ -36,8 +36,8 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 13    | 0        |
-| Low      | 1    | 7     | 2        |
+| Medium   | 0    | 14    | 0        |
+| Low      | 1    | 8     | 3        |
 
 ## Findings
 
@@ -343,6 +343,44 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
   defeating the tamper evidence (threat model T3).
 - **Fix:** changing the fallback would break verification of existing chains, so the security check
   (NX-FEAT-001) fails on it in production and the start-up warning names the consequence.
+
+### NX-SEC-030 — Plugin unpublish checked a user id against the word "admin"
+
+- **Severity:** low · **Status:** fixed
+- **Evidence:** `apps/api/src/routes/plugin-registry.ts` DELETE `/registry/plugins/:id` allowed
+  `caller !== "admin"`, comparing the caller's user id, not their role.
+- **Impact:** real admins could not remove another publisher's plugin; an account whose id is the
+  string `admin` could.
+- **Fix:** `request.nexusRole === "admin"`.
+- **Test:** `apps/api/tests/routes/plugin-registry-unpublish.test.ts`
+
+### NX-SEC-031 — No email delivery in production
+
+- **Severity:** low · **Status:** accepted
+- **Evidence:** `/auth/forgot-password` and `/auth/send-verification` only return their tokens
+  outside production; nothing sends them. Since NX-SEC-002 the tokens are not in the log either.
+- **Impact:** on a production server nobody can reset a password or verify an address; workspace
+  invitations therefore cannot require a verified address, and the first single sign-on to a
+  password account takes it over (NX-SEC-003) as designed.
+- **Reason:** delivering mail needs an outside account (SMTP or an email API) — an operator choice.
+  Tracked as NX-FEAT-015.
+
+### NX-SEC-032 — Unauthenticated Redis lets anyone act as any account
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** workers trust job payloads (`userId`, instructions) as written to BullMQ queues.
+- **Impact:** anyone who can write to Redis can run work as any user.
+- **Fix:** the trust boundary is Redis itself: the dev compose binds it to loopback (NX-SEC-014) and
+  the security check fails a remote `REDIS_URL` without a password (`redis-auth`).
+- **Test:** `apps/api/tests/lib/security-posture.test.ts`
+
+## Audit pass 2 (2026-10-14)
+
+Org layer (share guard, CLI runtimes with an allow-listed environment, HTTP runtime through the
+pinned fetch), worker coding runs (gated at the API as host shells, so admin-approved on shared
+servers), plugin registry and marketplace (installs create content in the caller's own space;
+skills still go through the exec gate), session sync (owner-scoped) and workspace invitations
+(secret token plus matching email) were read. New items: NX-SEC-030 to NX-SEC-032.
 
 ## Strengths worth keeping
 

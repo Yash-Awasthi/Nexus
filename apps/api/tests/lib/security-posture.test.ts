@@ -36,6 +36,7 @@ describe("checkPosture", () => {
     ["unsandboxed-exec", { ALLOW_UNSANDBOXED_EXEC: "true" }],
     ["pty-force", { NEXUS_LOCAL_PTY_FORCE: "1" }],
     ["queue-dashboard", { NEXUS_QUEUE_DASHBOARD_PASSWORD: "admin" }],
+    ["redis-auth", { REDIS_URL: "redis://cache.internal:6379" }],
   ])("fails %s in production when weakened", (id, change) => {
     expect(status({ ...HARDENED, ...change }, id)).toBe("fail");
   });
@@ -50,6 +51,15 @@ describe("checkPosture", () => {
     ["public-completions", { GROQ_API_KEY: "g", NEXUS_LIBERTAS_GLOBAL_PER_MIN: "1000" }],
   ])("warns about %s", (id, change) => {
     expect(status({ ...HARDENED, ...change }, id)).toBe("warn");
+  });
+
+  it("accepts a local or password-protected Redis", () => {
+    for (const REDIS_URL of [
+      "redis://localhost:6379",
+      "redis://redis:6379",
+      "rediss://default:secret@cache.example:6380",
+    ])
+      expect(status({ ...HARDENED, REDIS_URL }, "redis-auth")).toBe("pass");
   });
 
   it("fails per-process state only where several replicas run", () => {

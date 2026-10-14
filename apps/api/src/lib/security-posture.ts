@@ -212,6 +212,19 @@ export function checkPosture(env: Env, facts: PostureFacts): PostureCheck[] {
     "Add ?sslmode=require (or verify-full) to DATABASE_URL.",
   );
 
+  const redisUrl = env.REDIS_URL ?? "";
+  const redisHost = /^rediss?:\/\/(?:[^@/]*@)?([^:/?]+)/.exec(redisUrl)?.[1] ?? "";
+  const remoteRedis = !!redisUrl && !["localhost", "127.0.0.1", "redis"].includes(redisHost);
+  add(
+    "redis-auth",
+    "The job queue needs a password",
+    !remoteRedis || /^rediss?:\/\/[^@/]*:[^@/]+@/.test(redisUrl),
+    gap(),
+    "Workers run whatever jobs are in Redis as the user named in the job, so an open Redis is a " +
+      "way to act as any account.",
+    "Put a password in REDIS_URL (redis://:password@host:6379), and prefer rediss:// for TLS.",
+  );
+
   add(
     "queue-dashboard",
     "The queue dashboard has a strong password",

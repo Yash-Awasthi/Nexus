@@ -65,10 +65,10 @@ decision.
 
 ## Phase 5 — Second audit pass and documents
 
-- [ ] Audit org layer and workspace sharing
-- [ ] Audit worker job handlers and BullMQ payload trust
-- [ ] Audit plugin registry publish/run and marketplace content
-- [ ] Audit session sync
+- [x] Audit org layer and workspace sharing
+- [x] Audit worker job handlers and BullMQ payload trust
+- [x] Audit plugin registry publish/run and marketplace content
+- [x] Audit session sync
 - [ ] NX-SEC-027 Rewrite `docs/security/threat-model.md`
 - [ ] `docs/STATUS.md` behaviour-change notes for operators (webhook secrets now required, Libertas
       ceilings, SSO claim of unverified accounts)
