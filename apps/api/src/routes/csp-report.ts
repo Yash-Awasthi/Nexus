@@ -21,7 +21,7 @@ interface CspViolation {
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
 /** URLs lose their query and fragment: they can carry tokens the log must not keep. */
-const bare = (v: unknown): string | null => str(v)?.replace(/[?#].*$/, "") ?? null;
+const bare = (v: unknown): string | null => str(v)?.split(/[?#]/, 1)[0] ?? null;
 
 function violation(r: Record<string, unknown>, legacy: boolean): CspViolation {
   const k = legacy
