@@ -160,6 +160,9 @@ it("reads a saved key's model catalogue from the provider", async () => {
   });
   const real = globalThis.fetch;
   const seen: string[] = [];
+  // The probe goes through the pinned SSRF fetch on a server; the desktop path uses global fetch,
+  // which this test can stand in for.
+  process.env.NEXUS_DESKTOP = "1";
   globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     if (!url.endsWith("/models")) return real(input, init);
@@ -180,5 +183,6 @@ it("reads a saved key's model catalogue from the provider", async () => {
     expect(seen[0]).toBe("Bearer gsk_catalog_key_0123456789");
   } finally {
     globalThis.fetch = real;
+    delete process.env.NEXUS_DESKTOP;
   }
 });
