@@ -55,6 +55,30 @@ it("serves the dashboard to admin with the configured password", async () => {
   expect(res.headers["content-type"]).toContain("text/html");
 });
 
+it("stops answering an address after ten wrong passwords, even the right one", async () => {
+  const from = { remoteAddress: "203.0.113.77" };
+  for (let i = 0; i < 10; i++)
+    await app.inject({
+      method: "GET",
+      url: "/admin/queues",
+      headers: { authorization: basic("admin", `guess-${i}`) },
+      ...from,
+    });
+  const right = await app.inject({
+    method: "GET",
+    url: "/admin/queues",
+    headers: { authorization: basic("admin", "board-secret") },
+    ...from,
+  });
+  expect(right.statusCode).toBe(429);
+  const elsewhere = await app.inject({
+    method: "GET",
+    url: "/admin/queues",
+    headers: { authorization: basic("admin", "board-secret") },
+  });
+  expect(elsewhere.statusCode).toBe(200);
+});
+
 it("matches only the exact admin credentials", () => {
   expect(basicAuthMatches(basic("admin", "board-secret"), "board-secret")).toBe(true);
   expect(basicAuthMatches(basic("root", "board-secret"), "board-secret")).toBe(false);

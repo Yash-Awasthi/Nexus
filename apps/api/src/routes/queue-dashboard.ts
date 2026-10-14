@@ -27,6 +27,24 @@ export function basicAuthMatches(header: string | undefined, password: string): 
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+const FAILURE_LIMIT = 10;
+const FAILURE_WINDOW_MS = 15 * 60_000;
+// Counts are per process, so each replica allows its own ten; move them to the shared KV if the
+// dashboard is ever scaled out.
+const failures = new Map<string, { count: number; since: number }>();
+
+/** Whether `ip` has used up its wrong passwords; counts this one when `failed`. */
+function lockedOut(ip: string, failed: boolean): boolean {
+  const now = Date.now();
+  if (failures.size > 10_000)
+    for (const [k, v] of failures) if (now - v.since > FAILURE_WINDOW_MS) failures.delete(k);
+  let f = failures.get(ip);
+  if (!f || now - f.since > FAILURE_WINDOW_MS) f = { count: 0, since: now };
+  if (failed) f.count++;
+  failures.set(ip, f);
+  return f.count > FAILURE_LIMIT || (!failed && f.count >= FAILURE_LIMIT);
+}
+
 export async function queueDashboardRoutes(app: FastifyInstance): Promise<void> {
   const redisUrl = process.env.REDIS_URL;
   const password = process.env.NEXUS_QUEUE_DASHBOARD_PASSWORD;
@@ -40,7 +58,13 @@ export async function queueDashboardRoutes(app: FastifyInstance): Promise<void> 
 
   await app.register(async (scope) => {
     scope.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-      if (basicAuthMatches(request.headers.authorization, password)) return;
+      // Checked before the password, so a right guess past the limit is refused like a wrong one.
+      const ok = basicAuthMatches(request.headers.authorization, password);
+      if (lockedOut(request.ip, !ok)) {
+        await reply.code(429).header("Retry-After", "900").send({ error: "too_many_attempts" });
+        return;
+      }
+      if (ok) return;
       await reply
         .code(401)
         .header("WWW-Authenticate", 'Basic realm="nexus-queues"')
