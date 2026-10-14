@@ -10,6 +10,7 @@ For unauthenticated routes (e.g. /health, /metrics, /docs) use the
 """
 from __future__ import annotations
 
+import hmac
 import os
 from typing import Annotated
 
@@ -25,9 +26,11 @@ def verify_token(
     """FastAPI dependency — validates Bearer token against NEXUS_INGEST_API_KEY."""
     expected = os.getenv("NEXUS_INGEST_API_KEY", "")
     if not expected:
-        # If env var is not set, auth is disabled (useful for local dev)
-        return "anonymous"
-    if credentials.credentials != expected:
+        # Only a development run may go without a key; a deployed image fails closed.
+        if os.getenv("APP_ENV", "development") in ("development", "test"):
+            return "anonymous"
+        raise HTTPException(status_code=503, detail="NEXUS_INGEST_API_KEY is not configured")
+    if not hmac.compare_digest(credentials.credentials.encode(), expected.encode()):
         raise HTTPException(status_code=401, detail="Invalid API key")
     return credentials.credentials
 

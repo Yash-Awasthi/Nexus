@@ -207,3 +207,44 @@ class TestIngestEvents:
         # The publish call should have received 'medium' as priority
         _, call_kwargs = publish_mock.call_args
         assert call_kwargs.get("priority") == "medium"
+
+
+class TestFailClosed:
+    """NX-SEC-014: an unset key disables auth only in development, never in a deployed image."""
+
+    def test_unset_key_refuses_outside_development(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from fastapi import HTTPException
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        from nexus_ingest.auth import verify_token
+
+        monkeypatch.delenv("NEXUS_INGEST_API_KEY", raising=False)
+        monkeypatch.setenv("APP_ENV", "production")
+        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="anything")
+        with pytest.raises(HTTPException) as exc:
+            verify_token(creds)
+        assert exc.value.status_code == 503
+
+    def test_unset_key_allows_development(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        from nexus_ingest.auth import verify_token
+
+        monkeypatch.delenv("NEXUS_INGEST_API_KEY", raising=False)
+        monkeypatch.setenv("APP_ENV", "development")
+        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="anything")
+        assert verify_token(creds) == "anonymous"
+
+
+class TestScrapeRequiresKey:
+    """NX-SEC-014: scrape endpoints spend outbound requests, so they sit behind the key too."""
+
+    @pytest.mark.asyncio
+    async def test_scrape_sources_without_token(self, client: AsyncClient) -> None:
+        resp = await client.get("/scrape/sources")
+        assert resp.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_scrape_batch_without_token(self, client: AsyncClient) -> None:
+        resp = await client.post("/scrape/batch", json={"sources": []})
+        assert resp.status_code in (401, 403)

@@ -2,10 +2,20 @@
 """Tests for /scrape/* endpoints."""
 from __future__ import annotations
 
+from typing import AsyncIterator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from httpx import AsyncClient
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+
+@pytest_asyncio.fixture()
+async def client(app, auth_headers) -> AsyncIterator[AsyncClient]:
+    """The scrape routes sit behind the ingest key; these tests exercise them as a keyed caller."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", headers=auth_headers) as ac:
+        yield ac
 
 
 class TestListSources:

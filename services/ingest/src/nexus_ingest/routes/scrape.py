@@ -12,8 +12,9 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 
+from nexus_ingest.auth import verify_token
 from nexus_ingest.models import (
     ArticleOut,
     BatchScrapeRequest,
@@ -26,7 +27,7 @@ from nexus_ingest.models import (
 from nexus_ingest.settings import get_settings
 from nexus_ingest.scrapers.registry import SCRAPER_REGISTRY, get_scraper_class
 
-router = APIRouter(prefix="/scrape", tags=["scrape"])
+router = APIRouter(prefix="/scrape", tags=["scrape"], dependencies=[Depends(verify_token)])
 logger = logging.getLogger(__name__)
 
 

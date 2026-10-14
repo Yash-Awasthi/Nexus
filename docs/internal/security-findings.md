@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 3    | 10    | 0        |
+| Medium   | 2    | 11    | 0        |
 | Low      | 4    | 4     | 2        |
 
 ## Findings
@@ -202,14 +202,16 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-014 — Development stack exposes data stores and disables ingest auth
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `docker-compose.yml:29-30` and `:59-60` publish Postgres and password-less Redis on
   every interface; `:311` passes the ingest key as `NEXUS_API_SECRET`, which the service does not
   read, and `services/ingest/src/nexus_ingest/auth.py:26-29` disables auth when its key is unset;
   `routes/scrape.py` has no auth dependency at all.
-- **Fix:** bind published ports to `127.0.0.1`, pass `NEXUS_INGEST_API_KEY`, make ingest auth fail
-  closed unless `NEXUS_INGEST_ENV=development`, put the scrape router behind the key.
-- **Test:** _to be named_
+- **Fix:** Postgres, Redis, the Node inspectors (9229/9230) and debugpy (5678; both are remote
+  code execution for anyone who can reach them) publish on `127.0.0.1` only; compose passes
+  `NEXUS_INGEST_API_KEY`; ingest auth fails closed (503) unless `APP_ENV` is `development` or
+  `test` (the image sets `production`) and compares in constant time; the scrape router needs the key.
+- **Test:** `services/ingest/tests/test_auth.py`
 
 ### NX-SEC-015 — Model catalogue probe uses an unpinned fetch on a user-saved base URL
 

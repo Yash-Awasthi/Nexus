@@ -27,7 +27,7 @@ services:
       POSTGRES_USER: nexus
       POSTGRES_PASSWORD: nexus_dev_password
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       # Postgres 18 images keep data under a versioned subdirectory of this path.
       - postgres_data:/var/lib/postgresql
@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -309,6 +309,8 @@ services:
       # fin-scrape bridge (POST /scan, /push): pushes signals to the API's ingest endpoint.
       NEXUS_API_URL: http://api:3001
       NEXUS_API_SECRET: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
+      # Inbound key for /ingest and /scrape; without it the service runs open in development only.
+      NEXUS_INGEST_API_KEY: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
       FINSCRAPE_OUTPUT_DIR: /data/finscrape
       FINSCRAPE_DONE_DIR: /data/finscrape/done
     volumes:
