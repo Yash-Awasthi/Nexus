@@ -1748,6 +1748,13 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /api/v1/admin/security/posture:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/admin/routes:
     get:
       tags:

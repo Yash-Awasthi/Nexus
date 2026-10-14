@@ -17,6 +17,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { closePgPools, getPgPool, isEmbeddedUrl } from "./lib/pg-pool.ts";
+import { checkPosture } from "./lib/security-posture.ts";
+import { sharedKvBackend } from "./lib/shared-kv.ts";
 
 // ── .env loader (zero-dependency) ───────────────────────────────────────────
 // Parses a standard KEY=VALUE .env file at the monorepo root so `pnpm dev:api`
@@ -184,6 +186,11 @@ async function main(): Promise<void> {
 
   validateSecrets();
   console.log("[startup] secrets validated ✓");
+  if (process.env.NODE_ENV === "production") {
+    for (const c of checkPosture(process.env, { sharedKv: sharedKvBackend() }))
+      if (c.status === "fail")
+        console.warn(`[startup] ⚠ security check ${c.id}: ${c.detail} ${c.fix}`);
+  }
 
   // ── Step 1: Early health server ─────────────────────────────────────────────
   // Bind the port immediately so Render's health check gets 200 right away,

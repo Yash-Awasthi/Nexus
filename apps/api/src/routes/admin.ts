@@ -16,6 +16,10 @@
 import { GatewayAdminService } from "@nexus/admin-gateway";
 import type { FastifyInstance } from "fastify";
 
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
+import { checkPosture, summarize } from "../lib/security-posture.ts";
+import { sharedKvBackend } from "../lib/shared-kv.ts";
+
 import { requireAdminRole } from "./admin-users.ts";
 import { DRIVER_ALIASES, gatewayLog } from "./gateway.ts";
 
@@ -52,6 +56,22 @@ let adminSettings: AdminSettings = {
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** GET /admin/routes */
+  /** GET /admin/security/posture — the security check (NX-FEAT-001). */
+  app.get("/admin/security/posture", { preHandler: requireAdminRole }, async (request, reply) => {
+    const checks = checkPosture(process.env, { sharedKv: sharedKvBackend() });
+    emitAuditEvent(
+      {
+        entityType: "system",
+        entityId: "security-posture",
+        action: "security.check_run",
+        actor: request.nexusUserId ?? "unknown",
+        payload: summarize(checks),
+      },
+      request.log,
+    );
+    return reply.send({ checkedAt: new Date().toISOString(), summary: summarize(checks), checks });
+  });
+
   app.get("/admin/routes", { preHandler: requireAdminRole }, async (_req, reply) => {
     const routes = adminService.listRoutes();
     return reply.send({ routes, total: routes.length });
