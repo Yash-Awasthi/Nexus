@@ -16,7 +16,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-006 | Cross-account isolation test over the live route table                 | P2       | done   | —      |
 | NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)       | P1       | done   | —      |
 | NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)              | P1       | done   | FR-6   |
-| NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in        | P3       | open   | —      |
+| NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in        | P3       | done   | —      |
 | NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page                | P2       | done   | —      |
 | NX-FEAT-011 | Audit-log export to object storage with object lock (threat model T3)  | P3       | done   | —      |
 | NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI  | P2       | done   | —      |
@@ -31,8 +31,10 @@ P1 items is in [design.md](design.md).
   test until it does. Found NX-SEC-034 to NX-SEC-037.
 - **NX-FEAT-007.** Done as `apps/api/tests/security/public-routes.test.ts`: a test rather than a
   script, so CI runs it with the API suite and no new pipeline step is needed.
-- **NX-FEAT-009.** Worth it once recovery codes exist; needs a WebAuthn verifier, which means a
-  dependency or a careful CBOR/COSE implementation. Not this program.
+- **NX-FEAT-009.** Done with `@simplewebauthn/server` (verifying attestation by hand is not worth
+  the risk) and the browser's own WebAuthn JSON helpers. Passwordless only: user verification is
+  required, so a passkey is two factors itself and skips the code step. Tests:
+  `tests/routes/passkeys.test.ts` (a software authenticator) and `e2e/passkeys.spec.ts`.
 - **NX-FEAT-010.** Done: migration 0020 adds `last_used_ip`; `verifyPat` takes the request IP and
   writes at most once a minute per token unless the address changes (`tests/lib/pat-store.test.ts`).
 - **NX-FEAT-012.** Done with a user-side twin: `components/sessions-list.tsx` serves Profile and

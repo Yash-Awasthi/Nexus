@@ -30,7 +30,7 @@ import {
   emailVerificationTokens,
 } from "@nexus/db/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
@@ -59,6 +59,7 @@ import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { jwtClaims, requireAuthWithTier } from "../middleware/auth.ts";
 
 import { acceptLoginCode, acceptRecoveryCode } from "./mfa.ts";
+import { passkeyRoutes } from "./passkeys.ts";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,
@@ -213,6 +214,51 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     return { accessToken, rawRefresh };
   };
 
+  /** Open a session for a user who has proved who they are, and tell them of a new device. */
+  const completeSignIn = async (
+    user: typeof users.$inferSelect,
+    request: FastifyRequest,
+    reply: FastifyReply,
+    method: "password" | "passkey",
+  ) => {
+    emitReaction(user.id, "user.login", { at: new Date().toISOString() });
+    const agent = request.headers["user-agent"] ?? null;
+    const known = await db
+      .select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, user.id),
+          agent === null ? isNull(refreshTokens.userAgent) : eq(refreshTokens.userAgent, agent),
+        ),
+      )
+      .limit(1);
+    const { accessToken, rawRefresh } = await startSession(user, agent);
+    if (known.length === 0) {
+      await securityEvent(user.id, "signin.new", {
+        message: `From ${agent ?? "an unknown client"} at ${request.ip}.`,
+      });
+    }
+    emitAuditEvent(
+      {
+        entityType: "user",
+        entityId: user.id,
+        action: "auth.login",
+        actor: user.id,
+        payload: { userAgent: agent, ip: request.ip, method },
+      },
+      app.log,
+    );
+    setRefreshCookie(request, reply, rawRefresh);
+    return reply.send({
+      accessToken,
+      refreshToken: rawRefresh,
+      expiresIn: ACCESS_TOKEN_TTL_SEC,
+      tokenType: "Bearer",
+      user: safeUser(user),
+    });
+  };
+
   // A rotated-away refresh token coming back later was copied, so every session ends;
   // one coming back within the grace window is two tabs refreshing at once.
   const endSessionsOnReplay = async (tokenHash: string): Promise<void> => {
@@ -259,6 +305,8 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     app.post("/auth/verify-email", notConfigured);
     return;
   }
+
+  await passkeyRoutes(app, completeSignIn);
 
   /**
    * POST /auth/register
@@ -437,48 +485,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       }
 
       recordLoginSuccess(throttleKey);
-      emitReaction(user.id, "user.login", { at: new Date().toISOString() });
-
-      const agent = request.headers["user-agent"] ?? null;
-      const known = await db
-        .select({ id: refreshTokens.id })
-        .from(refreshTokens)
-        .where(
-          and(
-            eq(refreshTokens.userId, user.id),
-            agent === null ? isNull(refreshTokens.userAgent) : eq(refreshTokens.userAgent, agent),
-          ),
-        )
-        .limit(1);
-      const { accessToken, rawRefresh } = await startSession(user, agent);
-      if (known.length === 0) {
-        await securityEvent(user.id, "signin.new", {
-          message: `From ${agent ?? "an unknown client"} at ${request.ip}.`,
-        });
-      }
-
-      emitAuditEvent(
-        {
-          entityType: "user",
-          entityId: user.id,
-          action: "auth.login",
-          actor: user.id,
-          payload: {
-            userAgent: request.headers["user-agent"] ?? null,
-            ip: request.ip,
-          },
-        },
-        app.log,
-      );
-
-      setRefreshCookie(request, reply, rawRefresh);
-      return reply.send({
-        accessToken,
-        refreshToken: rawRefresh,
-        expiresIn: ACCESS_TOKEN_TTL_SEC,
-        tokenType: "Bearer",
-        user: safeUser(user),
-      });
+      return completeSignIn(user, request, reply, "password");
     },
   );
 

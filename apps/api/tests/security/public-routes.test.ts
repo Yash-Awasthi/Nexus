@@ -29,6 +29,8 @@ const PUBLIC_V1 = new Set<string>([
   "POST /api/v1/auth/forgot-password",
   "POST /api/v1/auth/reset-password",
   "POST /api/v1/auth/verify-email",
+  "POST /api/v1/auth/passkeys/login/options",
+  "POST /api/v1/auth/passkeys/login",
   // Single sign-on entry points and callbacks (state / SAML InResponseTo verified in-handler).
   "GET /api/v1/oauth/providers",
   "GET /api/v1/oauth/google",

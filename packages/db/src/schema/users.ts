@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  bigint,
+  boolean,
+  timestamp,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 // ── users ─────────────────────────────────────────────────────────────────────
 
@@ -264,3 +273,26 @@ export const emailVerificationTokens = pgTable(
 
 export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 export type NewEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
+
+/** WebAuthn credentials for passwordless sign-in (migration 0021). */
+export const passkeys = pgTable(
+  "passkeys",
+  {
+    /** Credential id, base64url, as the authenticator reports it */
+    id: text("id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    /** COSE public key, base64url */
+    publicKey: text("public_key").notNull(),
+    counter: bigint("counter", { mode: "number" }).notNull().default(0),
+    transports: text("transports")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [index("passkeys_user_id_idx").on(t.userId)],
+);
+
+export type Passkey = typeof passkeys.$inferSelect;

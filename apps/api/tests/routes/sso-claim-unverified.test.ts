@@ -70,6 +70,10 @@ it("takes every other way in away from an unverified account the real owner sign
   });
   expect(squat.statusCode, squat.body).toBe(201);
   const squatter = squat.json<{ refreshToken: string; user: { id: string } }>();
+  await getPgPool(DB)!.query(
+    `INSERT INTO passkeys (id, user_id, public_key, name) VALUES ('squatter-key', $1, 'k', 'x')`,
+    [squatter.user.id],
+  );
 
   const signedIn = await googleSignIn("owner@example.com");
   expect(signedIn.userId).toBe(squatter.user.id);
@@ -87,6 +91,11 @@ it("takes every other way in away from an unverified account the real owner sign
     payload: { refreshToken: squatter.refreshToken },
   });
   expect(refresh.statusCode).toBe(401);
+
+  const keys = await getPgPool(DB)!.query("SELECT id FROM passkeys WHERE user_id = $1", [
+    squatter.user.id,
+  ]);
+  expect(keys.rows).toEqual([]);
 });
 
 it("leaves a verified account's password alone", async () => {
