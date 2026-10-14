@@ -18,11 +18,11 @@ import { authenticate, AuthError, verifyJwtRS256 } from "@nexus/auth";
 import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-import { sessionRevocations } from "../lib/auth-hardening.ts";
 import { sha256hex } from "../lib/crypto-utils.ts";
 import { patScopesAllow } from "../lib/pat-scopes.ts";
 import { verifyPat } from "../lib/pat-store.ts";
 import { getPgPool } from "../lib/pg-pool.ts";
+import { isRevoked } from "../lib/session-revocation.ts";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 
@@ -107,6 +107,16 @@ export async function requireUserId(
   return userId;
 }
 
+/** Claims of a bearer JWT whose signature was already verified. */
+function jwtClaims(authorization: string | undefined): Record<string, unknown> {
+  try {
+    const body = (authorization ?? "").split(".")[1] ?? "";
+    return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 /** Requests whose caller is already known, so no layer verifies the token twice for it. */
 const resolved = new WeakSet<FastifyRequest>();
 
@@ -119,8 +129,6 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     // RS256 (asymmetric) mode (§14.1): verify with the public key, alg-pinned.
     jwtAlg: (process.env.NEXUS_JWT_ALG === "RS256" ? "RS256" : "HS256") as "HS256" | "RS256",
     jwtPublicKey: process.env.NEXUS_JWT_PUBLIC_KEY || undefined,
-    // Reject revoked sessions (§14.3) on every verified JWT.
-    revocations: sessionRevocations,
     // Dev bypass only when NO auth method is configured at all.
     disabled:
       !process.env.NEXUS_API_KEY &&
@@ -128,7 +136,11 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
       !process.env.NEXUS_JWT_PUBLIC_KEY,
   };
   try {
-    authenticate(request.headers.authorization, authConfig);
+    const result = authenticate(request.headers.authorization, authConfig);
+    if (result.method === "jwt" && (await isRevoked(jwtClaims(request.headers.authorization)))) {
+      await reply.code(401).send({ code: "REVOKED_TOKEN", message: "Token has been revoked" });
+      return;
+    }
     await resolveIdentity(request);
   } catch (err) {
     if (err instanceof AuthError) {
@@ -195,6 +207,7 @@ export async function resolveIdentity(request: FastifyRequest): Promise<void> {
       payload = _verifyHs256(token, jwtSecret);
     }
     if (payload) {
+      if (await isRevoked(payload)) return;
       request.nexusUserId = typeof payload.sub === "string" ? payload.sub : undefined;
       const { role } = payload as { role?: unknown };
       if (typeof role === "string") request.nexusRole = role;

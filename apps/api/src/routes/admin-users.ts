@@ -20,6 +20,7 @@ import { eq, isNull, isNotNull, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { assignOwnerless, ownerlessCounts } from "../lib/owner.ts";
+import { endAllSessions, revokeSubject } from "../lib/session-revocation.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Admin role guard ──────────────────────────────────────────────────────────
@@ -188,6 +189,8 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
         .returning();
 
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
+      // Access tokens carry the role; a changed role must not keep working for their lifetime.
+      if (updates.role || updates.tier) await revokeSubject(updated.id);
       return reply.send(safeUserAdmin(updated));
     },
   );
@@ -197,11 +200,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id/suspend",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      // Revoke all sessions
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: new Date() })
-        .where(and(eq(refreshTokens.userId, request.params.id), isNull(refreshTokens.revokedAt)));
+      await endAllSessions(request.params.id);
 
       const [updated] = await db
         .update(users)
@@ -259,10 +258,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id/sessions",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: new Date() })
-        .where(and(eq(refreshTokens.userId, request.params.id), isNull(refreshTokens.revokedAt)));
+      await endAllSessions(request.params.id);
 
       return reply.send({ revoked: true, userId: request.params.id });
     },
@@ -273,11 +269,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      // Revoke sessions first
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: new Date() })
-        .where(eq(refreshTokens.userId, request.params.id));
+      await endAllSessions(request.params.id);
 
       await db.delete(users).where(eq(users.id, request.params.id));
       return reply.code(204).send();

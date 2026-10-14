@@ -34,6 +34,8 @@ import { users, workspaces, workspaceMembers } from "@nexus/db/schema";
 import { eq, isNull, and, ilike, or } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
+import { endAllSessions } from "../lib/session-revocation.ts";
+
 // ── SCIM media type ───────────────────────────────────────────────────────────
 
 const SCIM_MEDIA = "application/scim+json";
@@ -330,6 +332,7 @@ export async function scimRoutes(app: FastifyInstance): Promise<void> {
         status: "404",
         detail: "User not found",
       });
+    if (updates.deletedAt) await endAllSessions(updated.id);
     return reply.send(toScimUser(updated));
   });
 
@@ -394,6 +397,7 @@ export async function scimRoutes(app: FastifyInstance): Promise<void> {
           detail: "User not found",
         });
       await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, request.params.id));
+      await endAllSessions(request.params.id);
       return reply.code(204).send();
     },
   );

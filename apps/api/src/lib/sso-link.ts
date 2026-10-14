@@ -3,11 +3,12 @@
 // identity provider strips the account of every credential its registrant set.
 
 import { db } from "@nexus/db";
-import { refreshTokens, users } from "@nexus/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { users } from "@nexus/db/schema";
+import { and, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
 import { emitAuditEvent } from "./audit-emitter.ts";
+import { endAllSessions } from "./session-revocation.ts";
 
 /** Make `user` safe to enter through `provider`; a no-op once its email is verified. */
 export async function claimForSso(
@@ -27,10 +28,7 @@ export async function claimForSso(
     .where(and(eq(users.id, user.id), eq(users.emailVerified, false)))
     .returning({ id: users.id });
   if (claimed.length === 0) return;
-  await db
-    .update(refreshTokens)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(refreshTokens.userId, user.id), isNull(refreshTokens.revokedAt)));
+  await endAllSessions(user.id);
   void emitAuditEvent(
     {
       entityType: "user",

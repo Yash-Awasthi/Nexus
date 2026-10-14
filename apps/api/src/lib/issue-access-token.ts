@@ -57,17 +57,23 @@ export function toNexusRole(role: string): NexusRole {
  * @param tier       optional tier claim (auth-users passes it; SAML omits it)
  * @param jwtSecret  HS256 signing secret (required for the HS256 path; the
  *                   RS256 path uses NEXUS_JWT_PRIVATE_KEY instead)
+ * @param sid        refresh-token row id of the session, so ending it ends this token
  */
 export function issueAccessToken(
   userId: string,
   role: string,
   tier?: string,
   jwtSecret?: string,
+  sid?: string,
 ): IssuedAccessToken {
+  // iatMs: revocation compares against a millisecond cutoff; iat alone cannot order a token
+  // issued in the same second as a revocation.
   const payload = {
     sub: userId,
     role: toNexusRole(role),
     ...(tier !== undefined ? { tier } : {}),
+    ...(sid ? { sid } : {}),
+    iatMs: Date.now(),
     exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
   } as Parameters<typeof signJwt>[0];
 

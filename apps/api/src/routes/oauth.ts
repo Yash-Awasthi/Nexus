@@ -133,17 +133,21 @@ async function upsertOAuthUser(
 
   // Issue access token honoring NEXUS_JWT_ALG (§14.1) — role mapped via
   // toNexusRole inside the shared helper (platform roles are not NexusRoles).
-  const { accessToken } = issueAccessToken(userId, role, tier, secret);
-
   const rawRefresh = randomBytes(32).toString("hex");
+  let sid: string | undefined;
   if (process.env.DATABASE_URL) {
-    await db.insert(refreshTokens).values({
-      userId,
-      tokenHash: _sha256hex(rawRefresh),
-      expiresAt: new Date(Date.now() + _OAUTH_REFRESH_TTL_MS),
-      userAgent: userAgent ?? null,
-    });
+    const [row] = await db
+      .insert(refreshTokens)
+      .values({
+        userId,
+        tokenHash: _sha256hex(rawRefresh),
+        expiresAt: new Date(Date.now() + _OAUTH_REFRESH_TTL_MS),
+        userAgent: userAgent ?? null,
+      })
+      .returning({ id: refreshTokens.id });
+    sid = row?.id;
   }
+  const { accessToken } = issueAccessToken(userId, role, tier, secret, sid);
 
   return { accessToken, refreshToken: rawRefresh, userId };
 }

@@ -225,15 +225,17 @@ async function upsertSamlUser(
     userId = newUser!.id;
   }
 
-  const { accessToken } = issueAccessToken(userId, role, tier, secret);
-
   const rawRefresh = randomBytes(32).toString("hex");
-  await db.insert(refreshTokens).values({
-    userId,
-    tokenHash: createHash("sha256").update(rawRefresh).digest("hex"),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
-    userAgent,
-  });
+  const [row] = await db
+    .insert(refreshTokens)
+    .values({
+      userId,
+      tokenHash: createHash("sha256").update(rawRefresh).digest("hex"),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+      userAgent,
+    })
+    .returning({ id: refreshTokens.id });
+  const { accessToken } = issueAccessToken(userId, role, tier, secret, row?.id);
 
   return { accessToken, refreshToken: rawRefresh, userId };
 }

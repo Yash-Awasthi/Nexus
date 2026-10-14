@@ -43,6 +43,7 @@ import { sha256hex } from "../lib/crypto-utils.ts";
 import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
+import { endAllSessions, revokeSession } from "../lib/session-revocation.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -177,6 +178,25 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     return s;
   };
 
+  /** A new refresh-token row and an access token bound to it by `sid`. */
+  const startSession = async (
+    user: { id: string; role: string; tier: string },
+    userAgent: string | null | undefined,
+  ): Promise<{ accessToken: string; rawRefresh: string }> => {
+    const rawRefresh = generateRefreshToken();
+    const [row] = await db
+      .insert(refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: sha256hex(rawRefresh),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        userAgent: userAgent ?? null,
+      })
+      .returning({ id: refreshTokens.id });
+    const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret(), row?.id);
+    return { accessToken, rawRefresh };
+  };
+
   const dbAvailable = !!process.env.DATABASE_URL;
 
   if (!dbAvailable) {
@@ -198,6 +218,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     app.post("/auth/reset-password", notConfigured);
     app.get("/auth/sessions", notConfigured);
     app.delete("/auth/sessions/:id", notConfigured);
+    app.post("/auth/sessions/revoke-all", notConfigured);
     app.post("/auth/send-verification", notConfigured);
     app.post("/auth/verify-email", notConfigured);
     return;
@@ -263,17 +284,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
       if (!user) return reply.code(500).send({ error: "insert_failed" });
 
-      // Issue tokens
-      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
-      const rawRefresh = generateRefreshToken();
-      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-
-      await db.insert(refreshTokens).values({
-        userId: user.id,
-        tokenHash: sha256hex(rawRefresh),
-        expiresAt,
-        userAgent: request.headers["user-agent"] ?? null,
-      });
+      const { accessToken, rawRefresh } = await startSession(user, request.headers["user-agent"]);
 
       emitAuditEvent(
         {
@@ -368,16 +379,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       recordLoginSuccess(throttleKey);
       emitReaction(user.id, "user.login", { at: new Date().toISOString() });
 
-      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
-      const rawRefresh = generateRefreshToken();
-      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-
-      await db.insert(refreshTokens).values({
-        userId: user.id,
-        tokenHash: sha256hex(rawRefresh),
-        expiresAt,
-        userAgent: request.headers["user-agent"] ?? null,
-      });
+      const { accessToken, rawRefresh } = await startSession(user, request.headers["user-agent"]);
 
       emitAuditEvent(
         {
@@ -476,21 +478,10 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(401).send({ error: "user_not_found" });
       }
 
-      const { accessToken: newAccessToken } = issueAccessToken(
-        user.id,
-        user.role,
-        user.tier,
-        jwtSecret(),
+      const { accessToken: newAccessToken, rawRefresh: newRawRefresh } = await startSession(
+        user,
+        stored.userAgent,
       );
-      const newRawRefresh = generateRefreshToken();
-      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-
-      await db.insert(refreshTokens).values({
-        userId: user.id,
-        tokenHash: sha256hex(newRawRefresh),
-        expiresAt,
-        userAgent: stored.userAgent,
-      });
 
       setRefreshCookie(request, reply, newRawRefresh);
       return reply.send({
@@ -524,12 +515,14 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const rawToken = request.body?.refreshToken ?? refreshCookie(request);
       if (rawToken) {
-        await db
+        const ended = await db
           .update(refreshTokens)
           .set({ revokedAt: new Date() })
           .where(
             and(eq(refreshTokens.tokenHash, sha256hex(rawToken)), isNull(refreshTokens.revokedAt)),
-          );
+          )
+          .returning({ id: refreshTokens.id });
+        for (const { id } of ended) await revokeSession(id);
       }
       setRefreshCookie(request, reply, null);
       // Always 204 — don't reveal whether token existed
@@ -772,10 +765,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
       await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, user.id));
 
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: now })
-        .where(and(eq(refreshTokens.userId, user.id), isNull(refreshTokens.revokedAt)));
+      await endAllSessions(user.id);
 
       emitAuditEvent(
         {
@@ -861,9 +851,27 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       .update(refreshTokens)
       .set({ revokedAt: new Date() })
       .where(and(eq(refreshTokens.id, sessionId), isNull(refreshTokens.revokedAt)));
+    await revokeSession(sessionId);
 
     return reply.code(204).send();
   });
+
+  /** POST /auth/sessions/revoke-all — sign out everywhere, this device included. */
+  app.post(
+    "/auth/sessions/revoke-all",
+    { preHandler: requireAuthWithTier },
+    async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+      await endAllSessions(userId);
+      emitAuditEvent(
+        { entityType: "user", entityId: userId, action: "auth.sessions_revoked", actor: userId },
+        app.log,
+      );
+      setRefreshCookie(request, reply, null);
+      return reply.code(204).send();
+    },
+  );
 
   // ── Email verification ─────────────────────────────────────────────────────
 

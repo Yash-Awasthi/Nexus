@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 13   | 0     | 0        |
+| Medium   | 12   | 1     | 0        |
 | Low      | 9    | 0     | 1        |
 
 ## Findings
@@ -111,7 +111,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-006 — Access-token revocation is never triggered, not persisted, and skipped on one path
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `lib/auth-hardening.ts` holds `SessionRevocationRegistry` in memory; nothing in the
   API calls `revokeAllForSubject` or `revokeJti`. `resolveIdentity` (`middleware/auth.ts:175`,
   run for every `/api/v1` request) never consults it, and `requireUserId` routes trust it.
@@ -122,7 +122,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Fix:** persist a per-subject cutoff (and per-session id) in the shared KV with a TTL equal to
   the access-token lifetime, check it in both verifiers, and call it from every place that ends
   sessions. See design.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/session-revocation.test.ts`
 
 ### NX-SEC-007 — Public completion endpoint has no effective spend ceiling
 

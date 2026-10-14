@@ -50,20 +50,23 @@ routes.
 - **Credentials accepted:** master `NEXUS_API_KEY` (no user identity, treated as admin by
   `authenticate`, but `requireAdminRole` needs a user so admin routes refuse it); user JWT
   (HS256 with `NEXUS_JWT_SECRET`, or RS256 with `NEXUS_JWT_PUBLIC_KEY`, 15-minute expiry, claims
-  `sub`, `role`, `tier`, `exp`, `iat`, no `jti`); personal access tokens `nxk_*` (SHA-256 in
+  `sub`, `role`, `tier`, `exp`, `iat`, `iatMs`, and `sid` = the refresh-token row of the session); personal access tokens `nxk_*` (SHA-256 in
   `api_keys`, scopes enforced by `lib/pat-scopes.ts`); any other `api_keys` row.
-- **Two verifiers.** `requireAuth` → `@nexus/auth` `authenticate()` verifies signature, expiry and
-  the revocation registry, then `resolveIdentity`. `resolveIdentity` alone (used by
-  `enterUserContext` on every `/api/v1` request) verifies the JWT signature and expiry with its
-  own HS256 routine and **does not** consult revocation. Routes that only call `requireUserId`
-  (governance, MCP servers, provider credentials in the bridge) rely on this second path.
+- **Two verifiers.** `requireAuth` → `@nexus/auth` `authenticate()` verifies signature and
+  expiry, then `lib/session-revocation.ts` `isRevoked`, then `resolveIdentity`.
+  `resolveIdentity` alone (used by `enterUserContext` on every `/api/v1` request, and trusted by
+  routes that only call `requireUserId`) verifies the JWT with its own HS256 routine and also asks
+  `isRevoked`; a revoked token resolves to no identity. Both paths must keep that check.
 - **Admin.** `requireAdminRole` (`routes/admin-users.ts`) re-reads the role from Postgres on each
   request, so a demotion is immediate for admin routes. Other role checks read the JWT `role`.
 - **Sessions.** Refresh tokens: 32 random bytes, SHA-256 at rest (`refresh_tokens`), 30 days,
   rotated on use, cookie `nexus_refresh` (`HttpOnly; SameSite=Strict; Path=/api/v1/auth`) for
-  browsers, body for API clients. Revocation of access tokens: `@nexus/auth`
-  `SessionRevocationRegistry`, held in process memory (`lib/auth-hardening.ts`), and at the
-  baseline never written to by any route.
+  browsers, body for API clients. Revocation of access tokens: per-user
+  cutoff and per-session marks in the shared KV (`lib/session-revocation.ts`, TTL one token
+  lifetime, 5-second memo per replica). `endAllSessions` revokes refresh tokens and the cutoff
+  together; password reset, admin suspend/delete/role change, SCIM deprovision, GDPR erasure, SSO
+  claim and `POST /auth/sessions/revoke-all` call it; `DELETE /auth/sessions/:id` and logout
+  revoke that session only.
 - **Brute force.** `LoginThrottle` keyed `email|ip`, in process memory; IP rate limits through the
   shared KV.
 - **SSO.** Google, GitHub, Slack (`routes/oauth.ts`), generic OIDC (`routes/oidc.ts`), SAML
