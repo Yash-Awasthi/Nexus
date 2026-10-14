@@ -342,6 +342,21 @@ export async function listPats(ownerId: string): Promise<PersonalAccessToken[]> 
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Revoke every token `ownerId` holds, in the DB and this process's cache. */
+export async function revokeOwnerPats(ownerId: string): Promise<void> {
+  if (_dbUsable()) {
+    try {
+      await defaultDb
+        .delete(apiKeys)
+        .where(and(eq(apiKeys.ownerId, ownerId), like(apiKeys.keyPrefix, `${PAT_PREFIX}%`)));
+    } catch {
+      _dbMode = "mem";
+      _cooldownUntil = Date.now() + _cooldownMs();
+    }
+  }
+  for (const [id, t] of _pats) if (t.ownerId === ownerId) _pats.delete(id);
+}
+
 /**
  * Revoke by id; returns false when the token doesn't exist or isn't the caller's.
  * Hard-deletes from api_keys AND the cache: the token vanishes from the

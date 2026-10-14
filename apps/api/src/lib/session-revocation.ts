@@ -7,6 +7,7 @@ import { refreshTokens } from "@nexus/db/schema";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 
 import { ACCESS_TOKEN_TTL_SEC } from "./issue-access-token.ts";
+import { revokeOwnerPats } from "./pat-store.ts";
 import { getSecurityKV } from "./shared-kv.ts";
 
 const TTL_MS = (ACCESS_TOKEN_TTL_SEC + 60) * 1000;
@@ -91,6 +92,15 @@ export async function endAllSessions(userId: string): Promise<void> {
     .set({ revokedAt: new Date() })
     .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   await revokeSubject(userId);
+}
+
+/**
+ * End every way into an account that is being suspended, deleted or claimed: sessions, access
+ * tokens and personal access tokens. Signing out everywhere leaves the account's API tokens alone.
+ */
+export async function endAccountAccess(userId: string): Promise<void> {
+  await endAllSessions(userId);
+  await revokeOwnerPats(userId);
 }
 
 /** Whether a verified access-token payload was revoked after it was issued. */
