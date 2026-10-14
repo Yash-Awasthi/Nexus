@@ -25,6 +25,8 @@ import type { FastifyInstance } from "fastify";
 import { isNeonCompatibleUrl } from "../lib/pg-pool.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
+import { requireAdminRole } from "./admin-users.ts";
+
 // ── Singletons ────────────────────────────────────────────────────────────────
 
 // In-memory store for the pipeline (sync BM25 search)
@@ -38,6 +40,9 @@ const wikiAcl = new WikiAcl();
 
 /** Who is acting: always the signed-in caller, never a name in the request. */
 const me = (req: { nexusUserId?: string }): string => req.nexusUserId ?? "local";
+/** Whether the caller wrote this comment; anyone else is told it does not exist. */
+const mine = (req: { nexusUserId?: string }, commentId: string): boolean =>
+  wikiComments.get(commentId)?.authorId === me(req);
 const _wikiSearch = new WikiSearch(); // supplementary full-text across comments
 const _wikiNotifier = new WikiNotifier();
 
@@ -136,7 +141,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
       dryRun?: boolean;
       sessionId?: string;
     };
-  }>("/wiki/update", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/wiki/update", { preHandler: requireAdminRole }, async (request, reply) => {
     const result = await wikiPipeline.run({
       document: request.body.document,
       dryRun: request.body.dryRun ?? false,
@@ -163,7 +168,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (request, reply) => {
       const deletedMem = wikiStore.delete(request.params.id);
@@ -188,7 +193,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (_req, reply) => {
       const terms = wikiStore.reindex();
@@ -246,6 +251,8 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
     Params: { commentId: string };
     Body: { content: string };
   }>("/wiki/comments/:commentId", { preHandler: requireAuth }, async (request, reply) => {
+    if (!mine(request, request.params.commentId))
+      return reply.code(404).send({ error: "Comment not found" });
     try {
       const updated = wikiComments.update(request.params.commentId, request.body.content);
       return reply.send(updated);
@@ -269,6 +276,8 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (request, reply) => {
+      if (!mine(request, request.params.commentId))
+        return reply.code(404).send({ error: "Comment not found" });
       try {
         const resolved = wikiComments.resolve(request.params.commentId);
         return reply.send(resolved);
@@ -290,6 +299,8 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (request, reply) => {
+      if (!mine(request, request.params.commentId))
+        return reply.code(404).send({ error: "Comment not found" });
       try {
         wikiComments.delete(request.params.commentId);
         return reply.code(204).send();
@@ -411,22 +422,17 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /wiki/articles/:id/acl
    * Grant a role to a user.
-   * Body: { userId, role }. The first grant on a page makes the caller its owner;
-   * after that only an owner grants.
+   * Body: { userId, role }. Admin only: pages are shared by the whole server.
    */
   app.post<{
     Params: { id: string };
     Body: { userId: string; role: "owner" | "editor" | "viewer" };
-  }>("/wiki/articles/:id/acl", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/wiki/articles/:id/acl", { preHandler: requireAdminRole }, async (request, reply) => {
     const { userId, role } = request.body;
     const pageId = request.params.id;
     if (!userId || !role) {
       return reply.code(400).send({ error: "userId and role are required" });
     }
-    if (wikiAcl.listEntries(pageId).length === 0)
-      wikiAcl.grant(pageId, me(request), "owner", me(request));
-    else if (!wikiAcl.canAdmin(pageId, me(request)))
-      return reply.code(403).send({ error: "Only a page owner grants access" });
     const entry = wikiAcl.grant(pageId, userId, role, me(request));
     return reply.code(201).send(entry);
   });
@@ -441,11 +447,9 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (request, reply) => {
-      if (!wikiAcl.canAdmin(request.params.id, me(request)))
-        return reply.code(403).send({ error: "Only a page owner revokes access" });
       wikiAcl.revoke(request.params.id, request.params.userId);
       return reply.code(204).send();
     },

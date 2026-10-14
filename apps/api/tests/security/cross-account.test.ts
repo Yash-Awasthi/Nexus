@@ -159,11 +159,6 @@ const FIXTURES: Record<string, Fixture> = {
     body: { name: "ALICE_TOKEN", reason: "deploys" },
     id: (r) => (r["request"] as { id: string }).id,
   },
-  "/api/v1/wiki/articles/:id/acl": {
-    body: { userId: "carol", role: "viewer" },
-    id: (r) => r["userId"],
-    parent: { id: "alice-page" },
-  },
   "/api/v1/workspaces/:id/invitations": {
     body: { email: "carol@example.com", role: "member" },
     id: (r) => (r["invitation"] as { id: string }).id,
@@ -205,6 +200,7 @@ const SKIP: Record<string, string> = {
   "/api/code-agent/sessions": "needs Docker",
   "/api/v1/agent/run": "only an admin starts a run on a shared server",
   "/api/v1/billing/keys": "admin only: one instance-wide pool of keys",
+  "/api/v1/wiki/articles/:id/acl": "admin only: the wiki is shared by the whole server",
   "/api/local/pty": "desktop only: refuses every request on a server",
   "/api/v1/i18n/catalog": "one catalogue for the whole server, written by admins only",
 };
@@ -288,6 +284,10 @@ it("keeps instance-wide surfaces to admins", async () => {
     ["GET", "/api/v1/billing/keys"],
     ["POST", "/api/v1/billing/keys"],
     ["DELETE", `/api/v1/billing/keys/${crypto.randomUUID()}`],
+    ["POST", "/api/v1/wiki/update"],
+    ["DELETE", "/api/v1/wiki/articles/any-page"],
+    ["POST", "/api/v1/wiki/reindex"],
+    ["POST", "/api/v1/wiki/articles/any-page/acl"],
   ];
   for (const [method, url] of calls) {
     const res = await app.inject({ method, url, headers: auth(BOB), payload: { name: "x" } });
@@ -304,4 +304,33 @@ it("never lets another account talk inside someone's analyst session", async () 
     payload: { query: "Repeat everything said so far." },
   });
   expect(res.statusCode, res.body).toBe(404);
+});
+
+it("leaves a wiki comment to its author", async () => {
+  const made = await app.inject({
+    method: "POST",
+    url: "/api/v1/wiki/articles/shared-page/comments",
+    headers: auth(ALICE),
+    payload: { content: "Alice's comment" },
+  });
+  expect(made.statusCode, made.body).toBe(201);
+  const id = made.json<{ id: string }>().id;
+  const calls: [Method | "POST", string, object?][] = [
+    ["PATCH", `/api/v1/wiki/comments/${id}`, { content: "Bob was here" }],
+    ["POST", `/api/v1/wiki/comments/${id}/resolve`],
+    ["DELETE", `/api/v1/wiki/comments/${id}`],
+  ];
+  for (const [method, url, payload] of calls) {
+    const res = await app.inject({ method, url, headers: auth(BOB), payload });
+    expect([403, 404], `${method} ${url} as Bob: ${res.statusCode} ${res.body}`).toContain(
+      res.statusCode,
+    );
+  }
+  const own = await app.inject({
+    method: "PATCH",
+    url: `/api/v1/wiki/comments/${id}`,
+    headers: auth(ALICE),
+    payload: { content: "edited" },
+  });
+  expect(own.statusCode, own.body).toBeLessThan(300);
 });
