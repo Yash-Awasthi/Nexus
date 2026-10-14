@@ -114,7 +114,13 @@ export async function safeResolve(rootDir: string, p: string): Promise<string> {
     return real;
   } catch (err) {
     if (err instanceof Error && err.message.includes("escapes drive")) throw err;
-    return resolved;
+    // A dangling link would let a write create its target wherever it points.
+    if ((await fs.lstat(resolved).catch(() => null))?.isSymbolicLink())
+      throw escapeError(`symlink escapes drive: ${p}`);
+    if (rel === "") return resolved;
+    // Missing path: its parent must still resolve inside the drive, links included.
+    const parent = await safeResolve(rootDir, path.dirname(rel));
+    return path.join(parent, path.basename(resolved));
   }
 }
 
