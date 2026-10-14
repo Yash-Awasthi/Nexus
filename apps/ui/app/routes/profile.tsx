@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/profile";
 
 import { MfaSection } from "~/components/mfa-section";
+import { Page, PageHeader, Section, SettingRow } from "~/components/page";
 import { PasskeysSection } from "~/components/passkeys-section";
 import { SessionsList } from "~/components/sessions-list";
-import { Page, PageHeader, Section, SettingRow } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {

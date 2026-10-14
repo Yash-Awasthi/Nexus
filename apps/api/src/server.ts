@@ -42,8 +42,8 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 
-import { startAuditExport } from "./lib/audit-export.ts";
 import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-maturity.ts";
+import { startAuditExport } from "./lib/audit-export.ts";
 import { attachChannels } from "./lib/channels.ts";
 import { costLogStore } from "./lib/cost-log.ts";
 import { idle as idleOrgRuns } from "./lib/org-runtime.ts";
@@ -73,6 +73,7 @@ import { contextRoutes } from "./routes/context.ts";
 import { conversationAnalysisRoutes } from "./routes/conversation-analysis.ts";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.ts";
 import { councilRoutes } from "./routes/council.ts";
+import { cspReportRoutes } from "./routes/csp-report.ts";
 import { diagnosticsRoutes } from "./routes/diagnostics.ts";
 import { diffRoutes } from "./routes/diff.ts";
 import { discussionRoutes } from "./routes/discussion.ts";
@@ -82,7 +83,6 @@ import { execApprovalRoutes } from "./routes/exec-approvals.ts";
 import { featureFlagsRoutes } from "./routes/feature-flags.ts";
 import { forecastRoutes } from "./routes/forecast.ts";
 import { gatewayRoutes } from "./routes/gateway.ts";
-import { cspReportRoutes } from "./routes/csp-report.ts";
 import { geoipRoutes } from "./routes/geoip.ts";
 import { governanceRoutes } from "./routes/governance.ts";
 import { healthRoutes } from "./routes/health.ts";

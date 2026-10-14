@@ -58,6 +58,12 @@ const signInRateLimit = makeRateLimitPreHandler({
   keyPrefix: "auth:passkey",
 });
 
+const manageRateLimit = makeRateLimitPreHandler({
+  limit: 20,
+  windowMs: 60_000,
+  keyPrefix: "auth:passkey-manage",
+});
+
 export async function passkeyRoutes(
   app: FastifyInstance,
   completeSignIn: CompleteSignIn,
@@ -87,7 +93,7 @@ export async function passkeyRoutes(
   /** POST /auth/passkeys/register/options — start adding a passkey. */
   app.post(
     "/auth/passkeys/register/options",
-    { preHandler: requireAuthWithTier },
+    { preHandler: [requireAuthWithTier, manageRateLimit] },
     async (request, reply) => {
       const rp = relyingParty();
       if (!rp) return unavailable(reply);
@@ -122,7 +128,7 @@ export async function passkeyRoutes(
   app.post<{ Body: { name?: string; response: RegistrationResponseJSON } }>(
     "/auth/passkeys/register",
     {
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, manageRateLimit],
       schema: {
         body: {
           type: "object",
@@ -167,7 +173,7 @@ export async function passkeyRoutes(
   /** DELETE /auth/passkeys/:id — remove one of the caller's passkeys. */
   app.delete<{ Params: { id: string } }>(
     "/auth/passkeys/:id",
-    { preHandler: requireAuthWithTier },
+    { preHandler: [requireAuthWithTier, manageRateLimit] },
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(403).send({ error: "jwt_required" });
