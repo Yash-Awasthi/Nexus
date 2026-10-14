@@ -59,6 +59,12 @@ Render dashboard; `OAUTH_REDIRECT_BASE` and `ALLOWED_ORIGINS` are the service's 
 `https://<name>.onrender.com` URL. Free instances sleep when idle, so the first
 request after a quiet spell takes about a minute.
 
+A value set in the dashboard wins over `render.yaml`. Keep `NEXUS_TRUST_PROXY` as the blueprint
+lists it (Cloudflare, then Render's edge, then a local hop): a hop count stops the API from
+starting, and a shorter list makes every user look like one proxy address to rate limits and
+security notices. Set `NEXUS_PUBLIC_URL` to the service URL for passkeys and mail links. When a
+deploy does not go live, Render's Events show `update_failed` and the start-up log says why.
+
 > The dashboard talks to two route layers: `/api/v1/*` are the real, DB-backed handlers
 > (auth, council, memory, connectors, billing, feature-flags, projects, image-gen, voice,
 > scraping). The broader `/api/*` surface is served by an in-memory bridge for
