@@ -69,8 +69,8 @@ decision.
 - [x] Audit worker job handlers and BullMQ payload trust
 - [x] Audit plugin registry publish/run and marketplace content
 - [x] Audit session sync
-- [ ] NX-SEC-027 Rewrite `docs/security/threat-model.md`
-- [ ] `docs/STATUS.md` behaviour-change notes for operators (webhook secrets now required, Libertas
+- [x] NX-SEC-027 Rewrite `docs/security/threat-model.md`
+- [x] `docs/STATUS.md` behaviour-change notes for operators (webhook secrets now required, Libertas
       ceilings, SSO claim of unverified accounts)
 - [ ] Push
 

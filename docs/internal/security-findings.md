@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 0    | 14    | 0        |
-| Low      | 1    | 8     | 3        |
+| Low      | 0    | 9     | 3        |
 
 ## Findings
 
@@ -317,10 +317,10 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-027 — Threat model no longer matches the code
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `docs/security/threat-model.md` lists removed packages (`packages/adapters`),
   "planned" controls that exist (rate limiting, SSRF guard) and none of the exec surfaces.
-- **Fix:** rewrite against [architecture.md](architecture.md) at the end of the program.
+- **Fix:** rewritten against [architecture.md](architecture.md) (version 2.0).
 
 ### NX-SEC-028 — Brief share links are signed with a public default key
 

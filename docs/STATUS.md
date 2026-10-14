@@ -352,6 +352,40 @@ account over. Consumer sign-in (Google/GitHub) is unaffected; creating an accoun
 SAML's user lookup also now skips soft-deleted rows, which every other auth path already did. An
 erased account is no longer revived by signing in.
 
+## ⚠ Behaviour changes from the October 2026 security hardening
+
+Run the security check after deploying: `nexus security check` (or Admin → System). It lists
+every setting below that still needs attention.
+
+- **Migration 0019** adds `users.mfa_recovery_codes`. The single-origin image (`infra/web`) now
+  applies migrations before the API starts; other deployments must run `node src/migrate.ts` (or
+  `pnpm db:migrate`) before the new API serves sign-ins.
+- **Bot webhooks need their secrets.** Slack answers 503 without `SLACK_SIGNING_SECRET`, Telegram
+  without `TELEGRAM_WEBHOOK_SECRET`, Teams without `TEAMS_BOT_APP_ID` (its Bot Framework token is
+  now verified). Replies authenticate with `NEXUS_API_KEY`.
+- **Public completions** (`/api/v1/libertas/complete`) are limited per client address (IPv6 by
+  /64, from `request.ip`, so set `NEXUS_TRUST_PROXY` behind a proxy) and globally by
+  `NEXUS_LIBERTAS_GLOBAL_PER_MIN` (default 30); prompts are capped at 4 000 characters.
+- **Single sign-on into an unverified account** removes that account's password, MFA and sessions
+  before signing in, so whoever registered an address without proving it cannot keep a way in.
+  Production has no email delivery yet, so password accounts there are unverified: their owners'
+  first Google/GitHub/OIDC/SAML sign-in turns them into SSO accounts.
+- **Sign-out is real.** Password reset, admin suspend/delete/role change, SCIM deprovisioning,
+  account erasure and `POST /api/v1/auth/sessions/revoke-all` end access tokens within seconds,
+  not 15 minutes later. Revocations persist in Redis/Upstash, or Postgres when neither is set.
+- **Reset and verification tokens are no longer logged.** With no email delivery, production
+  password reset is unavailable until one is configured.
+- **Sign-in codes are spent once**, ten recovery codes are issued when MFA is turned on, and
+  `POST /api/v1/mfa/validate` is gone. Thirty failed passwords in five minutes pause an account's
+  sign-ins until the window ends.
+- **Google sign-in requires a Google-verified address; GitHub uses a verified email or the
+  account's id; Slack identities are scoped to their workspace** (old Slack accounts are adopted on
+  their next sign-in).
+- **Development compose** publishes Postgres, Redis and the debuggers on 127.0.0.1 only, and the
+  ingest service refuses requests without its key outside `APP_ENV=development`.
+- **Brief share links** are signed with `BRIEF_SIGNING_KEY` or a key derived from `NEXUS_API_KEY`;
+  links made with the old default no longer open.
+
 ## Known caveats
 
 - Models with no price row (TokenRouter's models, which publish no prices) are billed at the default rate
