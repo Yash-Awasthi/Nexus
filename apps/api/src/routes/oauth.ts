@@ -36,13 +36,18 @@ import { randomBytes } from "node:crypto";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.ts";
 import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
-import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import {
+  bindSignInState,
+  failSignIn,
+  finishSignIn,
+  stateFromThisBrowser,
+} from "../lib/sign-in-finish.ts";
 import { claimForSso } from "../lib/sso-link.ts";
 
 // IP-keyed limiter for unauthenticated OAuth callback routes (no user yet).
@@ -66,13 +71,15 @@ const _redirectBase = (): string => process.env.OAUTH_REDIRECT_BASE ?? "http://l
 
 const STATE_TTL_MS = 5 * 60_000; // 5 minutes
 
-async function _genState(): Promise<string> {
+async function _genState(request: FastifyRequest, reply: FastifyReply): Promise<string> {
   const state = randomBytes(24).toString("base64url");
   await getSharedKV().set<boolean>(`oauth:state:${state}`, true, STATE_TTL_MS);
+  bindSignInState(request, reply, state);
   return state;
 }
 
-async function _consumeState(state: string): Promise<boolean> {
+async function _consumeState(request: FastifyRequest, state: string): Promise<boolean> {
+  if (!stateFromThisBrowser(request, state)) return false;
   const kv = getSharedKV();
   const key = `oauth:state:${state}`;
   const valid = await kv.get<boolean>(key);
@@ -176,14 +183,14 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
    * Redirect to Google OAuth consent screen.
    * Requires GOOGLE_CLIENT_ID env var.
    */
-  app.get("/oauth/google", async (_request, reply) => {
+  app.get("/oauth/google", async (request, reply) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       return reply
         .code(501)
         .send({ error: "Google OAuth not configured (GOOGLE_CLIENT_ID missing)" });
     }
-    const state = await _genState();
+    const state = await _genState(request, reply);
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${_redirectBase()}/api/v1/oauth/google/callback`,
@@ -207,7 +214,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       const { code, state, error } = request.query;
       if (error) return failSignIn(request, reply, 400, { error });
       if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
-      if (!state || !(await _consumeState(state))) {
+      if (!state || !(await _consumeState(request, state))) {
         return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
 
@@ -276,14 +283,14 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
    * Redirect to GitHub OAuth consent screen.
    * Requires GITHUB_CLIENT_ID env var.
    */
-  app.get("/oauth/github", async (_request, reply) => {
+  app.get("/oauth/github", async (request, reply) => {
     const clientId = process.env.GITHUB_CLIENT_ID;
     if (!clientId) {
       return reply
         .code(501)
         .send({ error: "GitHub OAuth not configured (GITHUB_CLIENT_ID missing)" });
     }
-    const state = await _genState();
+    const state = await _genState(request, reply);
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${_redirectBase()}/api/v1/oauth/github/callback`,
@@ -304,7 +311,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       const { code, state, error } = request.query;
       if (error) return failSignIn(request, reply, 400, { error });
       if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
-      if (!state || !(await _consumeState(state))) {
+      if (!state || !(await _consumeState(request, state))) {
         return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
 
@@ -391,14 +398,14 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
    * Redirect to Slack OAuth consent screen.
    * Requires SLACK_CLIENT_ID env var.
    */
-  app.get("/oauth/slack", async (_request, reply) => {
+  app.get("/oauth/slack", async (request, reply) => {
     const clientId = process.env.SLACK_CLIENT_ID;
     if (!clientId) {
       return reply
         .code(501)
         .send({ error: "Slack OAuth not configured (SLACK_CLIENT_ID missing)" });
     }
-    const state = await _genState();
+    const state = await _genState(request, reply);
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${_redirectBase()}/api/v1/oauth/slack/callback`,
@@ -416,7 +423,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       const { code, state, error } = request.query;
       if (error) return failSignIn(request, reply, 400, { error });
       if (!code) return failSignIn(request, reply, 400, { error: "missing_code" });
-      if (!state || !(await _consumeState(state))) {
+      if (!state || !(await _consumeState(request, state))) {
         return failSignIn(request, reply, 400, { error: "invalid_state" });
       }
       const clientId = process.env.SLACK_CLIENT_ID;

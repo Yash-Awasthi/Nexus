@@ -42,6 +42,31 @@ export function refreshCookie(request: FastifyRequest): string | undefined {
   return undefined;
 }
 
+const STATE_COOKIE = "nexus_sso_state";
+
+/** Tie a sign-in `state` to the browser starting it, so its callback cannot finish elsewhere. */
+export function bindSignInState(request: FastifyRequest, reply: FastifyReply, state: string): void {
+  const attrs = [
+    `${STATE_COOKIE}=${state}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/api/v1",
+    "Max-Age=300",
+    ...(request.protocol === "https" ? ["Secure"] : []),
+  ];
+  reply.header("Set-Cookie", attrs.join("; "));
+}
+
+/** A browser callback must carry the state cookie it was given; the desktop app's own fetch has none. */
+export function stateFromThisBrowser(request: FastifyRequest, state: string): boolean {
+  if (!isBrowserNavigation(request)) return true;
+  for (const part of (request.headers.cookie ?? "").split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name === STATE_COOKIE) return value.join("=") === state;
+  }
+  return false;
+}
+
 /** A page navigation asks for HTML; the desktop app's fetch and API clients do not. */
 export function isBrowserNavigation(request: FastifyRequest): boolean {
   return (request.headers.accept ?? "").includes("text/html");

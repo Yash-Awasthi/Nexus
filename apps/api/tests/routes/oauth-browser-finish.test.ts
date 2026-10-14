@@ -55,8 +55,12 @@ function stubGitHub(login: string) {
   );
 }
 
+let stateCookie = "";
+
+/** A started sign-in; a browser sends back the state cookie it was given (stateCookie). */
 async function freshState(): Promise<string> {
   const start = await app.inject({ method: "GET", url: "/api/v1/oauth/github" });
+  stateCookie = String(start.headers["set-cookie"]).split(";")[0]!;
   return new URL(String(start.headers.location)).searchParams.get("state")!;
 }
 
@@ -65,7 +69,7 @@ it("sends a browser into the app with the refresh cookie and no token in the URL
   const res = await app.inject({
     method: "GET",
     url: `/api/v1/oauth/github/callback?code=c&state=${await freshState()}`,
-    headers: { accept: BROWSER },
+    headers: { accept: BROWSER, cookie: stateCookie },
   });
 
   expect(res.statusCode).toBe(302);
@@ -125,7 +129,7 @@ it("sends a browser back to the sign-in page with the reason when sign-in fails"
   const refused = await app.inject({
     method: "GET",
     url: `/api/v1/oauth/github/callback?code=c&state=${await freshState()}`,
-    headers: { accept: BROWSER },
+    headers: { accept: BROWSER, cookie: stateCookie },
   });
   expect(refused.headers.location).toBe("/login?error=bad_verification_code");
 });

@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 9    | 4     | 0        |
+| Medium   | 8    | 5     | 0        |
 | Low      | 7    | 2     | 1        |
 
 ## Findings
@@ -151,14 +151,14 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-009 — Sign-in callbacks are not bound to the browser that started them
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** OAuth and OIDC store `state` in the shared KV only (`routes/oauth.ts:66`,
   `routes/oidc.ts`). Nothing ties it to the initiating browser.
 - **Impact:** login CSRF: a callback URL produced in one browser completes in another, signing the
   victim into the attacker's account (their later uploads and keys land there).
 - **Fix:** set an `HttpOnly; SameSite=Lax` cookie carrying the state when redirecting to the
   provider and require it on browser-navigation callbacks.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/oauth-state-binding.test.ts`
 
 ### NX-SEC-010 — Google ignores `email_verified`; Slack sign-in mints accounts for any Slack user
 

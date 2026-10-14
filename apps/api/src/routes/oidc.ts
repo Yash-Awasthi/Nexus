@@ -26,14 +26,19 @@ import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { pinnedFetch } from "@nexus/runtime";
 import { eq, and, isNull } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.ts";
 import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
-import { failSignIn, finishSignIn } from "../lib/sign-in-finish.ts";
+import {
+  bindSignInState,
+  failSignIn,
+  finishSignIn,
+  stateFromThisBrowser,
+} from "../lib/sign-in-finish.ts";
 import { claimForSso } from "../lib/sso-link.ts";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.ts";
 
@@ -65,13 +70,15 @@ function isOidcConfigured(): boolean {
 
 const STATE_TTL_MS = 5 * 60_000; // 5 minutes
 
-async function _genState(): Promise<string> {
+async function _genState(request: FastifyRequest, reply: FastifyReply): Promise<string> {
   const state = randomBytes(24).toString("base64url");
   await getSharedKV().set<boolean>(`oidc:state:${state}`, true, STATE_TTL_MS);
+  bindSignInState(request, reply, state);
   return state;
 }
 
-async function _consumeState(state: string): Promise<boolean> {
+async function _consumeState(request: FastifyRequest, state: string): Promise<boolean> {
+  if (!stateFromThisBrowser(request, state)) return false;
   const kv = getSharedKV();
   const key = `oidc:state:${state}`;
   const valid = await kv.get<boolean>(key);
@@ -406,7 +413,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const state = await _genState();
+      const state = await _genState(request, reply);
       const params = new URLSearchParams({
         response_type: "code",
         client_id: cfg.clientId!,
@@ -454,7 +461,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // CSRF validation
-    const stateValid = await _consumeState(state);
+    const stateValid = await _consumeState(request, state);
     if (!stateValid) {
       return failSignIn(request, reply, 400, {
         error: "invalid_state",
