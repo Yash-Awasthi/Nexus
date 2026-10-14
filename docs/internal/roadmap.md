@@ -32,7 +32,7 @@ decision.
 - [x] NX-SEC-017 Reset/verify single redemption; refresh reuse ends the family
 - [x] NX-SEC-009 Sign-in state cookie
 - [x] NX-SEC-010 Google `email_verified`; Slack identity and provisioning policy
-- [ ] NX-SEC-011 Account-wide guess ceiling in shared KV
+- [x] NX-SEC-011 Account-wide guess ceiling in shared KV
 - [ ] NX-SEC-012 Remove `/mfa/validate`; TOTP replay guard
 - [x] NX-SEC-019 JWT `exp` required
 - [x] NX-SEC-020 SCIM constant-time compare; deprovision revokes

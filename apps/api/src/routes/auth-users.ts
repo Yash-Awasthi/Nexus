@@ -34,8 +34,10 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
+  accountLocked,
   assertLoginAllowed,
   loginThrottleKey,
+  recordAccountFailure,
   recordLoginFailure,
   recordLoginSuccess,
 } from "../lib/auth-hardening.ts";
@@ -371,6 +373,14 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       // key is never billed scrypt cycles, and incremented on each failure.
       const throttleKey = loginThrottleKey(normalEmail, request.ip);
       assertLoginAllowed(throttleKey);
+      if (await accountLocked(normalEmail)) {
+        return reply
+          .code(429)
+          .send({
+            error: "too_many_attempts",
+            message: "Too many failed sign-ins; try again later",
+          });
+      }
 
       const [user] = await db
         .select()
@@ -383,6 +393,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
       if (!user || !valid) {
         recordLoginFailure(throttleKey);
+        await recordAccountFailure(normalEmail);
         return reply
           .code(401)
           .send({ error: "invalid_credentials", message: "Invalid email or password" });
@@ -396,6 +407,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         }
         if (!(await acceptLoginCode(user.id, user.totpSecret, code.trim()))) {
           recordLoginFailure(throttleKey);
+          await recordAccountFailure(normalEmail);
           return reply
             .code(401)
             .send({ error: "invalid_mfa_code", message: "That authenticator code is not valid" });

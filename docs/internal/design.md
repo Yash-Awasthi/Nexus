@@ -143,8 +143,8 @@ only through `assertMayProvision`.
 
 ## NX-SEC-011 — Account-wide guess ceiling
 
-Second counter keyed on the email alone in the shared KV: 30 failures per 15 minutes trips a
-5-minute lock. The per `email|ip` exponential throttle stays as the first line. Lock state lives
+Second counter keyed on the email alone in the shared KV: 30 failures in a fixed 5-minute window
+refuse further sign-ins (429) until the window ends. The per `email|ip` exponential throttle stays as the first line. Lock state lives
 in the KV so restarts and replicas agree.
 
 ## NX-SEC-012 — MFA

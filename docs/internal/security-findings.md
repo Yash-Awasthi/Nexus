@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 8    | 5     | 0        |
+| Medium   | 7    | 6     | 0        |
 | Low      | 7    | 2     | 1        |
 
 ## Findings
@@ -173,11 +173,11 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-011 — Password guessing is limited per address, not per account
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `loginThrottleKey(email, ip)` in `lib/auth-hardening.ts`; in memory.
 - **Fix:** add an account-wide failure counter in the shared KV with a softer ceiling (slows a
   distributed guess without letting an attacker lock the owner out for long).
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/auth-account-ceiling.test.ts`
 
 ### NX-SEC-012 — Unauthenticated TOTP check endpoint; codes are replayable; secrets may be plaintext
 
