@@ -359,8 +359,6 @@ export class StreamingAnalyst {
 
 // ── AnalystSession ────────────────────────────────────────────────────────────
 
-let _aSeq = 0;
-
 /** Analyst session. */
 export class AnalystSession {
   readonly id: string;
@@ -369,8 +367,8 @@ export class AnalystSession {
   private analyst: StreamingAnalyst;
   readonly createdAt: string;
 
-  constructor(domain: AnalystDomain, analyst: StreamingAnalyst) {
-    this.id = `analyst-${++_aSeq}`;
+  constructor(domain: AnalystDomain, analyst: StreamingAnalyst, id?: string) {
+    this.id = id ?? `analyst-${crypto.randomUUID()}`;
     this.domain = domain;
     this.analyst = analyst;
     this.createdAt = new Date().toISOString();
@@ -412,8 +410,9 @@ export class AnalystSessionManager {
     this.analyst = analyst;
   }
 
-  create(domain: AnalystDomain): AnalystSession {
-    const session = new AnalystSession(domain, this.analyst);
+  /** `id` restores a persisted session under the id its owner already holds. */
+  create(domain: AnalystDomain, id?: string): AnalystSession {
+    const session = new AnalystSession(domain, this.analyst, id);
     this.sessions.set(session.id, session);
     return session;
   }

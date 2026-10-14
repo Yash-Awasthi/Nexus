@@ -92,7 +92,7 @@ async function loadSession(
   try {
     const persisted = await getSharedKV().get<PersistedSession>(SESSION_KEY(sessionId));
     if (persisted?.ownerId !== ownerId) return undefined;
-    const session = manager.create(persisted.domain);
+    const session = manager.create(persisted.domain, sessionId);
     _owners.set(session.id, ownerId);
     // Re-hydrate history by adding messages back
     for (const msg of persisted.history) session.addMessage(msg.role, msg.content);
