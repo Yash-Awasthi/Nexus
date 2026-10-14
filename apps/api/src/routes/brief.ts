@@ -11,8 +11,10 @@
  *   DigestStore    — in-memory fallback
  *
  * Signing:
- *   BriefSigner uses BRIEF_SIGNING_KEY env var (falls back to "dev-key").
+ *   BRIEF_SIGNING_KEY, else a key derived from NEXUS_API_KEY; never a constant.
  */
+
+import { createHmac, randomBytes } from "node:crypto";
 
 import {
   BriefEngine,
@@ -33,13 +35,20 @@ const digestStore: DigestStore | PgDigestStore = isNeonCompatibleUrl(process.env
   ? new PgDigestStore(process.env.DATABASE_URL)
   : new DigestStore();
 
+// Share links prove who may read a brief; a fallback key anyone knows lets anyone mint them.
+const shareKey =
+  process.env.BRIEF_SIGNING_KEY ||
+  createHmac("sha256", process.env.NEXUS_API_KEY || randomBytes(32))
+    .update("nexus-brief-share-v1")
+    .digest("hex");
+
 const engine = new BriefEngine({
   baseUrl: process.env.NEXUS_API_URL ?? "http://localhost:3000",
-  hmacSecret: process.env.BRIEF_SIGNING_KEY,
+  hmacSecret: shareKey,
   store: digestStore instanceof DigestStore ? digestStore : undefined,
 });
 
-const signer = new BriefSigner(process.env.BRIEF_SIGNING_KEY);
+const signer = new BriefSigner(shareKey);
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 

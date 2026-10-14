@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 12   | 1     | 0        |
+| Medium   | 11   | 2     | 0        |
 | Low      | 9    | 0     | 1        |
 
 ## Findings
@@ -311,7 +311,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-028 — Brief share links are signed with a public default key
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `packages/brief-engine/src/index.ts:87` and `apps/api/src/routes/brief.ts` sign and
   verify share URLs with `BRIEF_SIGNING_KEY`, falling back to the literal `"dev-key"`; the Render
   blueprint does not set it. `GET /api/v1/brief/:domain/share/:digest` is public (found by the
@@ -319,7 +319,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Impact:** anyone can mint a valid share URL for any user id and date and read that brief.
 - **Fix:** when `BRIEF_SIGNING_KEY` is unset, derive the key from `NEXUS_API_KEY` (always present,
   checked at start-up) with a fixed label; never fall back to a constant.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/brief-share-key.test.ts`
 
 ### NX-SEC-029 — Audit chain falls back to a public HMAC key
 

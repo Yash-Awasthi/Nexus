@@ -46,7 +46,7 @@ decision.
 - [ ] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard
 - [ ] NX-SEC-026 GeoIP uses `request.ip`
 - [ ] NX-SEC-024 Upstash counter in one pipeline
-- [ ] NX-SEC-028 Brief share key derived from the API key, never a constant
+- [x] NX-SEC-028 Brief share key derived from the API key, never a constant
 - [ ] NX-SEC-013 Desktop external links limited to http/https/mailto
 - [ ] NX-SEC-014 Compose binds to loopback; ingest key wired; ingest auth fails closed; scrape router behind key
 - [ ] NX-SEC-016 Dependency advisories cleared (overrides / bumps)

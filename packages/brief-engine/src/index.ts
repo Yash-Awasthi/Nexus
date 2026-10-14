@@ -74,7 +74,7 @@ export interface BriefEngineOptions {
 
 // ── HMAC-SHA256 signing (node:crypto) ────────────────────────────────────────
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { neon } from "@neondatabase/serverless";
 
@@ -83,8 +83,8 @@ function realHmac(secret: string, data: string): string {
   return createHmac("sha256", secret).update(data).digest("hex");
 }
 
-/** Signing key — override via BRIEF_SIGNING_KEY env var in production. */
-const DEFAULT_HMAC_SECRET = process.env.BRIEF_SIGNING_KEY ?? "dev-key";
+/** BRIEF_SIGNING_KEY, else a per-process random key: links then last as long as the process. */
+const DEFAULT_HMAC_SECRET = process.env.BRIEF_SIGNING_KEY ?? randomBytes(32).toString("hex");
 
 // ── DigestStore ───────────────────────────────────────────────────────────────
 
@@ -340,7 +340,7 @@ export class BriefEngine {
   constructor(opts: BriefEngineOptions = {}) {
     this.baseUrl = opts.baseUrl ?? "https://nexus.local";
     this.store = opts.store ?? new DigestStore();
-    this.signer = new BriefSigner(opts.hmacSecret ?? "nexus-default-secret", opts.hmacFn);
+    this.signer = new BriefSigner(opts.hmacSecret ?? DEFAULT_HMAC_SECRET, opts.hmacFn);
     this.renderer = new BriefRenderer(opts.sectionsPerPage ?? 3);
     this.sectionBuilder = new SectionBuilder();
   }
