@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 11   | 2     | 0        |
+| Medium   | 10   | 3     | 0        |
 | Low      | 9    | 0     | 1        |
 
 ## Findings
@@ -230,13 +230,13 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-017 — One-time token races and no refresh-token reuse detection
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/auth-users.ts` reset-password selects then updates `usedAt` without a
   guard, so two concurrent requests both succeed; refresh rotation treats a replayed (revoked)
   token as merely invalid.
 - **Fix:** mark used with `WHERE used_at IS NULL … RETURNING`; on presentation of an already
   rotated refresh token revoke all of that user's sessions.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/auth-token-reuse.test.ts`
 
 ### NX-SEC-018 — Host terminal sessions are not owner-scoped
 

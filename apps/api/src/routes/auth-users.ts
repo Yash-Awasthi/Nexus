@@ -44,6 +44,7 @@ import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-toke
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
 import { endAllSessions, revokeSession } from "../lib/session-revocation.ts";
+import { getSharedKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -108,6 +109,11 @@ function generateRefreshToken(): string {
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
+
+interface RotatedMark {
+  userId: string;
+  at: number;
+}
 // Access-token issuance (TTL, RS256/HS256 selection, role mapping) lives in
 // lib/issue-access-token.ts — shared with the OAuth/OIDC/SAML SSO routes so
 // NEXUS_JWT_ALG is honored everywhere (§14.1).
@@ -195,6 +201,26 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       .returning({ id: refreshTokens.id });
     const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret(), row?.id);
     return { accessToken, rawRefresh };
+  };
+
+  // A rotated-away refresh token coming back later was copied, so every session ends;
+  // one coming back within the grace window is two tabs refreshing at once.
+  const endSessionsOnReplay = async (tokenHash: string): Promise<void> => {
+    const mark = await getSharedKV()
+      .get<RotatedMark>(`auth:rotated:${tokenHash}`)
+      .catch(() => undefined);
+    const grace = Number(process.env.NEXUS_REFRESH_REUSE_GRACE_MS ?? 30_000);
+    if (!mark || Date.now() - mark.at <= grace) return;
+    await endAllSessions(mark.userId);
+    emitAuditEvent(
+      {
+        entityType: "user",
+        entityId: mark.userId,
+        action: "auth.refresh_token_replayed",
+        actor: mark.userId,
+      },
+      app.log,
+    );
   };
 
   const dbAvailable = !!process.env.DATABASE_URL;
@@ -449,6 +475,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
 
       if (!stored) {
+        await endSessionsOnReplay(tokenHash);
         return reply.code(401).send({
           error: "invalid_refresh_token",
           message: "Refresh token is invalid, expired, or already used",
@@ -467,6 +494,11 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
           message: "Refresh token is invalid, expired, or already used",
         });
       }
+      await getSharedKV().set<RotatedMark>(
+        `auth:rotated:${tokenHash}`,
+        { userId: stored.userId, at: Date.now() },
+        REFRESH_TOKEN_TTL_MS,
+      );
 
       const [user] = await db
         .select()
@@ -755,13 +787,20 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "user_not_found" });
       }
 
-      const newPasswordHash = await hashPassword(password);
-
-      // Mark token used, update password, revoke all sessions — all in sequence
-      await db
+      // Only the request that marks the token used may redeem it.
+      const claimed = await db
         .update(passwordResetTokens)
         .set({ usedAt: now })
-        .where(eq(passwordResetTokens.id, stored.id));
+        .where(and(eq(passwordResetTokens.id, stored.id), isNull(passwordResetTokens.usedAt)))
+        .returning({ id: passwordResetTokens.id });
+      if (claimed.length === 0) {
+        return reply.code(400).send({
+          error: "invalid_reset_token",
+          message: "Reset token is invalid, expired, or already used",
+        });
+      }
+
+      const newPasswordHash = await hashPassword(password);
 
       await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, user.id));
 
@@ -993,10 +1032,19 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      await db
+      const claimed = await db
         .update(emailVerificationTokens)
         .set({ usedAt: now })
-        .where(eq(emailVerificationTokens.id, stored.id));
+        .where(
+          and(eq(emailVerificationTokens.id, stored.id), isNull(emailVerificationTokens.usedAt)),
+        )
+        .returning({ id: emailVerificationTokens.id });
+      if (claimed.length === 0) {
+        return reply.code(400).send({
+          error: "invalid_verification_token",
+          message: "Token is invalid, expired, or already used",
+        });
+      }
 
       // The token proves the address it was sent to; an email changed since then stays unverified.
       const verified = await db

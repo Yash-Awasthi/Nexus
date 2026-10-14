@@ -23,13 +23,13 @@ decision.
 - [x] NX-SEC-005 Teams webhook verifies the Bot Framework JWT; replies only to verified service URL
 - [x] NX-SEC-007 Libertas ceilings
 - [x] NX-FEAT-007 Route census test and allowlist
-- [ ] Push branch
+- [x] Push branch
 
 ## Phase 2 — Sessions and sign-in
 
 - [x] NX-SEC-006 Persistent revocation (`lib/session-revocation.ts`), `sid` claim, both verifiers
 - [x] NX-FEAT-002 `POST /auth/sessions/revoke-all`; session delete ends its access token
-- [ ] NX-SEC-017 Reset/verify single redemption; refresh reuse ends the family
+- [x] NX-SEC-017 Reset/verify single redemption; refresh reuse ends the family
 - [ ] NX-SEC-009 Sign-in state cookie
 - [ ] NX-SEC-010 Google `email_verified`; Slack identity and provisioning policy
 - [ ] NX-SEC-011 Account-wide guess ceiling in shared KV
