@@ -33,7 +33,7 @@ decision.
 - [x] NX-SEC-009 Sign-in state cookie
 - [x] NX-SEC-010 Google `email_verified`; Slack identity and provisioning policy
 - [x] NX-SEC-011 Account-wide guess ceiling in shared KV
-- [ ] NX-SEC-012 Remove `/mfa/validate`; TOTP replay guard
+- [x] NX-SEC-012 Remove `/mfa/validate`; TOTP replay guard
 - [x] NX-SEC-019 JWT `exp` required
 - [x] NX-SEC-020 SCIM constant-time compare; deprovision revokes
 - [x] Push
@@ -55,8 +55,8 @@ decision.
 
 ## Phase 4 — Security features
 
-- [ ] NX-FEAT-001 Security check: `lib/security-posture.ts`, admin endpoint, CLI command, admin panel
-- [ ] NX-SEC-029 Audit key fallback reported by the security check
+- [x] NX-FEAT-001 Security check: `lib/security-posture.ts`, admin endpoint, CLI command, admin panel
+- [x] NX-SEC-029 Audit key fallback reported by the security check
 - [ ] NX-FEAT-005 Audit events for security changes
 - [ ] NX-FEAT-003 Account security notifications
 - [ ] NX-FEAT-004 MFA recovery codes (migration, routes, login, UI)

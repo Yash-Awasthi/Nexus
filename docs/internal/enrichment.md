@@ -8,7 +8,7 @@ P1 items is in [design.md](design.md).
 
 | ID          | Feature                                                               | Priority | Status | Serves |
 | ----------- | --------------------------------------------------------------------- | -------- | ------ | ------ |
-| NX-FEAT-001 | Security check: posture endpoint, `nexus security check`, admin panel | P1       | in-progress | FR-1   |
+| NX-FEAT-001 | Security check: posture endpoint, `nexus security check`, admin panel | P1       | done   | FR-1   |
 | NX-FEAT-002 | Sign out everywhere / sign out one device ends access tokens          | P1       | done   | FR-2   |
 | NX-FEAT-003 | Account security notifications                                        | P1       | open   | FR-3   |
 | NX-FEAT-004 | MFA recovery codes                                                    | P1       | open   | FR-4   |

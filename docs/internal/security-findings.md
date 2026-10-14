@@ -36,8 +36,8 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 1    | 12    | 0        |
-| Low      | 3    | 5     | 2        |
+| Medium   | 0    | 13    | 0        |
+| Low      | 1    | 7     | 2        |
 
 ## Findings
 
@@ -181,14 +181,14 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-012 — Unauthenticated TOTP check endpoint; codes are replayable; secrets may be plaintext
 
-- **Severity:** medium · **Status:** in-progress
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/mfa.ts:282` `POST /mfa/validate` answers whether a code is valid for any
   `userId` without authentication (login already checks MFA itself). TOTP codes are accepted again
   within their window. Without `NEXUS_MFA_KEY` the secret is stored in plaintext.
 - **Fix:** remove `/mfa/validate` (done; no client used it); each sign-in code is accepted once
   (shared-KV mark per user and time step, done); the plaintext fallback is reported by the
   security check (NX-FEAT-001, pending).
-- **Test:** `apps/api/tests/routes/auth-mfa-login.test.ts`
+- **Test:** `apps/api/tests/routes/auth-mfa-login.test.ts, apps/api/tests/lib/security-posture.test.ts`
 
 ### NX-SEC-013 — Desktop shell opens any URL scheme from the renderer
 
@@ -270,10 +270,12 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-021 — CORS reflects every origin when `ALLOWED_ORIGINS` is unset
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `server.ts` `origin: ALLOWED_ORIGINS?.split(",") ?? true`. Bearer tokens are not
   sent automatically, so impact is limited; flagged by the security check.
-- **Fix:** keep the default for development; report it in the security check for production.
+- **Fix:** keep the default for development; the security check warns about it in production
+  (`cors-origins`).
+- **Test:** `apps/api/tests/lib/security-posture.test.ts`
 
 ### NX-SEC-022 — CI token permissions and action pinning
 
@@ -334,7 +336,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-029 — Audit chain falls back to a public HMAC key
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `apps/api/src/lib/audit-emitter.ts:62` and `routes/audit.ts:86` use
   `"nexus-dev-audit-key"` when `NEXUS_AUDIT_KEY` is unset; production start-up only warns.
 - **Impact:** someone with database write access can rebuild a valid chain after editing entries,
@@ -352,3 +354,5 @@ that never returns values; SAML with InResponseTo replay protection and signed a
 `email_verified` strictness and provisioning allowlist; startup refusal of placeholder secrets in
 production; refresh tokens hashed, rotated, cookie `HttpOnly; SameSite=Strict`; admin role
 re-read from the database.
+
+- **Test:** `apps/api/tests/lib/security-posture.test.ts`
