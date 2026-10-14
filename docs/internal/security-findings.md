@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 7    | 6     | 0        |
+| Medium   | 6    | 7     | 0        |
 | Low      | 7    | 2     | 1        |
 
 ## Findings
@@ -213,13 +213,13 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-015 — Model catalogue probe uses an unpinned fetch on a user-saved base URL
 
-- **Severity:** medium · **Status:** open
+- **Severity:** medium · **Status:** fixed
 - **Evidence:** `routes/api-bridge.ts:560` `fetchModelCatalog` calls global `fetch` on a base URL
   that a user saved (checked once at save time).
 - **Impact:** a hostname that re-resolves to a private address after saving reaches internal
   services; model ids from the response are echoed back.
 - **Fix:** use `callerFetch`.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/model-catalog-ssrf.test.ts`
 
 ### NX-SEC-016 — Production dependencies with high advisories
 

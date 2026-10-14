@@ -127,7 +127,7 @@ import {
   serviceKey,
   userEndpoint,
 } from "../lib/provider-keys.ts";
-import { fetchPublic, unsafeUrlReason } from "../lib/public-url.ts";
+import { callerFetch, fetchPublic, unsafeUrlReason } from "../lib/public-url.ts";
 import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import {
   emitReaction,
@@ -552,12 +552,16 @@ const _catalogCache = new Map<string, { ids: string[]; fetchedAt: number }>();
 const CATALOG_TTL_MS = 10 * 60_000;
 
 /** Model ids an OpenAI-compatible `/models` lists for one key (cached 10 min); null when unreachable. */
-async function fetchModelCatalog(base: string, key: string | null): Promise<string[] | null> {
+export async function fetchModelCatalog(
+  base: string,
+  key: string | null,
+): Promise<string[] | null> {
   const cacheKey = `${base}\n${key ? sha256hex(key) : ""}`;
   const cached = _catalogCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CATALOG_TTL_MS) return cached.ids;
   try {
-    const res = await fetch(`${base.replace(/\/+$/, "")}/models`, {
+    // A user saved this base URL; resolve-and-pin so it cannot re-point at a private host.
+    const res = await callerFetch(`${base.replace(/\/+$/, "")}/models`, {
       headers: { Accept: "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
       signal: AbortSignal.timeout(8_000),
     });
