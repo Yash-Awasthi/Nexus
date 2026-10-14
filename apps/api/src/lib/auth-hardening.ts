@@ -49,3 +49,11 @@ export async function recordAccountFailure(email: string): Promise<void> {
     .incr(accountKey(email), ACCOUNT_WINDOW_MS)
     .catch(() => undefined);
 }
+
+/** True for the first refused sign-in of a lockout window, so the owner hears about it once. */
+export async function firstLockRefusal(email: string): Promise<boolean> {
+  const n = await getSecurityKV()
+    .incr(`${accountKey(email)}:told`, ACCOUNT_WINDOW_MS)
+    .catch(() => 2);
+  return n === 1;
+}

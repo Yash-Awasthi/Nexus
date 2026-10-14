@@ -51,14 +51,14 @@ decision.
 - [x] NX-SEC-014 Compose binds to loopback; ingest key wired; ingest auth fails closed; scrape router behind key
 - [x] NX-SEC-016 Dependency advisories cleared (overrides / bumps)
 - [x] NX-SEC-022 CI `permissions: contents: read`
-- [ ] Push
+- [x] Push
 
 ## Phase 4 — Security features
 
 - [x] NX-FEAT-001 Security check: `lib/security-posture.ts`, admin endpoint, CLI command, admin panel
 - [x] NX-SEC-029 Audit key fallback reported by the security check
-- [ ] NX-FEAT-005 Audit events for security changes
-- [ ] NX-FEAT-003 Account security notifications
+- [x] NX-FEAT-005 Audit events for security changes
+- [x] NX-FEAT-003 Account security notifications
 - [ ] NX-FEAT-004 MFA recovery codes (migration, routes, login, UI)
 - [ ] NX-FEAT-008 CI advisory gate
 - [ ] Push

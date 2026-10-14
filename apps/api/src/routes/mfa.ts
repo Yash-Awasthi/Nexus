@@ -19,9 +19,9 @@ import { users } from "@nexus/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.ts";
+import { securityEvent } from "../lib/security-events.ts";
 import { getSecurityKV } from "../lib/shared-kv.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -273,10 +273,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
 
       await db.update(users).set({ mfaEnabled: true }).where(eq(users.id, userId));
 
-      emitAuditEvent(
-        { entityType: "user", entityId: userId, action: "mfa.enabled", actor: userId },
-        app.log,
-      );
+      await securityEvent(userId, "mfa.enabled", {}, app.log);
 
       return reply.send({ mfaEnabled: true, message: "MFA activated successfully" });
     },
@@ -325,10 +322,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
         .set({ mfaEnabled: false, totpSecret: null })
         .where(eq(users.id, userId));
 
-      emitAuditEvent(
-        { entityType: "user", entityId: userId, action: "mfa.disabled", actor: userId },
-        app.log,
-      );
+      await securityEvent(userId, "mfa.disabled", {}, app.log);
 
       return reply.send({ mfaEnabled: false, message: "MFA disabled successfully" });
     },

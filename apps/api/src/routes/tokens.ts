@@ -16,6 +16,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { isValidPatScope } from "../lib/pat-scopes.ts";
 import { createPat, listPats, revokePat } from "../lib/pat-store.ts";
+import { securityEvent } from "../lib/security-events.ts";
 
 /** Owner for the request's PATs: the authenticated user, or "dev" in bypass mode. */
 function patOwner(request: FastifyRequest): string {
@@ -82,6 +83,10 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
       scopes: request.body.scopes,
       expiresInDays: days,
     });
+    if (request.nexusUserId)
+      await securityEvent(request.nexusUserId, "token.created", {
+        message: `"${entry.name}", scopes: ${entry.scopes?.join(", ") || "all"}.`,
+      });
     return reply.code(201).send({
       id: entry.id,
       name: entry.name,

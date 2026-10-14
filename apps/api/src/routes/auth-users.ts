@@ -35,6 +35,7 @@ import type { FastifyInstance } from "fastify";
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
   accountLocked,
+  firstLockRefusal,
   assertLoginAllowed,
   loginThrottleKey,
   recordAccountFailure,
@@ -45,6 +46,7 @@ import { sha256hex } from "../lib/crypto-utils.ts";
 import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
+import { securityEvent } from "../lib/security-events.ts";
 import { endAllSessions, revokeSession } from "../lib/session-revocation.ts";
 import { getSecurityKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
@@ -374,6 +376,14 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const throttleKey = loginThrottleKey(normalEmail, request.ip);
       assertLoginAllowed(throttleKey);
       if (await accountLocked(normalEmail)) {
+        const [locked] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.email, normalEmail), isNull(users.deletedAt)))
+          .limit(1);
+        // Once per window: the counter has just crossed the line when this is the first refusal.
+        if (locked && (await firstLockRefusal(normalEmail)))
+          await securityEvent(locked.id, "signin.locked", {}, app.log);
         return reply.code(429).send({
           error: "too_many_attempts",
           message: "Too many failed sign-ins; try again later",
@@ -415,7 +425,23 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       recordLoginSuccess(throttleKey);
       emitReaction(user.id, "user.login", { at: new Date().toISOString() });
 
-      const { accessToken, rawRefresh } = await startSession(user, request.headers["user-agent"]);
+      const agent = request.headers["user-agent"] ?? null;
+      const known = await db
+        .select({ id: refreshTokens.id })
+        .from(refreshTokens)
+        .where(
+          and(
+            eq(refreshTokens.userId, user.id),
+            agent === null ? isNull(refreshTokens.userAgent) : eq(refreshTokens.userAgent, agent),
+          ),
+        )
+        .limit(1);
+      const { accessToken, rawRefresh } = await startSession(user, agent);
+      if (known.length === 0) {
+        await securityEvent(user.id, "signin.new", {
+          message: `From ${agent ?? "an unknown client"} at ${request.ip}.`,
+        });
+      }
 
       emitAuditEvent(
         {
@@ -657,6 +683,9 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const [updated] = await db.update(users).set(updates).where(eq(users.id, userId)).returning();
 
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
+      if (updates.email) {
+        await securityEvent(userId, "email.changed", { message: `It is now ${updates.email}.` });
+      }
       return reply.send(safeUser(updated));
     },
   );
@@ -815,6 +844,9 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, user.id));
 
       await endAllSessions(user.id);
+      await securityEvent(user.id, "password.changed", {
+        message: "Every session was signed out.",
+      });
 
       emitAuditEvent(
         {
@@ -913,10 +945,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(403).send({ error: "jwt_required" });
       await endAllSessions(userId);
-      emitAuditEvent(
-        { entityType: "user", entityId: userId, action: "auth.sessions_revoked", actor: userId },
-        app.log,
-      );
+      await securityEvent(userId, "sessions.revoked", {}, app.log);
       setRefreshCookie(request, reply, null);
       return reply.code(204).send();
     },

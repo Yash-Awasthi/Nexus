@@ -19,7 +19,9 @@ import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, isNull, isNotNull, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { assignOwnerless, ownerlessCounts } from "../lib/owner.ts";
+import { securityEvent } from "../lib/security-events.ts";
 import { endAllSessions, revokeSubject } from "../lib/session-revocation.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -53,6 +55,16 @@ export async function requireAdminRole(
       .code(403)
       .send({ error: "admin_required", message: "This endpoint requires the admin role" });
   }
+}
+
+/** An admin acting on the user named in the route, for the audit log. */
+function adminAction(request: FastifyRequest<{ Params: { id: string } }>, action: string) {
+  return {
+    entityType: "user",
+    entityId: request.params.id,
+    action,
+    actor: request.nexusUserId ?? "unknown",
+  };
 }
 
 // ── Safe user view ────────────────────────────────────────────────────────────
@@ -191,6 +203,13 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
       // Access tokens carry the role; a changed role must not keep working for their lifetime.
       if (updates.role || updates.tier) await revokeSubject(updated.id);
+      if (updates.role)
+        await securityEvent(
+          updated.id,
+          "role.changed",
+          { message: `It is now ${updated.role}.`, actor: request.nexusUserId },
+          request.log,
+        );
       return reply.send(safeUserAdmin(updated));
     },
   );
@@ -201,6 +220,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAdminRole },
     async (request, reply) => {
       await endAllSessions(request.params.id);
+      emitAuditEvent(adminAction(request, "admin.user_suspended"), request.log);
 
       const [updated] = await db
         .update(users)
@@ -225,6 +245,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
         .returning();
 
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
+      emitAuditEvent(adminAction(request, "admin.user_restored"), request.log);
       return reply.send({ restored: true, userId: updated.id });
     },
   );
@@ -259,6 +280,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAdminRole },
     async (request, reply) => {
       await endAllSessions(request.params.id);
+      emitAuditEvent(adminAction(request, "admin.sessions_revoked"), request.log);
 
       return reply.send({ revoked: true, userId: request.params.id });
     },
@@ -270,6 +292,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAdminRole },
     async (request, reply) => {
       await endAllSessions(request.params.id);
+      emitAuditEvent(adminAction(request, "admin.user_deleted"), request.log);
 
       await db.delete(users).where(eq(users.id, request.params.id));
       return reply.code(204).send();
