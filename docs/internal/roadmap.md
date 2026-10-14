@@ -21,7 +21,7 @@ decision.
 - [x] NX-SEC-003 Safe SSO linking (`lib/sso-link.ts`), all three SSO paths
 - [x] NX-SEC-004 GitHub identity from verified emails
 - [x] NX-SEC-005 Teams webhook verifies the Bot Framework JWT; replies only to verified service URL
-- [ ] NX-SEC-007 Libertas ceilings
+- [x] NX-SEC-007 Libertas ceilings
 - [ ] NX-FEAT-007 Route census script and allowlist
 - [ ] Push branch
 

@@ -12,8 +12,8 @@
  *                                 Uses Groq (when GROQ_API_KEY set) or
  *                                 a simple echo stub for local dev.
  *
- * Rate limit:  5 requests per 60 s per IP (IP extracted from X-Forwarded-For
- *              or socket remoteAddress).  Returns 429 + Retry-After on breach.
+ * Rate limit:  5 requests per 60 s per client (request.ip, IPv6 by /64) and
+ *              NEXUS_LIBERTAS_GLOBAL_PER_MIN (default 30) across all clients.
  *
  * Scope limits:
  *   - max_tokens capped at 512
@@ -24,6 +24,8 @@
  * Telemetry: each call is tracked as a "libertas.completion" hook event so
  * the AlertEngine and PostHog analytics can observe free-tier usage patterns.
  */
+
+import { isIP } from "node:net";
 
 import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
@@ -38,12 +40,21 @@ const LIBERTAS_MAX_TOKENS = 512; // hard cap
 const LIBERTAS_TEMPERATURE = 0.7; // fixed
 const LIBERTAS_KV_PREFIX = "libertas:rl"; // KV key namespace
 
-// ── IP extraction ─────────────────────────────────────────────────────────────
+const LIBERTAS_MAX_PROMPT_CHARS = 4_000;
+/** Ceiling across every caller: rotating addresses must not multiply the spend. */
+const globalPerMinute = (): number => Number(process.env.NEXUS_LIBERTAS_GLOBAL_PER_MIN) || 30;
 
-function getClientIp(request: FastifyRequest): string {
-  const fwd = request.headers["x-forwarded-for"];
-  if (fwd) return (Array.isArray(fwd) ? (fwd[0] ?? "") : (fwd.split(",")[0] ?? "")).trim();
-  return request.socket?.remoteAddress ?? "unknown";
+/** The rate-limit identity: request.ip (which honours NEXUS_TRUST_PROXY), IPv6 by its /64. */
+function clientKey(request: FastifyRequest): string {
+  const ip = request.ip;
+  if (isIP(ip) !== 6 || ip.toLowerCase().startsWith("::ffff:")) return ip;
+  const [head = "", tail = ""] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::")
+    ? [...left, ...Array<string>(8 - left.length - right.length).fill("0"), ...right]
+    : left;
+  return `${groups.slice(0, 4).join(":")}::/64`;
 }
 
 // ── Groq completion (free tier — no auth required for public endpoint) ────────
@@ -160,12 +171,12 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
     Body: { prompt: string; max_tokens?: number };
   }>("/libertas/complete", async (request: FastifyRequest, reply: FastifyReply) => {
     // ── Rate limit check ─────────────────────────────────────────────────────
-    const ip = getClientIp(request);
-    const kvKey = `${LIBERTAS_KV_PREFIX}:${ip}`;
+    const kvKey = `${LIBERTAS_KV_PREFIX}:${clientKey(request)}`;
     // Counted atomically, and locally when the shared store is down: this spends the server's key.
+    const overall = await countRequest(`${LIBERTAS_KV_PREFIX}:global`, LIBERTAS_WINDOW_MS);
     const current = await countRequest(kvKey, LIBERTAS_WINDOW_MS);
 
-    if (current > LIBERTAS_RATE_LIMIT) {
+    if (overall > globalPerMinute() || current > LIBERTAS_RATE_LIMIT) {
       const retryAfterSec = Math.ceil(LIBERTAS_WINDOW_MS / 1000);
       return reply
         .code(429)
@@ -180,12 +191,18 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // ── Validate body ────────────────────────────────────────────────────────
-    const body = request.body as { prompt?: string; max_tokens?: number };
+    const body = request.body as { prompt?: string; max_tokens?: unknown };
     const prompt = (body?.prompt ?? "").trim();
     if (!prompt) {
       return reply.code(400).send({ error: "prompt is required" });
     }
-    const maxTokens = Math.min(body?.max_tokens ?? 256, LIBERTAS_MAX_TOKENS);
+    if (prompt.length > LIBERTAS_MAX_PROMPT_CHARS) {
+      return reply
+        .code(400)
+        .send({ error: `prompt is limited to ${LIBERTAS_MAX_PROMPT_CHARS} characters` });
+    }
+    const requested = Math.floor(Number(body?.max_tokens ?? 256)) || 256;
+    const maxTokens = Math.min(Math.max(requested, 1), LIBERTAS_MAX_TOKENS);
 
     // ── LLM call ─────────────────────────────────────────────────────────────
     const _start = Date.now();

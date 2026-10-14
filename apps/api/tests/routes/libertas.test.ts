@@ -165,14 +165,14 @@ describe("POST /api/v1/libertas/complete", () => {
       await app.inject({
         method: "POST",
         url: "/api/v1/libertas/complete",
-        headers: { "x-forwarded-for": "55.55.55.55" },
+        remoteAddress: "55.55.55.55",
         payload: { prompt: `p${i}` },
       });
     }
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/libertas/complete",
-      headers: { "x-forwarded-for": "55.55.55.55" },
+      remoteAddress: "55.55.55.55",
       payload: { prompt: "over-limit" },
     });
     expect(res.statusCode).toBe(429);
@@ -193,7 +193,7 @@ describe("POST /api/v1/libertas/complete", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/libertas/complete",
-      headers: { "x-forwarded-for": "99.0.0.1" },
+      remoteAddress: "99.0.0.1",
       payload: { prompt: "hello" },
     });
     expect(res.statusCode).toBe(502);

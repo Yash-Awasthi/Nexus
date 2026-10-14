@@ -38,7 +38,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
-| High     | 1    | 4     | 0        |
+| High     | 0    | 5     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
 
@@ -129,7 +129,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-007 — Public completion endpoint has no effective spend ceiling
 
-- **Severity:** high · **Status:** open
+- **Severity:** high · **Status:** fixed
 - **Evidence:** `routes/libertas.ts:43` keys the 5-per-minute limit on the first
   `X-Forwarded-For` value, which the caller writes; prompt length is unbounded; `max_tokens` is
   not clamped below.
@@ -137,7 +137,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
   deployment).
 - **Fix:** key on `request.ip` (IPv6 by /64), clamp `max_tokens` to `[1, 512]`, cap the prompt,
   and add a global per-minute ceiling that holds whatever addresses the requests come from.
-- **Test:** _to be named_
+- **Test:** `apps/api/tests/routes/libertas-ceilings.test.ts`
 
 ### NX-SEC-008 — Slack and Telegram webhooks are unauthenticated unless configured, and Slack verification cannot pass
 
