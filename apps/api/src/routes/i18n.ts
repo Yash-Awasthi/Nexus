@@ -26,6 +26,8 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.ts";
 
+import { requireAdminRole } from "./admin-users.ts";
+
 // ── Catalog + I18n singleton ──────────────────────────────────────────────────
 
 const catalog = new TranslationCatalog();
@@ -136,7 +138,7 @@ export async function i18nRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: { locale: string; translations: Record<string, unknown> };
-  }>("/i18n/catalog", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/i18n/catalog", { preHandler: requireAdminRole }, async (request, reply) => {
     const { locale, translations } = request.body ?? {};
     if (!locale || typeof locale !== "string")
       return reply.code(400).send({ error: "locale is required" });
