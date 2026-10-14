@@ -283,6 +283,16 @@ describe("AnalystSession", () => {
 // ── AnalystSessionManager ─────────────────────────────────────────────────────
 
 describe("AnalystSessionManager", () => {
+  it("gives unguessable ids and restores a session under its own id", () => {
+    const manager = new AnalystSessionManager(new StreamingAnalyst({ llm: makeStreamingLlm([]) }));
+    const a = manager.create("general");
+    const b = manager.create("general");
+    expect(a.id).not.toBe(b.id);
+    expect(a.id).toMatch(/^analyst-[0-9a-f-]{36}$/);
+    expect(manager.create("aviation", "analyst-restored").id).toBe("analyst-restored");
+    expect(manager.get("analyst-restored")?.domain).toBe("aviation");
+  });
+
   it("create returns new AnalystSession", () => {
     const analyst = new StreamingAnalyst({ llm: makeStreamingLlm([]) });
     const manager = new AnalystSessionManager(analyst);
