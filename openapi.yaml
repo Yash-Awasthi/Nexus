@@ -4650,6 +4650,24 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/admin/users/{id}/sessions/{sid}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: sid
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/v1/traces/:
     get:
       tags:

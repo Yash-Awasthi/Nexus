@@ -4522,6 +4522,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/security/posture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/routes": {
         parameters: {
             query?: never;
@@ -9892,6 +9925,7 @@ export interface paths {
                         name?: string;
                         /** Format: email */
                         email?: string;
+                        currentPassword?: string;
                     };
                 };
             };
@@ -10050,6 +10084,39 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -11008,7 +11075,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/mfa/validate": {
+    "/api/v1/mfa/disable": {
         parameters: {
             query?: never;
             header?: never;
@@ -11027,7 +11094,6 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        userId: string;
                         code: string;
                     };
                 };
@@ -11048,7 +11114,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/mfa/disable": {
+    "/api/v1/mfa/recovery-codes": {
         parameters: {
             query?: never;
             header?: never;
@@ -11772,6 +11838,42 @@ export interface paths {
                 header?: never;
                 path: {
                     id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/sessions/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    sid: string;
                 };
                 cookie?: never;
             };
