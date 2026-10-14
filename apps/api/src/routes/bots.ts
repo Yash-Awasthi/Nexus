@@ -143,6 +143,14 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
     Body: Record<string, unknown>;
     Headers: { authorization?: string };
   }>("/bots/teams/activity", async (request, reply) => {
+    if (!process.env.TEAMS_BOT_APP_ID) {
+      return reply.code(503).send({ error: "teams_not_configured" });
+    }
+    try {
+      await _teamsAdapter.authenticate(request.headers.authorization, request.body);
+    } catch {
+      return reply.code(401).send({ error: "unauthorized" });
+    }
     const result = await _teamsAdapter.handleActivity(request.body);
 
     if (result.error) {

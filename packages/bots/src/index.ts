@@ -52,7 +52,14 @@
  * ```
  */
 
-import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
+import {
+  createHmac,
+  createPublicKey,
+  createVerify,
+  timingSafeEqual,
+  randomUUID,
+  type KeyObject,
+} from "node:crypto";
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -482,6 +489,12 @@ interface TeamsActivity {
   channelData?: { teamsChannelId?: string };
 }
 
+const BOT_FRAMEWORK_OPENID = "https://login.botframework.com/v1/.well-known/openidconfiguration";
+const BOT_FRAMEWORK_ISSUER = "https://api.botframework.com";
+const BOT_FRAMEWORK_KEYS_TTL_MS = 24 * 3600_000;
+type Jwk = Record<string, unknown> & { kid?: string };
+let botFrameworkKeys: { keys: Jwk[]; at: number } | null = null;
+
 /** Teams bot adapter. */
 export class TeamsBotAdapter {
   private readonly serviceUrl: string;
@@ -505,8 +518,76 @@ export class TeamsBotAdapter {
     this.name = config.name ?? "teams-bot";
   }
 
+  /** Throws AUTH_FAILED unless Bot Framework signed this request for `appId` and the activity's
+   *  `serviceUrl`, the only URL a reply (and the bot's own token) is ever sent to. */
+  async authenticate(authorization: string | undefined, body: unknown): Promise<void> {
+    const fail = (why: string): never => {
+      throw new BotError("AUTH_FAILED", `Bot Framework authentication failed: ${why}`);
+    };
+    if (!this.appId) fail("no app id configured");
+    const m = /^Bearer\s+([\w-]+)\.([\w-]+)\.([\w-]+)$/.exec(authorization ?? "");
+    if (!m) return fail("missing bearer token");
+    const [, h, p, s] = m as unknown as [string, string, string, string];
+    let header: { alg?: unknown; kid?: unknown };
+    let claims: Record<string, unknown>;
+    try {
+      header = JSON.parse(Buffer.from(h, "base64url").toString("utf8")) as typeof header;
+      claims = JSON.parse(Buffer.from(p, "base64url").toString("utf8")) as typeof claims;
+    } catch {
+      return fail("malformed token");
+    }
+    if (header.alg !== "RS256") fail("unexpected algorithm");
+    const key = await this._signingKey(typeof header.kid === "string" ? header.kid : undefined);
+    if (
+      !key ||
+      !createVerify("RSA-SHA256").update(`${h}.${p}`).verify(key, Buffer.from(s, "base64url"))
+    )
+      fail("bad signature");
+    const now = Math.floor(Date.now() / 1000);
+    const skew = 300;
+    if (claims.iss !== BOT_FRAMEWORK_ISSUER) fail("wrong issuer");
+    if (claims.aud !== this.appId) fail("wrong audience");
+    if (typeof claims.exp !== "number" || claims.exp + skew < now) fail("expired");
+    if (typeof claims.nbf === "number" && claims.nbf - skew > now) fail("not yet valid");
+    let activity: TeamsActivity | undefined;
+    try {
+      activity = (typeof body === "string" ? JSON.parse(body) : body) as TeamsActivity;
+    } catch {
+      fail("activity is not valid JSON");
+    }
+    const claimed = claims.serviceurl ?? claims.serviceUrl;
+    if (typeof claimed !== "string" || !activity?.serviceUrl || claimed !== activity.serviceUrl)
+      fail("service URL does not match the token");
+  }
+
+  /** Bot Framework's signing key `kid`, from its OpenID metadata; refetched once for an unknown kid. */
+  private async _signingKey(kid: string | undefined): Promise<KeyObject | null> {
+    const find = (keys: Jwk[]) => {
+      const jwk = keys.find((k) => k.kid === kid);
+      return jwk
+        ? createPublicKey({ key: jwk, format: "jwk" } as Parameters<typeof createPublicKey>[0])
+        : null;
+    };
+    const cached = botFrameworkKeys;
+    if (cached && Date.now() - cached.at < BOT_FRAMEWORK_KEYS_TTL_MS) {
+      const hit = find(cached.keys);
+      if (hit) return hit;
+    }
+    try {
+      const meta = await this.fetchFn(BOT_FRAMEWORK_OPENID);
+      const { jwks_uri } = (await meta.json()) as { jwks_uri?: string };
+      if (!jwks_uri?.startsWith("https://login.botframework.com/")) return null;
+      const set = (await (await this.fetchFn(jwks_uri)).json()) as { keys?: Jwk[] };
+      botFrameworkKeys = { keys: set.keys ?? [], at: Date.now() };
+      return find(botFrameworkKeys.keys);
+    } catch {
+      return null;
+    }
+  }
+
   /**
-   * Process an inbound Teams Bot Framework activity.
+   * Process an inbound Teams Bot Framework activity. Call {@link authenticate}
+   * first: this method trusts the activity, including where it says to reply.
    */
   async handleActivity(body: unknown): Promise<TeamsActivityResult> {
     // ── Parse ───────────────────────────────────────────────────────────────

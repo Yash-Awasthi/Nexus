@@ -38,7 +38,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 | Severity | Open | Fixed | Accepted |
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
-| High     | 2    | 3     | 0        |
+| High     | 1    | 4     | 0        |
 | Medium   | 12   | 0     | 0        |
 | Low      | 8    | 0     | 1        |
 
@@ -101,7 +101,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 
 ### NX-SEC-005 — Teams bot webhook is unauthenticated and sends the bot token to a caller-chosen URL
 
-- **Severity:** high · **Status:** open
+- **Severity:** high · **Status:** fixed
 - **Evidence:** `routes/bots.ts:142` `POST /api/v1/bots/teams/activity` has no verification;
   `packages/bots/src/index.ts:573` replies to `activity.serviceUrl` from the request body with a
   freshly acquired Bot Framework bearer token.
@@ -110,7 +110,7 @@ node scripts/security/route-census.mjs   # added in phase 1; see roadmap
 - **Fix:** verify the Bot Framework JWT (OpenID metadata, JWKS, issuer, audience = app id,
   `serviceUrl` claim equals the activity's), refuse when Teams is not configured, and only ever
   reply to the verified `serviceUrl`.
-- **Test:** _to be named_
+- **Test:** `packages/bots/tests/botframework-auth.test.ts, apps/api/tests/routes/bots-webhooks.test.ts`
 
 ### NX-SEC-006 — Access-token revocation is never triggered, not persisted, and skipped on one path
 
