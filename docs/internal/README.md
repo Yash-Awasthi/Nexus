@@ -38,16 +38,23 @@ these describe the work.
   same push that carries its fix. Open items that are not yet fixed stay at the level of detail
   an operator needs to mitigate them, not a recipe.
 
-## Current state
+## Current state (2026-10-15)
 
-- Baseline audit: 2026-10-14, against `main` at `c9d4a19`; second pass the same day.
-- `security/hardening` is merged into `main`. P2 work is on `feat/p2-enrichment`; merging it
-  deploys to Render, and the operator notes in `docs/STATUS.md` say what to set first.
-- Phases 0–6 of [roadmap.md](roadmap.md) are done: every critical, high and medium finding is
-  fixed with a test; the security check, sign-out everywhere, security notifications, audit
-  events, MFA recovery codes and the CI advisory gate shipped.
-- Phase 6 (account email, NX-FEAT-015) is done; mail goes out once the operator sets
-  `RESEND_API_KEY` and `NEXUS_MAIL_FROM`.
-- P2 and P3 are done except the Python warm pool (NX-FEAT-014), deferred while the deployment is
-  a 512 MB free instance.
+- Everything is merged into `main` and live on Render (`nexus-iosc.onrender.com`). Findings
+  NX-SEC-001 to NX-SEC-041 are fixed or accepted; P1, P2 and P3 features are done except the
+  Python warm pool (NX-FEAT-014), deferred while the deployment is a 512 MB free instance.
+- Checked on the live site after the last deploy: password and passkey sign-in, signed-in
+  devices, sign-out, token last-use address, CSP reports, and account erasure revoking the
+  account's sessions, tokens and passkeys. Code scanning has no open alerts.
+- Render dashboard values override `render.yaml`. Deploys from 2026-10-12 to 2026-10-14 failed
+  because the dashboard held `NEXUS_TRUST_PROXY=1`; it now holds the list in `render.yaml`. A
+  deploy that never goes live shows as `update_failed` in Render's Events, not in GitHub.
+- Not set yet, each a warning in the start-up log and in `nexus security check`:
+  `NEXUS_MFA_KEY` (TOTP secrets are stored in plain text; setting it means users re-enrol),
+  `REDIS_URL` or Upstash (rate limits reset on restart), `RESEND_API_KEY` and `NEXUS_MAIL_FROM`
+  (no password reset in production), `AUDIT_EXPORT_S3_*` (audit log stays in the database only).
+- Things that change on their own: Cloudflare's address ranges in `NEXUS_TRUST_PROXY`
+  (if security notices start naming Cloudflare addresses, refresh them); GitHub turns scheduled
+  workflows off after 60 days without commits (CodeQL, security scans, k6, ingest) and they must
+  be re-enabled in the Actions tab.
 - Coverage of each audit pass is listed in [security-findings.md](security-findings.md).
