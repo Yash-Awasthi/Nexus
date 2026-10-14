@@ -36,7 +36,7 @@ decision.
 - [ ] NX-SEC-012 Remove `/mfa/validate`; TOTP replay guard
 - [x] NX-SEC-019 JWT `exp` required
 - [x] NX-SEC-020 SCIM constant-time compare; deprovision revokes
-- [ ] Push
+- [x] Push
 
 ## Phase 3 — Platform
 
