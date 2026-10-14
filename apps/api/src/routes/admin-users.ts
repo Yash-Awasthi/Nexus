@@ -24,6 +24,7 @@ import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { assignOwnerless, ownerlessCounts } from "../lib/owner.ts";
 import { securityEvent } from "../lib/security-events.ts";
 import {
+  endAccountAccess,
   endAllSessions,
   endSession,
   liveSessions,
@@ -225,7 +226,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id/suspend",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      await endAllSessions(request.params.id);
+      await endAccountAccess(request.params.id);
       emitAuditEvent(adminAction(request, "admin.user_suspended"), request.log);
 
       const [updated] = await db
@@ -304,7 +305,7 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      await endAllSessions(request.params.id);
+      await endAccountAccess(request.params.id);
       emitAuditEvent(adminAction(request, "admin.user_deleted"), request.log);
 
       await db.delete(users).where(eq(users.id, request.params.id));

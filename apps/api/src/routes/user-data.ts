@@ -10,7 +10,7 @@ import { db, eraseUserData, type ErasableDb } from "@nexus/db";
 import type { FastifyInstance } from "fastify";
 
 import { handleSelfErasure } from "../lib/gdpr-erasure.ts";
-import { revokeSubject } from "../lib/session-revocation.ts";
+import { endAccountAccess } from "../lib/session-revocation.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 export async function userDataRoutes(app: FastifyInstance): Promise<void> {
@@ -32,7 +32,7 @@ export async function userDataRoutes(app: FastifyInstance): Promise<void> {
 
       if (outcome.status === 403) return reply.code(403).send(outcome.body);
       if (outcome.status === 500) return reply.code(500).send(outcome.body);
-      await revokeSubject(request.params.id);
+      await endAccountAccess(request.params.id);
       return reply.code(204).send();
     },
   );

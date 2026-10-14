@@ -8,7 +8,7 @@ import { and, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
 import { emitAuditEvent } from "./audit-emitter.ts";
-import { endAllSessions } from "./session-revocation.ts";
+import { endAccountAccess } from "./session-revocation.ts";
 
 /** Make `user` safe to enter through `provider`; a no-op once its email is verified. */
 export async function claimForSso(
@@ -30,7 +30,7 @@ export async function claimForSso(
     .returning({ id: users.id });
   if (claimed.length === 0) return;
   await db.delete(passkeys).where(eq(passkeys.userId, user.id));
-  await endAllSessions(user.id);
+  await endAccountAccess(user.id);
   void emitAuditEvent(
     {
       entityType: "user",

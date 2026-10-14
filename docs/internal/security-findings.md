@@ -36,7 +36,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | -------- | ---- | ----- | -------- |
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
-| Medium   | 0    | 20    | 0        |
+| Medium   | 0    | 21    | 0        |
 | Low      | 0    | 12    | 2        |
 
 ## Findings
@@ -465,6 +465,18 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Impact:** a weak dashboard password could be found by guessing.
 - **Fix:** after ten wrong passwords in 15 minutes an address is refused, right password included.
 - **Test:** `apps/api/tests/routes/queue-dashboard.test.ts`
+
+### NX-SEC-041 — Personal access tokens outlived the account
+
+- **Severity:** medium · **Status:** fixed
+- **Evidence:** suspending, deleting, erasing, SCIM-deprovisioning or SSO-claiming an account
+  ended its sessions but left its `nxk_` tokens in `api_keys` and in the process cache.
+- **Impact:** a suspended user, or whoever registered an address before its owner claimed it,
+  kept API access through tokens minted earlier.
+- **Fix:** `endAccountAccess` in `lib/session-revocation.ts` ends sessions and revokes the
+  account's tokens; every path that ends an account calls it. Signing out everywhere still leaves
+  API tokens alone.
+- **Test:** `apps/api/tests/lib/end-account-access.test.ts`
 
 ## Audit pass 2 (2026-10-14)
 
