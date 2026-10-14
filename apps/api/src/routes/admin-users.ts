@@ -10,19 +10,25 @@
  * POST   /api/v1/admin/users/:id/restore   — restore from soft-delete
  * GET    /api/v1/admin/users/:id/sessions  — list active sessions
  * DELETE /api/v1/admin/users/:id/sessions  — revoke all sessions
+ * DELETE /api/v1/admin/users/:id/sessions/:sid — revoke one session
  *
  * Requires: JWT with role="admin" — enforced by requireAdminRole middleware.
  */
 
 import { db } from "@nexus/db";
-import { users, refreshTokens } from "@nexus/db/schema";
-import { eq, isNull, isNotNull, desc, and } from "drizzle-orm";
+import { users } from "@nexus/db/schema";
+import { eq, isNull, isNotNull, desc } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import { assignOwnerless, ownerlessCounts } from "../lib/owner.ts";
 import { securityEvent } from "../lib/security-events.ts";
-import { endAllSessions, revokeSubject } from "../lib/session-revocation.ts";
+import {
+  endAllSessions,
+  endSession,
+  liveSessions,
+  revokeSubject,
+} from "../lib/session-revocation.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 // ── Admin role guard ──────────────────────────────────────────────────────────
@@ -255,22 +261,29 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
     "/admin/users/:id/sessions",
     { preHandler: requireAdminRole },
     async (request, reply) => {
-      const sessions = await db
-        .select()
-        .from(refreshTokens)
-        .where(and(eq(refreshTokens.userId, request.params.id), isNull(refreshTokens.revokedAt)))
-        .orderBy(desc(refreshTokens.createdAt));
-
+      const sessions = await liveSessions(request.params.id);
       return reply.send({
         sessions: sessions.map((s) => ({
           id: s.id,
           createdAt: s.createdAt.toISOString(),
           expiresAt: s.expiresAt.toISOString(),
           userAgent: s.userAgent,
-          expired: s.expiresAt < new Date(),
         })),
         total: sessions.length,
       });
+    },
+  );
+
+  /** DELETE /admin/users/:id/sessions/:sid — end one session */
+  app.delete<{ Params: { id: string; sid: string } }>(
+    "/admin/users/:id/sessions/:sid",
+    { preHandler: requireAdminRole },
+    async (request, reply) => {
+      if (!(await endSession(request.params.id, request.params.sid))) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      emitAuditEvent(adminAction(request, "admin.session_revoked"), request.log);
+      return reply.code(204).send();
     },
   );
 

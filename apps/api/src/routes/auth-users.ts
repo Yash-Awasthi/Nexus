@@ -29,7 +29,7 @@ import {
   passwordResetTokens,
   emailVerificationTokens,
 } from "@nexus/db/schema";
-import { eq, and, gt, isNull, desc } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.ts";
@@ -48,10 +48,15 @@ import { appLink, sendMail } from "../lib/mailer.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
 import { securityEvent } from "../lib/security-events.ts";
-import { endAllSessions, revokeSession } from "../lib/session-revocation.ts";
+import {
+  endAllSessions,
+  endSession,
+  liveSessions,
+  revokeSession,
+} from "../lib/session-revocation.ts";
 import { getSecurityKV } from "../lib/shared-kv.ts";
 import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.ts";
-import { requireAuthWithTier } from "../middleware/auth.ts";
+import { jwtClaims, requireAuthWithTier } from "../middleware/auth.ts";
 
 import { acceptLoginCode, acceptRecoveryCode } from "./mfa.ts";
 
@@ -918,36 +923,22 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * GET /auth/sessions
    *
    * List all active (non-revoked, non-expired) refresh token sessions
-   * for the currently authenticated user. Does not return token hashes.
+   * for the currently authenticated user, marking the one making the request.
+   * Does not return token hashes.
    */
   app.get("/auth/sessions", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-    const now = new Date();
-    const sessions = await db
-      .select({
-        id: refreshTokens.id,
-        userAgent: refreshTokens.userAgent,
-        createdAt: refreshTokens.createdAt,
-        expiresAt: refreshTokens.expiresAt,
-      })
-      .from(refreshTokens)
-      .where(
-        and(
-          eq(refreshTokens.userId, userId),
-          isNull(refreshTokens.revokedAt),
-          gt(refreshTokens.expiresAt, now),
-        ),
-      )
-      .orderBy(desc(refreshTokens.createdAt));
-
+    const { sid } = jwtClaims(request.headers.authorization);
+    const sessions = await liveSessions(userId);
     return reply.send({
       sessions: sessions.map((s) => ({
         id: s.id,
         userAgent: s.userAgent ?? null,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
+        current: s.id === sid,
       })),
     });
   });
@@ -964,25 +955,9 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-    const { id: sessionId } = request.params;
-
-    // Verify the session belongs to the requesting user before revoking
-    const [session] = await db
-      .select({ id: refreshTokens.id, userId: refreshTokens.userId })
-      .from(refreshTokens)
-      .where(eq(refreshTokens.id, sessionId))
-      .limit(1);
-
-    if (!session || session.userId !== userId) {
+    if (!(await endSession(userId, request.params.id))) {
       return reply.code(404).send({ error: "session_not_found" });
     }
-
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(refreshTokens.id, sessionId), isNull(refreshTokens.revokedAt)));
-    await revokeSession(sessionId);
-
     return reply.code(204).send();
   });
 

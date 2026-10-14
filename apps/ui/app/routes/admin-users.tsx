@@ -3,9 +3,18 @@ import { Search, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { Page, PageHeader } from "~/components/page";
+import { SessionsList } from "~/components/sessions-list";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import {
   Select,
@@ -70,6 +79,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [sessionsOf, setSessionsOf] = useState<User | null>(null);
 
   // ── Fetch users from the guarded v1 admin surface ────────────────────────
   useEffect(() => {
@@ -170,6 +180,9 @@ export default function AdminUsersPage() {
                     <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
                       Last Active
                     </th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                      Sessions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,9 +203,11 @@ export default function AdminUsersPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="editor">Editor</SelectItem>
-                            <SelectItem value="viewer">Viewer</SelectItem>
+                            {VALID_ROLES.map((r) => (
+                              <SelectItem key={r} value={r} className="capitalize">
+                                {r}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </td>
@@ -207,6 +222,11 @@ export default function AdminUsersPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{user.lastActive}</td>
+                      <td className="px-4 py-3">
+                        <Button variant="outline" size="sm" onClick={() => setSessionsOf(user)}>
+                          Devices
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -215,6 +235,16 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={sessionsOf !== null} onOpenChange={(o) => !o && setSessionsOf(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Signed-in devices</DialogTitle>
+            <DialogDescription>{sessionsOf?.email}</DialogDescription>
+          </DialogHeader>
+          {sessionsOf && <SessionsList userId={sessionsOf.id} />}
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }

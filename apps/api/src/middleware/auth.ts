@@ -109,7 +109,7 @@ export async function requireUserId(
 }
 
 /** Claims of a bearer JWT whose signature was already verified. */
-function jwtClaims(authorization: string | undefined): Record<string, unknown> {
+export function jwtClaims(authorization: string | undefined): Record<string, unknown> {
   try {
     const body = (authorization ?? "").split(".")[1] ?? "";
     return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Record<string, unknown>;
