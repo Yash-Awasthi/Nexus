@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 2    | 11    | 0        |
-| Low      | 4    | 4     | 2        |
+| Low      | 3    | 5     | 2        |
 
 ## Findings
 
@@ -276,10 +276,12 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-022 — CI token permissions and action pinning
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `build.yml`, `lint.yml`, `test.yml`, `k6.yml`, `conventional-commits.yml` declare
   no `permissions`; third-party actions are pinned by tag.
-- **Fix:** top-level `permissions: contents: read` everywhere it is missing.
+- **Fix:** top-level `permissions: contents: read` in every workflow that lacked one (done, including
+  `ingest-finscrape.yml`; none of them write). SHA pinning of third-party actions stays open as a
+  Renovate-managed follow-up.
 
 ### NX-SEC-023 — SSRF guard misses IPv6 ranges that embed IPv4
 

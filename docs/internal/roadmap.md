@@ -50,7 +50,7 @@ decision.
 - [x] NX-SEC-013 Desktop external links limited to http/https/mailto
 - [x] NX-SEC-014 Compose binds to loopback; ingest key wired; ingest auth fails closed; scrape router behind key
 - [ ] NX-SEC-016 Dependency advisories cleared (overrides / bumps)
-- [ ] NX-SEC-022 CI `permissions: contents: read`
+- [x] NX-SEC-022 CI `permissions: contents: read`
 - [ ] Push
 
 ## Phase 4 — Security features
