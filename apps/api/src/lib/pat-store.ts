@@ -60,6 +60,7 @@ interface PersonalAccessToken {
   expiresAt: string | null;
   revokedAt: string | null;
   lastUsedAt: string | null;
+  lastUsedIp: string | null;
 }
 
 /** Write-through cache — hydrated from api_keys at startup, kept in sync on every mutation. */
@@ -120,6 +121,7 @@ function _fromRow(row: ApiKey): PersonalAccessToken {
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
     revokedAt: row.revokedAt ? row.revokedAt.toISOString() : null,
     lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+    lastUsedIp: row.lastUsedIp ?? null,
   };
 }
 
@@ -167,15 +169,22 @@ async function _probeDb(): Promise<boolean> {
   }
 }
 
-/** Stamp lastUsedAt in the cache and (best-effort) in the DB. */
-async function _stampUsed(entry: PersonalAccessToken): Promise<void> {
-  const now = new Date().toISOString();
-  entry.lastUsedAt = now;
+/** A token used again from the same address within this window is not re-stamped. */
+const STAMP_EVERY_MS = 60_000;
+
+/** Stamp lastUsedAt/lastUsedIp in the cache and (best-effort) in the DB. */
+async function _stampUsed(entry: PersonalAccessToken, ip?: string): Promise<void> {
+  const now = Date.now();
+  const nextIp = ip ?? entry.lastUsedIp;
+  const last = entry.lastUsedAt ? Date.parse(entry.lastUsedAt) : 0;
+  if (now - last < STAMP_EVERY_MS && nextIp === entry.lastUsedIp) return;
+  entry.lastUsedAt = new Date(now).toISOString();
+  entry.lastUsedIp = nextIp;
   if (!_dbUsable()) return;
   try {
     await defaultDb
       .update(apiKeys)
-      .set({ lastUsedAt: new Date(now) })
+      .set({ lastUsedAt: new Date(now), lastUsedIp: nextIp })
       .where(eq(apiKeys.keyHash, entry.hash));
   } catch {
     _dbMode = "mem";
@@ -252,6 +261,7 @@ export async function createPat(input: {
     expiresAt: days > 0 ? new Date(Date.now() + days * 86_400_000).toISOString() : null,
     revokedAt: null,
     lastUsedAt: null,
+    lastUsedIp: null,
   };
   const dbOk = await _probeDb();
   await _sweepExpired();
@@ -287,14 +297,14 @@ export async function createPat(input: {
   return { entry, raw };
 }
 
-/** Verify a raw `nxk_` token; stamps lastUsedAt on success. */
-export async function verifyPat(raw: string): Promise<PersonalAccessToken | null> {
+/** Verify a raw `nxk_` token; stamps lastUsedAt and the caller's IP on success. */
+export async function verifyPat(raw: string, ip?: string): Promise<PersonalAccessToken | null> {
   const hash = sha256hex(raw);
   for (const t of _pats.values()) {
     if (t.hash !== hash) continue;
     if (t.revokedAt) return null;
     if (t.expiresAt && new Date(t.expiresAt).getTime() < Date.now()) return null;
-    await _stampUsed(t);
+    await _stampUsed(t, ip);
     return t;
   }
   // Cache miss — could be a token minted by another process. Consult the DB.
@@ -308,7 +318,7 @@ export async function verifyPat(raw: string): Promise<PersonalAccessToken | null
       if (row && !row.revokedAt && (!row.expiresAt || row.expiresAt.getTime() > Date.now())) {
         const entry = _fromRow(row);
         _pats.set(entry.id, entry);
-        await _stampUsed(entry);
+        await _stampUsed(entry, ip);
         return entry;
       }
     } catch {
