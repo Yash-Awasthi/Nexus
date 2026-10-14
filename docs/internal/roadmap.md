@@ -44,8 +44,8 @@ decision.
 - [x] NX-SEC-015 Catalogue probe through `callerFetch`
 - [ ] NX-SEC-018 PTY sessions owner-scoped
 - [x] NX-SEC-023 IPv6 embedded-IPv4 ranges in the SSRF guard
-- [ ] NX-SEC-026 GeoIP uses `request.ip`
-- [ ] NX-SEC-024 Upstash counter in one pipeline
+- [x] NX-SEC-026 GeoIP uses `request.ip`
+- [x] NX-SEC-024 Upstash counter in one pipeline
 - [x] NX-SEC-028 Brief share key derived from the API key, never a constant
 - [ ] NX-SEC-013 Desktop external links limited to http/https/mailto
 - [ ] NX-SEC-014 Compose binds to loopback; ingest key wired; ingest auth fails closed; scrape router behind key

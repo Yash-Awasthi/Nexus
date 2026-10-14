@@ -259,24 +259,25 @@ describe("Window drain — Upstash pipeline", () => {
     clearUpstashEnv();
   });
 
-  it("stamps EXPIRE only when INCR creates the key (result 1), never in-window", async () => {
+  it("pairs every INCR with a create-only EXPIRE, so in-window traffic never extends the window", async () => {
     const { bodies } = mockUpstashWithRecordedBodies();
     const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.ts");
     const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "drain-up" });
 
-    // First request creates the key → INCR + EXPIRE
     const r1 = makeReply();
     await handler(makeRequest("10.9.9.1"), r1);
     expect(r1._sent).toBe(false);
-    expect(bodies).toEqual([["INCR"], ["EXPIRE"]]);
-
-    // In-window traffic (counts 2, 3) → INCR only, expiry untouched
     const r2 = makeReply();
     await handler(makeRequest("10.9.9.1"), r2);
     const r3 = makeReply();
     await handler(makeRequest("10.9.9.1"), r3);
     expect(r3._code).toBe(429);
-    expect(bodies).toEqual([["INCR"], ["EXPIRE"], ["INCR"], ["INCR"]]);
+    // EXPIRE ... NX is a no-op once the key has a TTL (Redis 7), so only creation stamps it.
+    expect(bodies).toEqual([
+      ["INCR", "EXPIRE"],
+      ["INCR", "EXPIRE"],
+      ["INCR", "EXPIRE"],
+    ]);
   });
 });
 

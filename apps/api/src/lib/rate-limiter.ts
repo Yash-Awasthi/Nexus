@@ -57,8 +57,6 @@ function _apiKeyId(req: FastifyRequest): string | null {
 }
 
 // ── Atomic Redis INCR + EXPIRE (pipeline) ────────────────────────────────────
-// Uses the Upstash REST pipeline to atomically increment and set TTL.
-// This eliminates the read-check-set race condition present in the old code.
 
 /** A hung Upstash host would otherwise hold every rate-limited request. */
 const UPSTASH_TIMEOUT_MS = 2_000;
@@ -76,34 +74,18 @@ async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<numbe
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify([["INCR", key]]),
+      // EXPIRE NX stamps the window only when the key has none, in the same round trip as
+      // INCR: in-window traffic never extends it, and no failure can leave the key without it.
+      body: JSON.stringify([
+        ["INCR", key],
+        ["EXPIRE", key, windowSec, "NX"],
+      ]),
       signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const results = (await res.json()) as { result: number; error?: string }[];
     if (results[0]?.error) return null;
     const count = results[0]!.result as number;
-    // Stamp the window expiry ONLY when this call created the key (INCR
-    // returned 1). An unconditional EXPIRE refreshes the TTL on every request,
-    // so a bucket pushed over the limit could never drain while any traffic
-    // (e.g. an SSE reconnect loop) kept touching the key — the whole IP stuck
-    // at 429 forever. Failing EXPIRE is tolerated: the bucket just lacks a
-    // TTL (a one-key leak) instead of double-counting via the fallback.
-    if (count === 1) {
-      try {
-        await fetch(`${u}/pipeline`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify([["EXPIRE", key, windowSec]]),
-          signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
-        });
-      } catch {
-        /* ignored — see above */
-      }
-    }
     return count;
   } catch {
     return null; // the shared store, or a local count, takes over

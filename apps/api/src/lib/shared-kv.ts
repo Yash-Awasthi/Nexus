@@ -128,14 +128,15 @@ class UpstashKVStore implements KVStore {
     this.token = token;
   }
 
-  private async _cmd<T>(args: (string | number)[]): Promise<T> {
+  /** Run `args` (and any `also` commands in the same pipeline); returns the first result. */
+  private async _cmd<T>(args: (string | number)[], ...also: (string | number)[][]): Promise<T> {
     const res = await fetchWithTimeout(`${this.url}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify([args]),
+      body: JSON.stringify([args, ...also]),
     });
     if (!res.ok) {
       throw new Error(`Upstash error: ${res.status} ${await res.text()}`);
@@ -169,22 +170,12 @@ class UpstashKVStore implements KVStore {
     await this._cmd(["DEL", key]);
   }
 
-  /**
-   * Atomic INCR; EXPIRE is issued only when this call created the key
-   * (result 1) — in-window increments never refresh the expiry. A failed
-   * EXPIRE is tolerated (the counter just lacks a TTL) so a transient
-   * error can't double-count through a caller-side fallback.
-   */
+  /** Atomic INCR; the window TTL is set only when the key is created. */
   async incr(key: string, ttlMs?: number): Promise<number> {
-    const count = await this._cmd<number>(["INCR", key]);
-    if (count === 1 && ttlMs !== undefined && ttlMs > 0) {
-      try {
-        await this._cmd(["EXPIRE", key, Math.ceil(ttlMs / 1000)]);
-      } catch {
-        /* tolerated — see above */
-      }
-    }
-    return count;
+    // EXPIRE NX in the same pipeline: only creation stamps the window, and no failure between
+    // two requests can leave the key without one.
+    if (ttlMs === undefined || ttlMs <= 0) return this._cmd<number>(["INCR", key]);
+    return this._cmd<number>(["INCR", key], ["EXPIRE", key, Math.ceil(ttlMs / 1000), "NX"]);
   }
 
   async has(key: string): Promise<boolean> {

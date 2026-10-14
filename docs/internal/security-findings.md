@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 6    | 7     | 0        |
-| Low      | 6    | 3     | 1        |
+| Low      | 4    | 4     | 2        |
 
 ## Findings
 
@@ -289,9 +289,10 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-024 — Upstash rate-limit counter can lose its expiry
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** fixed
 - **Evidence:** `lib/rate-limiter.ts` sends `INCR` and `EXPIRE` as two requests.
 - **Fix:** one pipeline `[["INCR", k], ["EXPIRE", k, s, "NX"]]`.
+- **Test:** `apps/api/tests/lib/rate-limiter-upstash.test.ts`
 
 ### NX-SEC-025 — Registration reveals whether an email has an account
 
@@ -301,9 +302,11 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 
 ### NX-SEC-026 — GeoIP route reads raw `X-Forwarded-For`
 
-- **Severity:** low · **Status:** open
+- **Severity:** low · **Status:** wontfix
 - **Evidence:** `routes/geoip.ts:132`.
-- **Fix:** `request.ip`.
+- **Reason:** `/geoip/me` only tells the caller about an address; a spoofed header changes the
+  caller's own answer, and `/geoip/:ip` already looks up any address. Behind an untrusted proxy
+  the header is also the only way to see the client's address. No security effect.
 
 ### NX-SEC-027 — Threat model no longer matches the code
 
