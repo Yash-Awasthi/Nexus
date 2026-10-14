@@ -149,7 +149,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
       // /tokens authenticates even when the master-key/JWT path rejects it.
       const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
       if (m?.[1]?.startsWith("nxk_")) {
-        const pat = await verifyPat(m[1]);
+        const pat = await verifyPat(m[1], request.ip);
         if (pat) {
           // Scope enforcement (playtest round 7): scopes flowed mint → DB →
           // list but gated nothing. Now a restricted token may only reach
@@ -220,7 +220,7 @@ export async function resolveIdentity(request: FastifyRequest): Promise<void> {
   // owner — no DB round-trip. Only short-circuits when the PAT verifies; an
   // unknown nxk_ value still falls through to the api_keys lookup below.
   if (token.startsWith("nxk_")) {
-    const pat = await verifyPat(token);
+    const pat = await verifyPat(token, request.ip);
     if (pat) {
       request.nexusUserId = pat.ownerId;
       return;

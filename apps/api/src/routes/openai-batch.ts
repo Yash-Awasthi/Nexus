@@ -381,7 +381,7 @@ export async function openaiBatchRoutes(app: FastifyInstance): Promise<void> {
     if (!input || input.userId !== userOf(request)) return fail(reply, 404, "No such input file.");
     // Lines run on a token of their own, so a scoped token's limits are checked here.
     const raw = /^Bearer\s+(nxk_\S+)$/i.exec(request.headers.authorization ?? "")?.[1];
-    const pat = raw ? await verifyPat(raw) : null;
+    const pat = raw ? await verifyPat(raw, request.ip) : null;
     if (pat && !patScopesAllow(pat.scopes, body.endpoint))
       return reply.code(403).send({
         code: "INSUFFICIENT_SCOPE",

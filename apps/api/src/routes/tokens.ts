@@ -38,6 +38,7 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
         expiresAt: t.expiresAt,
         revokedAt: t.revokedAt,
         lastUsedAt: t.lastUsedAt,
+        lastUsedIp: t.lastUsedIp,
       })),
     });
   });

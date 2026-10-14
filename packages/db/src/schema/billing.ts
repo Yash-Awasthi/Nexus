@@ -54,6 +54,8 @@ export const apiKeys = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     /** PAT: last successful verification stamp (null until first use). PAT-only column. */
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /** PAT: address of the last verification stamp. PAT-only column. */
+    lastUsedIp: text("last_used_ip"),
     /** PAT: access scope list; ["*"] = full tier access. PAT-only column. */
     scopes: jsonb("scopes").$type<string[]>().notNull().default(["*"]),
     /** PAT: tier captured at mint time. PAT-only column. */

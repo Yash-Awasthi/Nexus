@@ -47,6 +47,7 @@ interface PAToken {
   createdAt: string;
   expiresAt?: string | null;
   lastUsedAt?: string | null;
+  lastUsedIp?: string | null;
   revokedAt?: string | null;
 }
 
@@ -334,7 +335,12 @@ export default function APITokens() {
                             Expires {fmtDate(token.expiresAt)}
                           </span>
                         )}
-                        {token.lastUsedAt && <span>Last used {fmtDate(token.lastUsedAt)}</span>}
+                        {token.lastUsedAt && (
+                          <span>
+                            Last used {fmtDate(token.lastUsedAt)}
+                            {token.lastUsedIp && ` from ${token.lastUsedIp}`}
+                          </span>
+                        )}
                       </div>
                     </div>
 

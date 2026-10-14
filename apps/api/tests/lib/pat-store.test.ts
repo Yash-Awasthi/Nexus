@@ -229,6 +229,21 @@ describe("verifyPat", () => {
     expect(set.lastUsedAt).toBeInstanceOf(Date);
   });
 
+  it("records the caller's IP and writes at most once a minute unless the IP changes", async () => {
+    const { entry, raw } = await createPat({ ownerId: "u1", name: "busy" });
+    await verifyPat(raw, "203.0.113.7");
+    await verifyPat(raw, "203.0.113.7");
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    expect((mockUpdateSet.mock.calls[0] as unknown[])[0]).toMatchObject({
+      lastUsedIp: "203.0.113.7",
+    });
+    expect(entry.lastUsedIp).toBe("203.0.113.7");
+
+    await verifyPat(raw, "198.51.100.9");
+    expect(mockUpdateSet).toHaveBeenCalledTimes(2);
+    expect(entry.lastUsedIp).toBe("198.51.100.9");
+  });
+
   it("rejects a revoked token (map removed → DB empty → null)", async () => {
     const { entry, raw } = await createPat({ ownerId: "u1", name: "doomed" });
     await revokePat(entry.id, "u1");

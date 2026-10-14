@@ -17,7 +17,7 @@ P1 items is in [design.md](design.md).
 | NX-FEAT-007 | Route census test in CI (public `/api/v1` routes must be listed)       | P1       | done   | —      |
 | NX-FEAT-008 | CI advisory gate (`pnpm audit --prod --audit-level high`)              | P1       | done   | FR-6   |
 | NX-FEAT-009 | Passkeys (WebAuthn) as a second factor and passwordless sign-in        | P3       | open   | —      |
-| NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page                | P2       | open   | —      |
+| NX-FEAT-010 | Per-PAT last-used time and IP, shown in the tokens page                | P2       | done   | —      |
 | NX-FEAT-011 | Audit-log export to object storage with object lock (threat model T3)  | P3       | open   | —      |
 | NX-FEAT-012 | Admin session viewer: list and revoke any user's sessions from the UI  | P2       | open   | —      |
 | NX-FEAT-013 | Content-Security-Policy violation reporting endpoint                   | P3       | open   | —      |
@@ -34,9 +34,10 @@ P1 items is in [design.md](design.md).
   script, so CI runs it with the API suite and no new pipeline step is needed.
 - **NX-FEAT-009.** Worth it once recovery codes exist; needs a WebAuthn verifier, which means a
   dependency or a careful CBOR/COSE implementation. Not this program.
-- **NX-FEAT-010.** `api_keys` already has the row; add `last_used_at`, `last_used_ip`, update at
-  most once a minute per key.
-- **NX-FEAT-014.** Only after measuring that users notice the boot.
+- **NX-FEAT-010.** Done: migration 0020 adds `last_used_ip`; `verifyPat` takes the request IP and
+  writes at most once a minute per token unless the address changes (`tests/lib/pat-store.test.ts`).
+- **NX-FEAT-014.** Measured 2026-10-14: ~2.2 s per run, almost all of it Pyodide start-up; one
+  pre-booted child holds ~136 MB idle. Deferred while the deployment is a 512 MB free instance.
 - **NX-FEAT-015.** Resend's HTTP API over `fetch`, so no new dependency; SMTP waits until an
   operator needs it. Mails reset links, verification links (sent after sign-up), workspace
   invitations and every security notice (an email change tells the old address). UI pages:
