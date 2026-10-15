@@ -41,7 +41,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { ensureDrive } from "../lib/drive-durability.ts";
-import { classifyAction } from "../lib/exec-approvals.ts";
+import { runDriveShell } from "../lib/drive-shell.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
@@ -153,7 +153,7 @@ function clip(s: string, max: number): string {
 let _docker: Promise<boolean> | null = null;
 /** Whether Docker answers on this host, asked once per process. */
 const dockerReady = () => (_docker ??= isDockerAvailable());
-/** Commands run in Docker unless the operator allowed a host shell. */
+/** Commands stay contained (Docker, else the built-in shell) unless the operator allowed a host shell. */
 const sandboxed = () => process.env.ALLOW_UNSANDBOXED_EXEC !== "true";
 
 export async function driveRoutes(app: FastifyInstance): Promise<void> {
@@ -188,7 +188,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
           ? `Drive at ${Math.round(pct * 100)}% — nearing ${QUOTA_BYTES / 1024 / 1024}MB limit`
           : null,
         dockerAvailable: await dockerReady(),
-        shellAvailable: !sandboxed() || (await dockerReady()),
+        shell: !sandboxed() ? "host" : (await dockerReady()) ? "docker" : "builtin",
       });
     },
   );
@@ -223,24 +223,33 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const safeEnv = buildSafeEnv();
       const timeout = Math.min(timeoutMs ?? CMD_TIMEOUT_MS, 60_000);
 
-      // The Docker sandbox is the only supported path; leaving it takes an
+      // A contained shell is the only supported path; leaving it takes an
       // explicit flag naming what the alternative is, never a missing NODE_ENV.
       const useDocker = sandboxed();
-      // The container is the control for the sandbox surface; outside it this is a host shell.
+      // Containment is the control for the sandbox surface; outside it this is a host shell.
       const action: ExecAction = {
         surface: useDocker ? "sandbox" : "pty",
         command: "sh",
         args: ["-c", command],
         cwd: workDir,
       };
-      // After the policy's own refusals, before approval: nobody approves a command that cannot run.
-      if (sandboxed() && classifyAction(action).decision !== "deny" && !(await dockerReady()))
-        return reply.code(503).send({
-          error: "sandbox_unavailable",
-          message:
-            "Drive commands run in Docker, which this server does not have. Files still upload, download and export.",
-        });
       if ((await guardExec(request, reply, action, request.body.approvalId)) === "handled") return;
+
+      if (useDocker && !(await dockerReady())) {
+        const at = "/" + path.relative(driveDir, workDir).split(path.sep).join("/");
+        const result = await withKeyLock(`drive:${userId}`, () =>
+          runDriveShell(command, driveDir, at, QUOTA_BYTES - usedBefore, timeout),
+        );
+        const usedAfter = await getDriveUsage(driveDir);
+        return reply.send({
+          stdout: clip(result.stdout, MAX_OUTPUT_BYTES),
+          stderr: clip(result.stderr, MAX_OUTPUT_BYTES),
+          exitCode: result.exitCode,
+          timedOut: result.timedOut,
+          applied: true,
+          quota: { used: usedAfter, limit: QUOTA_BYTES, exceeded: usedAfter > QUOTA_BYTES },
+        });
+      }
 
       if (useDocker) {
         // The run replaces the drive directory, so nothing else may write to it meanwhile.

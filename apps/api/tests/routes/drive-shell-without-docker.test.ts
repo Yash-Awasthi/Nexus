@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/** On a host without Docker the drive says its shell is off, and a command gets a plain 503. */
+/** On a host without Docker, drive commands run in the built-in shell, confined to the drive. */
 import crypto from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -10,7 +10,8 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
 const SECRET = "drive-shell-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
-process.env.NEXUS_DRIVE_ROOT = mkdtempSync(path.join(tmpdir(), "drive-shell-"));
+const ROOT = mkdtempSync(path.join(tmpdir(), "drive-shell-"));
+process.env.NEXUS_DRIVE_ROOT = ROOT;
 delete process.env.ALLOW_UNSANDBOXED_EXEC;
 
 vi.mock("@nexus/code-repl", async (importOriginal) => ({
@@ -39,17 +40,32 @@ afterAll(async () => {
   await app.close();
 });
 
-it("reports no shell and refuses commands plainly when Docker is missing", async () => {
+it("runs commands in the built-in shell, inside the drive only", async () => {
   const headers = auth(crypto.randomUUID());
   const status = await app.inject({ method: "GET", url: "/api/v1/drive/status", headers });
-  expect(status.json()).toMatchObject({ dockerAvailable: false, shellAvailable: false });
-
-  const run = await app.inject({
-    method: "POST",
-    url: "/api/v1/drive/exec",
-    headers,
-    payload: { command: "echo hi" },
+  expect(status.json()).toMatchObject({
+    dockerAvailable: false,
+    shell: "builtin",
   });
-  expect(run.statusCode).toBe(503);
-  expect(run.json()).toMatchObject({ error: "sandbox_unavailable" });
-});
+  const { root } = status.json<{ root: string }>();
+
+  const exec = (command: string, cwd?: string) =>
+    app.inject({
+      method: "POST",
+      url: "/api/v1/drive/exec",
+      headers,
+      payload: { command, ...(cwd ? { cwd } : {}) },
+    });
+  const made = await exec(
+    "mkdir -p notes && echo hello > notes/a.txt && cp notes/a.txt notes/b.txt",
+  );
+  expect(made.statusCode, made.body).toBe(200);
+  expect(made.json()).toMatchObject({ exitCode: 0, timedOut: false });
+  expect(readFileSync(path.join(root, "notes", "b.txt"), "utf8")).toBe("hello\n");
+
+  const inside = await exec("pwd && cat b.txt | tr a-z A-Z", "notes");
+  expect(inside.json()).toMatchObject({ stdout: "/notes\nHELLO", exitCode: 0 });
+
+  const escape = await exec("cat ../../../../etc/hostname; echo x > ../../../outside.txt; ls /");
+  expect(escape.json().stdout).toBe("notes\noutside.txt");
+}, 60_000);
