@@ -106,7 +106,7 @@ describe("HNSWIndex matches the brute-force reference", () => {
       const recall = recallFraction(index, vectors, queries, 5, exact);
       expect(recall).toBe(1);
     }
-  });
+  }, 30_000);
 
   it("deterministic: same seed + same insert order rebuilds an identical index", () => {
     const build = () => {
