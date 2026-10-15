@@ -6,25 +6,26 @@ Baseline: `main` at `c9d4a19`, 2026-10-14. Conventions are in [README.md](README
 
 ## Audit coverage
 
-| Area                                                        | Depth at baseline | Notes                                                                     |
-| ----------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------- |
-| API bootstrap, route scopes, auth middleware, `@nexus/auth` | Full              |                                                                           |
-| Register / login / refresh / reset / verify / sessions      | Full              |                                                                           |
-| OAuth (Google, GitHub, Slack), OIDC, SAML, SCIM, MFA        | Full              |                                                                           |
-| Route census: `/api/v1` routes without a `preHandler`       | Full (script)     | Re-run after adding routes, see below                                     |
-| Exec surfaces: sandbox, PTC, drive, PTY, skills, workflows  | Full              | Org CLI runtimes read for env handling only                               |
-| SSRF guard and outbound fetch call sites in api and worker  | Full              | Packages' own fetches only where a user URL reaches them                  |
-| Bots (Slack, Teams, Telegram), Libertas                     | Full              |                                                                           |
-| IDOR across every create/item route pair                    | Full (test)       | `tests/security/cross-account.test.ts` (NX-FEAT-006)                      |
-| Org layer (`org-*.ts`), workspaces sharing                  | Not yet           | Next audit pass                                                           |
-| Worker job handlers, BullMQ payload trust                   | Not yet           | Next audit pass                                                           |
-| Connectors, MCP client/servers, plugin registry/run         | Partial           | MCP servers SSRF checked; plugin publish/run not yet                      |
-| Session sync (desktop ↔ cloud)                              | Not yet           |                                                                           |
-| UI (XSS sinks, link handling, token storage)                | Full (grep)       | React 19 blocks `javascript:` hrefs; one static `dangerouslySetInnerHTML` |
-| Desktop shell                                               | Partial           | Window prefs, navigation, IPC entry                                       |
-| Python ingest service                                       | Partial           | Auth, crawl fetch                                                         |
-| CI workflows, compose files, Dockerfiles                    | Partial           |                                                                           |
-| Dependencies (`pnpm audit --prod`)                          | Full              | 51 advisories: 21 high, 23 moderate, 7 low                                |
+| Area                                                        | Depth at baseline | Notes                                                                                                 |
+| ----------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| API bootstrap, route scopes, auth middleware, `@nexus/auth` | Full              |                                                                                                       |
+| Register / login / refresh / reset / verify / sessions      | Full              |                                                                                                       |
+| OAuth (Google, GitHub, Slack), OIDC, SAML, SCIM, MFA        | Full              |                                                                                                       |
+| Route census: `/api/v1` routes without a `preHandler`       | Full (script)     | Re-run after adding routes, see below                                                                 |
+| Exec surfaces: sandbox, PTC, drive, PTY, skills, workflows  | Full              | Org CLI runtimes read for env handling only                                                           |
+| SSRF guard and outbound fetch call sites in api and worker  | Full              | Packages' own fetches only where a user URL reaches them                                              |
+| Bots (Slack, Teams, Telegram), Libertas                     | Full              |                                                                                                       |
+| IDOR across every create/item route pair                    | Full (test)       | `tests/security/cross-account.test.ts` (NX-FEAT-006)                                                  |
+| Every other id route (132, audit pass 3)                    | Full (read)       | Owner-scoped, admin only or shared by design; NX-SEC-042, NX-SEC-043                                  |
+| Org layer (`org-*.ts`), workspaces sharing                  | Full              | Every store call takes the caller as owner (passes 2 and 3)                                           |
+| Worker job handlers, BullMQ payload trust                   | Partial           | Coding runs gated at the API (pass 2); Redis is the trust boundary (NX-SEC-032)                       |
+| Connectors, MCP client/servers, plugin registry/run         | Full              | Per-owner connector registries; plugins install only from the server directory                        |
+| Session sync (desktop ↔ cloud)                              | Full              | Keys owner-scoped (passes 2 and 3)                                                                    |
+| UI (XSS sinks, link handling, token storage)                | Full (grep)       | React 19 blocks `javascript:` hrefs; one static `dangerouslySetInnerHTML`                             |
+| Desktop shell                                               | Partial           | Window prefs, navigation, IPC entry                                                                   |
+| Python ingest service                                       | Partial           | Auth, crawl fetch                                                                                     |
+| CI workflows, compose files, Dockerfiles                    | Full              | Pass 3: token read by default, no event text in shells, dev ports on loopback                         |
+| Dependencies (`pnpm audit --prod`)                          | Full              | 2026-10-15: `sprintf-js` (moderate, via mammoth) and `katex` (low, via @lobehub/ui); CI fails on high |
 
 Route census: `apps/api/tests/security/public-routes.test.ts` builds the server, lists every
 `/api/v1` route without a `require*` preHandler and fails unless it is on the test's allowlist
@@ -37,7 +38,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 0    | 21    | 0        |
-| Low      | 0    | 13    | 2        |
+| Low      | 0    | 13    | 3        |
 
 ## Findings
 
@@ -487,6 +488,21 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 - **Impact:** any signed-in account saw how many requests the server handled and what they cost.
 - **Fix:** admin only, like the billing keys whose usage they count (NX-SEC-035).
 - **Test:** `apps/api/tests/security/cross-account.test.ts`
+
+### NX-SEC-043 — Agent and task streams admit a subscriber before the run is recorded
+
+- **Severity:** low · **Status:** accepted
+- **Evidence:** `verifySessionOwnership` in `apps/api/src/routes/sse.ts` allows a stream id with
+  no `agent_sessions` row yet, and checks only when the stream opens.
+- **Reason:** agent stream ids are a hash of the account id and a client id, or random, and task
+  and verdict ids are UUIDs, so another account cannot name a stream it does not own. Closing the
+  window would mean recording ownership at launch on every replica, for no practical gain.
+
+## Audit pass 3 (2026-10-15)
+
+Every `/api` route taking an id that the cross-account test does not create was read (132),
+with CI workflows, compose files and Dockerfiles. New items: NX-SEC-039 to NX-SEC-043; dev
+tooling ports moved to loopback and an unused CI permission dropped.
 
 ## Audit pass 2 (2026-10-14)
 
