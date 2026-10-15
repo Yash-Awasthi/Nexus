@@ -39,6 +39,8 @@ overrides:
   "brace-expansion@5": ^5.0.12
   "sharp@0": ^0.35.5
   "adm-zip@0": ^0.6.1
+  "just-bash>sql.js": "-"
+  "just-bash>typescript": "-"
 
 engineStrict: true
 strictPeerDependencies: false
@@ -53,9 +55,11 @@ publicHoistPattern:
 
 # Install scripts run only for packages listed true; native binaries need them.
 allowBuilds:
+  "@mongodb-js/zstd": false
   core-js: false
   esbuild: true
   msgpackr-extract: true
+  node-liblzma: false
   node-pty: true
   onnxruntime-node: true
   protobufjs: false

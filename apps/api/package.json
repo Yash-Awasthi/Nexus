@@ -124,6 +124,7 @@
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "ioredis": "catalog:",
+    "just-bash": "3.6.0",
     "mammoth": "^1.13.0",
     "pg": "catalog:",
     "pyodide": "^314.0.7",
