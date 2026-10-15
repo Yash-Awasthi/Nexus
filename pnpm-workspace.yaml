@@ -41,6 +41,7 @@ overrides:
   "adm-zip@0": ^0.6.1
   "just-bash>sql.js": "-"
   "just-bash>typescript": "-"
+  "guarded-fetch>undici": ^7.30.0
 
 engineStrict: true
 strictPeerDependencies: false
