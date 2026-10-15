@@ -17,25 +17,31 @@ import {
 } from "@nexus/lens";
 import type { FastifyInstance } from "fastify";
 
-import { evictOldestEntry } from "../lib/lru-utils.ts";
 import { ownerIdFor } from "../lib/owner.ts";
+import { PersistentStore } from "../lib/persistent-store.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
 // ── In-memory store (survives request lifetime, not process restarts) ─────────
 
 /** Insights keyed by owner and conversation id, so an id names a conversation only within its account. */
-const _insights = new Map<string, ConversationInsight & { ownerId: string }>();
+const _insights = new PersistentStore<ConversationInsight & { ownerId: string }>(
+  "conversation_insights",
+);
 const MAX_STORED = 500;
 const keyOf = (ownerId: string, id: string) => `${ownerId}:${id}`;
 
-function store(ownerId: string, insight: ConversationInsight): void {
-  evictOldestEntry(_insights, MAX_STORED);
-  _insights.set(keyOf(ownerId, insight.conversationId), { ...insight, ownerId });
+async function store(ownerId: string, insight: ConversationInsight): Promise<void> {
+  if (_insights.size >= MAX_STORED) {
+    const oldest = _insights.values().next().value;
+    if (oldest) _insights.delete(keyOf(oldest.ownerId, oldest.conversationId));
+  }
+  await _insights.save(keyOf(ownerId, insight.conversationId), { ...insight, ownerId });
 }
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function conversationAnalysisRoutes(app: FastifyInstance): Promise<void> {
+  await _insights.load();
   /**
    * POST /conversation-analysis/analyze
    *
@@ -70,7 +76,7 @@ export async function conversationAnalysisRoutes(app: FastifyInstance): Promise<
 
     const conversationId = id ?? crypto.randomUUID();
     const insight = analyzeConversation({ id: conversationId, messages });
-    store(ownerIdFor(request), insight);
+    await store(ownerIdFor(request), insight);
 
     return reply.code(200).send({ insight });
   });

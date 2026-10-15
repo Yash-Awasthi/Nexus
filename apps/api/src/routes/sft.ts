@@ -19,9 +19,11 @@ import {
   SftExporter,
   type ExportFormat,
   type TurnRole,
+  type SftSample,
 } from "@nexus/sft-tagger";
 import type { FastifyInstance } from "fastify";
 
+import { PersistentStore } from "../lib/persistent-store.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
 const now = (): string => new Date().toISOString();
@@ -36,6 +38,9 @@ function datasetFor(req: { nexusUserId?: string }): SftDataset {
   if (!d) datasets.set(id, (d = new SftDataset()));
   return d;
 }
+// Each sample is also kept in Postgres and restored into its owner's dataset at start-up.
+const saved = new PersistentStore<SftSample & { ownerId: string }>("sft_samples");
+
 const filter = new DatasetFilter();
 const exporter = new SftExporter();
 
@@ -48,6 +53,9 @@ const EXPORT_MIME: Record<ExportFormat, string> = {
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function sftRoutes(app: FastifyInstance): Promise<void> {
+  await saved.load();
+  for (const { ownerId, ...sample } of saved.values())
+    datasetFor({ nexusUserId: ownerId }).restore(sample);
   /**
    * POST /sft/conversations
    *
@@ -70,6 +78,8 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const sample = datasetFor(request).addConversation(turns, source);
+    const owner = request.nexusUserId ?? "local";
+    await saved.save(`${owner}::${sample.id}`, { ...sample, ownerId: owner });
     return reply.code(201).send(sample);
   });
 
