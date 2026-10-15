@@ -434,7 +434,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const dir = request.query.dir;
       const root = dir ? await safeResolve(driveDir, dir) : driveDir;
       const st = await fs.stat(root).catch(() => null);
-      if (!st?.isDirectory() || (!dir && (await fs.readdir(root)).length === 0))
+      if (!st?.isDirectory() || (!dir && (await fs.readdir(driveDir)).length === 0))
         return reply.code(404).send({ error: dir ? "not_found" : "no_drive" });
       const file =
         dir && root !== driveDir ? path.basename(root).replace(/[^\w.-]/g, "_") : "nexus-drive";
