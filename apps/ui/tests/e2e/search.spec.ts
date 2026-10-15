@@ -30,5 +30,6 @@ test("search says so when nothing matches", async ({ page }) => {
   await page.getByRole("button", { name: "Graph" }).click();
   await page.getByLabel("Search", { exact: true }).fill(`zzqx-${Date.now()}-nothing`);
   await page.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(page.getByText("Nothing matched that.").first()).toBeVisible();
+  // Results wait on the answer attempt, which has no model to reach offline.
+  await expect(page.getByText("Nothing matched that.").first()).toBeVisible({ timeout: 30_000 });
 });
