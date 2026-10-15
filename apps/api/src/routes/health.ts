@@ -69,6 +69,9 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(200).send({
       status: "ok",
       version: process.env.npm_package_version ?? "0.1.0",
+      ...(process.env.RENDER_GIT_COMMIT
+        ? { commit: process.env.RENDER_GIT_COMMIT.slice(0, 7) }
+        : {}),
       timestamp: new Date().toISOString(),
     });
   });
