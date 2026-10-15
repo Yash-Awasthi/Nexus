@@ -153,3 +153,12 @@ export function isOpenableExternally(url: string): boolean {
     return false;
   }
 }
+
+/** Whether an IPC call came from a frame on the renderer's own origin, not an embedded or stray page. */
+export function isTrustedSender(frameUrl: string | undefined, rendererUrl: string): boolean {
+  try {
+    return !!frameUrl && new URL(frameUrl).origin === new URL(rendererUrl).origin;
+  } catch {
+    return false;
+  }
+}

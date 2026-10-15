@@ -22,7 +22,13 @@ import { OsKeychainVault } from "./auth/keychain";
 import { createSessionFile, fetchJsonHttp } from "./auth/ports";
 import { createDesktopAuth, type DesktopAuth } from "./auth/session";
 import { clearSignInSession, openSignInWindow } from "./auth/sign-in-window";
-import { createInvokeHandler, INVOKE_CHANNEL, isOpenableExternally, type RunMode } from "./bridge";
+import {
+  createInvokeHandler,
+  INVOKE_CHANNEL,
+  isOpenableExternally,
+  isTrustedSender,
+  type RunMode,
+} from "./bridge";
 import { startLocalApi, type LocalApi } from "./local-api";
 import { freePort, nodeLocalApiPorts } from "./local-api-node";
 import { syncOnce } from "./sync";
@@ -236,9 +242,11 @@ app.whenReady().then(async () => {
     auth,
   });
 
-  ipcMain.handle(INVOKE_CHANNEL, (_event, method: string, args: unknown[]) =>
-    handler(method, args ?? []),
-  );
+  ipcMain.handle(INVOKE_CHANNEL, (event, method: string, args: unknown[]) => {
+    if (!isTrustedSender(event.senderFrame?.url, host.url))
+      throw new Error("IPC from a page that is not Nexus");
+    return handler(method, args ?? []);
+  });
 
   if (SMOKE) {
     win.webContents.once("did-finish-load", () => {
