@@ -13,6 +13,7 @@ import type { ErasureResult } from "@nexus/db";
 /** Minimal logger surface the route's pino logger satisfies. */
 interface ErasureLogger {
   info(obj: Record<string, unknown>, msg: string): void;
+  error(obj: Record<string, unknown>, msg: string): void;
 }
 
 /** Minimal erase surface — satisfied by `@nexus/db`'s `eraseUserData`. */
@@ -52,7 +53,8 @@ export async function handleSelfErasure(
       "GDPR erasure complete",
     );
     return { status: 204 };
-  } catch {
+  } catch (err) {
+    log.error({ err, userId: targetId }, "GDPR erasure failed");
     return { status: 500, body: { code: "ERASURE_FAILED", message: "Erasure failed" } };
   }
 }
