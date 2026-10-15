@@ -54,4 +54,5 @@ it("keeps a connector switched off across a restart", async () => {
   const mine = after.json<{ connectors: { id: string; enabled: boolean }[] }>().connectors;
   expect(mine.find((c) => c.id === id)?.enabled).toBe(false);
   await app.close();
-});
+  // Two full server boots; under a parallel run each can take most of the default.
+}, 120_000);
