@@ -25,7 +25,7 @@ catalog:
   ioredis: ^6.0.0
   pg: ^8.23.1
   playwright-core: 1.64.0
-  vitest: 5.0.4
+  vitest: 4.1.11
 
 # Transitive packages lifted to their first patched release in the same major, for advisories
 # their parents have not picked up yet. Drop an entry once every parent requires the fix.
