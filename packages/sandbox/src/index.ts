@@ -601,6 +601,6 @@ export {
   driveLastActiveMs,
 } from "./drive-fs.ts";
 export type { DriveStat, DriveEntry } from "./drive-fs.ts";
-export { tarGzDirectory } from "./tar.ts";
+export { extractTarGz, tarGzDirectory } from "./tar.ts";
 export { runOnDrive, RUN_COMPLETE, type DriveRunOptions } from "./drive-run.ts";
 export { s3Bucket, s3ConfigFromEnv, type S3Bucket, type S3Config } from "./s3.ts";

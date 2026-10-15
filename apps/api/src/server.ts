@@ -46,6 +46,7 @@ import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-
 import { startAuditExport } from "./lib/audit-export.ts";
 import { attachChannels } from "./lib/channels.ts";
 import { costLogStore } from "./lib/cost-log.ts";
+import { startDriveBackups } from "./lib/drive-durability.ts";
 import { idle as idleOrgRuns } from "./lib/org-runtime.ts";
 import { initPatStore } from "./lib/pat-store.ts";
 import { asUser } from "./lib/provider-keys.ts";
@@ -454,10 +455,14 @@ export async function buildServer(): Promise<FastifyInstance> {
   // few-seconds loss.
   // Audit entries go to a write-once bucket when AUDIT_EXPORT_S3_* names one (NX-FEAT-011).
   const stopAuditExport = startAuditExport(app.log);
+  // Drives back up to DRIVE_BACKUP_S3_* so a restart or redeploy does not lose them.
+  const stopDriveBackups = startDriveBackups(app.log);
 
   app.addHook("onClose", async () => {
     // Runs that outlast the wait are failed by the boot sweep on the next start.
     stopAuditExport();
+    // One last backup, bounded so a slow bucket cannot hold up shutdown.
+    await Promise.race([stopDriveBackups(), new Promise((r) => setTimeout(r, 20_000))]);
     await idleOrgRuns(5_000).catch(() => {});
     await flushTraces();
     await costLogStore.close();

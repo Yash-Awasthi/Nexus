@@ -17,7 +17,6 @@ import * as path from "node:path";
 import { db } from "@nexus/db";
 import { agentSessions, ingestedEvents, runtimeTasks, signals } from "@nexus/db/schema";
 import type { ExecAction } from "@nexus/exec-policy";
-import { userDrivePath } from "@nexus/sandbox";
 import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -37,6 +36,7 @@ import {
   pickDesign,
   scaffoldApp,
 } from "../lib/app-scaffold.ts";
+import { ensureDrive } from "../lib/drive-durability.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { ownerScope } from "../lib/owner.ts";
 import { getUserDrivers } from "../lib/user-context.ts";
@@ -195,7 +195,7 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
     const { provider, model, sessionId, approvalId } = request.body;
 
     const name = appFolderName(userId, prompt);
-    const dir = path.join(userDrivePath(userId), "apps", name);
+    const dir = path.join(await ensureDrive(userId), "apps", name);
     // Kept from the first call, so a replay after approval builds on the same starter.
     let design = await fs
       .readFile(path.join(dir, DESIGN_FILE), "utf8")
