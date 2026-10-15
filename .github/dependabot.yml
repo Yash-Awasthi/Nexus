@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Security updates only (version updates are capped at 0 open PRs); auto-merged by
+# dependabot-automerge.yml once the required checks pass.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: build
+      include: scope
+  - package-ecosystem: uv
+    directory: "/services/ingest"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: build
+      include: scope
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: ci
