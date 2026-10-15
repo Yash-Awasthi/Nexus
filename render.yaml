@@ -16,7 +16,9 @@ services:
     plan: free
     branch: main
     autoDeploy: true
-    healthCheckPath: /health
+    # Readiness, not liveness: the early health server answers /health while the app still loads,
+    # so a deploy or restart would switch traffic to an instance that cannot serve yet.
+    healthCheckPath: /health/ready
     envVars:
       # The service's own https://<name>.onrender.com URL, known once it exists.
       - key: OAUTH_REDIRECT_BASE
