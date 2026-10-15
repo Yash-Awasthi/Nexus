@@ -26,6 +26,7 @@ import {
 import { RuleTagger, QualityScorer } from "@nexus/sft-tagger";
 import type { FastifyInstance } from "fastify";
 
+import { PersistentStore } from "../lib/persistent-store.ts";
 import { requireAuthWithTier, getTierFromRequest } from "../middleware/auth.ts";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
@@ -54,6 +55,15 @@ function corpusFor(req: { nexusUserId?: string }) {
   return c;
 }
 
+// Each account's batches and pending samples are also kept in Postgres and restored at start-up.
+const saved = new PersistentStore<ReturnType<InMemoryBatchStore["snapshot"]> & { ownerId: string }>(
+  "corpus_snapshots",
+);
+function saveCorpus(req: { nexusUserId?: string }): Promise<void> {
+  const ownerId = req.nexusUserId ?? "local";
+  return saved.save(ownerId, { ...corpusFor(req).batchStore.snapshot(), ownerId });
+}
+
 // Tier comes from verified JWT/DB — never from a forgeable header
 function callerTier(req: Parameters<typeof getTierFromRequest>[0]): DataTier {
   const t = getTierFromRequest(req);
@@ -64,6 +74,9 @@ function callerTier(req: Parameters<typeof getTierFromRequest>[0]): DataTier {
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
+  await saved.load();
+  for (const { ownerId, ...snap } of saved.values())
+    corpusFor({ nexusUserId: ownerId }).batchStore.restore(snap);
   /** GET /corpus/batches */
   app.get<{ Querystring: { limit?: string } }>(
     "/corpus/batches",
@@ -166,6 +179,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
         ...(qualityScore !== undefined ? { qualityScore } : {}),
       },
     });
+    await saveCorpus(request);
     return reply.code(201).send(sample);
   });
 
@@ -204,6 +218,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
         userTier: callerTier(request),
         body: { name: request.body.name },
       });
+      await saveCorpus(request);
       return reply.code(result.status).send(result.data ?? { error: result.error });
     },
   );

@@ -20,17 +20,23 @@ import {
   sensitivityAnalysis,
   type Assumption,
   type Outcome,
+  type Scenario,
   type SensitivityOptions,
   type Variable,
 } from "@nexus/scenario-planner";
 import type { FastifyInstance } from "fastify";
 
+import { PersistentStore } from "../lib/persistent-store.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
 // One plan per account: scenarios are their author's.
 const plans = new Map<string, ScenarioPlan>();
+// Each scenario is also kept in Postgres and replayed into its owner's plan at start-up.
+const saved = new PersistentStore<Scenario & { ownerId: string }>("scenarios");
+const savedKey = (ownerId: string, id: string) => `${ownerId}::${id}`;
+
 function planFor(req: { nexusUserId?: string }): ScenarioPlan {
   const id = req.nexusUserId ?? "local";
   let p = plans.get(id);
@@ -41,6 +47,9 @@ function planFor(req: { nexusUserId?: string }): ScenarioPlan {
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void> {
+  await saved.load();
+  for (const { ownerId, ...scenario } of saved.values())
+    planFor({ nexusUserId: ownerId }).add(scenario);
   /**
    * GET /scenarios/plan/rank
    *
@@ -129,6 +138,8 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
 
     const scenario = builder.build();
     planFor(request).add(scenario);
+    const owner = request.nexusUserId ?? "local";
+    await saved.save(savedKey(owner, scenario.id), { ...scenario, ownerId: owner });
 
     return reply.code(201).send(scenario);
   });
@@ -177,6 +188,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
       const next = new ScenarioPlan();
       for (const s of current.list()) if (s.id !== request.params.id) next.add(s);
       plans.set(request.nexusUserId ?? "local", next);
+      saved.delete(savedKey(request.nexusUserId ?? "local", request.params.id));
       return reply.send({ deleted: true, id: request.params.id });
     },
   );

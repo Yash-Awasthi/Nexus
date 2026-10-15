@@ -262,6 +262,11 @@ export class SftDataset {
     return sample;
   }
 
+  /** Put back a sample saved earlier, keeping its id. */
+  restore(sample: SftSample): void {
+    this.samples.push(sample);
+  }
+
   get(id: string): SftSample | undefined {
     return this.samples.find((s) => s.id === id);
   }

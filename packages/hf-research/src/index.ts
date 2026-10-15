@@ -62,9 +62,6 @@ export interface BatchFilter {
 
 // ── InMemoryBatchStore ────────────────────────────────────────────────────────
 
-let _batchSeq = 0;
-let _sampleSeq = 0;
-
 /** In memory batch store. */
 export class InMemoryBatchStore {
   private batches = new Map<string, CorpusBatch>();
@@ -73,7 +70,7 @@ export class InMemoryBatchStore {
   addSample(sample: Omit<CorpusSample, "id" | "createdAt">): CorpusSample {
     const full: CorpusSample = {
       ...sample,
-      id: `sample-${++_sampleSeq}`,
+      id: `sample-${crypto.randomUUID()}`,
       createdAt: new Date().toISOString(),
     };
     this.pendingSamples.push(full);
@@ -83,7 +80,7 @@ export class InMemoryBatchStore {
   /** Flush pending samples into a new batch. */
   flush(name: string, tier: DataTier = "free"): CorpusBatch {
     const batch: CorpusBatch = {
-      id: `batch-${++_batchSeq}`,
+      id: `batch-${crypto.randomUUID()}`,
       name,
       samples: [...this.pendingSamples],
       createdAt: new Date().toISOString(),
@@ -93,6 +90,17 @@ export class InMemoryBatchStore {
     this.batches.set(batch.id, batch);
     this.pendingSamples = [];
     return batch;
+  }
+
+  /** Everything the store holds, for saving. */
+  snapshot(): { batches: CorpusBatch[]; pending: CorpusSample[] } {
+    return { batches: this.allBatches(), pending: [...this.pendingSamples] };
+  }
+
+  /** Put back what {@link snapshot} returned. */
+  restore(saved: { batches: CorpusBatch[]; pending: CorpusSample[] }): void {
+    for (const b of saved.batches) this.batches.set(b.id, b);
+    this.pendingSamples = [...saved.pending];
   }
 
   getBatch(id: string): CorpusBatch | undefined {
