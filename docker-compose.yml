@@ -300,7 +300,7 @@ services:
     container_name: nexus-ingest
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
       REDIS_URL: redis://redis:6379
@@ -347,7 +347,7 @@ services:
     container_name: nexus-searxng
     restart: unless-stopped
     ports:
-      - "4000:8080"
+      - "127.0.0.1:4000:8080"
     volumes:
       - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
       - searxng_data:/etc/searxng
@@ -389,9 +389,9 @@ services:
     volumes:
       - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
     ports:
-      - "4318:4318"
-      - "4317:4317"
-      - "8888:8888"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:8888:8888"
     profiles:
       - observability
     logging:

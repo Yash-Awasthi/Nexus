@@ -389,7 +389,8 @@ every setting below that still needs attention.
 - **Google sign-in requires a Google-verified address; GitHub uses a verified email or the
   account's id; Slack identities are scoped to their workspace** (old Slack accounts are adopted on
   their next sign-in).
-- **Development compose** publishes Postgres, Redis and the debuggers on 127.0.0.1 only, and the
+- **Development compose** publishes Postgres, Redis, the debuggers, search, ingest and the tracing stack (collector,
+  Prometheus, Grafana, Jaeger) on 127.0.0.1 only, and the
   ingest service refuses requests without its key outside `APP_ENV=development`.
 - **Brief share links** are signed with `BRIEF_SIGNING_KEY` or a key derived from `NEXUS_API_KEY`;
   links made with the old default no longer open.
