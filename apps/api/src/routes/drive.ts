@@ -34,12 +34,12 @@ import {
   runOnDrive,
   statDrive,
   tarGzDirectory,
-  userDrivePath,
   WORKSPACE_MOUNT,
   type DockerSandboxConfig,
 } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
+import { ensureDrive } from "../lib/drive-durability.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
@@ -81,12 +81,6 @@ function hostUser(): string | undefined {
 function containerWorkdir(driveDir: string, workDir: string): string {
   const rel = path.relative(driveDir, workDir);
   return rel ? path.posix.join(WORKSPACE_MOUNT, ...rel.split(path.sep)) : WORKSPACE_MOUNT;
-}
-
-async function ensureDriveDir(userId: string): Promise<string> {
-  const dir = userDrivePath(userId);
-  await fs.mkdir(dir, { recursive: true });
-  return dir;
 }
 
 async function getDriveUsage(dir: string): Promise<number> {
@@ -174,7 +168,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(401).send({ error: "auth_required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
       const usage = await getDriveUsage(driveDir);
       const pct = usage / QUOTA_BYTES;
       const warning = pct >= QUOTA_WARN_PCT;
@@ -208,7 +202,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const { command, cwd, timeoutMs } = request.body ?? {};
       if (!command?.trim()) return reply.code(400).send({ error: "command is required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
 
       const usedBefore = await getDriveUsage(driveDir);
       if (usedBefore >= QUOTA_BYTES) {
@@ -318,7 +312,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(401).send({ error: "auth_required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
       const listDir = request.query.dir ? await safeResolve(driveDir, request.query.dir) : driveDir;
 
       try {
@@ -362,7 +356,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const filePath = request.query.path;
       if (!filePath) return reply.code(400).send({ error: "path is required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
       try {
         const resolved = await safeResolve(driveDir, filePath);
         const content = await fs.readFile(resolved, "utf8");
@@ -398,7 +392,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       if (!filePath?.trim()) return reply.code(400).send({ error: "path is required" });
       if (content === undefined) return reply.code(400).send({ error: "content is required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
       const resolved = await safeResolve(driveDir, filePath);
       // An overwrite frees the old file's bytes, so only the difference counts.
       const replaced = (await fs.stat(resolved).catch(() => null))?.size ?? 0;
@@ -436,11 +430,11 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(401).send({ error: "auth_required" });
-      const driveDir = userDrivePath(userId);
+      const driveDir = await ensureDrive(userId);
       const dir = request.query.dir;
       const root = dir ? await safeResolve(driveDir, dir) : driveDir;
       const st = await fs.stat(root).catch(() => null);
-      if (!st?.isDirectory())
+      if (!st?.isDirectory() || (!dir && (await fs.readdir(root)).length === 0))
         return reply.code(404).send({ error: dir ? "not_found" : "no_drive" });
       const file =
         dir && root !== driveDir ? path.basename(root).replace(/[^\w.-]/g, "_") : "nexus-drive";
@@ -470,7 +464,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const filePath = request.body?.path?.trim();
       if (!filePath) return reply.code(400).send({ error: "path is required" });
 
-      const driveDir = await ensureDriveDir(userId);
+      const driveDir = await ensureDrive(userId);
       const resolved = await safeResolve(driveDir, filePath);
       if (path.basename(resolved) === ".env")
         return reply.code(403).send({ error: "The drive's key file is never linked." });
@@ -520,7 +514,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       if (typeof claim.i !== "string" || driveLinks.get(claim.i)?.ownerId !== claim.u)
         return refuse();
 
-      const resolved = await safeResolve(userDrivePath(claim.u), claim.p).catch(() => null);
+      const resolved = await safeResolve(await ensureDrive(claim.u), claim.p).catch(() => null);
       if (!resolved || path.basename(resolved) === ".env") return refuse();
       if (!(await fs.stat(resolved).catch(() => null))?.isFile())
         return reply.code(404).send({ error: "file not found" });
@@ -578,7 +572,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(401).send({ error: "auth_required" });
 
-      const driveDir = userDrivePath(userId);
+      const driveDir = await ensureDrive(userId);
       try {
         await withKeyLock(`drive:${userId}`, () =>
           fs.rm(driveDir, { recursive: true, force: true }),

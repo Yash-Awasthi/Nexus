@@ -8,7 +8,7 @@ import { createReadStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Readable } from "node:stream";
-import { createGzip } from "node:zlib";
+import { createGunzip, createGzip } from "node:zlib";
 
 const BLOCK = 512;
 
@@ -88,6 +88,64 @@ async function* entries(
 async function* archive(root: string, skip: (name: string) => boolean): AsyncGenerator<Buffer> {
   yield* entries(root, "", skip);
   yield Buffer.alloc(BLOCK * 2);
+}
+
+const padOf = (size: number) => (BLOCK - (size % BLOCK)) % BLOCK;
+
+/**
+ * Unpack a .tar.gz made by {@link tarGzDirectory} into `dest`, streaming, so a large drive is never
+ * held decompressed. Files and directories only; an entry that resolves outside `dest` aborts.
+ */
+export async function extractTarGz(input: Readable, dest: string): Promise<void> {
+  const root = path.resolve(dest);
+  await fs.mkdir(root, { recursive: true });
+  let pending: Buffer = Buffer.alloc(0);
+  let file: { handle: fs.FileHandle; left: number; pad: number } | null = null;
+  let skip = 0;
+  try {
+    for await (const chunk of input.pipe(createGunzip()) as AsyncIterable<Buffer>) {
+      pending = pending.length ? Buffer.concat([pending, chunk]) : chunk;
+      for (;;) {
+        if (file) {
+          const n = Math.min(file.left, pending.length);
+          if (n) await file.handle.write(pending.subarray(0, n));
+          pending = pending.subarray(n);
+          file.left -= n;
+          if (file.left) break;
+          await file.handle.close();
+          skip = file.pad;
+          file = null;
+        }
+        if (skip) {
+          const n = Math.min(skip, pending.length);
+          pending = pending.subarray(n);
+          skip -= n;
+          if (skip) break;
+        }
+        if (pending.length < BLOCK) break;
+        const h = pending.subarray(0, BLOCK);
+        pending = pending.subarray(BLOCK);
+        if (h.every((b) => b === 0)) continue;
+        const field = (at: number, len: number) => h.toString("utf8", at, at + len).split("\0")[0]!;
+        const name = [field(345, 155), field(0, 100)].filter(Boolean).join("/");
+        const size = parseInt(field(124, 12).trim() || "0", 8);
+        const target = path.resolve(root, name);
+        if (target !== root && !target.startsWith(root + path.sep))
+          throw new Error(`archive entry escapes its target: ${name}`);
+        const type = field(156, 1);
+        if (type === "5") {
+          await fs.mkdir(target, { recursive: true });
+        } else if (type === "0" || type === "") {
+          await fs.mkdir(path.dirname(target), { recursive: true });
+          file = { handle: await fs.open(target, "w"), left: size, pad: padOf(size) };
+        } else {
+          skip = size + padOf(size);
+        }
+      }
+    }
+  } finally {
+    await file?.handle.close();
+  }
 }
 
 /** `root` as a .tar.gz stream; `skip` drops any file or directory by name. */
