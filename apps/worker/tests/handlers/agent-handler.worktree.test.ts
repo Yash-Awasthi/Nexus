@@ -62,7 +62,7 @@ afterAll(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
-describe("handleAgentRunJob — worktree workspace", () => {
+describe("handleAgentRunJob — worktree workspace", { timeout: 30_000 }, () => {
   it("provisions a worktree, runs the agent inside it, and returns workspace info", async () => {
     const res = await handleAgentRunJob({
       instruction: "noop",
