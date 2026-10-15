@@ -85,3 +85,6 @@ inspiration/
 # Local tooling marker, not project source.
 .freebuff/
 *.tsbuildinfo
+
+# The workspace installs from the root pnpm-lock.yaml only.
+**/package-lock.json
