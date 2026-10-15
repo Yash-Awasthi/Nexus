@@ -194,46 +194,26 @@ describe("HNSWIndex matches the brute-force reference", () => {
     expect(index.capacity).toBe(10);
   });
 
-  it("mass deletion (33%): no deleted label ever leaks; recall still 1.0", () => {
-    // Pins the behavior measured for the module header: deletions are marks
-    // without graph repair (upstream hnswlib semantics) — the invariant is
-    // that a deleted label can never appear in results.
-    const n = 800;
-    const dim = 16;
-    const vectors = seededVectors(n, dim, 99);
-    const index = new HNSWIndex("l2", dim);
-    index.initIndex(n + 10, { M: 16, efConstruction: 200, randomSeed: 3 });
-    index.addItems(vectors, labelsOf(n));
-    index.setEf(100);
-    const exact = new BFIndex("l2", dim);
-    exact.addItems(vectors, labelsOf(n));
-    const queries = seededVectors(25, dim, 77);
-    const delCount = Math.round(0.33 * n);
-    for (let i = 0; i < delCount; i++) index.markDeleted(i);
-    let hits = 0;
-    for (const q of queries) {
-      const got = index.searchKnn(q, 10);
-      expect(got.every((h) => h.label >= delCount)).toBe(true); // never leak
-      const want = exact.searchKnn(q, 10, (l) => l >= delCount).map((h) => h.label);
-      for (const h of got) if (want.includes(h.label)) hits++;
-    }
-    expect(hits / (queries.length * 10)).toBe(1); // recall unaffected at 33%
-  });
-
-  it("extreme deletion (90%): still no leak; fragmenting recall recovers with higher ef", () => {
-    const n = 800;
-    const dim = 16;
-    const vectors = seededVectors(n, dim, 99);
-    const index = new HNSWIndex("l2", dim);
-    index.initIndex(n + 10, { M: 16, efConstruction: 200, randomSeed: 3 });
-    index.addItems(vectors, labelsOf(n));
-    const exact = new BFIndex("l2", dim);
-    exact.addItems(vectors, labelsOf(n));
-    const queries = seededVectors(25, dim, 876);
-    const delCount = Math.round(0.9 * n);
-    for (let i = 0; i < delCount; i++) index.markDeleted(i);
-    const recallAt = (ef: number): number => {
-      index.setEf(ef);
+  // Each deletion case builds an 800-vector graph: well under 5 s plain, past it under CI coverage.
+  it(
+    "mass deletion (33%): no deleted label ever leaks; recall still 1.0",
+    { timeout: 60_000 },
+    () => {
+      // Pins the behavior measured for the module header: deletions are marks
+      // without graph repair (upstream hnswlib semantics) — the invariant is
+      // that a deleted label can never appear in results.
+      const n = 800;
+      const dim = 16;
+      const vectors = seededVectors(n, dim, 99);
+      const index = new HNSWIndex("l2", dim);
+      index.initIndex(n + 10, { M: 16, efConstruction: 200, randomSeed: 3 });
+      index.addItems(vectors, labelsOf(n));
+      index.setEf(100);
+      const exact = new BFIndex("l2", dim);
+      exact.addItems(vectors, labelsOf(n));
+      const queries = seededVectors(25, dim, 77);
+      const delCount = Math.round(0.33 * n);
+      for (let i = 0; i < delCount; i++) index.markDeleted(i);
       let hits = 0;
       for (const q of queries) {
         const got = index.searchKnn(q, 10);
@@ -241,11 +221,40 @@ describe("HNSWIndex matches the brute-force reference", () => {
         const want = exact.searchKnn(q, 10, (l) => l >= delCount).map((h) => h.label);
         for (const h of got) if (want.includes(h.label)) hits++;
       }
-      return hits / (queries.length * 10);
-    };
-    expect(recallAt(100)).toBeGreaterThanOrEqual(0.8); // degraded, not broken
-    expect(recallAt(200)).toBe(1); // ef bump restores full recall
-  });
+      expect(hits / (queries.length * 10)).toBe(1); // recall unaffected at 33%
+    },
+  );
+
+  it(
+    "extreme deletion (90%): still no leak; fragmenting recall recovers with higher ef",
+    { timeout: 60_000 },
+    () => {
+      const n = 800;
+      const dim = 16;
+      const vectors = seededVectors(n, dim, 99);
+      const index = new HNSWIndex("l2", dim);
+      index.initIndex(n + 10, { M: 16, efConstruction: 200, randomSeed: 3 });
+      index.addItems(vectors, labelsOf(n));
+      const exact = new BFIndex("l2", dim);
+      exact.addItems(vectors, labelsOf(n));
+      const queries = seededVectors(25, dim, 876);
+      const delCount = Math.round(0.9 * n);
+      for (let i = 0; i < delCount; i++) index.markDeleted(i);
+      const recallAt = (ef: number): number => {
+        index.setEf(ef);
+        let hits = 0;
+        for (const q of queries) {
+          const got = index.searchKnn(q, 10);
+          expect(got.every((h) => h.label >= delCount)).toBe(true); // never leak
+          const want = exact.searchKnn(q, 10, (l) => l >= delCount).map((h) => h.label);
+          for (const h of got) if (want.includes(h.label)) hits++;
+        }
+        return hits / (queries.length * 10);
+      };
+      expect(recallAt(100)).toBeGreaterThanOrEqual(0.8); // degraded, not broken
+      expect(recallAt(200)).toBe(1); // ef bump restores full recall
+    },
+  );
 
   // The 1,500-vector build takes about 5 s plain but over 40 s under CI coverage.
   it("approximation still holds recall at larger scale", { timeout: 120_000 }, () => {
