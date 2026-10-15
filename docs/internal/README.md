@@ -49,10 +49,15 @@ these describe the work.
 - Render dashboard values override `render.yaml`. Deploys from 2026-10-12 to 2026-10-14 failed
   because the dashboard held `NEXUS_TRUST_PROXY=1`; it now holds the list in `render.yaml`. A
   deploy that never goes live shows as `update_failed` in Render's Events, not in GitHub.
-- Not set yet, each a warning in the start-up log and in `nexus security check`:
-  `NEXUS_MFA_KEY` (TOTP secrets are stored in plain text; setting it means users re-enrol),
-  `REDIS_URL` or Upstash (rate limits reset on restart), `RESEND_API_KEY` and `NEXUS_MAIL_FROM`
-  (no password reset in production), `AUDIT_EXPORT_S3_*` (audit log stays in the database only).
+- Live configuration (2026-10-15): Groq (shared provider key; public completions capped at 3 a
+  minute with `NEXUS_LIBERTAS_GLOBAL_PER_MIN`), Upstash Redis, Resend (test sender
+  `onboarding@resend.dev`, which only reaches the Resend account's own address), `NEXUS_MFA_KEY`,
+  and a Backblaze B2 bucket `Buckybuckey` holding Drive backups (`drives/`) and the audit copy
+  (`audit/`). Render's health check is `/health/ready`. The start-up log shows no security warnings.
+- Left for later: a B2 lifecycle rule deleting hidden versions under `drives/` after 1 day (the
+  bucket keeps every version, so old backups would fill the free 10 GB); B2 Object Lock plus
+  `AUDIT_EXPORT_RETAIN_DAYS` to make the audit copy tamper-proof; a Resend sending domain; a few
+  throwaway `@example.com` accounts from live checks (Admin → Users).
 - Things that change on their own: Cloudflare's address ranges in `NEXUS_TRUST_PROXY`
   (if security notices start naming Cloudflare addresses, refresh them); GitHub turns scheduled
   workflows off after 60 days without commits (CodeQL, security scans, k6, ingest) and they must
