@@ -10,7 +10,7 @@ const asked: string[] = [];
 const realFetch = globalThis.fetch;
 vi.stubGlobal("fetch", async (url: string | URL | Request, init?: RequestInit) => {
   const u = String(url instanceof Request ? url.url : url);
-  if (!u.includes("api.groq.com")) return realFetch(url, init);
+  if (new URL(u).hostname !== "api.groq.com") return realFetch(url, init);
   asked.push((JSON.parse(String(init?.body)) as { model: string }).model);
   return new Response(
     JSON.stringify({
