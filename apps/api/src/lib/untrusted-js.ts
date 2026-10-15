@@ -67,6 +67,7 @@ export function runSandboxedNode(
   code: string,
   timeoutMs: number,
   runnerArgs: string[] = [],
+  bootMs = BOOT_MS,
 ): Promise<SandboxRunResult> {
   const started = Date.now();
   return new Promise((resolve) => {
@@ -89,7 +90,7 @@ export function runSandboxedNode(
       timedOut = true;
       child.kill("SIGKILL");
     };
-    let timer = setTimeout(kill, BOOT_MS);
+    let timer = setTimeout(kill, bootMs);
     const take = (buf: Buffer, into: "out" | "err") => {
       let text = buf.toString("utf8");
       if (into === "err" && !runStarted && text.includes(STARTED)) {
@@ -110,7 +111,11 @@ export function runSandboxedNode(
       clearTimeout(timer);
       resolve({
         stdout: stdout.replace(/\n$/, ""),
-        stderr: timedOut ? `Timed out after ${timeoutMs}ms` : stderr.replace(/\n$/, ""),
+        stderr: !timedOut
+          ? stderr.replace(/\n$/, "")
+          : runStarted
+            ? `Timed out after ${timeoutMs}ms`
+            : `The sandbox did not start within ${Math.round(bootMs / 1000)}s; the server may be busy.`,
         exitCode: timedOut ? 124 : (code ?? 1),
         timedOut,
         truncated,

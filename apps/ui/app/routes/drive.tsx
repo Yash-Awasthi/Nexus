@@ -43,6 +43,7 @@ interface DriveStatus {
   quota: { used: number; limit: number; pct: number };
   warning: string | null;
   dockerAvailable: boolean;
+  shellAvailable?: boolean;
 }
 
 interface DriveFile {
@@ -381,7 +382,11 @@ export default function Drive() {
               variant="outline"
               className={status?.dockerAvailable ? "text-success" : "text-warning"}
             >
-              {status?.dockerAvailable ? "Sandboxed" : "Shell runs unsandboxed"}
+              {status?.shellAvailable === false
+                ? "Shell needs Docker"
+                : status?.dockerAvailable
+                  ? "Sandboxed"
+                  : "Shell runs unsandboxed"}
             </Badge>
             <Button
               size="icon-sm"
@@ -616,21 +621,28 @@ export default function Drive() {
               ))}
               <div ref={termEnd} />
             </div>
-            <div className="flex gap-2">
-              <Input
-                value={command}
-                onChange={(e) => setCommand(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !running) void run();
-                }}
-                placeholder="ls -la"
-                className="font-mono"
-                aria-label="Command"
-              />
-              <Button onClick={() => void run()} disabled={running || !command.trim()}>
-                {running ? <Loader2 className="w-4 h-4 animate-spin" /> : "Run"}
-              </Button>
-            </div>
+            {status?.shellAvailable === false ? (
+              <p className="text-sm text-muted-foreground">
+                Commands run in Docker, which this server does not have. Files still upload,
+                download and export.
+              </p>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !running) void run();
+                  }}
+                  placeholder="ls -la"
+                  className="font-mono"
+                  aria-label="Command"
+                />
+                <Button onClick={() => void run()} disabled={running || !command.trim()}>
+                  {running ? <Loader2 className="w-4 h-4 animate-spin" /> : "Run"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

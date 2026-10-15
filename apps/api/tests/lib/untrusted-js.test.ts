@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { runUntrustedJs } from "../../src/lib/untrusted-js.ts";
+import { runSandboxedNode, runUntrustedJs, STARTED } from "../../src/lib/untrusted-js.ts";
 
 describe("runUntrustedJs", () => {
   it("returns console output and the completion value", async () => {
@@ -53,5 +53,21 @@ describe("runUntrustedJs timeout", () => {
     expect(r.stdout).toBe("42");
     const spin = await runUntrustedJs("for (;;) {}", 300);
     expect(spin.timedOut).toBe(true);
+  });
+});
+
+describe("start-up deadline", () => {
+  const slowStart = (ms: number) =>
+    `setTimeout(() => process.stderr.write(${JSON.stringify(STARTED)}), ${ms});`;
+
+  it("waits as long as the caller allows for the runner to start", async () => {
+    const r = await runSandboxedNode([], slowStart(1500), "", 5_000, [], 4_000);
+    expect(r.timedOut).toBe(false);
+  });
+
+  it("says the runner never started, not that the code ran too long", async () => {
+    const r = await runSandboxedNode([], slowStart(3000), "", 5_000, [], 1_000);
+    expect(r.timedOut).toBe(true);
+    expect(r.stderr).toMatch(/did not start within 1s/);
   });
 });
