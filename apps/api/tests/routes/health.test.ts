@@ -28,6 +28,16 @@ import { buildServer } from "../../src/server.ts";
 import { costLogStore } from "../../src/lib/cost-log.ts";
 
 describe("GET /health", () => {
+  it("names the deployed commit, so a stale instance is visible", async () => {
+    vi.stubEnv("RENDER_GIT_COMMIT", "fc6ed44c12578edbc34c2b62528b8e65e9fa4bcf");
+    const app = await buildServer();
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/health" });
+    expect(res.json()).toMatchObject({ commit: "fc6ed44" });
+    vi.unstubAllEnvs();
+    await app.close();
+  });
+
   it("returns 200 with status, version, and timestamp", async () => {
     const app = await buildServer();
     await app.ready();
