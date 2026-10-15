@@ -22,8 +22,8 @@ Baseline: `main` at `c9d4a19`, 2026-10-14. Conventions are in [README.md](README
 | Connectors, MCP client/servers, plugin registry/run         | Full              | Per-owner connector registries; plugins install only from the server directory                        |
 | Session sync (desktop ↔ cloud)                              | Full              | Keys owner-scoped (passes 2 and 3)                                                                    |
 | UI (XSS sinks, link handling, token storage)                | Full (grep)       | React 19 blocks `javascript:` hrefs; one static `dangerouslySetInnerHTML`                             |
-| Desktop shell                                               | Partial           | Window prefs, navigation, IPC entry                                                                   |
-| Python ingest service                                       | Partial           | Auth, crawl fetch                                                                                     |
+| Desktop shell                                               | Full              | Sandboxed, isolated windows; navigation guarded; IPC only from the renderer origin (pass 3)           |
+| Python ingest service                                       | Full              | Every route needs the key except `/health` and Prometheus `/metrics` (pass 3)                         |
 | CI workflows, compose files, Dockerfiles                    | Full              | Pass 3: token read by default, no event text in shells, dev ports on loopback                         |
 | Dependencies (`pnpm audit --prod`)                          | Full              | 2026-10-15: `sprintf-js` (moderate, via mammoth) and `katex` (low, via @lobehub/ui); CI fails on high |
 
