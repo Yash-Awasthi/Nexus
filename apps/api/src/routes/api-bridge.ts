@@ -235,6 +235,19 @@ type MemberKeySource = "user" | "oauth" | "env" | "local" | "none";
  * Returns the registry plus a per-provider key source for honest hints.
  * Only the source string is ever returned — keys stay server-side.
  */
+/** NEXUS_DEFAULT_COUNCIL as members: `provider:model` pairs, comma-separated. */
+function defaultCouncil(): { label: string; provider: string; model: string }[] {
+  return (process.env.NEXUS_DEFAULT_COUNCIL ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.includes(":"))
+    .map((s) => {
+      const at = s.indexOf(":");
+      const model = s.slice(at + 1);
+      return { label: model.split("/").at(-1)!, provider: s.slice(0, at), model };
+    });
+}
+
 async function buildChatRegistry(
   userId: string | undefined,
   providers: Iterable<string>,
@@ -269,8 +282,16 @@ async function buildChatRegistry(
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
-/** Default model for all internal LLM calls — change once to affect the whole file. */
-let DEFAULT_MODEL = process.env.NEXUS_DEFAULT_MODEL ?? "anthropic/claude-3.5-haiku";
+/** The model internal LLM calls ask for when NEXUS_DEFAULT_MODEL or the admin setting names one. */
+let _configuredModel = process.env.NEXUS_DEFAULT_MODEL ?? "";
+
+/**
+ * Model for internal LLM calls: the configured one, else the first provider's own model, so a
+ * server holding only a Groq key never asks Groq for another provider's model.
+ */
+function defaultModel(): string {
+  return _configuredModel || getDefaultDriver()?.model || "anthropic/claude-3.5-haiku";
+}
 
 /** Current UTC timestamp as ISO-8601. */
 const now = (): string => new Date().toISOString();
@@ -438,7 +459,7 @@ function _guessLanguage(code: string): string {
 async function _llm(
   messages: { role: LlmRole; content: string }[],
   maxTokens = 512,
-  model = DEFAULT_MODEL,
+  model = defaultModel(),
 ): Promise<string> {
   const driver = getDefaultDriver();
   if (!driver) throw Object.assign(new Error(NO_LLM_MESSAGE), { statusCode: 503 });
@@ -889,7 +910,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       templateId?: string;
     };
   }>("/chat/stream", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const { members, round, rounds } = request.body;
+    const { round, rounds } = request.body;
+    let { members } = request.body;
     let message = request.body.message;
     const preamble =
       typeof request.body.preamble === "string" ? request.body.preamble.slice(0, 4000).trim() : "";
@@ -911,14 +933,29 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: "members_required", message: "body.members must be a non-empty array" });
     }
     // BYOK: resolve each member's key per-user (saved key first, env fallback).
-    const { registry: reg, sources } = await buildChatRegistry(
+    let { registry: reg, sources } = await buildChatRegistry(
       request.nexusUserId,
       members.map((m) => m.provider),
     );
+    // A browser that never chose a council asks for the UI's built-in members; when this server
+    // holds none of their keys, NEXUS_DEFAULT_COUNCIL answers instead of an error.
+    const fallback = members.some((m) => reg.get(m.provider)) ? [] : defaultCouncil();
+    if (fallback.length) {
+      members = fallback;
+      ({ registry: reg, sources } = await buildChatRegistry(
+        request.nexusUserId,
+        members.map((m) => m.provider),
+      ));
+    }
 
     reply.hijack();
     const raw = reply.raw;
     raw.writeHead(200, SSE_HEADERS);
+    if (fallback.length)
+      sseWrite(raw, {
+        type: "notice",
+        message: `None of the chosen members has a key here, so the server's default council answers (${fallback.map((m) => m.label).join(", ")}). Add your own keys under Settings → Provider Keys.`,
+      });
     if (request.body.live === true) {
       const { writerRef, readerRef } = createChannel();
       sseWrite(raw, { type: "live", reader: readerRef });
@@ -1476,7 +1513,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
           const t0 = Date.now();
           try {
             const res = await driver.complete({
-              model: DEFAULT_MODEL,
+              model: defaultModel(),
               maxTokens: 1200,
               messages: [
                 {
@@ -1498,7 +1535,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
                 },
               ],
             });
-            _trackServed(res, DEFAULT_MODEL);
+            _trackServed(res, defaultModel());
             const text = res.content.trim();
             issueCount += text.split("\n").filter((l) => /^\s*[-*] /.test(l)).length;
             if (text.includes("```")) suggestionCount++;
@@ -2438,7 +2475,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // live there (PersistentStore collection "skills", same /api scope, same
   // auth). api-bridge only supplies the narrow driver/cost deps.
   await registerSkillRoutes(app, {
-    defaultModel: DEFAULT_MODEL,
+    defaultModel: defaultModel(),
     getDefaultDriver,
     trackCost: _trackCost,
   });
@@ -2474,7 +2511,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // the stream needs (narrow ResearchBridgeDeps) and delegates — no research
   // code lives in this file anymore.
   registerResearchRoutes(app, {
-    defaultModel: DEFAULT_MODEL,
+    defaultModel: defaultModel(),
     sseHeaders: SSE_HEADERS,
     userMsg,
     parseJsonResponse,
@@ -2690,12 +2727,12 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     try {
       // Step 1: Generate code via the caller's model
       const res = await driver.complete({
-        model: DEFAULT_MODEL,
+        model: defaultModel(),
         messages: [systemMsg(systemPrompt), userMsg(task)],
         temperature: 0.2,
         maxTokens: 2048,
       });
-      _trackServed(res, DEFAULT_MODEL);
+      _trackServed(res, defaultModel());
       const generatedCode = res.content
         .trim()
         .replace(/^```[a-z]*\n?/, "")
@@ -2973,7 +3010,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     if (drv) {
       try {
         const r = await drv.complete({
-          model: reg.get("groq") ? "openai/gpt-oss-120b" : DEFAULT_MODEL,
+          model: reg.get("groq") ? "openai/gpt-oss-120b" : defaultModel(),
           messages: [systemMsg(system), userMsg(user)],
           maxTokens: 400,
         });
@@ -3674,7 +3711,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     try {
       if (!driver) throw new Error(NO_LLM);
       const res = await driver.complete({
-        model: DEFAULT_MODEL,
+        model: defaultModel(),
         messages: [
           {
             role: "user" as LlmRole,
@@ -3683,7 +3720,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 512,
       });
-      _trackServed(res, DEFAULT_MODEL);
+      _trackServed(res, defaultModel());
       return parseJsonResponse(res.content);
     } catch {
       return { scores: heuristicScores(text, names), reason: "Keyword heuristic." };
@@ -3796,7 +3833,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     const driver = getDefaultDriver();
     if (!driver) throw new Error(NO_LLM);
     const res = await driver.complete({
-      model: DEFAULT_MODEL,
+      model: defaultModel(),
       messages: [
         {
           role: "user" as LlmRole,
@@ -3805,7 +3842,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       ],
       maxTokens: 2048,
     });
-    _trackServed(res, DEFAULT_MODEL);
+    _trackServed(res, defaultModel());
     let parsed: { score?: unknown; explanation?: unknown; claims?: unknown };
     try {
       parsed = parseJsonResponse(res.content);
@@ -3853,7 +3890,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       const driver = getDefaultDriver();
       if (!driver) return reply.code(503).send({ error: NO_LLM });
       const res = await driver.complete({
-        model: DEFAULT_MODEL,
+        model: defaultModel(),
         messages: [
           {
             role: "user" as LlmRole,
@@ -3862,7 +3899,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 1024,
       });
-      _trackServed(res, DEFAULT_MODEL);
+      _trackServed(res, defaultModel());
       try {
         const parsed = parseJsonResponse<{ score?: unknown; ungroundedClaims?: unknown }>(
           res.content,
@@ -3925,8 +3962,8 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   app.get("/speculative/config", async (_req, reply) =>
     reply.send({
       enabled: !!getDefaultDriver(),
-      draftModel: DEFAULT_MODEL,
-      targetModel: DEFAULT_MODEL,
+      draftModel: defaultModel(),
+      targetModel: defaultModel(),
       numSpecTokens: 256,
       mode: "llm-simulated",
     }),
@@ -3948,11 +3985,11 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     if (!driver) return reply.code(503).send({ error: NO_LLM });
     const t0 = Date.now();
     const draftRes = await driver.complete({
-      model: DEFAULT_MODEL,
+      model: defaultModel(),
       messages: [userMsg(prompt)],
       maxTokens: 256,
     });
-    _trackServed(draftRes, DEFAULT_MODEL);
+    _trackServed(draftRes, defaultModel());
     const draftMs = Date.now() - t0;
     const t1 = Date.now();
     const verifyContent = await _llm(
@@ -4002,7 +4039,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     const driver = getDefaultDriver();
     if (!driver) return reply.code(503).send({ error: NO_LLM });
     const res = await driver.complete({
-      model: DEFAULT_MODEL,
+      model: defaultModel(),
       messages: [
         {
           role: "user" as LlmRole,
@@ -4011,7 +4048,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       ],
       maxTokens: 512,
     });
-    _trackServed(res, DEFAULT_MODEL);
+    _trackServed(res, defaultModel());
     try {
       const p = parseJsonResponse<{
         category?: unknown;
@@ -4187,7 +4224,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     if (driver) {
       const catalog = answers.map((a, i) => `[${i}] ${a.question}`).join("\n");
       const res = await driver.complete({
-        model: DEFAULT_MODEL,
+        model: defaultModel(),
         messages: [
           {
             role: "user" as LlmRole,
@@ -4196,7 +4233,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ],
         maxTokens: 256,
       });
-      _trackServed(res, DEFAULT_MODEL);
+      _trackServed(res, defaultModel());
       try {
         const parsed = parseJsonResponse<{ index: number; confidence: unknown }>(res.content);
         const hit = answers[parsed.index];
@@ -4626,14 +4663,14 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   // every /api call away except for admins.
 
   const _SYS_KEYS: Record<string, { type: "string" | "boolean"; initial: string }> = {
-    default_llm_model: { type: "string", initial: DEFAULT_MODEL },
+    default_llm_model: { type: "string", initial: _configuredModel },
     maintenance_mode: { type: "boolean", initial: process.env.MAINTENANCE_MODE ?? "false" },
   };
   const _sysStore = new PersistentStore<{ id: string; value: string }>("system_config");
   await _sysStore.load();
   const _sysValue = (key: string) => _sysStore.get(key)?.value ?? _SYS_KEYS[key]?.initial ?? "";
   const _applySysConfig = () => {
-    DEFAULT_MODEL = _sysValue("default_llm_model") || DEFAULT_MODEL;
+    _configuredModel = _sysValue("default_llm_model") || process.env.NEXUS_DEFAULT_MODEL || "";
   };
   _applySysConfig();
 
