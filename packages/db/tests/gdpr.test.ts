@@ -32,6 +32,7 @@ function recorderDb(rowCount = 1): {
         },
       };
     },
+    execute: () => Promise.resolve({}),
   };
   return { db, order };
 }
@@ -101,6 +102,7 @@ describe("eraseUserData", () => {
         order.push(table);
         return { where: () => Promise.resolve({}) }; // no rowCount reported
       },
+      execute: () => Promise.resolve({}),
     };
     const results = await eraseUserData(db, "u");
     expect(results.every((r) => r.deleted === 0)).toBe(true);

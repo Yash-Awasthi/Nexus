@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { handleSelfErasure, type ErasureFn } from "../../src/lib/gdpr-erasure.ts";
 
-const fakeLogger = () => ({ info: vi.fn() });
+const fakeLogger = () => ({ info: vi.fn(), error: vi.fn() });
 
 describe("handleSelfErasure", () => {
   it("rejects with 403 when there is no authenticated caller", async () => {
@@ -44,8 +44,13 @@ describe("handleSelfErasure", () => {
 
   it("maps a failing erase to 500 without leaking details", async () => {
     const erase = vi.fn<ErasureFn>().mockRejectedValue(new Error("pg boom"));
-    const out = await handleSelfErasure("u-1", "u-1", erase, fakeLogger());
+    const log = fakeLogger();
+    const out = await handleSelfErasure("u-1", "u-1", erase, log);
     expect(out.status).toBe(500);
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u-1" }),
+      "GDPR erasure failed",
+    );
     if (out.status === 500) {
       expect(out.body).toEqual({ code: "ERASURE_FAILED", message: "Erasure failed" });
     }

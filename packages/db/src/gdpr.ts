@@ -12,15 +12,15 @@
  * The db handle is a narrow structural interface ({@link ErasableDb}), so the
  * cascade is unit-testable against a fake recorder with no live database.
  *
- * Deliberate exclusions (documented, not oversights):
- *   • billing / usage rows — retained under the "legal obligation" lawful basis
- *     (financial record-keeping); erased on a separate retention schedule.
- *   • `workspaces.ownerId` / `workspaceInvitations.invitedByUserId` — deleting a
- *     workspace owner is an ownership-transfer policy decision, not a row wipe;
- *     handled by a separate workspace-offboarding flow.
+ * Workspaces the user owns pass to the senior remaining member (owner, admin,
+ * member, viewer, then earliest joined) or are deleted when nobody else is in
+ * them; invitations they sent are re-attributed to the workspace's owner.
+ *
+ * Deliberate exclusion: billing / usage rows are retained under the "legal
+ * obligation" lawful basis and erased on a separate retention schedule.
  */
 
-import { eq, type SQL } from "drizzle-orm";
+import { eq, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 
 import {
@@ -82,7 +82,29 @@ export interface ErasableDb {
   delete(table: PgTable): {
     where(condition: SQL | undefined): Promise<{ rowCount?: number | null }>;
   };
+  execute(query: SQL): Promise<unknown>;
 }
+
+/** Statements that release the user's workspaces, run before any row is deleted. */
+const workspaceHandoff = (userId: string): SQL[] => [
+  sql`UPDATE workspaces w SET owner_id = heir.user_id
+      FROM (SELECT DISTINCT ON (m.workspace_id) m.workspace_id, m.user_id
+            FROM workspace_members m JOIN workspaces o ON o.id = m.workspace_id
+            WHERE o.owner_id = ${userId} AND m.user_id <> ${userId}
+            ORDER BY m.workspace_id,
+              CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END,
+              m.created_at) heir
+      WHERE w.id = heir.workspace_id`,
+  sql`UPDATE workspace_members m SET role = 'owner'
+      FROM workspaces w
+      WHERE m.workspace_id = w.id AND m.user_id = w.owner_id AND m.role <> 'owner'
+        AND EXISTS (SELECT 1 FROM workspace_members x
+                    WHERE x.workspace_id = w.id AND x.user_id = ${userId})`,
+  sql`DELETE FROM workspaces WHERE owner_id = ${userId}`,
+  sql`UPDATE workspace_invitations i SET invited_by_user_id = w.owner_id
+      FROM workspaces w
+      WHERE i.workspace_id = w.id AND i.invited_by_user_id = ${userId}`,
+];
 
 /**
  * Erase all data owned by `userId`: every {@link USER_SCOPED_TABLES} entry, then
@@ -92,6 +114,7 @@ export interface ErasableDb {
  * zeroes.
  */
 export async function eraseUserData(db: ErasableDb, userId: string): Promise<ErasureResult[]> {
+  for (const statement of workspaceHandoff(userId)) await db.execute(statement);
   const results: ErasureResult[] = [];
   for (const t of USER_SCOPED_TABLES) {
     const res = await db.delete(t.table).where(eq(t.column, userId));
