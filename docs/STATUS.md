@@ -402,9 +402,10 @@ every setting below that still needs attention.
   database edit then no longer goes unnoticed.
 - **Content-Security-Policy violations are reported** to `POST /api/v1/csp-report` and logged as
   `csp violation` warnings. `NEXUS_CSP_REPORT_ONLY=true` reports without blocking, to try a policy.
-- **Billing keys (`/api/v1/billing/keys`), the translation catalogue (`POST /api/v1/i18n/catalog`)
+- **Billing keys and usage (`/api/v1/billing/keys`, `/billing/current-period`, `/billing/quota`,
+  `/billing/usage/*`), the translation catalogue (`POST /api/v1/i18n/catalog`)
   and wiki writes (articles, reindex, access grants) are admin only.** They are shared by the
-  whole server; any signed-in account could change them. A wiki comment answers only its author.
+  whole server; any signed-in account could read or change them. A wiki comment answers only its author.
 
 ## Known caveats
 

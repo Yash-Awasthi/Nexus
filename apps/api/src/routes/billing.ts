@@ -85,7 +85,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (_req, reply) => {
       const now = new Date();
@@ -259,7 +259,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (_req, reply) => {
       const planKey = currentPlanKey();
@@ -302,7 +302,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { tenantId: string } }>(
     "/billing/usage/:tenantId",
-    { preHandler: requireAuth },
+    { preHandler: requireAdminRole },
     async (request, reply) => {
       const now = new Date();
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -352,7 +352,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           500: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAdminRole,
     },
     async (_req, reply) => {
       const now = new Date();

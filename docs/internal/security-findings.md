@@ -37,7 +37,7 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
 | Critical | 0    | 1     | 0        |
 | High     | 0    | 5     | 0        |
 | Medium   | 0    | 21    | 0        |
-| Low      | 0    | 12    | 2        |
+| Low      | 0    | 13    | 2        |
 
 ## Findings
 
@@ -477,6 +477,16 @@ Route census: `apps/api/tests/security/public-routes.test.ts` builds the server,
   account's tokens; every path that ends an account calls it. Signing out everywhere still leaves
   API tokens alone.
 - **Test:** `apps/api/tests/lib/end-account-access.test.ts`
+
+### NX-SEC-042 — Any account read the instance's usage and spend
+
+- **Severity:** low · **Status:** fixed
+- **Evidence:** `/billing/current-period`, `/billing/quota`, `/billing/usage/:tenantId` and
+  `/billing/usage/by-model-day` in `apps/api/src/routes/billing.ts` summed `usage_events` for
+  the whole server (the tenant id was ignored) behind `requireAuth`.
+- **Impact:** any signed-in account saw how many requests the server handled and what they cost.
+- **Fix:** admin only, like the billing keys whose usage they count (NX-SEC-035).
+- **Test:** `apps/api/tests/security/cross-account.test.ts`
 
 ## Audit pass 2 (2026-10-14)
 
