@@ -24,10 +24,10 @@ services:
       - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
     command: ["--config=/etc/otel/config.yaml"]
     ports:
-      - "4317:4317" # OTLP gRPC
-      - "4318:4318" # OTLP HTTP
-      - "8888:8888" # Collector self-metrics
-      - "8889:8889" # Prometheus exporter
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
+      - "127.0.0.1:8888:8888" # Collector self-metrics
+      - "127.0.0.1:8889:8889" # Prometheus exporter
 
   prometheus:
     image: prom/prometheus:v3.15.0
@@ -37,7 +37,7 @@ services:
       - ./infra/otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -59,7 +59,7 @@ services:
       - ./infra/grafana/provisioning/alerting/rules.yml:/etc/grafana/provisioning/alerting/nexus-rules.yaml:ro
       - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3010:3000"
+      - "127.0.0.1:3010:3000"
 
   jaeger:
     # Jaeger v2 is built on the OTel Collector: it takes OTLP on 4317 by default.
@@ -67,7 +67,7 @@ services:
     profiles: !reset []
     restart: unless-stopped
     ports:
-      - "16686:16686" # Jaeger UI
+      - "127.0.0.1:16686:16686" # Jaeger UI
 
   # Wire existing services to emit telemetry
   api:

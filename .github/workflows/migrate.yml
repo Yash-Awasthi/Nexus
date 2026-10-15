@@ -69,7 +69,6 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: read
-      id-token: write # for OIDC if Neon supports it in future
 
     steps:
       - uses: actions/checkout@v7
