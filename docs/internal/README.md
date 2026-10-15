@@ -49,8 +49,9 @@ these describe the work.
 - Render dashboard values override `render.yaml`. Deploys from 2026-10-12 to 2026-10-14 failed
   because the dashboard held `NEXUS_TRUST_PROXY=1`; it now holds the list in `render.yaml`. A
   deploy that never goes live shows as `update_failed` in Render's Events, not in GitHub.
-- Live configuration (2026-10-15): Groq (shared provider key; public completions capped at 3 a
-  minute with `NEXUS_LIBERTAS_GLOBAL_PER_MIN`), Upstash Redis, Resend (test sender
+- Live configuration (2026-10-15): Groq (shared provider key; default council
+  `groq:openai/gpt-oss-20b,groq:openai/gpt-oss-120b` for users without keys; public completions
+  capped at 3 a minute with `NEXUS_LIBERTAS_GLOBAL_PER_MIN`; Polymarket reads on), Upstash Redis, Resend (test sender
   `onboarding@resend.dev`, which only reaches the Resend account's own address), `NEXUS_MFA_KEY`,
   and a Backblaze B2 bucket `Buckybuckey` holding Drive backups (`drives/`) and the audit copy
   (`audit/`). Render's health check is `/health/ready`. The start-up log shows no security warnings.
