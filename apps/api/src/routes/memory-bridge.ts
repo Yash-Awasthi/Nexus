@@ -39,7 +39,11 @@ export async function memoryBridgeRoutes(
       const { limit = 20, query } = request.query;
       if (query) {
         const results = await mem.recall(query, limit, { userId: uid });
-        const entries = results.map((r) => ({ ...r.entry, score: r.score }));
+        // Vectors stay server-side, as in the list below.
+        const entries = results.map(({ entry: { embedding: _vector, ...entry }, score }) => ({
+          ...entry,
+          score,
+        }));
         return reply.send({ entries, total: entries.length });
       }
       const project = request.query.project_id;

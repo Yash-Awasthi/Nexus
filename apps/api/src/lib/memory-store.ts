@@ -68,8 +68,14 @@ class SharedMemoryStore implements IMemoryStore {
     return (this.backend ??= openBackend(process.env.DATABASE_URL));
   }
 
+  // Callers name the owner either way (the page sets userId, /api/v1/memory sets metadata.userId)
+  // and filter the same way; storing both lets every surface find every entry.
   async save(entry: MemoryEntry) {
-    return (await this.inner()).save(entry);
+    const owner = entry.userId ?? (entry.metadata?.["userId"] as string | undefined);
+    const owned = owner
+      ? { ...entry, userId: owner, metadata: { ...entry.metadata, userId: owner } }
+      : entry;
+    return (await this.inner()).save(owned);
   }
   async search(queryEmbedding: number[], limit: number, filter?: MemoryFilter) {
     return (await this.inner()).search(queryEmbedding, limit, filter);
