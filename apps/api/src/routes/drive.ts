@@ -26,6 +26,7 @@ import { createReadStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
+import { isDockerAvailable } from "@nexus/code-repl";
 import type { ExecAction } from "@nexus/exec-policy";
 import { globalFlags } from "@nexus/feature-flags";
 import {
@@ -40,6 +41,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { ensureDrive } from "../lib/drive-durability.ts";
+import { classifyAction } from "../lib/exec-approvals.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
@@ -148,6 +150,12 @@ function clip(s: string, max: number): string {
 // Route plugin
 // ═══════════════════════════════════════════════════════════════════════════════
 
+let _docker: Promise<boolean> | null = null;
+/** Whether Docker answers on this host, asked once per process. */
+const dockerReady = () => (_docker ??= isDockerAvailable());
+/** Commands run in Docker unless the operator allowed a host shell. */
+const sandboxed = () => process.env.ALLOW_UNSANDBOXED_EXEC !== "true";
+
 export async function driveRoutes(app: FastifyInstance): Promise<void> {
   await driveLinks.load();
   // Per-user rate limiters for drive routes (defense against abuse / DoS).
@@ -179,7 +187,8 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         warning: warning
           ? `Drive at ${Math.round(pct * 100)}% — nearing ${QUOTA_BYTES / 1024 / 1024}MB limit`
           : null,
-        dockerAvailable: process.env.ALLOW_UNSANDBOXED_EXEC !== "true",
+        dockerAvailable: await dockerReady(),
+        shellAvailable: !sandboxed() || (await dockerReady()),
       });
     },
   );
@@ -201,7 +210,6 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       }
       const { command, cwd, timeoutMs } = request.body ?? {};
       if (!command?.trim()) return reply.code(400).send({ error: "command is required" });
-
       const driveDir = await ensureDrive(userId);
 
       const usedBefore = await getDriveUsage(driveDir);
@@ -217,7 +225,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
       // The Docker sandbox is the only supported path; leaving it takes an
       // explicit flag naming what the alternative is, never a missing NODE_ENV.
-      const useDocker = process.env.ALLOW_UNSANDBOXED_EXEC !== "true";
+      const useDocker = sandboxed();
       // The container is the control for the sandbox surface; outside it this is a host shell.
       const action: ExecAction = {
         surface: useDocker ? "sandbox" : "pty",
@@ -225,6 +233,13 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         args: ["-c", command],
         cwd: workDir,
       };
+      // After the policy's own refusals, before approval: nobody approves a command that cannot run.
+      if (sandboxed() && classifyAction(action).decision !== "deny" && !(await dockerReady()))
+        return reply.code(503).send({
+          error: "sandbox_unavailable",
+          message:
+            "Drive commands run in Docker, which this server does not have. Files still upload, download and export.",
+        });
       if ((await guardExec(request, reply, action, request.body.approvalId)) === "handled") return;
 
       if (useDocker) {

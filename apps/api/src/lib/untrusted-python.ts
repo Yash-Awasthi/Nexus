@@ -55,5 +55,8 @@ export function runUntrustedPython(code: string, timeoutMs = 30_000): Promise<Sa
     code,
     timeoutMs,
     [PYODIDE_DIR],
+    // Pyodide compiles ~10 MB of wasm before the first line runs, slow on a 0.1-CPU host; kept
+    // under the 100 s a Cloudflare-fronted host (Render) allows a request.
+    80_000,
   );
 }
