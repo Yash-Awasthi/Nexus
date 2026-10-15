@@ -16,6 +16,7 @@ import {
   createHostApi,
   createInvokeHandler,
   isOpenableExternally,
+  isTrustedSender,
   type HostImplementation,
 } from "../src/bridge";
 
@@ -151,5 +152,16 @@ describe("exposed host object", () => {
     );
 
     expect(Object.keys(host).sort()).toEqual(["capabilities", "invoke", "name", "version"]);
+  });
+});
+
+describe("isTrustedSender", () => {
+  const renderer = "http://127.0.0.1:47321";
+  it("accepts only frames on the renderer's origin", () => {
+    expect(isTrustedSender("http://127.0.0.1:47321/chat?x=1", renderer)).toBe(true);
+    expect(isTrustedSender("http://127.0.0.1:9999/", renderer)).toBe(false);
+    expect(isTrustedSender("https://evil.example/", renderer)).toBe(false);
+    expect(isTrustedSender("about:blank", renderer)).toBe(false);
+    expect(isTrustedSender(undefined, renderer)).toBe(false);
   });
 });
