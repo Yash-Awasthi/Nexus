@@ -13,7 +13,7 @@ vi.mock("../../src/lib/shared-kv.ts", () => ({
 }));
 
 // Import AFTER mock is registered
-const { makeRateLimitPreHandler, makeUserRateLimitPreHandler } =
+const { makeRateLimitPreHandler, makeUserRateLimitPreHandler, peerIsLoopback } =
   await import("../../src/lib/rate-limiter.ts");
 
 function makeUserRequest(opts: {
@@ -261,5 +261,20 @@ describe("the desktop app on loopback", () => {
     } finally {
       delete process.env.NEXUS_DESKTOP;
     }
+  });
+});
+
+describe("peerIsLoopback", () => {
+  const req = (remoteAddress: string, headers: Record<string, string> = {}) =>
+    ({ socket: { remoteAddress }, headers, raw: { socket: { remoteAddress } } }) as never;
+
+  it("trusts a direct local connection", () => {
+    expect(peerIsLoopback(req("127.0.0.1"))).toBe(true);
+    expect(peerIsLoopback(req("::ffff:127.0.0.1"))).toBe(true);
+  });
+
+  it("refuses a remote caller relayed by a proxy on the same machine", () => {
+    // Render's sleep proxy runs beside the app, so every remote request arrives from 127.0.0.1.
+    expect(peerIsLoopback(req("127.0.0.1", { "x-forwarded-for": "182.77.87.183" }))).toBe(false);
   });
 });

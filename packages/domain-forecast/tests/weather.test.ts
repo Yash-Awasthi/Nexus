@@ -38,6 +38,39 @@ describe("weatherHandler without an OpenWeather key", () => {
     });
   });
 
+  it("falls back to MET Norway when Open-Meteo refuses, as it does a shared IP over quota", async () => {
+    const step = (time: string, t: number, symbol: string) => ({
+      time,
+      data: {
+        instant: { details: { air_temperature: t } },
+        next_6_hours: { summary: { symbol_code: symbol } },
+      },
+    });
+    const agents: (string | undefined)[] = [];
+    const handler = weatherHandler("Paris", {
+      apiKey: "",
+      fetchFn: async (url, init) => {
+        if (url.includes("geocoding")) return { ok: true, json: async () => GEO };
+        if (url.includes("open-meteo")) return { ok: false, json: async () => ({}) };
+        agents.push(init?.headers?.["user-agent"]);
+        const timeseries = [
+          step("2026-09-29T06:00:00Z", 14, "fog"),
+          step("2026-09-29T12:00:00Z", 21, "clearsky_day"),
+          step("2026-09-30T12:00:00Z", 18, "lightrain"),
+        ];
+        return { ok: true, json: async () => ({ properties: { timeseries } }) };
+      },
+    });
+    const res = await handler.generate({ domain: "geo", horizon: "7d" });
+    expect(agents[0]).toMatch(/Nexus/);
+    expect(res.summary).toBe("Paris, France: clear sky, 14–21°C");
+    expect(res.indicators).toMatchObject({ source: "met-no" });
+    expect(res.scenarios.map((s) => s.description)).toEqual([
+      "clear sky, 14–21°C",
+      "slight rain, 18–18°C",
+    ]);
+  });
+
   it("says so when the city is unknown", async () => {
     const handler = weatherHandler("Nowhere", {
       apiKey: "",
