@@ -221,17 +221,18 @@ function driverFor(
   conn: { baseUrl: string | null; models: string[] | null },
 ): (() => LlmDriver) | undefined {
   // `provider` is user-controlled: only an OWN factory may run, never "constructor" or "__proto__".
-  if (Object.hasOwn(DRIVER_FACTORIES, provider))
-    return key
-      ? () => {
-          const driver = DRIVER_FACTORIES[provider]!(key);
-          return "useFetch" in driver
-            ? (driver as LlmDriver & { useFetch(f: typeof fetch): LlmDriver }).useFetch(
-                _pacedPublicFetch,
-              )
-            : driver;
-        }
-      : undefined;
+  if (Object.hasOwn(DRIVER_FACTORIES, provider)) {
+    const factory = DRIVER_FACTORIES[provider];
+    if (!key || typeof factory !== "function") return undefined;
+    return () => {
+      const driver = factory(key);
+      return "useFetch" in driver
+        ? (driver as LlmDriver & { useFetch(f: typeof fetch): LlmDriver }).useFetch(
+            _pacedPublicFetch,
+          )
+        : driver;
+    };
+  }
   const { baseUrl } = conn;
   const model = conn.models?.[0];
   if (!baseUrl || !model) return undefined;
