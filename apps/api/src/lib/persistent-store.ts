@@ -50,6 +50,26 @@ function _ensureTable(): Promise<void> {
   return _tableReady;
 }
 
+/** Every store this process built, so an erasure reaches records already held in memory. */
+const _stores = new Set<PersistentStore<unknown>>();
+
+/** Records name their account by key (`<id>`, `<id>::…` from `for`) or by an ownerId/userId field. */
+function ownedBy(userId: string, key: string, val: unknown): boolean {
+  if (key === userId || key.startsWith(`${userId}::`)) return true;
+  const v = val as { ownerId?: unknown; userId?: unknown } | null;
+  return typeof v === "object" && v !== null && (v.ownerId === userId || v.userId === userId);
+}
+
+/** Remove an account's records from every store, in memory and in the backing table. */
+export async function eraseStoredRecords(userId: string): Promise<void> {
+  for (const store of _stores) store.dropOwned(userId);
+  await _getPool()?.query(
+    `DELETE FROM nexus_kv
+     WHERE id = $1 OR starts_with(id, $1 || '::') OR data->>'ownerId' = $1 OR data->>'userId' = $1`,
+    [userId],
+  );
+}
+
 export class PersistentStore<T> {
   private _mem = new Map<string, T>();
 
@@ -57,6 +77,12 @@ export class PersistentStore<T> {
 
   constructor(_name: string) {
     this._name = _name;
+    _stores.add(this as PersistentStore<unknown>);
+  }
+
+  /** Forget the account's records held in memory; the caller clears the table. */
+  dropOwned(userId: string): void {
+    for (const [key, val] of this._mem) if (ownedBy(userId, key, val)) this._mem.delete(key);
   }
 
   /** Load from backing store. Call once at server startup. */

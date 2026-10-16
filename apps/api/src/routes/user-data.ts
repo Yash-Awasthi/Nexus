@@ -10,6 +10,7 @@ import { db, eraseUserData, type ErasableDb } from "@nexus/db";
 import type { FastifyInstance } from "fastify";
 
 import { handleSelfErasure } from "../lib/gdpr-erasure.ts";
+import { eraseStoredRecords } from "../lib/persistent-store.ts";
 import { endAccountAccess } from "../lib/session-revocation.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -26,7 +27,11 @@ export async function userDataRoutes(app: FastifyInstance): Promise<void> {
         // satisfy ErasableDb (weak-type check on the optional rowCount), but the
         // real client does expose rowCount at runtime. The cascade is otherwise
         // unit-tested against a fake ErasableDb in @nexus/db.
-        (userId) => eraseUserData(db as ErasableDb, userId),
+        async (userId) => {
+          const results = await eraseUserData(db as ErasableDb, userId);
+          await eraseStoredRecords(userId);
+          return results;
+        },
         request.log,
       );
 
