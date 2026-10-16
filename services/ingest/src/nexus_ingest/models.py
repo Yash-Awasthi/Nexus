@@ -15,13 +15,11 @@ from pydantic import BaseModel, Field
 class ScrapeSource(str, Enum):
     BLOOMBERG = "bloomberg"
     REUTERS = "reuters"
-    EDGAR = "edgar"
     YAHOO = "yahoo"
     CNBC = "cnbc"
     FT = "ft"
     BENZINGA = "benzinga"
     GOOGLE_NEWS = "google_news"
-    GOOGLE_SERP = "google_serp"
     INVESTINGCOM = "investingcom"
     MARKETWATCH = "marketwatch"
     RSS = "rss"

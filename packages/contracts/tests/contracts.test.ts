@@ -32,13 +32,11 @@ describe("SCRAPE_SOURCES", () => {
     const expected = [
       "bloomberg",
       "reuters",
-      "edgar",
       "yahoo",
       "cnbc",
       "ft",
       "benzinga",
       "google_news",
-      "google_serp",
       "investingcom",
       "marketwatch",
       "rss",

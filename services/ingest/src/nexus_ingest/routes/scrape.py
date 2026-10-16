@@ -19,7 +19,6 @@ from nexus_ingest.models import (
     ArticleOut,
     BatchScrapeRequest,
     BatchScrapeResponse,
-    FinEventOut,
     ScrapeRequest,
     ScrapeResponse,
     ScrapeSource,
@@ -42,12 +41,6 @@ def _article_to_out(article: Any) -> ArticleOut:
         age_hours=article.age_hours,
         raw_tickers=article.raw_tickers or [],
     )
-
-
-def _event_to_out(event: Any) -> FinEventOut:
-    """Convert a finscrape FinEvent to our wire type."""
-    d = event.to_dict() if hasattr(event, "to_dict") else vars(event)
-    return FinEventOut(**d)
 
 
 async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: float) -> ScrapeResponse:
@@ -75,19 +68,11 @@ async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: f
     duration_ms = (time.monotonic() - start) * 1000
     articles_out = [_article_to_out(a) for a in articles]
 
-    # Attempt financial analysis if the pipeline module is available
-    events_out: list[FinEventOut] = []
-    try:
-        from finscrape.pipeline import run_pipeline  # type: ignore[import]
-        raw_events = await loop.run_in_executor(None, run_pipeline, articles)
-        events_out = [_event_to_out(e) for e in raw_events]
-    except Exception as exc:
-        logger.debug("Pipeline unavailable, returning raw articles only: %s", exc)
-
     return ScrapeResponse(
         source=source,
         articles=articles_out,
-        events=events_out,
+        # Analysis needs an LLM and an event store; it runs in fin-scrape's worker, not here.
+        events=[],
         duration_ms=round(duration_ms, 1),
         scraped_at=datetime.now(timezone.utc).isoformat(),
     )
