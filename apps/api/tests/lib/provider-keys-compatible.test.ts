@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import http from "node:http";
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
 const DB = "pglite://:memory:provider-keys-compatible";
 process.env.DATABASE_URL = DB;
@@ -19,6 +19,7 @@ const { buildUserDriverRegistry, compatibleEndpointError } =
 const { encryptSecret } = await import("../../src/lib/secret-crypto.ts");
 const { db } = await import("@nexus/db");
 const { userProviderCredentials } = await import("@nexus/db/schema");
+const { eq } = await import("drizzle-orm");
 
 const USER = crypto.randomUUID();
 
@@ -101,5 +102,47 @@ describe("OpenAI-compatible provider keys", () => {
       delete process.env.NEXUS_DESKTOP;
       server.close();
     }
+  });
+});
+
+describe("built-in provider keys", () => {
+  it("sit out a short rate-limit wait and record when the key was last used", async () => {
+    await db.insert(userProviderCredentials).values({
+      userId: USER,
+      provider: "groq",
+      encryptedKey: encryptSecret("gsk-test-key-0123456789"),
+    });
+    let calls = 0;
+    vi.stubGlobal("fetch", async () => {
+      calls++;
+      if (calls === 1)
+        return new Response(
+          JSON.stringify({ error: { message: "Rate limit reached. Please try again in 50ms." } }),
+          { status: 429 },
+        );
+      return Response.json({
+        id: "c1",
+        model: "m",
+        choices: [{ message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      });
+    });
+    try {
+      const driver = (await buildUserDriverRegistry(USER, ["groq"])).registry.get("groq");
+      const res = await driver!.complete({
+        model: "m",
+        messages: [{ role: "user", content: "hi" }],
+      });
+      expect(res.content).toBe("ok");
+      expect(calls).toBe(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    const [row] = await db
+      .select()
+      .from(userProviderCredentials)
+      .where(eq(userProviderCredentials.provider, "groq"));
+    expect(row?.lastUsedAt).toBeInstanceOf(Date);
   });
 });

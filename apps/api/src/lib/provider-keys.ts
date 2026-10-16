@@ -177,10 +177,11 @@ async function resolveUserConnection(
   if (!row.encryptedKey) return row.baseUrl ? { key: null, ...meta } : null;
   try {
     const key = decryptSecret(row.encryptedKey);
-    void db
-      .update(userProviderCredentials)
+    // A drizzle query runs only once awaited or then'd; `void` alone never sends it.
+    db.update(userProviderCredentials)
       .set({ lastUsedAt: new Date() })
-      .where(eq(userProviderCredentials.id, row.id));
+      .where(eq(userProviderCredentials.id, row.id))
+      .catch(() => undefined);
     return { key, ...meta };
   } catch {
     // Read-time migration: a legacy row may hold a PLAINTEXT key written before
@@ -210,6 +211,8 @@ async function resolveUserConnection(
 }
 
 const _pacedFetch = pacedFetch(callerFetch);
+// Built-in providers sit at fixed public hosts, so they need pacing but no pinning.
+const _pacedPublicFetch = pacedFetch((input, init) => fetch(input, init));
 
 /** A driver builder for a stored connection: a built-in provider, else an OpenAI-compatible endpoint. */
 function driverFor(
@@ -219,7 +222,16 @@ function driverFor(
 ): (() => LlmDriver) | undefined {
   // `provider` is user-controlled: only an OWN factory may run, never "constructor" or "__proto__".
   if (Object.hasOwn(DRIVER_FACTORIES, provider))
-    return key ? () => DRIVER_FACTORIES[provider]!(key) : undefined;
+    return key
+      ? () => {
+          const driver = DRIVER_FACTORIES[provider]!(key);
+          return "useFetch" in driver
+            ? (driver as LlmDriver & { useFetch(f: typeof fetch): LlmDriver }).useFetch(
+                _pacedPublicFetch,
+              )
+            : driver;
+        }
+      : undefined;
   const { baseUrl } = conn;
   const model = conn.models?.[0];
   if (!baseUrl || !model) return undefined;
