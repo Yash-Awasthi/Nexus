@@ -221,7 +221,8 @@ export class McpHttpTransport implements McpTransport {
     this.timeoutMs = opts.timeoutMs ?? 30_000;
     this.headers = {
       "Content-Type": "application/json",
-      Accept: "application/json",
+      // Streamable HTTP servers refuse (406) a client that cannot take an event stream.
+      Accept: "application/json, text/event-stream",
       ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
       ...(opts.extraHeaders ?? {}),
     };
@@ -250,7 +251,17 @@ export class McpHttpTransport implements McpTransport {
         throw new McpClientError(`HTTP ${res.status}`, "HTTP_ERROR", { status: res.status });
       }
 
-      const response = (await res.json()) as JsonRpcResponse;
+      const session = res.headers?.get("mcp-session-id");
+      if (session) this.headers["Mcp-Session-Id"] = session;
+      const response = (
+        res.headers?.get("content-type")?.includes("text/event-stream")
+          ? (await res.text())
+              .split("\n")
+              .filter((l) => l.startsWith("data:"))
+              .map((l) => JSON.parse(l.slice(5)) as JsonRpcResponse)
+              .find((m) => m.id === request.id)
+          : await res.json()
+      ) as JsonRpcResponse;
 
       if (isError(response)) {
         throw new McpClientError(response.error.message, "RPC_ERROR", {

@@ -117,6 +117,24 @@ describe("McpHttpTransport", () => {
     await expect(transport.send("ping", {})).rejects.toThrow(McpClientError);
   });
 
+  it("speaks streamable HTTP: accepts an event stream and echoes the session id", async () => {
+    const seen: Record<string, string>[] = [];
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      seen.push(init.headers as Record<string, string>);
+      const { id } = JSON.parse(init.body as string) as { id: string };
+      const event = `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id, result: { n: seen.length } })}\n\n`;
+      return new Response(event, {
+        headers: { "content-type": "text/event-stream", "mcp-session-id": "s1" },
+      });
+    }) as unknown as typeof fetch;
+    const transport = new McpHttpTransport({ url: SERVER_URL, fetchFn });
+
+    expect(await transport.send("initialize", {})).toEqual({ n: 1 });
+    expect(await transport.send("tools/list", {})).toEqual({ n: 2 });
+    expect(seen[0]?.["Accept"]).toContain("text/event-stream");
+    expect(seen[1]?.["Mcp-Session-Id"]).toBe("s1");
+  });
+
   it("throws McpClientError when response contains JSON-RPC error", async () => {
     const fetchFn = mockFetch(makeRpcError(-32601, "Method not found"));
     const transport = new McpHttpTransport({ url: SERVER_URL, fetchFn });
