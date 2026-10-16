@@ -10,11 +10,11 @@ test.skip(!withModels, "set E2E_MODELS=1 with provider keys saved for the owner"
 const unique = (name: string) => `${name} ${Date.now()}`;
 
 // Free-tier TokenHarbor models carry the runs. The budget and scorecard checks need a model
-// that costs something, so they make a few short calls on Gemini, billed at the default rate.
+// that costs something, so they make a few short calls on Gemini (E2E_PRICED_MODEL swaps it).
 // E2E_MODEL / E2E_MODEL_B swap in another provider's models when TokenHarbor is not saved.
 const FREE = process.env["E2E_MODEL"] ?? "tokenharbor/qwen3.8-flash:free";
 const FREE_B = process.env["E2E_MODEL_B"] ?? "tokenharbor/deepseek-v4.1-flash:free";
-const PRICED = "gemini/gemini-flash-latest";
+const PRICED = process.env["E2E_PRICED_MODEL"] ?? "gemini/gemini-flash-latest";
 // Budgets and pricing are on hold, so the checks that spend on a priced model are opt-in.
 const priced = process.env["E2E_PRICED"] ? test : test.skip;
 
