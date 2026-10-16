@@ -284,7 +284,7 @@ export function TaskBoard({
           return (
             <div
               key={col.status}
-              className="w-[80vw] shrink-0 snap-start rounded-xl bg-muted/40 p-2 sm:w-64"
+              className="w-[80vw] shrink-0 snap-start rounded-xl bg-muted/40 p-2 sm:w-64 lg:w-auto lg:min-w-40 lg:flex-1"
               data-testid={`column-${col.status}`}
             >
               <h3 className="flex items-center justify-between px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
