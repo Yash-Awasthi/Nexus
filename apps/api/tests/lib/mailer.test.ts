@@ -49,3 +49,23 @@ it("sends nothing when unconfigured and reports a refusal without throwing", asy
   });
   expect(await sendMail({ to: "a@b.test", subject: "s", text: "t" })).toBe(false);
 });
+
+it("sends through Brevo from a single verified sender when its key is set", async () => {
+  vi.stubEnv("RESEND_API_KEY", "");
+  vi.stubEnv("BREVO_API_KEY", "xkeysib-k");
+  vi.stubEnv("NEXUS_MAIL_FROM", "Nexus <me@gmail.test>");
+  vi.stubEnv("NEXUS_PUBLIC_URL", "https://n.test");
+  const fetchSpy = vi.fn(async () => new Response("{}", { status: 201 }));
+  vi.stubGlobal("fetch", fetchSpy);
+
+  expect(await sendMail({ to: "a@b.test", subject: "s", text: "t" })).toBe(true);
+  const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+  expect(url).toBe("https://api.brevo.com/v3/smtp/email");
+  expect(init.headers).toMatchObject({ "api-key": "xkeysib-k" });
+  expect(JSON.parse(String(init.body))).toEqual({
+    sender: { name: "Nexus", email: "me@gmail.test" },
+    to: [{ email: "a@b.test" }],
+    subject: "s",
+    textContent: "t",
+  });
+});
