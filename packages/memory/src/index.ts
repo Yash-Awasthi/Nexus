@@ -345,6 +345,8 @@ export interface JinaEmbedderConfig {
   model?: string;
   /** Task hint sent with the request (retrieval.passage / retrieval.query). */
   task?: string;
+  /** Output size; v3 truncates to any size from 32 to 1024. Default 1024. */
+  dimensions?: number;
 }
 
 interface JinaEmbeddingResponse {
@@ -359,7 +361,7 @@ interface JinaEmbeddingResponse {
  * with an extra `task` field for late-chunking retrieval hints.
  */
 export class JinaEmbedder implements IEmbedder {
-  readonly dimensions = 1024;
+  readonly dimensions: number;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly task: string | undefined;
@@ -376,6 +378,7 @@ export class JinaEmbedder implements IEmbedder {
     this.apiKey = key;
     this.model = config.model ?? "jina-embeddings-v3";
     this.task = config.task;
+    this.dimensions = config.dimensions ?? 1024;
   }
 
   async embed(text: string): Promise<number[]> {
@@ -391,6 +394,7 @@ export class JinaEmbedder implements IEmbedder {
           model: this.model,
           input: [text],
           ...(this.task ? { task: this.task } : {}),
+          ...(this.dimensions !== 1024 ? { dimensions: this.dimensions } : {}),
         }),
       });
     } catch (cause) {
@@ -778,7 +782,7 @@ export function createBestEmbedder(config?: {
   }
   const jinaKey = config?.jinaApiKey ?? process.env.JINA_API_KEY;
   if (provider === "jina" && jinaKey) {
-    return new JinaEmbedder({ apiKey: jinaKey });
+    return new JinaEmbedder({ apiKey: jinaKey, dimensions: 768 });
   }
   const cohereKey = config?.cohereApiKey ?? process.env.COHERE_API_KEY;
   if (provider === "cohere" && cohereKey) {
