@@ -16,6 +16,7 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { failInterruptedRuns } from "./lib/agent-queue.ts";
 import { closePgPools, getPgPool, isEmbeddedUrl } from "./lib/pg-pool.ts";
 import { checkPosture } from "./lib/security-posture.ts";
 import { sharedKvBackend } from "./lib/shared-kv.ts";
@@ -304,7 +305,10 @@ async function main(): Promise<void> {
   if (probePool) {
     probePool
       .query("SELECT 1")
-      .then(() => console.info("[startup] ✓ Database reachable"))
+      .then(async () => {
+        console.info("[startup] ✓ Database reachable");
+        if (!process.env.REDIS_URL) await failInterruptedRuns(probePool);
+      })
       .catch((err: unknown) =>
         console.warn(`[startup] ⚠ DB ping failed: ${(err as Error).message}`),
       );
