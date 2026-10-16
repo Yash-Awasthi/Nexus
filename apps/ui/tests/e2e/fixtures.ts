@@ -81,7 +81,15 @@ export const test = base.extend<{ api: Api }, { owner: Session }>({
   owner: [
     async ({ playwright }, use, info) => {
       const request = await playwright.request.newContext({ baseURL: info.project.use.baseURL });
-      await use(await signIn(request, OWNER));
+      const session = await signIn(request, OWNER);
+      // Each run starts on empty storage, so a key for the model specs is saved here.
+      const groq = process.env["E2E_GROQ_KEY"];
+      if (groq)
+        await request.post("/api/user/provider-keys", {
+          headers: { authorization: `Bearer ${session.token}` },
+          data: { provider: "groq", apiKey: groq },
+        });
+      await use(session);
       await request.dispose();
     },
     { scope: "worker" },
