@@ -24,6 +24,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import { syncCouncilFromServer, type CouncilMember } from "~/lib/council";
+import { Markdown } from "~/lib/markdown";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -284,7 +285,9 @@ export default function Discussion() {
                   )}
                   <span>{new Date(entry.at).toLocaleTimeString()}</span>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
+                <div className="text-sm">
+                  <Markdown text={entry.text} />
+                </div>
               </div>
             ))
           )}
@@ -303,7 +306,7 @@ export default function Discussion() {
               {outcome.totalTokens.toLocaleString()} tokens.
             </p>
             {outcome.digest ? (
-              <p className="whitespace-pre-wrap">{outcome.digest}</p>
+              <Markdown text={outcome.digest} />
             ) : (
               <p className="text-muted-foreground">The supervisor produced no record.</p>
             )}
