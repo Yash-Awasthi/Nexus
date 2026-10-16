@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { expect, test } from "./fixtures";
+import { expect, signIn, signInPage, test } from "./fixtures";
 
 test("search finds a document in a chosen knowledge base and marks the words", async ({
   page,
@@ -25,11 +25,13 @@ test("search finds a document in a chosen knowledge base and marks the words", a
 });
 
 test("search says so when nothing matches", async ({ page }) => {
+  // An account with no knowledge bases: the test embedder hashes words, so the shared
+  // owner's documents can collide with any query and score as a weak match.
+  await signInPage(page, await signIn(page.request, `empty-${Date.now()}@example.com`));
   await page.goto("/search");
   await page.getByLabel("Write an answer").click();
   await page.getByRole("button", { name: "Graph" }).click();
   await page.getByLabel("Search", { exact: true }).fill(`zzqx-${Date.now()}-nothing`);
   await page.getByRole("button", { name: "Search", exact: true }).click();
-  // Results wait on the answer attempt, which has no model to reach offline.
-  await expect(page.getByText("Nothing matched that.").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Nothing matched that.").first()).toBeVisible();
 });
