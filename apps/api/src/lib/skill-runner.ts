@@ -25,6 +25,8 @@ import { executeCode, type Runner, type SandboxLanguage } from "@nexus/sandbox";
 import { classifyAction } from "./exec-approvals.ts";
 import type { ExecutionStatus } from "./session-graph.ts";
 import { splitSkillCodeImports } from "./skill-imports.ts";
+import { runUntrustedJs } from "./untrusted-js.ts";
+import { runUntrustedPython } from "./untrusted-python.ts";
 
 /** Structural shape of a stored skill (matches StoredSkill in routes/skills.ts). */
 /** Output styles for mission agents — opt-in system-prompt injectors that cut
@@ -135,6 +137,35 @@ function outcomeDetail(r: {
 }
 
 type RunCodeResult = Awaited<ReturnType<typeof executeCode>>;
+
+/**
+ * Python and JavaScript run in the same restricted children as the Sandbox page: the host may
+ * have no python3 (Render has none), and skill code should not run with the host's rights.
+ */
+async function runSkillCode(
+  language: SandboxLanguage,
+  code: string,
+  timeoutMs: number,
+  runner?: Runner,
+): Promise<RunCodeResult> {
+  if (runner || (language !== "python" && language !== "javascript"))
+    return executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, runner);
+  const r =
+    language === "python"
+      ? await runUntrustedPython(code, timeoutMs)
+      : await runUntrustedJs(code, timeoutMs);
+  const ok = r.exitCode === 0 && !r.timedOut;
+  return {
+    ok,
+    stdout: r.stdout,
+    stderr: r.stderr,
+    exitCode: r.exitCode,
+    timedOut: r.timedOut,
+    durationMs: r.durationMs,
+    language,
+    ...(ok ? {} : { error: r.timedOut ? "timed out" : `exit code ${r.exitCode}` }),
+  };
+}
 
 /**
  * One shared skill-run choreography (used by BOTH the harness pre-execution
@@ -254,11 +285,7 @@ export async function executeSkillsOnce(
         language,
         SKILL_EXEC_TIMEOUT_MS,
         opts.onExecution,
-        () =>
-          executeCode(
-            { taskType: "sandbox.execute", language, code, timeoutMs: SKILL_EXEC_TIMEOUT_MS },
-            opts.runner,
-          ),
+        () => runSkillCode(language, code, SKILL_EXEC_TIMEOUT_MS, opts.runner),
       );
       const compressed = compressForTool(
         "run_skill_code",
@@ -372,7 +399,7 @@ export function makeRunSkillCodeTool(
       // thrown sandbox error records `failed` and propagates so the harness
       // loop (and tool wrapper) still sees the failure.
       const result = await runSkillWithExecution(skill, language, timeoutMs, opts.onExecution, () =>
-        executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, opts.runner),
+        runSkillCode(language, code, timeoutMs, opts.runner),
       );
       const compressed = compressForTool(
         "run_skill_code",
