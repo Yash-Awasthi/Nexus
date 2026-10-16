@@ -11,6 +11,7 @@ import type { PgTable } from "drizzle-orm/pg-core";
 
 import {
   eraseUserData,
+  UNMODELLED_TABLES,
   USER_SCOPED_TABLES,
   type ErasableDb,
   type ErasureResult,
@@ -32,17 +33,15 @@ function recorderDb(rowCount = 1): {
         },
       };
     },
-    execute: () => Promise.resolve({}),
+    execute: () => Promise.resolve({ rowCount }),
   };
   return { db, order };
 }
 
 describe("USER_SCOPED_TABLES manifest", () => {
-  it("every entry targets a user_id column", () => {
+  it("every entry targets an owning-account column", () => {
     for (const t of USER_SCOPED_TABLES) {
-      // Drizzle columns expose their SQL name; the whole point of the cascade is
-      // that each entry keys off the owning user.
-      expect((t.column as unknown as { name: string }).name).toBe("user_id");
+      expect(["user_id", "owner_id"]).toContain((t.column as unknown as { name: string }).name);
     }
   });
 
@@ -69,9 +68,9 @@ describe("eraseUserData", () => {
   it("deletes from every user-scoped table plus users", async () => {
     const { db, order } = recorderDb();
     const results = await eraseUserData(db, "user-123");
-    // one delete per manifest table + the users row
+    // one delete per manifest table + the users row; unmodelled tables go through execute
     expect(order).toHaveLength(USER_SCOPED_TABLES.length + 1);
-    expect(results).toHaveLength(USER_SCOPED_TABLES.length + 1);
+    expect(results).toHaveLength(UNMODELLED_TABLES.length + USER_SCOPED_TABLES.length + 1);
   });
 
   it("removes the users row LAST (children before parent)", async () => {
