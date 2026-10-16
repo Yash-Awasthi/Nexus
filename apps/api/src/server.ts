@@ -233,10 +233,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   const cspDirectives = {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'strict-dynamic'", ...spaInlineScriptHashes(process.env.NEXUS_SPA_DIR)],
-    styleSrc: ["'self'", "'unsafe-inline'"],
+    // The prompt editor (Monaco) fetches its stylesheet and icon font from jsDelivr.
+    styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net/npm/"],
     imgSrc: ["'self'", "data:", "blob:"],
     connectSrc: ["'self'", ...(process.env.ALLOWED_ORIGINS?.split(",") ?? [])],
-    fontSrc: ["'self'"],
+    fontSrc: ["'self'", "https://cdn.jsdelivr.net/npm/"],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
     formAction: ["'self'"],

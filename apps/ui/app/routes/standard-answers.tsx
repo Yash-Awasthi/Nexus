@@ -346,7 +346,7 @@ export default function StandardAnswers() {
 
       {/* Create / Edit dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Answer" : "New Standard Answer"}</DialogTitle>
           </DialogHeader>

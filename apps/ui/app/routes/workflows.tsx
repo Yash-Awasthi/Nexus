@@ -586,7 +586,9 @@ function WorkflowEditor({
 
   const onConnect = useCallback(
     (connection: Connection) =>
-      setEdges((eds) => addEdge({ ...connection, style: { stroke: "#555" } }, eds)),
+      setEdges((eds) =>
+        addEdge({ ...connection, style: { stroke: "var(--muted-foreground)" } }, eds),
+      ),
     [setEdges],
   );
 
@@ -603,8 +605,8 @@ function WorkflowEditor({
         style: {
           border: `2px solid ${cfg.border}`,
           borderRadius: 8,
-          background: "#0a0a0a",
-          color: "#fff",
+          background: "var(--card)",
+          color: "var(--card-foreground)",
           padding: 12,
         },
       };
@@ -831,11 +833,11 @@ function WorkflowEditor({
               onNodeClick={handleNodeClick}
               onPaneClick={handlePaneClick}
               fitView
-              style={{ background: "#0a0a0a" }}
+              style={{ background: "var(--background)" }}
             >
-              <Background color="#333" gap={20} />
+              <Background color="var(--border)" gap={20} />
               <Controls />
-              <MiniMap style={{ background: "#1a1a1a" }} nodeColor="#666" />
+              <MiniMap style={{ background: "var(--muted)" }} nodeColor="var(--muted-foreground)" />
             </ReactFlow>
           </div>
         </div>
@@ -906,7 +908,7 @@ function NewWorkflowDialog({ open, onOpenChange, onSubmit }: NewWorkflowDialogPr
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New Workflow</DialogTitle>
         </DialogHeader>

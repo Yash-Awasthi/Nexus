@@ -867,7 +867,7 @@ function ImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="size-4" />
@@ -1481,7 +1481,7 @@ export default function SkillsPage() {
 
       {/* View Code Dialog */}
       <Dialog open={!!selectedSkill} onOpenChange={(open) => !open && setSelectedSkill(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Code className="size-4" />
@@ -1524,7 +1524,7 @@ export default function SkillsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Play className="size-4" />
@@ -1630,7 +1630,7 @@ export default function SkillsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="size-4" />
@@ -1826,7 +1826,7 @@ export default function SkillsPage() {
 
       {/* Merge Skills Dialog */}
       <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GitMerge className="size-4" />
@@ -1903,7 +1903,7 @@ export default function SkillsPage() {
 
       {/* Add Skill Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="size-4" />

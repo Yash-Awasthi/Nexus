@@ -556,7 +556,7 @@ export default function PromptsPage() {
 
       {/* Read-only version preview */}
       <Dialog open={viewingVersion != null} onOpenChange={(o) => !o && setViewingVersion(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
               <GitCommit className="size-4" />
