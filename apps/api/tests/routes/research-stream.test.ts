@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 vi.mock("../../src/lib/duckduckgo.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/duckduckgo.ts")>()),
   searchDuckDuckGo: async () => [],
+  searchWikipedia: async () => [],
 }));
 
 for (const k of Object.keys(process.env))
