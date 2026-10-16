@@ -251,6 +251,22 @@ describe("POST /api/v1/gateway/messages", () => {
     expect(JSON.parse(String((init as RequestInit).body)).model).toBe("qwen/qwen3-32b");
   });
 
+  it("sends every Groq-hosted gpt-oss model to Groq", async () => {
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload: { model: "openai/gpt-oss-20b", messages: [{ role: "user", content: "Hello!" }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(String(url)).toContain("api.groq.com");
+    expect(JSON.parse(String((init as RequestInit).body)).model).toBe("openai/gpt-oss-20b");
+  });
+
   it("completes non-streaming request with mocked Groq", async () => {
     process.env.GROQ_API_KEY = "test-key";
     vi.stubGlobal("fetch", mockGroqFetch());
