@@ -427,7 +427,10 @@ export interface ForecastPoint {
 export interface OpenWeatherForecastHandlerOptions {
   apiKey?: string;
   city?: string;
-  fetchFn?: (url: string) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+  fetchFn?: (
+    url: string,
+    init?: { headers?: Record<string, string> },
+  ) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
 }
 
 interface OWMItem {
@@ -553,20 +556,77 @@ interface OpenMeteoDaily {
   weather_code: number[];
 }
 
-/** Seven-day forecast from Open-Meteo, which needs no key. */
+interface MetNoStep {
+  time: string;
+  data: {
+    instant: { details: { air_temperature: number } };
+    next_6_hours?: { summary: { symbol_code: string } };
+    next_1_hours?: { summary: { symbol_code: string } };
+  };
+}
+
+/** A MET Norway symbol such as `lightrainshowers_day` as the nearest WMO weather code. */
+function metNoCode(symbol: string): number {
+  if (symbol.includes("thunder")) return 95;
+  if (symbol.includes("snow")) return 71;
+  if (symbol.includes("sleet")) return 66;
+  if (symbol.includes("heavyrain")) return 65;
+  if (symbol.includes("rain")) return 61;
+  if (symbol.includes("fog")) return 45;
+  if (symbol.startsWith("clearsky")) return 0;
+  if (symbol.startsWith("fair")) return 1;
+  if (symbol.startsWith("partlycloudy")) return 2;
+  return 3;
+}
+
+/** MET Norway's hourly series folded into Open-Meteo's daily shape; the sky is the one nearest noon. */
+function metNoDaily(series: MetNoStep[]): OpenMeteoDaily {
+  const days = new Map<string, MetNoStep[]>();
+  for (const step of series) {
+    const day = step.time.slice(0, 10);
+    days.set(day, [...(days.get(day) ?? []), step]);
+  }
+  const d: OpenMeteoDaily = {
+    time: [],
+    temperature_2m_max: [],
+    temperature_2m_min: [],
+    precipitation_probability_max: [],
+    weather_code: [],
+  };
+  for (const [day, steps] of [...days].slice(0, 7)) {
+    const temps = steps.map((s) => s.data.instant.details.air_temperature);
+    const noon = steps.reduce((a, b) =>
+      Math.abs(Number(b.time.slice(11, 13)) - 12) < Math.abs(Number(a.time.slice(11, 13)) - 12)
+        ? b
+        : a,
+    );
+    const symbol = (noon.data.next_6_hours ?? noon.data.next_1_hours)?.summary.symbol_code ?? "";
+    d.time.push(day);
+    d.temperature_2m_max.push(Math.max(...temps));
+    d.temperature_2m_min.push(Math.min(...temps));
+    d.precipitation_probability_max.push(null);
+    d.weather_code.push(metNoCode(symbol));
+  }
+  return d;
+}
+
+/** Seven-day forecast from Open-Meteo, which needs no key, or MET Norway when Open-Meteo refuses. */
 class OpenMeteoForecastHandler implements ForecastHandler {
   readonly domain: ForecastDomain = "geo";
   private city: string;
-  private fetchFn: (url: string) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+  private fetchFn: NonNullable<OpenWeatherForecastHandlerOptions["fetchFn"]>;
 
   constructor(opts: OpenWeatherForecastHandlerOptions = {}) {
     this.city = opts.city ?? process.env.OWM_CITY ?? "London";
-    this.fetchFn = opts.fetchFn ?? ((url) => fetch(url));
+    this.fetchFn = opts.fetchFn ?? ((url, init) => fetch(url, init));
   }
 
-  private async getJson<T>(url: string): Promise<T | null> {
+  private async getJson<T>(
+    url: string,
+    init?: { headers?: Record<string, string> },
+  ): Promise<T | null> {
     try {
-      const resp = await this.fetchFn(url);
+      const resp = await this.fetchFn(url, init);
       return resp.ok ? ((await resp.json()) as T) : null;
     } catch {
       return null;
@@ -588,21 +648,34 @@ class OpenMeteoForecastHandler implements ForecastHandler {
         "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code" +
         "&timezone=auto&forecast_days=7",
     );
-    const d = data?.daily;
-    if (!d?.time?.length) return noop("Open-Meteo returned no forecast");
+    let d = data?.daily;
+    let source = "open-meteo";
+    if (!d?.time?.length) {
+      // MET Norway's terms ask every caller to name itself.
+      const met = await this.getJson<{ properties?: { timeseries?: MetNoStep[] } }>(
+        `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${place.latitude.toFixed(4)}&lon=${place.longitude.toFixed(4)}`,
+        { headers: { "user-agent": "Nexus/0.1 github.com/Yash-Awasthi/Nexus" } },
+      );
+      const series = met?.properties?.timeseries;
+      if (!series?.length) return noop("No forecast service answered; try again shortly");
+      d = metNoDaily(series);
+      source = "met-no";
+    }
+    const daily = d;
 
     const range = (i: number) =>
-      `${Math.round(d.temperature_2m_min[i]!)}–${Math.round(d.temperature_2m_max[i]!)}°C`;
-    const sky = (i: number) => WMO[d.weather_code[i]!] ?? `weather code ${d.weather_code[i]}`;
-    const scenarios: ForecastScenario[] = d.time.map((day, i) => {
-      const rain = (d.precipitation_probability_max[i] ?? 0) / 100;
+      `${Math.round(daily.temperature_2m_min[i]!)}–${Math.round(daily.temperature_2m_max[i]!)}°C`;
+    const sky = (i: number) =>
+      WMO[daily.weather_code[i]!] ?? `weather code ${daily.weather_code[i]}`;
+    const scenarios: ForecastScenario[] = daily.time.map((day, i) => {
+      const rain = (daily.precipitation_probability_max[i] ?? 0) / 100;
       return {
-        id: `open-meteo-${day}`,
+        id: `${source}-${day}`,
         label: day,
         description: `${sky(i)}, ${range(i)}${rain > 0.2 ? `, ${Math.round(rain * 100)}% chance of rain` : ""}`,
         probability: rain,
         likelihood: rain > 0.7 ? "high" : rain > 0.4 ? "medium" : "low",
-        drivers: ["open-meteo"],
+        drivers: [source],
         impacts: [sky(i)],
       };
     });
@@ -616,16 +689,16 @@ class OpenMeteoForecastHandler implements ForecastHandler {
       indicators: {
         latitude: place.latitude,
         longitude: place.longitude,
-        temp_max_c: d.temperature_2m_max[0]!,
-        temp_min_c: d.temperature_2m_min[0]!,
-        source: "open-meteo",
+        temp_max_c: daily.temperature_2m_max[0]!,
+        temp_min_c: daily.temperature_2m_min[0]!,
+        source,
       },
       scenarios,
     };
   }
 }
 
-/** Weather for one city: OpenWeatherMap when OWM_API_KEY is set, Open-Meteo otherwise. */
+/** Weather for one city: OpenWeatherMap when OWM_API_KEY is set, the keyless services otherwise. */
 export function weatherHandler(
   city: string,
   opts: OpenWeatherForecastHandlerOptions = {},

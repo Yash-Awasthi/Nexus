@@ -100,9 +100,11 @@ function isLoopback(ip: string | undefined): boolean {
 
 /**
  * Whether the connection itself comes from this machine. Never `request.ip`: with a trusted
- * proxy that is read from X-Forwarded-For, which a caller can write.
+ * proxy that is read from X-Forwarded-For, which a caller can write. A proxy on this machine
+ * (Render's sleep proxy) relays remote callers from 127.0.0.1, so a forwarded request is not local.
  */
 export function peerIsLoopback(request: FastifyRequest): boolean {
+  if (request.headers?.["x-forwarded-for"]) return false;
   return isLoopback(request.socket?.remoteAddress ?? request.raw.socket?.remoteAddress);
 }
 

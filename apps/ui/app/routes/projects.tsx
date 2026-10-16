@@ -302,7 +302,7 @@ export default function ProjectsPage() {
                     {project.conversationCount} conversation
                     {project.conversationCount !== 1 ? "s" : ""}
                   </span>
-                  <span>{project.createdAt}</span>
+                  <span>{new Date(project.createdAt).toLocaleDateString()}</span>
                 </div>
               </CardContent>
             </Card>
