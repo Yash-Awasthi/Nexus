@@ -992,7 +992,7 @@ export default function SkillsPage() {
       const res = await apiFetch<CompressResponse>("/api/skills/compress", {
         method: "POST",
         body: JSON.stringify({
-          ids,
+          ids: await ensureStored(ids),
           task: compressTask.trim(),
           polish: compressForm.polish,
           save,
@@ -1022,6 +1022,26 @@ export default function SkillsPage() {
       .catch(() => setSkills(EXAMPLE_SKILLS));
   };
 
+  /** Examples are shown before the user has any skills; one is saved for real the first time it is used. */
+  const ensureStored = (ids: string[]): Promise<string[]> =>
+    Promise.all(
+      ids.map(async (id) => {
+        const example = EXAMPLE_SKILLS.find((s) => s.id === id);
+        if (!example) return id;
+        const created = await apiFetch<BackendSkill>("/api/skills", {
+          method: "POST",
+          body: JSON.stringify({
+            name: example.name,
+            description: example.description,
+            language: example.language.toLowerCase(),
+            code: example.code,
+          }),
+        });
+        setSkills((prev) => prev.map((s) => (s.id === id ? toSkill(created) : s)));
+        return created.id;
+      }),
+    );
+
   const handleMergeSkills = async () => {
     const ids = [...mergeSelected];
     if (ids.length < 2) return;
@@ -1041,7 +1061,7 @@ export default function SkillsPage() {
       }>("/api/skills/merge", {
         method: "POST",
         body: JSON.stringify({
-          ids,
+          ids: await ensureStored(ids),
           name: mergeForm.name || undefined,
           description: mergeForm.description || undefined,
           deleteOriginals: mergeForm.deleteOriginals,
@@ -1082,7 +1102,7 @@ export default function SkillsPage() {
   const [runLoading, setRunLoading] = useState(false);
   const [runMission, setRunMission] = useState<MissionRecord | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [runTerse, setRunTerse] = useState(true); // caveman-ponytail output style
+  const [runTerse, setRunTerse] = useState(true);
   const [runShell, setRunShell] = useState(false);
 
   useEffect(() => {
@@ -1120,6 +1140,7 @@ export default function SkillsPage() {
           : runSkill
             ? `Execute skill "${runSkill.name}" end-to-end: run its code, verify the output, and report the result.`
             : "");
+      const skillIds = runSkill ? await ensureStored([runSkill.id]) : [];
       // Named here so a shell approval, which the server binds to this id, matches on the retry.
       const missionId = `mission-${crypto.randomUUID()}`;
       const start = (approvalId?: string) =>
@@ -1133,7 +1154,7 @@ export default function SkillsPage() {
             ...(composite
               ? { compress: { ids: composite.ids, task: composite.task } }
               : runSkill
-                ? { skillIds: [runSkill.id] }
+                ? { skillIds }
                 : {}),
             ...(overrides?.continueFrom ? { continueFrom: overrides.continueFrom } : {}),
             maxIterations: 3,
@@ -1558,7 +1579,7 @@ export default function SkillsPage() {
                   checked={runTerse}
                   onChange={(e) => setRunTerse(e.target.checked)}
                 />
-                Terse caveman-ponytail output (fewer output tokens)
+                Terse output (fewer output tokens)
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
