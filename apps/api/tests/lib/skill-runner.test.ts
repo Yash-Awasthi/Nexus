@@ -8,7 +8,7 @@
  * contract (failed runs surface as recoverable errors, never throws).
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Runner, RunnerResult } from "@nexus/sandbox";
 
 import {
@@ -165,6 +165,17 @@ describe("withOutputStyle", () => {
 });
 
 describe("executeSkillsOnce", () => {
+  it("runs Python in the restricted Pyodide child, so a host without python3 still runs it", async () => {
+    vi.stubEnv("PATH", "");
+    vi.stubEnv("Path", "");
+    const [r] = await executeSkillsOnce([
+      { id: "fib", name: "Fib", language: "python", code: "print(sum(range(10)))" },
+    ]);
+    vi.unstubAllEnvs();
+    expect(r?.output).toContain("45");
+    expect(r?.ok).toBe(true);
+  }, 120_000);
+
   it("runs every skill's code deterministically and returns real outcomes", async () => {
     const results = await executeSkillsOnce([PYTHON_SKILL, TS_SKILL], {
       runner: fakeRunner({ stdout: "ran\n", exitCode: 0 }),

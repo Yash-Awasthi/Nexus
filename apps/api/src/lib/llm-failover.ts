@@ -219,7 +219,7 @@ const modelFor = (
       : opts;
 
 // A free key's per-minute limit names waits of a few seconds; worth sitting out once.
-const SHORT_REST_MS = 20_000;
+const SHORT_REST_MS = 45_000;
 // A busy free key can be limited again right after a wait; a few rests still beat failing.
 const MAX_RESTS = 3;
 
