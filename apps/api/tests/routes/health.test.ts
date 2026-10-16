@@ -73,6 +73,19 @@ describe("GET /health/ready", () => {
     await app.close();
   });
 
+  it("reuses a healthy answer, so a platform probe every few seconds leaves the database idle", async () => {
+    const app = await buildServer();
+    await app.ready();
+
+    await app.inject({ method: "GET", url: "/health/ready" });
+    const calls = vi.mocked(db.execute).mock.calls.length;
+    const again = await app.inject({ method: "GET", url: "/health/ready" });
+
+    expect(again.json<{ status: string }>().status).toBe("ready");
+    expect(vi.mocked(db.execute).mock.calls.length).toBe(calls);
+    await app.close();
+  });
+
   it("surfaces cost-log flush stats and stays ready while persistence is healthy", async () => {
     const app = await buildServer();
     await app.ready();
