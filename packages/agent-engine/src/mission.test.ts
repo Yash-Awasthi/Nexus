@@ -202,6 +202,39 @@ describe("MissionRunner", () => {
     expect(record.lastReview?.noWork).toBeUndefined();
   });
 
+  it("shows the reviewer what the tools returned when the agent wrote no summary", async () => {
+    let toolCall = true;
+    let reviewed = "";
+    const llm = makeLlm({
+      acting: [""],
+      reviews: ['{"score": 90, "verdict": "accept", "issues": [], "suggestions": []}'],
+    });
+    const runner = new MissionRunner({
+      llm: async (messages, o) => {
+        const text = messages[messages.length - 1]?.content ?? "";
+        if (text.includes("Work to review")) reviewed = text;
+        if (o.tools !== undefined && toolCall) {
+          toolCall = false;
+          return {
+            content: "",
+            toolCalls: [{ name: "run", arguments: { code: "print(6*7)" }, callId: "c1" }],
+            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+          };
+        }
+        return llm(messages, o);
+      },
+      thinkPrompt: THINK,
+      maxIterations: 1,
+      toolSet: new RuntimeToolSet().add({
+        name: "run",
+        description: "",
+        handler: () => Promise.resolve("stdout: 42"),
+      }),
+    });
+    await runner.run("Run the skill");
+    expect(reviewed).toContain("stdout: 42");
+  });
+
   it("aborts cleanly when the signal fires", async () => {
     const controller = new AbortController();
     controller.abort();
