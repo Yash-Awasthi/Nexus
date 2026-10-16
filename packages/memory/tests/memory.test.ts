@@ -566,6 +566,21 @@ describe("JinaEmbedder", () => {
     expect(body.task).toBeUndefined();
   });
 
+  it("asks for the stored vector size when chosen by createBestEmbedder", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeJinaResponse(JINA_EMBEDDING(768)));
+    vi.stubGlobal("fetch", mockFetch);
+    vi.stubEnv("NEXUS_EMBED_PROVIDER", "jina");
+    vi.stubEnv("JINA_API_KEY", FAKE_KEY);
+    const embedder = createBestEmbedder();
+    vi.unstubAllEnvs();
+    expect(embedder.dimensions).toBe(768);
+    expect(await embedder.embed("q")).toHaveLength(768);
+    const body = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+    ) as { dimensions?: number };
+    expect(body.dimensions).toBe(768);
+  });
+
   it("throws EMBED_FAILED on 401 and DIMENSION_MISMATCH on wrong length", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("no", { status: 401 })));
     const embedder = new JinaEmbedder({ apiKey: FAKE_KEY });
