@@ -215,7 +215,7 @@ function MissionProgress({
               {new Date(p.timestamp).toLocaleTimeString()}
             </span>
             <span className="font-medium shrink-0">{PHASE_LABELS[p.phase] ?? p.phase}</span>
-            {p.note && <span className="text-muted-foreground truncate">{p.note}</span>}
+            {p.note && <span className="min-w-0 truncate text-muted-foreground">{p.note}</span>}
           </div>
         ))}
       </div>

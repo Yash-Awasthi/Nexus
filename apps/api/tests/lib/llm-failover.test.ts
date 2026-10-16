@@ -312,6 +312,39 @@ describe("llm-failover", () => {
   });
 });
 
+describe("a short rate limit on every provider", () => {
+  /** Answers 429 with a short named wait the first `fails` times, then succeeds. */
+  class BriefLimitDriver extends OkDriver {
+    constructor(
+      provider: string,
+      private fails: number,
+    ) {
+      super(provider);
+    }
+    override async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+      if (this.fails-- > 0) {
+        this.calls++;
+        throw new LlmError("RATE_LIMITED", "Please try again in 50ms.", this.provider, 429);
+      }
+      return super.complete(opts);
+    }
+  }
+
+  it("waits it out and answers instead of failing the call", async () => {
+    const only = new BriefLimitDriver("groq", 1);
+    const d = new FailoverDriver(entries(only, new FailingDriver("ollama", "fetch failed")));
+    expect((await d.complete(req("q-brief-1"))).content).toBe("groq-answer");
+  });
+
+  it("still fails at once when the wait is long", async () => {
+    const capped = new FailingDriver("groq");
+    capped.error = new LlmError("RATE_LIMITED", "Please try again in 9m42s.", "groq", 429);
+    const started = Date.now();
+    await expect(new FailoverDriver(entries(capped)).complete(req("q-brief-2"))).rejects.toThrow();
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
 describe("context-window memory", () => {
   /** Overflows on any prompt longer than `limit` characters. */
   class SmallContextDriver extends OkDriver {
