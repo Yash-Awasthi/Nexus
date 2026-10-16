@@ -331,8 +331,8 @@ function pinnedProvider(
 /** Resolve model string → { provider, model }. Null if unrecognised. */
 function resolveAlias(model: string): { provider: string; model: string } | null {
   if (DRIVER_ALIASES[model]) return DRIVER_ALIASES[model]!;
-  // Canonical Groq smart default since llama-3.3-70b-versatile was decommissioned.
-  if (model === "openai/gpt-oss-120b") return { provider: "groq", model };
+  // Groq hosts the gpt-oss models, its defaults since llama-3.3-70b-versatile was retired.
+  if (model.startsWith("openai/gpt-oss")) return { provider: "groq", model };
   if (model.startsWith("claude-")) return { provider: "anthropic", model };
   if (model.startsWith("gemini-")) return { provider: "gemini", model };
   if (model.startsWith("deepseek")) return { provider: "deepseek", model };
