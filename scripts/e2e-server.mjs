@@ -38,15 +38,15 @@ export function createServerEnvironment(parent) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const child = spawn(
-    process.execPath,
-    ["--require", path.join(root, "scripts/e2e-offline.cjs"), "src/index.ts"],
-    {
-      cwd: path.join(root, "apps/api"),
-      env: createServerEnvironment(process.env),
-      stdio: "inherit",
-    },
-  );
+  // A model run (E2E_MODELS) has to reach its provider; every other run stays offline.
+  const offline = process.env.E2E_MODELS
+    ? []
+    : ["--require", path.join(root, "scripts/e2e-offline.cjs")];
+  const child = spawn(process.execPath, [...offline, "src/index.ts"], {
+    cwd: path.join(root, "apps/api"),
+    env: createServerEnvironment(process.env),
+    stdio: "inherit",
+  });
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
   child.on("error", (error) => {
     console.error(error);
