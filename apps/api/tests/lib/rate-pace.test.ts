@@ -38,3 +38,22 @@ it("holds off a spent key until its reset, then calls again", async () => {
   expect((await f("https://api.example.com/v1/chat/completions", init)).status).toBe(200);
   expect(calls).toBe(3);
 });
+
+it("sits out a short rate-limit wait named in the error, rather than failing the turn", async () => {
+  let calls = 0;
+  const inner = (async () => {
+    calls++;
+    if (calls === 1)
+      return new Response(
+        JSON.stringify({ error: { message: "Rate limit reached. Please try again in 50ms." } }),
+        { status: 429 },
+      );
+    return new Response("{}");
+  }) as unknown as typeof fetch;
+  const res = await pacedFetch(inner)("https://api.groq.example/v1/chat/completions", {
+    method: "POST",
+    headers: { authorization: "Bearer k3" },
+  });
+  expect(res.status).toBe(200);
+  expect(calls).toBe(2);
+});

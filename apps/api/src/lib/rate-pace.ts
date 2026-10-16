@@ -7,7 +7,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { rateLimitWaitMs } from "@nexus/gateway";
+import { parseRetryFromText, rateLimitWaitMs } from "@nexus/gateway";
 
 import { IdleMap } from "./idle-map.ts";
 
@@ -20,20 +20,29 @@ function paceKey(input: Parameters<typeof fetch>[0], init?: RequestInit): string
   return `${url.host}:${createHash("sha256").update(auth).digest("hex").slice(0, 16)}`;
 }
 
+// A wait this short costs less to sit out than a failed turn does.
+const SHORT_WAIT_MS = 15_000;
+
 export function pacedFetch(inner: typeof fetch): typeof fetch {
   return async (input, init) => {
     const key = paceKey(input, init);
-    const wait = (_until.get(key) ?? 0) - Date.now();
-    if (wait > 0) {
-      const message = `Rate limit window spent, try again in ${Math.ceil(wait / 1000)}s`;
-      return new Response(JSON.stringify({ error: { message } }), {
-        status: 429,
-        headers: { "content-type": "application/json" },
-      });
+    for (let attempt = 0; ; attempt++) {
+      const wait = (_until.get(key) ?? 0) - Date.now();
+      if (wait > SHORT_WAIT_MS) {
+        const message = `Rate limit window spent, try again in ${Math.ceil(wait / 1000)}s`;
+        return new Response(JSON.stringify({ error: { message } }), {
+          status: 429,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      const res = await inner(input, init);
+      const ms = rateLimitWaitMs(res.headers);
+      if (ms) _until.set(key, Date.now() + ms);
+      if (res.status !== 429 || attempt >= 2) return res;
+      const hint = ms ?? parseRetryFromText(await res.clone().text());
+      if (!hint || hint > SHORT_WAIT_MS) return res;
+      _until.set(key, Date.now() + hint);
     }
-    const res = await inner(input, init);
-    const ms = rateLimitWaitMs(res.headers);
-    if (ms) _until.set(key, Date.now() + ms);
-    return res;
   };
 }

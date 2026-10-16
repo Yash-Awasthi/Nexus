@@ -147,6 +147,25 @@ describe("POST /api/v1/discussion/stream", () => {
     expect(done?.data.contributions).toBe(3);
   });
 
+  it("seats several personas on a lone provider, so one key still makes a discussion", async () => {
+    reset();
+    script["recorder-model"] = ["Positions: none yet.\n\nSTATUS: CONTINUE"];
+
+    const { frames } = await discuss({
+      participants: [{ label: "groq", provider: "openai", model: "alpha-model" }],
+      maxContributions: 6,
+    });
+
+    const authors = new Set(
+      frames
+        .filter((f) => f.event === "entry" && f.data.kind === "contribution")
+        .map((f) => f.data.author),
+    );
+    expect(authors.size).toBe(3);
+    const prompts = new Set(turns["alpha-model"]?.map((t) => t.messages?.[0]?.content));
+    expect(prompts.size).toBe(3);
+  });
+
   it("rejects an unknown supervisor model before opening a stream", async () => {
     reset();
     const res = await app.inject({
