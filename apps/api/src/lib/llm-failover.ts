@@ -218,6 +218,9 @@ const modelFor = (
       ? { ...opts, model: entry.driver.model }
       : opts;
 
+// A free key's per-minute limit names waits of a few seconds; worth sitting out once.
+const SHORT_REST_MS = 20_000;
+
 /** A call no provider in the chain was allowed to take. */
 export class CallRefused extends Error {}
 
@@ -249,6 +252,49 @@ export class FailoverDriver implements LlmDriver {
    * providers are skipped, and when every one is, the call is refused without contacting any.
    */
   async complete(
+    opts: LlmRequestOptions,
+    guard?: (model: string) => string | null,
+  ): Promise<LlmResponse> {
+    try {
+      return await this.completeOnce(opts, guard);
+    } catch (err) {
+      const wait = err instanceof CallRefused ? null : this.shortRest(opts);
+      if (wait === null) throw err;
+      await new Promise((r) => setTimeout(r, wait));
+      return this.completeOnce(opts, guard);
+    }
+  }
+
+  async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    let emitted = false;
+    const tracked: StreamHandler = (delta) => {
+      emitted = true;
+      return handler(delta);
+    };
+    try {
+      return await this.streamOnce(opts, tracked);
+    } catch (err) {
+      const wait = emitted ? null : this.shortRest(opts);
+      if (wait === null) throw err;
+      await new Promise((r) => setTimeout(r, wait));
+      return this.streamOnce(opts, handler);
+    }
+  }
+
+  /** The shortest bench when it is short enough to sit out rather than fail the call. */
+  private shortRest(opts: LlmRequestOptions): number | null {
+    const rests = this.entries
+      .map((e, i) =>
+        _bench.benchRemainingMs(
+          benchKey(e, modelFor(e, opts, this.model, i === 0).model ?? e.driver.model),
+        ),
+      )
+      .filter((ms) => ms > 0);
+    const ms = Math.min(...rests);
+    return rests.length > 0 && ms <= SHORT_REST_MS ? ms : null;
+  }
+
+  private async completeOnce(
     opts: LlmRequestOptions,
     guard?: (model: string) => string | null,
   ): Promise<LlmResponse> {
@@ -290,7 +336,7 @@ export class FailoverDriver implements LlmDriver {
     throw withAllFailures(lastErr, failures);
   }
 
-  async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+  private async streamOnce(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
     let lastErr: unknown;
     const failures: string[] = [];
     for (const [i, entry] of this.entries.entries()) {
