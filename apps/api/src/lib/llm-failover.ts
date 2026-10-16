@@ -220,6 +220,8 @@ const modelFor = (
 
 // A free key's per-minute limit names waits of a few seconds; worth sitting out once.
 const SHORT_REST_MS = 20_000;
+// A busy free key can be limited again right after a wait; a few rests still beat failing.
+const MAX_RESTS = 3;
 
 /** A call no provider in the chain was allowed to take. */
 export class CallRefused extends Error {}
@@ -255,13 +257,14 @@ export class FailoverDriver implements LlmDriver {
     opts: LlmRequestOptions,
     guard?: (model: string) => string | null,
   ): Promise<LlmResponse> {
-    try {
-      return await this.completeOnce(opts, guard);
-    } catch (err) {
-      const wait = err instanceof CallRefused ? null : this.shortRest(opts);
-      if (wait === null) throw err;
-      await new Promise((r) => setTimeout(r, wait));
-      return this.completeOnce(opts, guard);
+    for (let pass = 0; ; pass++) {
+      try {
+        return await this.completeOnce(opts, guard);
+      } catch (err) {
+        const wait = err instanceof CallRefused || pass >= MAX_RESTS ? null : this.shortRest(opts);
+        if (wait === null) throw err;
+        await new Promise((r) => setTimeout(r, wait));
+      }
     }
   }
 
@@ -271,13 +274,14 @@ export class FailoverDriver implements LlmDriver {
       emitted = true;
       return handler(delta);
     };
-    try {
-      return await this.streamOnce(opts, tracked);
-    } catch (err) {
-      const wait = emitted ? null : this.shortRest(opts);
-      if (wait === null) throw err;
-      await new Promise((r) => setTimeout(r, wait));
-      return this.streamOnce(opts, handler);
+    for (let pass = 0; ; pass++) {
+      try {
+        return await this.streamOnce(opts, tracked);
+      } catch (err) {
+        const wait = emitted || pass >= MAX_RESTS ? null : this.shortRest(opts);
+        if (wait === null) throw err;
+        await new Promise((r) => setTimeout(r, wait));
+      }
     }
   }
 

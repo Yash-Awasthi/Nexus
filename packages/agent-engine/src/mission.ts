@@ -305,6 +305,8 @@ export class MissionRunner {
 
       // 2. ACT — bounded harness run toward the goal (resuming prior work).
       let actingOutput = "";
+      /** What the reviewer judges: the closing text plus what this iteration's tools returned. */
+      let reviewedWork = "";
       /** This iteration produced output text or ran a tool (blocks empty accepts). */
       let actingEvidence = false;
       try {
@@ -322,6 +324,14 @@ export class MissionRunner {
         record.actingSteps += res.steps.length;
         actingOutput = res.finalContent;
         record.finalContent = actingOutput;
+        // An agent that spends its steps on tools may never write a summary; its results are the work.
+        const toolOutput = res.steps.flatMap((s) =>
+          s.toolResults.map(
+            (r) =>
+              `Tool ${r.name}: ${r.error ? `error: ${r.error}` : (typeof r.output === "string" ? r.output : JSON.stringify(r.output)).slice(0, 2000)}`,
+          ),
+        );
+        reviewedWork = [actingOutput, ...toolOutput].filter((t) => t.trim()).join("\n\n");
         carried = res.messages;
         actingEvidence =
           actingOutput.trim().length > 0 ||
@@ -384,7 +394,7 @@ export class MissionRunner {
       let review: MissionReview;
       try {
         const reviewTurn = await this.llm(
-          [{ role: "user", content: buildReviewPrompt(goal, actingOutput, "") }],
+          [{ role: "user", content: buildReviewPrompt(goal, reviewedWork, "") }],
           { systemPrompt: this.reviewerSystemPrompt },
         );
         this.addUsage(record, reviewTurn.usage);
