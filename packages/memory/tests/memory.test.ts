@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 
 import {
+  FallbackEmbedder,
   FixedEmbedder,
   GroqEmbedder,
   VoyageEmbedder,
@@ -670,16 +671,27 @@ describe("CohereEmbedder", () => {
   });
 
   it("createBestEmbedder selects the new providers by NEXUS_EMBED_PROVIDER", async () => {
+    const chosen = () => (createBestEmbedder() as FallbackEmbedder).primary;
     process.env.NEXUS_EMBED_PROVIDER = "voyage";
     process.env.VOYAGE_API_KEY = FAKE_KEY;
-    expect(createBestEmbedder()).toBeInstanceOf(VoyageEmbedder);
+    expect(chosen()).toBeInstanceOf(VoyageEmbedder);
     process.env.NEXUS_EMBED_PROVIDER = "jina";
     process.env.JINA_API_KEY = FAKE_KEY;
-    expect(createBestEmbedder()).toBeInstanceOf(JinaEmbedder);
+    expect(chosen()).toBeInstanceOf(JinaEmbedder);
     process.env.NEXUS_EMBED_PROVIDER = "cohere";
     process.env.COHERE_API_KEY = FAKE_KEY;
-    expect(createBestEmbedder()).toBeInstanceOf(CohereEmbedder);
+    expect(chosen()).toBeInstanceOf(CohereEmbedder);
     delete process.env.NEXUS_EMBED_PROVIDER;
+  });
+
+  it("keeps embedding locally when the hosted embedder fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("quota", { status: 402 })));
+    vi.stubEnv("NEXUS_EMBED_PROVIDER", "jina");
+    vi.stubEnv("JINA_API_KEY", FAKE_KEY);
+    const embedder = createBestEmbedder();
+    vi.unstubAllEnvs();
+    const local = await new FixedEmbedder(768).embed("staging lives in Frankfurt");
+    expect(await embedder.embed("staging lives in Frankfurt")).toEqual(local);
   });
 });
 

@@ -766,30 +766,64 @@ export function createBestEmbedder(config?: {
   const ollamaUrl = config?.ollamaBaseUrl ?? process.env.OLLAMA_BASE_URL;
 
   if (provider === "ollama" || (!provider && ollamaUrl)) {
-    return new OllamaEmbedder({ baseUrl: ollamaUrl });
+    return new FallbackEmbedder(new OllamaEmbedder({ baseUrl: ollamaUrl }));
   }
   const openAiKey = config?.openAiApiKey ?? process.env.OPENAI_API_KEY;
   if ((provider === "openai" || !provider) && openAiKey) {
-    return new OpenAIEmbedder({ apiKey: openAiKey });
+    return new FallbackEmbedder(new OpenAIEmbedder({ apiKey: openAiKey }));
   }
   const groqKey = config?.groqApiKey ?? process.env.GROQ_API_KEY;
   if (provider === "groq" && groqKey) {
-    return new GroqEmbedder({ apiKey: groqKey });
+    return new FallbackEmbedder(new GroqEmbedder({ apiKey: groqKey }));
   }
   const voyageKey = config?.voyageApiKey ?? process.env.VOYAGE_API_KEY;
   if (provider === "voyage" && voyageKey) {
-    return new VoyageEmbedder({ apiKey: voyageKey });
+    return new FallbackEmbedder(new VoyageEmbedder({ apiKey: voyageKey }));
   }
   const jinaKey = config?.jinaApiKey ?? process.env.JINA_API_KEY;
   if (provider === "jina" && jinaKey) {
-    return new JinaEmbedder({ apiKey: jinaKey, dimensions: 768 });
+    return new FallbackEmbedder(new JinaEmbedder({ apiKey: jinaKey, dimensions: 768 }));
   }
   const cohereKey = config?.cohereApiKey ?? process.env.COHERE_API_KEY;
   if (provider === "cohere" && cohereKey) {
-    return new CohereEmbedder({ apiKey: cohereKey });
+    return new FallbackEmbedder(new CohereEmbedder({ apiKey: cohereKey }));
   }
   // Deterministic dev fallback — 768 dims to match the pgvector(768) schema.
   return new FixedEmbedder(768);
+}
+
+// ── FallbackEmbedder ──────────────────────────────────────────────────────────
+
+/**
+ * A hosted embedder whose failures (spent quota, outage, revoked key) fall back
+ * to the local FixedEmbedder for that call, so saving and recall keep working;
+ * those vectors rank by shared words until the hosted one answers again.
+ */
+export class FallbackEmbedder implements IEmbedder {
+  readonly primary: IEmbedder;
+  private readonly local: FixedEmbedder;
+  private warnedAt = 0;
+
+  constructor(primary: IEmbedder) {
+    this.primary = primary;
+    this.local = new FixedEmbedder(primary.dimensions);
+  }
+
+  get dimensions(): number {
+    return this.primary.dimensions;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    try {
+      return await this.primary.embed(text);
+    } catch (err) {
+      if (Date.now() - this.warnedAt > 600_000) {
+        this.warnedAt = Date.now();
+        console.warn(`[memory] hosted embedder failed, using the local one: ${String(err)}`);
+      }
+      return this.local.embed(text);
+    }
+  }
 }
 
 // ── FixedEmbedder ─────────────────────────────────────────────────────────────
