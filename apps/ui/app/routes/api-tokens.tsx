@@ -387,7 +387,7 @@ export default function APITokens() {
 
       {/* Create dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create API Token</DialogTitle>
           </DialogHeader>

@@ -237,7 +237,7 @@ export default function AdminUsersPage() {
       </Card>
 
       <Dialog open={sessionsOf !== null} onOpenChange={(o) => !o && setSessionsOf(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Signed-in devices</DialogTitle>
             <DialogDescription>{sessionsOf?.email}</DialogDescription>
