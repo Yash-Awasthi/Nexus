@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# The free Render instance sleeps after 15 idle minutes and takes about a minute to wake;
+# a request every 10 minutes keeps it answering at once. One always-on instance uses
+# about 744 of the 750 free hours a month.
+name: Keep warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping readiness
+        run: curl -fsS --retry 5 --retry-delay 20 --retry-all-errors --max-time 90 https://nexus-iosc.onrender.com/health/ready -o /dev/null
