@@ -45,6 +45,36 @@ describe("GET /api/context/web", () => {
     ]);
   });
 
+  it("falls back to Wikipedia when DuckDuckGo refuses a server", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) =>
+        String(url).includes("duckduckgo")
+          ? new Response("", { status: 403 })
+          : Response.json({
+              query: {
+                search: [
+                  {
+                    title: "Canberra",
+                    snippet: 'The <span class="searchmatch">capital</span> city',
+                  },
+                ],
+              },
+            }),
+      ),
+    );
+    const res = await app.inject({ method: "GET", url: "/api/context/web?q=capital+of+australia" });
+
+    expect(res.json()).toEqual([
+      {
+        title: "Canberra",
+        url: "https://en.wikipedia.org/wiki/Canberra",
+        snippet: "The capital city",
+        provider: "wikipedia",
+      },
+    ]);
+  });
+
   it("returns no results and says so when no search answers", async () => {
     vi.stubGlobal(
       "fetch",

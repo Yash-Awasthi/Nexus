@@ -98,7 +98,7 @@ import {
   type CostEntry,
 } from "../lib/cost-log.ts";
 import { sha256hex } from "../lib/crypto-utils.ts";
-import { searchDuckDuckGo } from "../lib/duckduckgo.ts";
+import { searchDuckDuckGo, searchWikipedia } from "../lib/duckduckgo.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { screenForPrompt } from "../lib/injection-classifier.ts";
 import { getKG } from "../lib/knowledge-graph-store.ts";
@@ -1810,7 +1810,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   await app.register(tokensRoutes);
 
   // -- WEB SEARCH ------------------------------------------------------------
-  // The first provider with a key or URL answers; DuckDuckGo needs neither and goes last.
+  // The first provider with a key or URL that finds something answers; DuckDuckGo and
+  // Wikipedia need neither and go last.
 
   interface WebSearchHit {
     url: string;
@@ -1892,6 +1893,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         },
       },
       { id: "duckduckgo", name: "DuckDuckGo", ready: true, run: searchDuckDuckGo },
+      { id: "wikipedia", name: "Wikipedia", ready: true, run: searchWikipedia },
     ];
   }
 
@@ -1908,7 +1910,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     let error: string | undefined;
     for (const p of chosen) {
       try {
-        return { results: (await p.run(query, max)).slice(0, max), provider: p.id };
+        const results = (await p.run(query, max)).slice(0, max);
+        if (results.length || p === chosen.at(-1)) return { results, provider: p.id };
       } catch (e) {
         error = `${p.name}: ${e instanceof Error ? e.message : String(e)}`;
       }
