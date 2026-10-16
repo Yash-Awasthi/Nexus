@@ -358,6 +358,12 @@ abstract class BaseDriver implements LlmDriver {
     this.transport = transport ?? this.makeDefaultTransport();
   }
 
+  /** Send every real request through `fn`, e.g. one that paces a rate-limited key. */
+  useFetch(fn: typeof fetch): this {
+    this.fetchFn = fn;
+    return this;
+  }
+
   private makeDefaultTransport(): HttpTransport {
     return {
       post: async (url, body, headers) => {
