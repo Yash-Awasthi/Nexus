@@ -600,7 +600,8 @@ function WorkflowEditor({
       const newNode: Node = {
         id: newId,
         type: "default",
-        position: { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 },
+        // Below the lowest node, so a new node never lands on top of another.
+        position: { x: 250, y: nodes.reduce((y, n) => Math.max(y, n.position.y + 100), 50) },
         data: { label: cfg.label, nodeType: type },
         style: {
           border: `2px solid ${cfg.border}`,
@@ -613,7 +614,7 @@ function WorkflowEditor({
       setNodes((nds) => [...nds, newNode]);
       setSelectedNode(newNode);
     },
-    [nodeIdCounter, setNodes],
+    [nodeIdCounter, nodes, setNodes],
   );
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
