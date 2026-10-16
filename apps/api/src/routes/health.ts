@@ -62,7 +62,16 @@ function getAggregator(): HealthAggregator {
   return agg;
 }
 
+/** A healthy answer stands this long; the platform probes every few seconds. */
+const READY_REUSE_MS = 30 * 60_000;
+/** An unhealthy one is checked again soon. */
+const UNREADY_REUSE_MS = 15_000;
+
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
+  // Probing Postgres and Redis on every probe would keep a free database awake
+  // around the clock and spend a free Redis plan's monthly commands.
+  let last: { at: number; code: number; body: Record<string, unknown> } | null = null;
+
   app.get("/health", async (_req, reply) => {
     // Health liveness: must always reflect current state — no caching.
     reply.header("Cache-Control", "no-cache");
@@ -77,15 +86,19 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/health/ready", async (_req, reply) => {
-    // Readiness check must not be cached — K8s kubelet polls this.
+    // No proxy may cache it; reuse is decided below, per process.
     reply.header("Cache-Control", "no-cache, no-store");
+
+    const reuse = last?.body.status === "ready" ? READY_REUSE_MS : UNREADY_REUSE_MS;
+    if (last && Date.now() - last.at < reuse)
+      return reply.code(last.code).send({ ...last.body, costLog: costLogStore.flushStats() });
 
     const health = await getAggregator().check();
     // "ready" / "degraded" still serve traffic (200); only "down" (a critical
     // dependency failed) takes the pod out of rotation (503).
     const httpStatus = health.status === "down" ? 503 : 200;
 
-    return reply.code(httpStatus).send({
+    const body = {
       status: health.status,
       checks: health.checks,
       messages: health.messages,
@@ -100,6 +113,8 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
         providers: getProviderSnapshot(),
         stats: getProviderStats(),
       },
-    });
+    };
+    last = { at: Date.now(), code: httpStatus, body };
+    return reply.code(httpStatus).send(body);
   });
 }
