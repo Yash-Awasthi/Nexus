@@ -219,7 +219,7 @@ const modelFor = (
       : opts;
 
 // A free key's per-minute limit names waits of a few seconds; worth sitting out once.
-const SHORT_REST_MS = 20_000;
+const SHORT_REST_MS = 45_000;
 
 /** A call no provider in the chain was allowed to take. */
 export class CallRefused extends Error {}
