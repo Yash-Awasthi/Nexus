@@ -222,7 +222,9 @@ export async function workflowsRoutes(
             const prompt: string =
               typeof s.task === "function"
                 ? String(await (s.task as (d: unknown) => unknown)(data))
-                : String(s.task ?? JSON.stringify(data));
+                : s.task
+                  ? `${String(s.task)}\n\nWorkflow data:\n${JSON.stringify(data, null, 2)}`
+                  : JSON.stringify(data);
             const models: { model: string; provider?: string }[] = Array.isArray(s.models)
               ? (s.models as { model: string; provider?: string }[])
               : s.model
