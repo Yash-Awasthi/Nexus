@@ -155,6 +155,16 @@ export async function runAgentInProcess(
   return { sessionId };
 }
 
+/** At startup with no queue: every run still marked running was hosted by the process that died. */
+export async function failInterruptedRuns(pool: {
+  query(text: string): Promise<{ rowCount: number | null }>;
+}): Promise<number> {
+  const res = await pool.query(
+    "UPDATE agent_sessions SET status = 'error', error = 'Interrupted by a server restart. Run it again.' WHERE status = 'running'",
+  );
+  return res.rowCount ?? 0;
+}
+
 /**
  * Enqueue a `browser.task` job for an existing session, so the run survives an
  * API restart. Returns false when no queue is configured, which is the signal
