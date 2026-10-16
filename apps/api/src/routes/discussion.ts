@@ -119,15 +119,18 @@ export async function discussionRoutes(app: FastifyInstance): Promise<void> {
       }
 
       await loadArchetypeStore();
+      // One model alone only talks to itself, so a lone provider seats three personas.
+      const seats =
+        available.length === 1 ? [available[0]!, available[0]!, available[0]!] : available;
       const personas = resolveCouncilMembers(
         request.nexusUserId ?? ANON_OWNER,
         detectTaskCategory(body.topic),
-        available.length,
+        seats.length,
       );
-      const participants: DebateMember[] = available.map((p, i) => {
+      const participants: DebateMember[] = seats.map((p, i) => {
         const persona = personas[i];
         return {
-          label: p.label,
+          label: seats !== available && persona ? `${p.label} · ${persona.name}` : p.label,
           provider: p.provider,
           model: p.model,
           ...(persona ? { systemPrompt: persona.systemPrompt, archetype: persona.name } : {}),
