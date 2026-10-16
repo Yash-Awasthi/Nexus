@@ -47,8 +47,8 @@ describe("SCRAPE_SOURCES", () => {
     }
   });
 
-  it("has exactly 13 sources", () => {
-    expect(SCRAPE_SOURCES).toHaveLength(13);
+  it("has exactly 11 sources", () => {
+    expect(SCRAPE_SOURCES).toHaveLength(11);
   });
 
   it("contains no duplicates", () => {
