@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # The free Render instance sleeps after 15 idle minutes and takes about a minute to wake;
-# a request every 10 minutes keeps it answering at once. One always-on instance uses
-# about 744 of the 750 free hours a month.
+# a request every 10 minutes keeps it answering at once. The 750 free hours a month are
+# shared by every service in the account, so it stays awake 05:30 to 00:30 IST (about
+# 590 hours) and sleeps overnight.
 name: Keep warm
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/10 0-18 * * *"
   workflow_dispatch:
 
 permissions: {}
