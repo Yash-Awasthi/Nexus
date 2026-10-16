@@ -178,3 +178,12 @@ class TestBatchScrape:
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["results"]) == 2
+
+
+def test_every_source_resolves_to_a_finscrape_scraper() -> None:
+    pytest.importorskip("finscrape")
+    from nexus_ingest.models import ScrapeSource
+    from nexus_ingest.scrapers.registry import get_scraper_class
+
+    missing = [s.value for s in ScrapeSource if get_scraper_class(s) is None]
+    assert missing == []

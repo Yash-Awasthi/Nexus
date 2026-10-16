@@ -19,16 +19,14 @@ logger = logging.getLogger(__name__)
 _SCRAPER_MAP: dict[str, tuple[str, str]] = {
     ScrapeSource.BLOOMBERG: ("finscrape.scrapers.bloomberg", "BloombergScraper"),
     ScrapeSource.REUTERS: ("finscrape.scrapers.reuters", "ReutersScraper"),
-    ScrapeSource.EDGAR: ("finscrape.scrapers.edgar", "EdgarScraper"),
     ScrapeSource.YAHOO: ("finscrape.scrapers.yahoo", "YahooScraper"),
     ScrapeSource.CNBC: ("finscrape.scrapers.cnbc", "CNBCScraper"),
     ScrapeSource.FT: ("finscrape.scrapers.ft", "FTScraper"),
     ScrapeSource.BENZINGA: ("finscrape.scrapers.benzinga", "BenzingaScraper"),
     ScrapeSource.GOOGLE_NEWS: ("finscrape.scrapers.google_news", "GoogleNewsScraper"),
-    ScrapeSource.GOOGLE_SERP: ("finscrape.scrapers.google_serp", "GoogleSerpScraper"),
     ScrapeSource.INVESTINGCOM: ("finscrape.scrapers.investingcom", "InvestingComScraper"),
     ScrapeSource.MARKETWATCH: ("finscrape.scrapers.marketwatch", "MarketWatchScraper"),
-    ScrapeSource.RSS: ("finscrape.scrapers.rss", "RSSScraper"),
+    ScrapeSource.RSS: ("finscrape.scrapers.rss", "RSSScraperSource"),
     ScrapeSource.SEEKINGALPHA: ("finscrape.scrapers.seekingalpha", "SeekingAlphaScraper"),
 }
 
@@ -59,7 +57,7 @@ def get_scraper_class(source: ScrapeSource) -> Optional[Any]:
         SCRAPER_REGISTRY[key] = cls
         logger.debug("Loaded scraper %s from %s", class_name, module_path)
         return cls
-    except ImportError as exc:
+    except (ImportError, AttributeError) as exc:
         safe_src = str(source.value).replace("\n", "\\n").replace("\r", "\\r")
         logger.warning("Cannot load scraper %s: %s", safe_src, exc)
         return None

@@ -11,13 +11,11 @@
 export const SCRAPE_SOURCES = [
   "bloomberg",
   "reuters",
-  "edgar",
   "yahoo",
   "cnbc",
   "ft",
   "benzinga",
   "google_news",
-  "google_serp",
   "investingcom",
   "marketwatch",
   "rss",
