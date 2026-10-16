@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Transactional email through Resend's HTTP API (NX-FEAT-015).
+ * Transactional email through Brevo's or Resend's HTTP API (NX-FEAT-015).
  *
- *   RESEND_API_KEY   — enables sending
+ *   BREVO_API_KEY    — enables sending through Brevo, which needs only a verified sender address
+ *   RESEND_API_KEY   — enables sending through Resend, which needs a verified domain
  *   NEXUS_MAIL_FROM  — sender, e.g. "Nexus <no-reply@example.com>"
  *   NEXUS_PUBLIC_URL — origin the links in a message point at (falls back to OAUTH_REDIRECT_BASE)
  */
@@ -16,7 +17,9 @@ export interface Mail {
 }
 
 export function mailConfigured(env: Record<string, string | undefined> = process.env): boolean {
-  return !!env.RESEND_API_KEY && !!env.NEXUS_MAIL_FROM && !!publicOrigin(env);
+  return (
+    !!(env.BREVO_API_KEY || env.RESEND_API_KEY) && !!env.NEXUS_MAIL_FROM && !!publicOrigin(env)
+  );
 }
 
 // Links come from configuration only: a Host header would let a caller point a reset link at itself.
@@ -40,24 +43,44 @@ export function appLink(path: string, env: Record<string, string | undefined> = 
 export async function sendMail(mail: Mail, logger?: FastifyBaseLogger): Promise<boolean> {
   if (!mailConfigured()) return false;
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.NEXUS_MAIL_FROM,
-        to: [mail.to],
-        subject: mail.subject,
-        text: mail.text,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    const res = process.env.BREVO_API_KEY ? await sendBrevo(mail) : await sendResend(mail);
     if (!res.ok) logger?.warn({ status: res.status, subject: mail.subject }, "mail-send-refused");
     return res.ok;
   } catch (err) {
     logger?.warn({ err: (err as Error).message, subject: mail.subject }, "mail-send-failed");
     return false;
   }
+}
+
+function sendBrevo(mail: Mail): Promise<Response> {
+  const from = process.env.NEXUS_MAIL_FROM!;
+  const named = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(from);
+  return fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": process.env.BREVO_API_KEY!, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sender: named ? { name: named[1], email: named[2] } : { email: from.trim() },
+      to: [{ email: mail.to }],
+      subject: mail.subject,
+      textContent: mail.text,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+}
+
+function sendResend(mail: Mail): Promise<Response> {
+  return fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: process.env.NEXUS_MAIL_FROM,
+      to: [mail.to],
+      subject: mail.subject,
+      text: mail.text,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
 }
