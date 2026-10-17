@@ -15,6 +15,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import { apiFetch, authFetch } from "~/lib/api";
+import { useAppBuilderAvailable } from "~/lib/app-builder";
 
 interface Generated {
   sessionId: string;
@@ -28,6 +29,7 @@ interface Step {
 }
 
 export default function AppBuilderPage() {
+  const available = useAppBuilderAvailable();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -129,6 +131,16 @@ export default function AppBuilderPage() {
   };
 
   const running = status === "running";
+
+  if (available === false)
+    return (
+      <Page width="default">
+        <PageHeader
+          title="App builder"
+          description="App builder installs packages and builds the app it writes, so it runs only in the desktop app."
+        />
+      </Page>
+    );
 
   return (
     <Page width="default">
