@@ -80,15 +80,23 @@ claimable("knowledge_graph", {
   },
 });
 
+const RETRY_MAX_TOKENS = 4096;
+
 /** Adapt an LlmDriver to the minimal client @nexus/nlp-utils expects. */
 export function nlpClientFromDriver(driver: LlmDriver, model?: string): NlpLlmClient {
   return async (messages, opts) => {
-    const res = await driver.complete({
-      model: model ?? (driver.model || "default"),
-      messages: messages.map((m) => ({ role: m.role as LlmRole, content: m.content })),
-      temperature: opts?.temperature,
-      maxTokens: opts?.maxTokens,
-    });
+    const ask = (maxTokens?: number) =>
+      driver.complete({
+        model: model ?? (driver.model || "default"),
+        messages: messages.map((m) => ({ role: m.role as LlmRole, content: m.content })),
+        temperature: opts?.temperature,
+        maxTokens,
+      });
+    let res = await ask(opts?.maxTokens);
+    // A reasoning model can spend the whole budget thinking; one retry with room, not a bigger
+    // budget on every call, since a free key's per-minute limit counts the tokens asked for.
+    if (res.finishReason === "length" && opts?.maxTokens && opts.maxTokens < RETRY_MAX_TOKENS)
+      res = await ask(RETRY_MAX_TOKENS);
     // Extraction parses JSON, so a blank or truncated answer must fail loudly, not read as no entities.
     if (res.finishReason === "length") {
       throw new Error("The model's answer was cut off at its token limit. Try another model.");

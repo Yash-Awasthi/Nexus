@@ -82,6 +82,30 @@ describe("nlpClientFromDriver", () => {
     await expect(ask(answer("[]", "stop"))).resolves.toMatchObject({ content: "[]" });
   });
 
+  it("retries a cut-off answer once with more room, since reasoning models spend tokens thinking", async () => {
+    const asked: (number | undefined)[] = [];
+    const driver: LlmDriver = {
+      ...stubDriver([]),
+      complete: async (opts) => {
+        asked.push(opts.maxTokens);
+        const cut = asked.length === 1;
+        return {
+          id: "s",
+          content: cut ? '[{"text": "Al' : ENTITIES,
+          model: "stub-model",
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          finishReason: cut ? "length" : "stop",
+          durationMs: 0,
+        };
+      },
+    };
+    const res = await nlpClientFromDriver(driver)([{ role: "user", content: "x" }], {
+      maxTokens: 1024,
+    });
+    expect(res.content).toBe(ENTITIES);
+    expect(asked).toEqual([1024, 4096]);
+  });
+
   it("drives a real ingest: entities and relationships land in the graph", async () => {
     const driver = stubDriver([ENTITIES, RELATIONSHIPS]);
     const llm = nlpClientFromDriver(driver);
