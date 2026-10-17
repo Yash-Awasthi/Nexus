@@ -113,9 +113,9 @@ function normalizeWorkflow(w: Record<string, unknown>): Workflow {
           : "idle";
   const lastRun =
     typeof w.lastRunAt === "string"
-      ? w.lastRunAt
+      ? new Date(w.lastRunAt).toLocaleString()
       : typeof w.lastRun === "string"
-        ? w.lastRun
+        ? new Date(w.lastRun).toLocaleString()
         : "Never";
   return {
     id: String(w.id ?? ""),

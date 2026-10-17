@@ -185,7 +185,8 @@ export default function Drive() {
   );
 
   useEffect(() => {
-    termEnd.current?.scrollIntoView({ behavior: "smooth" });
+    // Not on first render: an empty terminal would pull a phone's page down to it.
+    if (history.length) termEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [history]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
