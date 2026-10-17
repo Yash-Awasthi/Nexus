@@ -1083,6 +1083,17 @@ describe("WebDocumentConnector", () => {
     expect(docs[1]!.sourceUrl).toBe("https://b.com");
   });
 
+  it("sync() fails with the reason when no page could be fetched, instead of reporting zero docs", async () => {
+    const c = new WebDocumentConnector({
+      urls: ["https://blocked.example/a"],
+      fetch: makeTextFetch([{ ok: false, status: 403 }]),
+    });
+    const drain = async () => {
+      for await (const _d of c.sync()) void _d;
+    };
+    await expect(drain()).rejects.toThrow(/blocked\.example\/a.*403/);
+  });
+
   it("sync() respects limit option", async () => {
     const fetchFn = makeTextFetch([
       { ok: true, textBody: "A" },
