@@ -332,7 +332,28 @@ export async function scaffoldApp(dir: string, name: string, design: AppDesign):
 }
 
 /** The coding agent's instruction for customising the scaffold. */
-export function codegenInstruction(prompt: string, design: AppDesign): string {
+export function codegenInstruction(
+  prompt: string,
+  design: AppDesign,
+  canRunCommands = true,
+): string {
+  const work = canRunCommands
+    ? [
+        "- shadcn/ui is configured: run `npx shadcn@latest add <component>` for buttons, cards,",
+        "  dialogs and the like instead of writing them by hand.",
+        "- Install packages with npm. When done, run `npm run build` and fix every error it reports.",
+        "- Run each command plainly, without piping or trimming its output.",
+        "- A clean `npm run build` is the check: once it passes, do not write check scripts or",
+        "  inspect the built files. Delete node_modules and dist, then reply with a short summary.",
+      ]
+    : [
+        "- Commands cannot run on this server: no installs, no shadcn CLI, no build. Write the code",
+        "  directly with write_file, components by hand under src/components.",
+        "- Use only the packages already in package.json (react, react-router, lucide-react, clsx,",
+        "  tailwind-merge); the user installs and runs the project on their own machine.",
+        "- Read only the files you need (src/main.tsx, src/App.tsx, src/index.css), then write.",
+        "  Keep the code type-correct. When the app is complete, reply with a short summary.",
+      ];
   return [
     `Build this app by editing the starter project in the working directory: ${prompt}`,
     "",
@@ -342,11 +363,6 @@ export function codegenInstruction(prompt: string, design: AppDesign): string {
     "colours (bg-card, text-muted-foreground, border-input), rounded-lg and shadow-card, not new colours.",
     "",
     "- Add routes in src/main.tsx and put pages under src/pages/.",
-    "- shadcn/ui is configured: run `npx shadcn@latest add <component>` for buttons, cards,",
-    "  dialogs and the like instead of writing them by hand.",
-    "- Install packages with npm. When done, run `npm run build` and fix every error it reports.",
-    "- Run each command plainly, without piping or trimming its output.",
-    "- A clean `npm run build` is the check: once it passes, do not write check scripts or",
-    "  inspect the built files. Delete node_modules and dist, then reply with a short summary.",
+    ...work,
   ].join("\n");
 }

@@ -93,9 +93,15 @@ function auditLog(event: string, detail: Record<string, unknown>): void {
 /** Below this, a command such as `npm install` beside the server gets the whole container OOM-killed. */
 const MIN_COMMAND_MEMORY = 1024 ** 3;
 
+/** True where `run_command` refuses: a container too small to run installs beside the server. */
+export function hostTooSmallForCommands(): boolean {
+  const limit = process.constrainedMemory?.() ?? 0;
+  return limit > 0 && limit < MIN_COMMAND_MEMORY;
+}
+
 function smallHostRefusal(): string | null {
   const limit = process.constrainedMemory?.() ?? 0;
-  return limit > 0 && limit < MIN_COMMAND_MEMORY
+  return hostTooSmallForCommands()
     ? `This server has only ${Math.round(limit / 1024 ** 2)} MB of memory, so it cannot run commands: ` +
         "a package install or build would take the whole server down. Write and edit the files " +
         "instead; the user downloads the project and runs it on their own machine."

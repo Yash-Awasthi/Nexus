@@ -29,7 +29,7 @@ const { userDrivePath } = await import("@nexus/sandbox");
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildServer } = await import("../../src/server.ts");
-const { appFolderName, fallbackDesign, parseDesign, pickDesign, scaffoldApp } =
+const { appFolderName, codegenInstruction, fallbackDesign, parseDesign, pickDesign, scaffoldApp } =
   await import("../../src/lib/app-scaffold.ts");
 
 function tokenFor(userId: string): string {
@@ -59,6 +59,14 @@ describe("design and scaffold", () => {
     const d = await pickDesign("a bakery site", async () => '{"style":"wild"}');
     expect(d).toEqual(fallbackDesign("a bakery site"));
     expect(parseDesign(d)).toEqual(d);
+  });
+
+  it("asks for hand-written code, not installs or builds, where commands cannot run", () => {
+    const design = fallbackDesign("x");
+    expect(codegenInstruction("a tip calculator", design)).toMatch(/npm run build/);
+    const filesOnly = codegenInstruction("a tip calculator", design, false);
+    expect(filesOnly).not.toMatch(/npx shadcn|npm run build|Install packages/);
+    expect(filesOnly).toMatch(/already in package\.json/);
   });
 
   it("names folders by prompt and never overwrites an edited file", async () => {
