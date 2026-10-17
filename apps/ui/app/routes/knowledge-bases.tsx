@@ -493,7 +493,7 @@ function KBGraph({ kbId }: { kbId: string }) {
           {job.entities
             ? `Read ${job.chunksTotal} of ${job.of} chunks: ${job.entities} entities and ${job.relationships} relationships.`
             : `Read ${job.chunksTotal} chunks and found no entities. Check that your default model answers.`}
-          {job.failed ? ` ${job.failed} chunks failed.` : ""}{" "}
+          {job.failed ? ` ${job.failed} chunks failed${job.error ? `: ${job.error}` : ""}.` : ""}{" "}
           <Link to="/knowledge-graph" className="underline underline-offset-2">
             Open the graph
           </Link>

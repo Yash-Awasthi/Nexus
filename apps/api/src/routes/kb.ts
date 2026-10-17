@@ -421,8 +421,8 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
           relationships: result.totalEdgesAdded + result.totalEdgesMerged,
           failed: result.chunksErrored,
         });
-        // Every chunk failing means the model never answered: say why instead of an empty graph.
-        if (job.state === "error") job.error = result.perChunk.find((c) => c.error)?.error;
+        // Say why chunks failed, whether all of them (an empty graph) or only some.
+        if (result.chunksErrored) job.error = result.perChunk.find((c) => c.error)?.error;
       })
       .catch((err: unknown) => {
         job.state = "error";
