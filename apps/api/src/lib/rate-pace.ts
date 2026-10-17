@@ -22,11 +22,14 @@ function paceKey(input: Parameters<typeof fetch>[0], init?: RequestInit): string
 
 // A wait this short costs less to sit out than a failed turn does.
 const SHORT_WAIT_MS = 15_000;
+// A drained per-minute token window answers each retry with another short wait; the total is capped.
+const WAIT_BUDGET_MS = 45_000;
 
 export function pacedFetch(inner: typeof fetch): typeof fetch {
   return async (input, init) => {
     const key = paceKey(input, init);
-    for (let attempt = 0; ; attempt++) {
+    let waited = 0;
+    for (;;) {
       const wait = (_until.get(key) ?? 0) - Date.now();
       if (wait > SHORT_WAIT_MS) {
         const message = `Rate limit window spent, try again in ${Math.ceil(wait / 1000)}s`;
@@ -39,9 +42,10 @@ export function pacedFetch(inner: typeof fetch): typeof fetch {
       const res = await inner(input, init);
       const ms = rateLimitWaitMs(res.headers);
       if (ms) _until.set(key, Date.now() + ms);
-      if (res.status !== 429 || attempt >= 2) return res;
+      if (res.status !== 429) return res;
       const hint = ms ?? parseRetryFromText(await res.clone().text());
-      if (!hint || hint > SHORT_WAIT_MS) return res;
+      if (!hint || hint > SHORT_WAIT_MS || waited + hint > WAIT_BUDGET_MS) return res;
+      waited += Math.max(hint, 250);
       _until.set(key, Date.now() + hint);
     }
   };
