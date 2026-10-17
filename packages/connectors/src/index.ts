@@ -1248,11 +1248,17 @@ export class WebDocumentConnector extends BaseDocumentConnector {
     const limit = opts?.limit !== undefined ? opts.limit : this.urls.length;
     const urls = this.urls.slice(0, limit);
     const now = Date.now();
+    const failures: string[] = [];
+    let fetched = 0;
 
     for (const url of urls) {
       try {
         const res = await this.fetchFn(url);
-        if (!res.ok) continue;
+        if (!res.ok) {
+          failures.push(`${url}: HTTP ${res.status}`);
+          continue;
+        }
+        fetched++;
 
         const content = await res.text();
 
@@ -1275,10 +1281,12 @@ export class WebDocumentConnector extends BaseDocumentConnector {
           syncedAt: now,
           metadata: { status: res.status },
         };
-      } catch {
-        // Skip unreachable URLs silently
+      } catch (e) {
+        failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+    // One bad page among several is skipped; when none loads, the sync fails and says why.
+    if (fetched === 0 && failures.length > 0) throw new Error(failures.join("; "));
   }
 }
 

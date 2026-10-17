@@ -25,11 +25,13 @@ import zlib from "node:zlib";
 
 import { isPrivateAddress, safeLookup, type SafeLookup } from "./security-utils.ts";
 
+const USER_AGENT = "Nexus/0.1 (+https://github.com/Yash-Awasthi/Nexus)";
+
 function normalizeHeaders(h: RequestInit["headers"]): Record<string, string> {
   if (!h) return {};
   if (h instanceof Headers) return Object.fromEntries(h.entries());
   if (Array.isArray(h)) return Object.fromEntries(h);
-  return h as Record<string, string>;
+  return { ...(h as Record<string, string>) };
 }
 
 const DECODERS: Record<string, () => NodeJS.ReadWriteStream & Readable> = {
@@ -70,7 +72,10 @@ export function createPinnedFetch(lookup: SafeLookup = safeLookup): typeof fetch
     const mod = isHttps ? https : http;
     const agent = isHttps ? httpsAgent : httpAgent;
 
+    // node:http sends no User-Agent, and many sites (Wikipedia among them) answer such a request 403.
     const headers = normalizeHeaders(init?.headers);
+    if (!Object.keys(headers).some((k) => k.toLowerCase() === "user-agent"))
+      headers["user-agent"] = USER_AGENT;
     const body = init?.body;
     const signal = init?.signal ?? undefined;
 

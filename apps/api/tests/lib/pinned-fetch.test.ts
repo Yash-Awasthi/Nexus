@@ -165,3 +165,29 @@ describe("createPinnedFetch — responses", () => {
     }
   });
 });
+
+describe("createPinnedFetch — request headers", () => {
+  it("names itself, since sites such as Wikipedia refuse a request with no User-Agent", async () => {
+    const { createServer } = await import("node:http");
+    const dns = await import("node:dns");
+    const seen: (string | undefined)[] = [];
+    const server = createServer((req, res) => {
+      seen.push(req.headers["user-agent"]);
+      res.end("ok");
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address() as { port: number };
+    // A resolver that sends the test hostname to this local server, outside the private-address guard.
+    const toLocal = ((_h: string, o: object, cb: never) =>
+      dns.lookup("127.0.0.1", o, cb)) as unknown as Parameters<typeof createPinnedFetch>[0];
+    try {
+      const f = createPinnedFetch(toLocal);
+      await (await f(`http://ua.test:${port}/`)).text();
+      await (await f(`http://ua.test:${port}/`, { headers: { "user-agent": "custom/1" } })).text();
+      expect(seen[0]).toMatch(/Nexus/);
+      expect(seen[1]).toBe("custom/1");
+    } finally {
+      server.close();
+    }
+  });
+});
