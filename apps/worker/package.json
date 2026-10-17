@@ -7,6 +7,7 @@
   "type": "module",
   "exports": {
     "./agent-handler": "./src/handlers/agent-handler.ts",
+    "./agent-tools": "./src/handlers/agent-tools.ts",
     "./drive-lifecycle": "./src/handlers/drive-lifecycle.ts",
     "./ingest-handler": "./src/handlers/ingest-handler.ts"
   },

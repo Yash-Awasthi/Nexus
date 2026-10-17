@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { db } from "@nexus/db";
 import { agentSessions, ingestedEvents, runtimeTasks, signals } from "@nexus/db/schema";
 import type { ExecAction } from "@nexus/exec-policy";
+import { hostTooSmallForCommands } from "@nexus/worker/agent-tools";
 import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -223,7 +224,7 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       request,
       reply,
       {
-        instruction: codegenInstruction(prompt, design),
+        instruction: codegenInstruction(prompt, design, !hostTooSmallForCommands()),
         workspaceDir: dir,
         maxSteps: 60,
         commandTimeoutMs: 180_000,
