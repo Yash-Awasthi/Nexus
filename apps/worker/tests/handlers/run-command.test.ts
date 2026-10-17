@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createCodingToolSet, shellNote } from "../../src/handlers/agent-tools.ts";
 
@@ -45,6 +45,20 @@ describe("run_command", () => {
     await new Promise((r) => setTimeout(r, 3_000));
     expect(existsSync(join(dir, "late.txt"))).toBe(false);
   }, 10_000);
+});
+
+describe("run_command on a small host", () => {
+  it("refuses instead of letting a package install exhaust the server's memory", async () => {
+    vi.spyOn(process, "constrainedMemory").mockReturnValue(512 * 1024 * 1024);
+    try {
+      const dir = workspace({});
+      const out = await run(dir, "node -e \"require('fs').writeFileSync('ran.txt','x')\"", 10_000);
+      expect(out).toMatch(/512 MB/);
+      expect(existsSync(join(dir, "ran.txt"))).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe("shellNote", () => {
