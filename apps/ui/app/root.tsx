@@ -88,6 +88,7 @@ import { TooltipProvider } from "~/components/ui/tooltip";
 import { AuthProvider, bootstrapSession, useAuth } from "~/context/AuthContext";
 import { NotificationsProvider } from "~/context/NotificationsContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
+import { useAppBuilderAvailable } from "~/lib/app-builder";
 import { hostCan } from "~/lib/host";
 import { installAuthFetch } from "~/lib/install-auth-fetch";
 import "./app.css";
@@ -127,6 +128,8 @@ interface NavEntry {
   icon: React.ElementType;
   label: string;
   end?: boolean;
+  /** Shown only when the server can run it. */
+  requires?: "appBuilder";
 }
 
 // The council leads; everything else supports it. Admin shows to admins only.
@@ -177,7 +180,7 @@ const navGroups: { label: string; admin?: boolean; items: NavEntry[] }[] = [
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
       { to: "/terminals", icon: SquareTerminal, label: "Terminals" },
       { to: "/drive", icon: HardDrive, label: "Drive" },
-      { to: "/app-builder", icon: Wand2, label: "App builder" },
+      { to: "/app-builder", icon: Wand2, label: "App builder", requires: "appBuilder" },
       { to: "/weather", icon: CloudSun, label: "Weather" },
     ],
   },
@@ -313,6 +316,7 @@ function AppSidebar() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin" || user?.role === "owner";
+  const appBuilder = useAppBuilderAvailable() === true;
 
   return (
     <Sidebar collapsible="icon">
@@ -341,9 +345,11 @@ function AppSidebar() {
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items.map((item) => (
-                    <NavItem key={item.to} item={item} />
-                  ))}
+                  {group.items
+                    .filter((item) => item.requires !== "appBuilder" || appBuilder)
+                    .map((item) => (
+                      <NavItem key={item.to} item={item} />
+                    ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

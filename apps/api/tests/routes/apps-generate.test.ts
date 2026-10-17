@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const DB = "pglite://:memory:apps-generate";
 const SECRET = "apps-generate-test-secret";
@@ -29,7 +29,7 @@ const { userDrivePath } = await import("@nexus/sandbox");
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildServer } = await import("../../src/server.ts");
-const { appFolderName, codegenInstruction, fallbackDesign, parseDesign, pickDesign, scaffoldApp } =
+const { appFolderName, fallbackDesign, parseDesign, pickDesign, scaffoldApp } =
   await import("../../src/lib/app-scaffold.ts");
 
 function tokenFor(userId: string): string {
@@ -59,14 +59,6 @@ describe("design and scaffold", () => {
     const d = await pickDesign("a bakery site", async () => '{"style":"wild"}');
     expect(d).toEqual(fallbackDesign("a bakery site"));
     expect(parseDesign(d)).toEqual(d);
-  });
-
-  it("asks for hand-written code, not installs or builds, where commands cannot run", () => {
-    const design = fallbackDesign("x");
-    expect(codegenInstruction("a tip calculator", design)).toMatch(/npm run build/);
-    const filesOnly = codegenInstruction("a tip calculator", design, false);
-    expect(filesOnly).not.toMatch(/npx shadcn|npm run build|Install packages/);
-    expect(filesOnly).toMatch(/already in package\.json/);
   });
 
   it("names folders by prompt and never overwrites an edited file", async () => {
@@ -107,6 +99,30 @@ describe("POST /apps/generate", () => {
   afterAll(async () => {
     await app.close();
     model.close();
+  });
+
+  it("is unavailable on a host too small to install and build, and writes nothing there", async () => {
+    const auth = { authorization: `Bearer ${tokenFor(USER)}` };
+    expect((await app.inject({ url: "/api/v1/apps/status", headers: auth })).json()).toEqual({
+      available: true,
+    });
+    vi.spyOn(process, "constrainedMemory").mockReturnValue(512 * 1024 * 1024);
+    try {
+      const status = await app.inject({ url: "/api/v1/apps/status", headers: auth });
+      expect(status.json()).toEqual({ available: false });
+      const r = await app.inject({
+        method: "POST",
+        url: "/api/v1/apps/generate",
+        headers: auth,
+        payload: { prompt: "a small-host app" },
+      });
+      expect(r.statusCode).toBe(403);
+      expect(r.json().error).toBe("app_builder_unavailable");
+      const apps = join(userDrivePath(USER), "apps", appFolderName(USER, "a small-host app"));
+      await expect(fs.stat(apps)).rejects.toThrow();
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("scaffolds the model's design into the drive, runs the agent and exports the folder", async () => {

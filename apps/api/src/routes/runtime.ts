@@ -178,6 +178,11 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // GET /apps/status — App builder installs and builds, so it is offered only where commands can run
+  app.get("/apps/status", { preHandler: requireAuth }, async (_request, reply) =>
+    reply.send({ available: !hostTooSmallForCommands() }),
+  );
+
   // POST /apps/generate — scaffold a themed starter in the drive, then have an agent build on it
   app.post<{
     Body: {
@@ -191,6 +196,11 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
   }>("/apps/generate", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(401).send({ error: "auth_required" });
+    if (hostTooSmallForCommands())
+      return reply.code(403).send({
+        error: "app_builder_unavailable",
+        message: "App builder needs to install and build, so it runs only in the desktop app.",
+      });
     const prompt = (request.body?.prompt ?? "").trim();
     if (!prompt) return reply.code(400).send({ error: "prompt is required" });
     const { provider, model, sessionId, approvalId } = request.body;
@@ -224,7 +234,7 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       request,
       reply,
       {
-        instruction: codegenInstruction(prompt, design, !hostTooSmallForCommands()),
+        instruction: codegenInstruction(prompt, design),
         workspaceDir: dir,
         maxSteps: 60,
         commandTimeoutMs: 180_000,
