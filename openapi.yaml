@@ -462,6 +462,13 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/apps/status:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/apps/generate:
     post:
       tags:
