@@ -118,7 +118,8 @@ describe("LeakDetector", () => {
     // contract is that readings accumulate and a numeric rate is always reported.
     expect(typeof report.subscriptions.growthRate).toBe("number");
     expect(typeof report.subscriptions.suspiciousGrowth).toBe("boolean");
-    expect(report.memory.heapGrowthMB).toBeGreaterThanOrEqual(0);
+    // Real heap readings: a GC between them makes the growth negative, which is still a reading.
+    expect(Number.isFinite(report.memory.heapGrowthMB)).toBe(true);
   });
 
   it("caps stored readings and resets on demand", () => {
