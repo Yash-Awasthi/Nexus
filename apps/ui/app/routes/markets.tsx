@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { apiFetch } from "~/lib/api";
+import { API_PROVIDERS } from "~/lib/council";
 
 interface Outcome {
   id: string;
@@ -100,9 +101,12 @@ export default function MarketsPage() {
       .then((res) =>
         setMembers(
           res.keys
-            .flatMap((k) =>
-              (k.models ?? []).map((model) => ({ label: model, provider: k.provider, model })),
-            )
+            .flatMap((k) => {
+              // A built-in key names no models; it runs the provider's default.
+              const fallback = API_PROVIDERS.find((p) => p.id === k.provider)?.defaultModel;
+              const models = k.models?.length ? k.models : fallback ? [fallback] : [];
+              return models.map((model) => ({ label: model, provider: k.provider, model }));
+            })
             .slice(0, 3),
         ),
       )
