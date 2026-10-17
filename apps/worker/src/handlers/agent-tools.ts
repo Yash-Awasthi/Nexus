@@ -90,6 +90,18 @@ function auditLog(event: string, detail: Record<string, unknown>): void {
  * --network=none, --cap-drop=ALL, no-new-privileges, memory + CPU caps.
  * Otherwise falls back to a direct child_process with a scrubbed env.
  */
+/** Below this, a command such as `npm install` beside the server gets the whole container OOM-killed. */
+const MIN_COMMAND_MEMORY = 1024 ** 3;
+
+function smallHostRefusal(): string | null {
+  const limit = process.constrainedMemory?.() ?? 0;
+  return limit > 0 && limit < MIN_COMMAND_MEMORY
+    ? `This server has only ${Math.round(limit / 1024 ** 2)} MB of memory, so it cannot run commands: ` +
+        "a package install or build would take the whole server down. Write and edit the files " +
+        "instead; the user downloads the project and runs it on their own machine."
+    : null;
+}
+
 function runCommand(
   command: string,
   cwd: string,
@@ -288,7 +300,8 @@ export function createCodingToolSet(opts: CodingToolsOptions): RuntimeToolSet {
         properties: { command: { type: "string", description: "Shell command line" } },
         required: ["command"],
       },
-      handler: (args) =>
+      handler: async (args) =>
+        (!opts.dockerConfig && smallHostRefusal()) ||
         runCommand(
           String(args.command ?? ""),
           root,
