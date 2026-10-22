@@ -8,8 +8,8 @@ Routes:
   POST /scrape/{source}        — single source scrape
   POST /scrape/batch           — multi-source concurrent scrape
   GET  /scrape/sources         — list registered scrapers
-  POST /push, POST /scan       — forward fin-scrape signals to the Nexus API
-  GET  /status                 — fin-scrape bridge counters
+  POST /push, POST /scan       — forward FinScrape signals to the Nexus API
+  GET  /status                 — FinScrape bridge counters
   GET  /health                 — liveness + readiness (includes DB check)
   GET  /metrics                — Prometheus metrics (optional)
 """
@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="nexus-ingest",
         version="0.1.0",
-        description="Financial scraping + event ingestion — part of the NEXUS platform",
+        description="Financial scraping + event ingestion — part of the Nexus platform",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",

@@ -2,13 +2,13 @@
 
 # @nexus/auth
 
-Zero-runtime-dependency authentication primitives for NEXUS.
+Zero-runtime-dependency authentication primitives for Nexus.
 
 Provides API key verification, HS256 JWT sign/verify, and a Fastify preHandler hook — all implemented on top of Node.js `node:crypto` with no external packages.
 
 ## Installation
 
-This package is internal to the NEXUS monorepo. It is consumed by `apps/api`, `apps/worker`, and `services/ingest`.
+This package is internal to the Nexus monorepo. It is consumed by `apps/api`, `apps/worker`, and `services/ingest`.
 
 ```ts
 import {

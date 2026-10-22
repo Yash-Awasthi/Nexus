@@ -112,9 +112,9 @@ lint: ## Run ESLint + Prettier check across all packages
 typecheck: ## Run TypeScript type-check across all packages
 	pnpm typecheck
 
-# ── fin-scrape bridge ─────────────────────────────────────────────────────────
+# ── FinScrape bridge ─────────────────────────────────────────────────────────
 
-ingest-scan: ## Trigger a /scan on the ingest service (flushes the fin-scrape output dir)
+ingest-scan: ## Trigger a /scan on the ingest service (flushes the FinScrape output dir)
 	@INGEST_URL=$${INGEST_URL:-http://localhost:8000}; \
 	INGEST_KEY=$${NEXUS_INGEST_API_KEY:-}; \
 	curl -sf -X POST "$$INGEST_URL/scan" -H "Authorization: Bearer $$INGEST_KEY" | python3 -m json.tool

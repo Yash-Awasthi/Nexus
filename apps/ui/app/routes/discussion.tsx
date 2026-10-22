@@ -28,7 +28,7 @@ import { Markdown } from "~/lib/markdown";
 
 export function meta(_: Route.MetaArgs) {
   return [
-    { title: "NEXUS - Discussion" },
+    { title: "Nexus - Discussion" },
     { name: "description", content: "Council discussion with participants on independent clocks" },
   ];
 }

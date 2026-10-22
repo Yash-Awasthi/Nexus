@@ -2,9 +2,9 @@
 
 <div align="center">
 
-<img src=".github/assets/nexus-logo.svg" alt="NEXUS" width="96" />
+<img src=".github/assets/nexus-logo.svg" alt="Nexus" width="96" />
 
-# NEXUS
+# Nexus
 
 Run, coordinate, and compare large language models from one place.
 
@@ -34,7 +34,7 @@ Run, coordinate, and compare large language models from one place.
 
 ## What it is
 
-NEXUS sends the same task to several language models, coordinates multi-step agents,
+Nexus sends the same task to several language models, coordinates multi-step agents,
 and keeps memory across sessions — behind a Fastify API, a React dashboard, and
 background workers. It is bring-your-own-key: you provide your LLM provider keys and
 they stay within your deployment.

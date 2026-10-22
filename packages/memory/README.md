@@ -2,7 +2,7 @@
 
 # @nexus/memory
 
-Long-term agent memory with vector search for NEXUS.
+Long-term agent memory with vector search for Nexus.
 
 Provides a swap-in architecture: develop with `FixedEmbedder` + `InMemoryStore` (no external dependencies), deploy with any real embedder + `PgVectorStore` backed by pgvector.
 

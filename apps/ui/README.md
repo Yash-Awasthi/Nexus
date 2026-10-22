@@ -2,7 +2,7 @@
 
 # @nexus/ui
 
-The NEXUS web dashboard — a **React Router 7 SPA** (`ssr: false`) built with Vite and
+The Nexus web dashboard — a **React Router 7 SPA** (`ssr: false`) built with Vite and
 served as static files by nginx in production. It talks to the `apps/api` Fastify server
 over HTTP/SSE; there is no server-side rendering and no edge runtime.
 

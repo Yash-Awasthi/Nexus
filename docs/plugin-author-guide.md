@@ -7,7 +7,7 @@
 
 ---
 
-## 1. What is a NEXUS adapter?
+## 1. What is a Nexus adapter?
 
 An adapter is a TypeScript module that implements `IExecutionAdapter` from `@nexus/plugin-sdk`.
 It exposes one or more **task types** (e.g., `github.create-issue`) and declares which
@@ -46,7 +46,7 @@ cd packages/adapters/$ADAPTER
   "name": "@nexus/adapter-myservice",
   "version": "0.1.0",
   "private": false,
-  "description": "NEXUS adapter for MyService",
+  "description": "Nexus adapter for MyService",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./src/index.ts",

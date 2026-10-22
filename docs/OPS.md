@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Operational reference (health, SSE, durable stores)
+# Nexus — Operational reference (health, SSE, durable stores)
 
 Short operational surface for the surfaces built and verified in the 2026-09-06
 durability campaign: health endpoints with flush observability, the research SSE

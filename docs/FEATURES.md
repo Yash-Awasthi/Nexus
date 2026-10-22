@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Features & Core Concepts
+# Nexus — Features & Core Concepts
 
 A capability-by-capability reference. For how the pieces fit together see
 [ARCHITECTURE.md](ARCHITECTURE.md); for running it see the

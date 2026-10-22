@@ -2,7 +2,7 @@
 
 # apps/cli — nexus CLI
 
-Developer CLI for interacting with a running NEXUS instance. Built with `commander.js`.
+Developer CLI for interacting with a running Nexus instance. Built with `commander.js`.
 
 ## Installation
 

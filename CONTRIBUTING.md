@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# Contributing to NEXUS
+# Contributing to Nexus
 
 Thank you for your interest in contributing. This guide covers everything you need to go from a fresh clone to a merged pull request.
 

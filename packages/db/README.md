@@ -4,7 +4,7 @@
 
 Drizzle ORM schemas, migrations, and typed query client for PostgreSQL 16 + pgvector.
 
-The single source of truth for all database structure in NEXUS. Every other package that reads or writes the database imports from here.
+The single source of truth for all database structure in Nexus. Every other package that reads or writes the database imports from here.
 
 ## Installation
 

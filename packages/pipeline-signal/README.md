@@ -2,7 +2,7 @@
 
 # @nexus/pipeline-signal
 
-Ingest-to-signal pipeline worker for NEXUS.
+Ingest-to-signal pipeline worker for Nexus.
 
 Converts raw `ingested_events` rows (produced by `services/ingest` adapters) into typed `Signal` records with classified type, priority, and metadata — ready for council deliberation.
 

@@ -1,6 +1,6 @@
 {{/*
 SPDX-License-Identifier: Apache-2.0
-Common Helm template helpers for NEXUS.
+Common Helm template helpers for Nexus.
 */}}
 
 {{- define "nexus.fullname" -}}

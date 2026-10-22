@@ -2,7 +2,7 @@
   "name": "@nexus/root",
   "private": true,
   "version": "0.0.0",
-  "description": "NEXUS — AI orchestration platform (monorepo root)",
+  "description": "Nexus — AI orchestration platform (monorepo root)",
   "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=24",

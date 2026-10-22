@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Deployment
+# Nexus — Deployment
 
 Production deployment options and the full environment-variable reference. For local
 development see the [README Quick Start](../README.md#quick-start). For day-2 operations

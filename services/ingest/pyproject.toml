@@ -6,7 +6,7 @@ build-backend = "uv_build"
 [project]
 name = "nexus-ingest"
 version = "0.0.0"
-description = "NEXUS ingest service — financial scraping + analysis (ex-fin-scrape)"
+description = "Nexus ingest service — financial scraping + analysis (ex-FinScrape)"
 requires-python = ">=3.14"
 dependencies = [
   "fastapi>=0.143.0",

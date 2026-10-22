@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""nexus-ingest — fin-scrape bridge routes.
+"""nexus-ingest — FinScrape bridge routes.
 
-Forwards fin-scrape signal payloads to the Nexus API's POST /api/v1/ingest/events.
+Forwards FinScrape signal payloads to the Nexus API's POST /api/v1/ingest/events.
 
   POST /push    — forward one payload immediately
   POST /scan    — push every *.json file in FINSCRAPE_OUTPUT_DIR, then move it to FINSCRAPE_DONE_DIR

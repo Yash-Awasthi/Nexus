@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Scaffolding generator for repetitive NEXUS package patterns.
+ * Scaffolding generator for repetitive Nexus package patterns.
  *
  * Usage (via pnpm):
  *   pnpm scaffold:adapter <name>    # new packages/adapters/<name> package
@@ -57,7 +57,7 @@ function scaffoldAdapter(name: string): void {
         name: `@nexus/adapter-${name}`,
         version: "0.0.0",
         private: false,
-        description: `NEXUS adapter for ${name}`,
+        description: `Nexus adapter for ${name}`,
         license: "Apache-2.0",
         type: "module",
         main: "./src/index.ts",
@@ -250,7 +250,7 @@ describe("${name.replace(/-/g, "")}Adapter", () => {
 
 # @nexus/adapter-${name}
 
-NEXUS adapter for ${name}
+Nexus adapter for ${name}
 
 **Status:** Skeleton — implementation pending.
 `,

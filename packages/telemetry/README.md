@@ -2,7 +2,7 @@
 
 # @nexus/telemetry
 
-Observability stack for NEXUS: health aggregation, SLO tracking, structured logging, Prometheus metrics, HMAC-chained audit log, disaster recovery, and OpenTelemetry bootstrap.
+Observability stack for Nexus: health aggregation, SLO tracking, structured logging, Prometheus metrics, HMAC-chained audit log, disaster recovery, and OpenTelemetry bootstrap.
 
 ## Installation
 

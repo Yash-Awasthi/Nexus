@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""fin-scrape bridge: /scan pushes each file once, moves it, and reports bad files without detail."""
+"""FinScrape bridge: /scan pushes each file once, moves it, and reports bad files without detail."""
 
 from __future__ import annotations
 

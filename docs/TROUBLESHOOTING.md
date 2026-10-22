@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Troubleshooting
+# Nexus — Troubleshooting
 
 Common first-run and local-dev issues. If your problem isn't here, check the
 [runbook](runbook.md) for operational issues or open an issue.

@@ -2,7 +2,7 @@
 /**
  * @nexus/plugin-sdk
  *
- * Stable interface contract for NEXUS execution adapters.
+ * Stable interface contract for Nexus execution adapters.
  * Every adapter in packages/adapters/* must implement IExecutionAdapter
  * via the defineAdapter factory.
  *
