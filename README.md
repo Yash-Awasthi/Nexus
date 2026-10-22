@@ -32,6 +32,16 @@ Run, coordinate, and compare large language models from one place.
 
 ---
 
+## 📸 Screenshots
+
+<a href="docs/screenshots/after-login.jpg"><img src="docs/screenshots/after-login.jpg" width="100%" alt="Nexus workspace after login with setup steps, companies and spend"></a>
+
+<a href="docs/screenshots/chat.jpg"><img src="docs/screenshots/chat.jpg" width="100%" alt="Nexus chat answering a question across several models with citations"></a>
+
+<a href="docs/screenshots/grid.jpg"><img src="docs/screenshots/grid.jpg" width="100%" alt="Nexus pages: archetypes, connectors, marketplace, playground, discussion, research, sandbox, drive, costs, profile, tokens and keys"></a>
+
+---
+
 ## What it is
 
 Nexus sends the same task to several language models, coordinates multi-step agents,
