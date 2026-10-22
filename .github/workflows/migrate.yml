@@ -13,7 +13,7 @@ name: DB Migrate
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "packages/db/src/schema/**"
       - "packages/db/drizzle/**"

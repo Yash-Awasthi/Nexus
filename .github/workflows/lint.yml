@@ -4,7 +4,7 @@ name: Lint
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [master]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"

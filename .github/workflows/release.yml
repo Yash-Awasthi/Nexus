@@ -3,7 +3,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -44,7 +44,7 @@ jobs:
   docker-release:
     name: Build + sign Docker images (${{ matrix.service }}, ${{ matrix.context }}, ${{ matrix.dockerfile }}, ${{ matrix.image }})
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     permissions:
       contents: read
       packages: write
