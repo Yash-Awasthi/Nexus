@@ -10,7 +10,7 @@ Run, coordinate, and compare large language models from one place.
 
 <p>
   <a href="https://github.com/Yash-Awasthi/Nexus/actions/workflows/test.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/Yash-Awasthi/Nexus/test.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI">
+    <img src="https://img.shields.io/github/actions/workflow/status/Yash-Awasthi/Nexus/test.yml?branch=master&label=CI&logo=github&style=flat-square" alt="CI">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">

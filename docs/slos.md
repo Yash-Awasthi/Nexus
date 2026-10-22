@@ -165,7 +165,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
     severity: critical
   annotations:
     summary: "Nexus audit log chain integrity breach — security incident"
-    runbook: "https://github.com/Yash-Awasthi/Nexus/blob/main/docs/runbook.md#p4--audit-chain-broken-t3-incident"
+    runbook: "https://github.com/Yash-Awasthi/Nexus/blob/master/docs/runbook.md#p4--audit-chain-broken-t3-incident"
 ```
 
 ---

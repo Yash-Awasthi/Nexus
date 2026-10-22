@@ -95,7 +95,7 @@ echo "==> Tagging: $TAG"
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "    [DRY RUN] Would run:"
   echo "      git tag -a $TAG -m \"Release $TAG\""
-  echo "      git push origin main --tags"
+  echo "      git push origin master --tags"
   echo ""
   echo "==> Dry run complete. No changes made."
   exit 0
@@ -107,7 +107,7 @@ Automated release from scripts/release/tag-release.sh
 Branch: main
 Commit: $(git rev-parse HEAD)"
 
-git push origin main
+git push origin master
 git push origin "$TAG"
 
 echo ""
