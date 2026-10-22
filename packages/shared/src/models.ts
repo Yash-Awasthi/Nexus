@@ -2,7 +2,7 @@
 /**
  * @nexus/shared — MODEL_REGISTRY
  *
- * Authoritative list of LLM model identifiers available across NEXUS.
+ * Authoritative list of LLM model identifiers available across Nexus.
  * Every model string here has been verified against the provider's pricing page.
  *
  * Sources (verified 2026-06-11):

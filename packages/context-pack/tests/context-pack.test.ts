@@ -266,9 +266,9 @@ describe("assembleContextPack — memories", () => {
 describe("assembleContextPack — extraContext", () => {
   it("appends extra context as a section", async () => {
     const pack = await assembleContextPack(nullFetchers, {
-      extraContext: "Current project: NEXUS platform v2",
+      extraContext: "Current project: Nexus platform v2",
     });
-    expect(pack.systemPrompt).toContain("NEXUS platform v2");
+    expect(pack.systemPrompt).toContain("Nexus platform v2");
     const extraSection = pack.sections.find((s) => s.name === "Additional Context");
     expect(extraSection).toBeDefined();
   });

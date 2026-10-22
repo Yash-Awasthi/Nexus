@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * k6 load test for NEXUS API
+ * k6 load test for Nexus API
  *
  * Usage:
  *   k6 run infra/k6/load-test.js \

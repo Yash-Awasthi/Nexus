@@ -306,7 +306,7 @@ services:
       REDIS_URL: redis://redis:6379
       NEXUS_API_KEY: ${NEXUS_API_KEY}
       LOG_LEVEL: info
-      # fin-scrape bridge (POST /scan, /push): pushes signals to the API's ingest endpoint.
+      # FinScrape bridge (POST /scan, /push): pushes signals to the API's ingest endpoint.
       NEXUS_API_URL: http://api:3001
       NEXUS_API_SECRET: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
       # Inbound key for /ingest and /scrape; without it the service runs open in development only.

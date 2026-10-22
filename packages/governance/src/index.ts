@@ -5,7 +5,7 @@
  * Runtime governance engine — ported from Ghoststack (Yash-Awasthi/Ghoststack).
  *
  * Provides constraint evaluation, policy enforcement, and guardrail checking
- * for the NEXUS task execution pipeline.
+ * for the Nexus task execution pipeline.
  *
  * Architecture (from ADR-0003, Ghoststack kernel):
  *   Constraints — hard rules that block execution (cost, scope, timeout)

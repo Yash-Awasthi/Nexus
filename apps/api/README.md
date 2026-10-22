@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# apps/api — NEXUS API Server
+# apps/api — Nexus API Server
 
-Fastify HTTP/SSE gateway. The central entry point for all external and internal communication with NEXUS.
+Fastify HTTP/SSE gateway. The central entry point for all external and internal communication with Nexus.
 
 ## Routes
 

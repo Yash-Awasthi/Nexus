@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Roadmap
+# Nexus — Roadmap
 
 Open work only. What ships is described by the code and `docs/`; git history is the record. When
 an item is done, its line goes.

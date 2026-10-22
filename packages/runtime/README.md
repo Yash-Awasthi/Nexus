@@ -2,7 +2,7 @@
 
 # @nexus/runtime
 
-Execution kernel for NEXUS (evolved from GhostStack).
+Execution kernel for Nexus (evolved from GhostStack).
 
 Provides the low-level building blocks that every service depends on: queue backends, circuit breaker, crash recovery, event bus, OTel distributed tracing, and the `createNexusRuntime` factory that wires them together.
 
@@ -103,7 +103,7 @@ await bus.publish("nexus.signals.created", { signalId: "..." });
 
 ### NexusOtelTracer
 
-W3C traceparent propagation. Wraps `@opentelemetry/api` with NEXUS-specific helpers.
+W3C traceparent propagation. Wraps `@opentelemetry/api` with Nexus-specific helpers.
 
 ```ts
 import { NexusOtelTracer, encodeTraceparent } from "@nexus/runtime";

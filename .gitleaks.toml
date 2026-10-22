@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# gitleaks configuration for NEXUS
+# gitleaks configuration for Nexus
 # Run: gitleaks detect --source . --config .gitleaks.toml
 
 [extend]
@@ -34,13 +34,13 @@ paths = [
 # Custom rules on top of defaults
 [[rules]]
 id = "nexus-api-key"
-description = "NEXUS API Key"
+description = "Nexus API Key"
 regex = '''NEXUS_API_KEY\s*=\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]'''
 tags = ["secret", "nexus"]
 
 [[rules]]
 id = "nexus-audit-key"
-description = "NEXUS Audit HMAC Key"
+description = "Nexus Audit HMAC Key"
 regex = '''NEXUS_AUDIT_KEY\s*=\s*['\"]([a-zA-Z0-9_\-]{16,})['\"]'''
 tags = ["secret", "nexus"]
 

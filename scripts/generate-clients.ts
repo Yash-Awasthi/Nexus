@@ -54,7 +54,7 @@ if (!existsSync(asyncapiSpec)) {
 const scriptArgs = process.argv.slice(2);
 const scriptPath = resolve(__dirname, "codegen/generate-types.sh");
 
-console.log("[generate-clients] Starting NEXUS codegen pipeline…");
+console.log("[generate-clients] Starting Nexus codegen pipeline…");
 console.log(`[generate-clients] OpenAPI spec : ${openapiSpec}`);
 console.log(`[generate-clients] AsyncAPI spec: ${asyncapiSpec}`);
 console.log("");

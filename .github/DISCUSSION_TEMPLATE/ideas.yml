@@ -9,6 +9,6 @@ body:
   - type: textarea
     id: motivation
     attributes:
-      label: Why would this benefit NEXUS?
+      label: Why would this benefit Nexus?
     validations:
       required: true

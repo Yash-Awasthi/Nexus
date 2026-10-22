@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# NEXUS deployment on Fly.io
+# Nexus deployment on Fly.io
 # Prerequisites: flyctl installed + authenticated; Fly.io account
 
 terraform {

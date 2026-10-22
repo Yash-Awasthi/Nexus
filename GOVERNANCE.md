@@ -1,10 +1,10 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS Governance
+# Nexus Governance
 
 ## Model
 
-NEXUS currently operates under a **BDFL** (Benevolent Dictator For Life) model with a defined path to lazy consensus as the contributor base grows.
+Nexus currently operates under a **BDFL** (Benevolent Dictator For Life) model with a defined path to lazy consensus as the contributor base grows.
 
 **BDFL:** Yash Awasthi (@Yash-Awasthi)
 
@@ -22,7 +22,7 @@ The BDFL has final say on all architectural decisions, ADRs, and release timing.
 
 ## Path to lazy consensus
 
-Once NEXUS has ≥ 3 regular contributors (≥ 5 merged PRs each), the project will move to **lazy consensus**: any maintainer can merge PRs that pass CI and have been open ≥ 48 hours with no objections, unless marked `needs-bdfl-review`.
+Once Nexus has ≥ 3 regular contributors (≥ 5 merged PRs each), the project will move to **lazy consensus**: any maintainer can merge PRs that pass CI and have been open ≥ 48 hours with no objections, unless marked `needs-bdfl-review`.
 
 ## Roles
 

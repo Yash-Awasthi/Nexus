@@ -2,7 +2,7 @@
 
 # @nexus/shared
 
-Shared types, Zod schemas, model registry, and error classes used across all NEXUS packages.
+Shared types, Zod schemas, model registry, and error classes used across all Nexus packages.
 
 No business logic lives here — only primitives that multiple packages need without creating circular dependencies.
 
@@ -39,7 +39,7 @@ if (result.ok) {
 
 ### `NexusError`
 
-Base error class for all typed errors in NEXUS. Carry a `code` string and optional `cause`.
+Base error class for all typed errors in Nexus. Carry a `code` string and optional `cause`.
 
 ```ts
 throw new NexusError("SIGNAL_NOT_FOUND", `Signal ${id} does not exist`);

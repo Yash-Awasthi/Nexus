@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS Threat Model
+# Nexus Threat Model
 
 **Version:** 2.0
 **Last updated:** 2026-10-14

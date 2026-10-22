@@ -12,13 +12,13 @@ The four absorbed repos use four different persistence strategies:
 - workspace → Neon Postgres (5 thin tables)
 - Judica → Postgres 16 + pgvector (62 Drizzle schemas, 28 migrations)
 - GhostStack → JSONL files
-- fin-scrape → SQLite + Cloudflare Durable Objects
+- FinScrape → SQLite + Cloudflare Durable Objects
 
 Four storage systems means four migration paths, four backup strategies, and four data models that need to stay in sync.
 
 ## Decision
 
-One Postgres 16 + pgvector cluster is the sole persistent state store for all NEXUS services. Judica's 62 Drizzle schemas and 28 migrations are the starting point — they are the most complete and production-grade of the four. GhostStack's file-backed implementations (`FileQueueBackend`, `JsonlEventStore`) are retained as `--backend=file` for offline development only and are not supported in production.
+One Postgres 16 + pgvector cluster is the sole persistent state store for all Nexus services. Judica's 62 Drizzle schemas and 28 migrations are the starting point — they are the most complete and production-grade of the four. GhostStack's file-backed implementations (`FileQueueBackend`, `JsonlEventStore`) are retained as `--backend=file` for offline development only and are not supported in production.
 
 ## Consequences
 

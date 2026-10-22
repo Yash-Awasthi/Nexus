@@ -7,7 +7,7 @@
 
 ## Context
 
-NEXUS makes decisions that affect real systems (deploy, send email, post to Slack, create Linear tickets). These decisions must be auditable and tamper-evident — especially when an approval workflow is involved.
+Nexus makes decisions that affect real systems (deploy, send email, post to Slack, create Linear tickets). These decisions must be auditable and tamper-evident — especially when an approval workflow is involved.
 
 ## Decision
 

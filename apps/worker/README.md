@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# apps/worker — NEXUS Queue Workers
+# apps/worker — Nexus Queue Workers
 
-BullMQ consumer processes for NEXUS. Pulls from Redis queues and drives the signal pipeline and task execution loops.
+BullMQ consumer processes for Nexus. Pulls from Redis queues and drives the signal pipeline and task execution loops.
 
 ## Workers
 

@@ -2,7 +2,7 @@
 
 # @nexus/council
 
-Multi-model deliberation engine for NEXUS (evolved from Judica).
+Multi-model deliberation engine for Nexus (evolved from Judica).
 
 Orchestrates parallel queries to multiple LLM providers, synthesises their responses using configurable voting modes, and enforces guardrail constraints on the output.
 

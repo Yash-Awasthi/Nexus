@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS Service Level Objectives (SLOs)
+# Nexus Service Level Objectives (SLOs)
 
 **Version:** 1.0  
 **Review cadence:** Quarterly  
@@ -164,7 +164,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
   labels:
     severity: critical
   annotations:
-    summary: "NEXUS audit log chain integrity breach — security incident"
+    summary: "Nexus audit log chain integrity breach — security incident"
     runbook: "https://github.com/Yash-Awasthi/Nexus/blob/main/docs/runbook.md#p4--audit-chain-broken-t3-incident"
 ```
 

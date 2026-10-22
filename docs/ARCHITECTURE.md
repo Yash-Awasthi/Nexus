@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Architecture & Repository Layout
+# Nexus — Architecture & Repository Layout
 
 How the apps, packages, and infrastructure fit together. For per-feature detail see
 [FEATURES.md](FEATURES.md); for the design history see the
@@ -10,7 +10,7 @@ How the apps, packages, and infrastructure fit together. For per-feature detail 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              NEXUS monorepo                                 │
+│                              Nexus monorepo                                 │
 │                                                                             │
 │  ┌──────────────┐   ┌───────────────────┐   ┌──────────────────────────┐   │
 │  │  services/   │   │    apps/api        │   │      apps/worker         │   │
@@ -102,7 +102,7 @@ nexus/
 │                               drive, github, gmail, groq, hubspot, jira,
 │                               linear, neon, notion, salesforce, slack, ...
 ├── services/
-│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB, fin-scrape bridge
+│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB, FinScrape bridge
 ├── infra/
 │   ├── docker/         docker-compose.dev/observability
 │   ├── grafana/        Pre-provisioned dashboards

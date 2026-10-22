@@ -15,7 +15,7 @@ See Section 4 of README.md for the authoritative naming table. Key entries:
 
 | Concept        | Canonical name          |
 | -------------- | ----------------------- |
-| Master project | NEXUS                   |
+| Master project | Nexus                   |
 | Runtime kernel | `@nexus/runtime`        |
 | Council engine | `@nexus/council`        |
 | Governance     | `@nexus/governance`     |

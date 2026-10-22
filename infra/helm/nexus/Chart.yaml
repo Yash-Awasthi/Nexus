@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 apiVersion: v2
 name: nexus
-description: NEXUS — autonomous orchestration platform
+description: Nexus — autonomous orchestration platform
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

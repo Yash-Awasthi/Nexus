@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS Operational Runbook
+# Nexus Operational Runbook
 
 **Version:** 1.0  
 **Last updated:** 2026-06-11  

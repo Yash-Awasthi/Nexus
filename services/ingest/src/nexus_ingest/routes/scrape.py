@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """nexus-ingest — /scrape/* routes.
 
-Each route invokes a fin-scrape scraper, converts the output to our wire types,
+Each route invokes a FinScrape scraper, converts the output to our wire types,
 and returns ScrapeResponse or BatchScrapeResponse.
 """
 from __future__ import annotations
@@ -71,7 +71,7 @@ async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: f
     return ScrapeResponse(
         source=source,
         articles=articles_out,
-        # Analysis needs an LLM and an event store; it runs in fin-scrape's worker, not here.
+        # Analysis needs an LLM and an event store; it runs in FinScrape's worker, not here.
         events=[],
         duration_ms=round(duration_ms, 1),
         scraped_at=datetime.now(timezone.utc).isoformat(),

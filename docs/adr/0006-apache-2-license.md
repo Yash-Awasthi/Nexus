@@ -7,7 +7,7 @@
 
 ## Context
 
-All four absorbed repos use MIT. NEXUS needs a license for the combined work.
+All four absorbed repos use MIT. Nexus needs a license for the combined work.
 
 ## Decision
 

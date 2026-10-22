@@ -9,7 +9,7 @@
 | `main` (pre-release) | ✅        |
 | Older tags           | ❌        |
 
-Once NEXUS reaches v1.0.0, a formal N-2 minor version support policy will be adopted.
+Once Nexus reaches v1.0.0, a formal N-2 minor version support policy will be adopted.
 
 ## Reporting a vulnerability
 

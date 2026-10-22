@@ -2,7 +2,7 @@
 
 # @nexus/plugin-sdk
 
-First-class adapter plugin SDK for NEXUS.
+First-class adapter plugin SDK for Nexus.
 
 Provides everything needed to build, test, and register a new data source adapter without touching core. Adapters plug into `services/ingest` and emit typed events into the `ingested_events` pipeline.
 

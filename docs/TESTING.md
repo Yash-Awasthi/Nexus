@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# NEXUS — Testing
+# Nexus — Testing
 
 Install with Node >=22.12 and `pnpm install --frozen-lockfile`, then `pnpm build`.
 On Windows PowerShell, use `pnpm.cmd` if the PowerShell shim does not execute.

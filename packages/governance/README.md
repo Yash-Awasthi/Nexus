@@ -2,7 +2,7 @@
 
 # @nexus/governance
 
-Policy engine for NEXUS: execution constraints, guardrails, approval workflow, and capability policies.
+Policy engine for Nexus: execution constraints, guardrails, approval workflow, and capability policies.
 
 Enforces safety boundaries around every task before it executes. Used by `apps/api` and `apps/worker` as a pre-execution gate.
 

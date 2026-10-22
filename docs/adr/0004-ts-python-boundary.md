@@ -7,7 +7,7 @@
 
 ## Context
 
-NEXUS uses Python (FastAPI) for the ingest service because fin-scrape's scrapers and Scrapling are Python-native and high-quality. All other services are TypeScript. The TS↔Python boundary must be type-safe and testable.
+Nexus uses Python (FastAPI) for the ingest service because FinScrape's scrapers and Scrapling are Python-native and high-quality. All other services are TypeScript. The TS↔Python boundary must be type-safe and testable.
 
 ## Decision
 
