@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "electron": "45.0.0-beta.1",
+    "electron": "45.0.0-beta.6",
     "rolldown": "^1.2.13",
     "vitest": "catalog:"
   }
