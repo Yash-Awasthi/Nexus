@@ -9,6 +9,9 @@
   "scripts": {
     "test": "vitest run"
   },
+  "dependencies": {
+    "@nexus/llm": "workspace:*"
+  },
   "devDependencies": {
     "vitest": "catalog:"
   },

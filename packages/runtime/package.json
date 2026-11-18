@@ -10,16 +10,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@nexus/governance": "workspace:*",
-    "@nexus/memory": "workspace:*",
-    "@nexus/telemetry": "workspace:*",
-    "bullmq": "catalog:",
-    "js-yaml": "^4.3.1"
+    "@nexus/agent-core": "workspace:*"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

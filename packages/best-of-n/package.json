@@ -13,6 +13,9 @@
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@nexus/council": "workspace:*"
+  },
   "devDependencies": {
     "vitest": "catalog:"
   },

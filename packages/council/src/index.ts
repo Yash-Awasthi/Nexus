@@ -19,3 +19,12 @@ export * from "./critique.ts";
 export * from "./transcript.ts";
 export * from "./run-transcript.ts";
 export * from "./mcp-server.ts";
+
+export * as debateEngine from "./debate-engine/index.ts";
+export * from "./debate-engine/index.ts";
+
+export * as bestOfN from "./best-of-n/index.ts";
+export * from "./best-of-n/index.ts";
+
+export * as gauntlet from "./gauntlet/index.ts";
+export * from "./gauntlet/index.ts";

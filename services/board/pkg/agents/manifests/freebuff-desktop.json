@@ -1,0 +1,9 @@
+{
+  "id": "freebuff-desktop",
+  "name": "Freebuff Desktop",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\@codebufffreebuff-desktop\\Freebuff.exe"
+  },
+  "docs": "https://freebuff.com"
+}

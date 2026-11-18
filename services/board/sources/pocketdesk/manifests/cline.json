@@ -1,0 +1,15 @@
+{
+  "id": "cline",
+  "name": "Cline",
+  "adapter": "terminal",
+  "bin": "cline",
+  "install": { "npm": "cline" },
+  "auth": { "login": ["auth"] },
+  "chat": {
+    "args": ["--json", "--auto-approve", "false"],
+    "modelArg": ["-m"],
+    "format": "cline-json",
+    "promptArg": true,
+    "inlineHistory": true
+  }
+}

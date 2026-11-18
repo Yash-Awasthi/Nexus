@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "vitest": "catalog:"
@@ -17,5 +17,8 @@
     "exports": {
       ".": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "@nexus/agent-core": "workspace:*"
   }
 }

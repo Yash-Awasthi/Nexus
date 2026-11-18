@@ -17,9 +17,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@nexus/mcp-client": "workspace:*",
-    "@nexus/reranker": "workspace:*",
-    "@nexus/retrieval": "workspace:*"
+    "@nexus/search": "workspace:*"
   },
   "publishConfig": {
     "main": "./dist/index.js",

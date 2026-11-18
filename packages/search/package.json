@@ -1,0 +1,59 @@
+{
+  "name": "@nexus/search",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Unified search subsystem: retrieval, hybrid search, GraphRAG query, knowledge graph, and reranking",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./retrieval": "./src/retrieval/index.ts",
+    "./hybrid-search": "./src/hybrid-search/index.ts",
+    "./graphrag-query": "./src/graphrag-query/index.ts",
+    "./knowledge-graph": "./src/knowledge-graph/index.ts",
+    "./reranker": "./src/reranker/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@nexus/contracts": "workspace:*",
+    "@nexus/mcp-client": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      },
+      "./retrieval": {
+        "import": "./dist/retrieval/index.js",
+        "types": "./dist/retrieval/index.d.ts"
+      },
+      "./hybrid-search": {
+        "import": "./dist/hybrid-search/index.js",
+        "types": "./dist/hybrid-search/index.d.ts"
+      },
+      "./graphrag-query": {
+        "import": "./dist/graphrag-query/index.js",
+        "types": "./dist/graphrag-query/index.d.ts"
+      },
+      "./knowledge-graph": {
+        "import": "./dist/knowledge-graph/index.js",
+        "types": "./dist/knowledge-graph/index.d.ts"
+      },
+      "./reranker": {
+        "import": "./dist/reranker/index.js",
+        "types": "./dist/reranker/index.d.ts"
+      }
+    }
+  }
+}

@@ -29,6 +29,9 @@ apps/api/data/stores/
 # Runtime data the API writes when NEXUS_DATA_DIR is unset (never source)
 apps/api/data/
 
+# Embedded PGlite database (DATABASE_URL=pglite://.nexus/db)
+.nexus/
+
 # Local runtime state under data/ (auth tokens, run ids — dev state, not source)
 data/.*
 data/bridge/

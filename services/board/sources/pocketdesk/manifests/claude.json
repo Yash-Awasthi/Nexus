@@ -1,0 +1,20 @@
+{
+  "id": "claude",
+  "name": "Claude Code",
+  "adapter": "terminal",
+  "bin": "claude",
+  "install": { "npm": "@anthropic-ai/claude-code" },
+  "auth": { "status": ["auth", "status"], "login": ["auth", "login"], "logout": ["auth", "logout"] },
+  "chat": {
+    "args": ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages"],
+    "modelArg": ["--model"],
+    "format": "claude-stream-json",
+    "resumeArgs": ["--continue", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages"],
+    "resumeIdArgs": ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--resume", "{id}"],
+    "models": {
+      "opus": { "args": ["--model", "opus"] },
+      "sonnet": { "args": ["--model", "sonnet"] },
+      "haiku": { "args": ["--model", "haiku"] }
+    }
+  }
+}

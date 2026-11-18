@@ -1,0 +1,479 @@
+asyncapi: "3.0.0"
+
+info:
+  title: Nexus Event Bus
+  version: "1.0.0"
+  description: |
+    AsyncAPI specification for all internal events published on the Nexus
+    GhostStack EventBus (ADR-0007). Consumers subscribe to typed channels;
+    the runtime guarantees at-least-once delivery via BullMQ on Redis 7.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+defaultContentType: application/json
+
+channels:
+  nexus.events.ingested:
+    address: nexus.events.ingested
+    description: Fired when a raw event is accepted by the ingest layer
+    messages:
+      EventIngested:
+        $ref: "#/components/messages/EventIngested"
+
+  nexus.signals.created:
+    address: nexus.signals.created
+    description: Fired when a processed signal is derived from one or more events
+    messages:
+      SignalCreated:
+        $ref: "#/components/messages/SignalCreated"
+
+  nexus.council.started:
+    address: nexus.council.started
+    description: Fired when a council deliberation session begins
+    messages:
+      CouncilStarted:
+        $ref: "#/components/messages/CouncilStarted"
+
+  nexus.council.verdict:
+    address: nexus.council.verdict
+    description: Fired when the council reaches a verdict
+    messages:
+      VerdictReached:
+        $ref: "#/components/messages/VerdictReached"
+
+  nexus.tasks.queued:
+    address: nexus.tasks.queued
+    description: Fired when a runtime task is submitted to the queue
+    messages:
+      TaskQueued:
+        $ref: "#/components/messages/TaskQueued"
+
+  nexus.tasks.started:
+    address: nexus.tasks.started
+    description: Fired when a worker picks up a task
+    messages:
+      TaskStarted:
+        $ref: "#/components/messages/TaskStarted"
+
+  nexus.tasks.completed:
+    address: nexus.tasks.completed
+    description: Fired when a task completes successfully
+    messages:
+      TaskCompleted:
+        $ref: "#/components/messages/TaskCompleted"
+
+  nexus.tasks.failed:
+    address: nexus.tasks.failed
+    description: Fired when a task fails (after all retries exhausted)
+    messages:
+      TaskFailed:
+        $ref: "#/components/messages/TaskFailed"
+
+  nexus.approvals.requested:
+    address: nexus.approvals.requested
+    description: Fired when a governance approval request is created
+    messages:
+      ApprovalRequested:
+        $ref: "#/components/messages/ApprovalRequested"
+
+  nexus.approvals.resolved:
+    address: nexus.approvals.resolved
+    description: Fired when an approval is approved or rejected
+    messages:
+      ApprovalResolved:
+        $ref: "#/components/messages/ApprovalResolved"
+
+  nexus.audit.entry:
+    address: nexus.audit.entry
+    description: Fired for every HMAC-chained audit log write
+    messages:
+      AuditEntryWritten:
+        $ref: "#/components/messages/AuditEntryWritten"
+
+  nexus.budget.exceeded:
+    address: nexus.budget.exceeded
+    description: Fired when an agent or council session exceeds its USD budget cap
+    messages:
+      BudgetExceeded:
+        $ref: "#/components/messages/BudgetExceeded"
+
+operations:
+  publishEventIngested:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.events.ingested"
+    description: Ingest layer publishes this after persisting the event
+
+  consumeEventIngested:
+    action: receive
+    channel:
+      $ref: "#/channels/nexus.events.ingested"
+    description: Pipeline-signal worker consumes this to derive signals
+
+  publishSignalCreated:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.signals.created"
+
+  consumeSignalCreated:
+    action: receive
+    channel:
+      $ref: "#/channels/nexus.signals.created"
+    description: Council dispatcher consumes signals and starts deliberations
+
+  publishVerdictReached:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.council.verdict"
+
+  consumeVerdictReached:
+    action: receive
+    channel:
+      $ref: "#/channels/nexus.council.verdict"
+    description: Runtime task dispatcher consumes verdicts to enqueue approved actions
+
+  publishTaskQueued:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.tasks.queued"
+
+  publishTaskCompleted:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.tasks.completed"
+
+  publishTaskFailed:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.tasks.failed"
+
+  publishApprovalRequested:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.approvals.requested"
+
+  publishApprovalResolved:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.approvals.resolved"
+
+  publishAuditEntry:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.audit.entry"
+
+  publishBudgetExceeded:
+    action: send
+    channel:
+      $ref: "#/channels/nexus.budget.exceeded"
+
+components:
+  messages:
+    EventIngested:
+      name: EventIngested
+      title: Event Ingested
+      payload:
+        $ref: "#/components/schemas/EventIngestedPayload"
+
+    SignalCreated:
+      name: SignalCreated
+      title: Signal Created
+      payload:
+        $ref: "#/components/schemas/SignalCreatedPayload"
+
+    CouncilStarted:
+      name: CouncilStarted
+      title: Council Deliberation Started
+      payload:
+        $ref: "#/components/schemas/CouncilStartedPayload"
+
+    VerdictReached:
+      name: VerdictReached
+      title: Council Verdict Reached
+      payload:
+        $ref: "#/components/schemas/VerdictReachedPayload"
+
+    TaskQueued:
+      name: TaskQueued
+      title: Runtime Task Queued
+      payload:
+        $ref: "#/components/schemas/TaskQueuedPayload"
+
+    TaskStarted:
+      name: TaskStarted
+      title: Runtime Task Started
+      payload:
+        $ref: "#/components/schemas/TaskStartedPayload"
+
+    TaskCompleted:
+      name: TaskCompleted
+      title: Runtime Task Completed
+      payload:
+        $ref: "#/components/schemas/TaskCompletedPayload"
+
+    TaskFailed:
+      name: TaskFailed
+      title: Runtime Task Failed
+      payload:
+        $ref: "#/components/schemas/TaskFailedPayload"
+
+    ApprovalRequested:
+      name: ApprovalRequested
+      title: Governance Approval Requested
+      payload:
+        $ref: "#/components/schemas/ApprovalRequestedPayload"
+
+    ApprovalResolved:
+      name: ApprovalResolved
+      title: Governance Approval Resolved
+      payload:
+        $ref: "#/components/schemas/ApprovalResolvedPayload"
+
+    AuditEntryWritten:
+      name: AuditEntryWritten
+      title: Audit Log Entry Written
+      payload:
+        $ref: "#/components/schemas/AuditEntryWrittenPayload"
+
+    BudgetExceeded:
+      name: BudgetExceeded
+      title: Budget Cap Exceeded
+      payload:
+        $ref: "#/components/schemas/BudgetExceededPayload"
+
+  schemas:
+    # Shared envelope
+    BaseEvent:
+      type: object
+      required: [event_id, occurred_at, version]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Schema version (semver)
+          example: "1.0.0"
+        correlation_id:
+          type: string
+          format: uuid
+          description: Optional trace ID linking related events
+
+    EventIngestedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [ingested_event_id, source, event_type]
+          properties:
+            ingested_event_id:
+              type: string
+              format: uuid
+            source:
+              type: string
+            event_type:
+              type: string
+            idempotency_key:
+              type: string
+
+    SignalCreatedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [signal_id, signal_type, priority]
+          properties:
+            signal_id:
+              type: string
+              format: uuid
+            signal_type:
+              type: string
+            priority:
+              type: string
+              enum: [low, medium, high, critical]
+            source_event_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+
+    CouncilStartedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [verdict_id, signal_id, archetypes]
+          properties:
+            verdict_id:
+              type: string
+              format: uuid
+            signal_id:
+              type: string
+              format: uuid
+            archetypes:
+              type: array
+              items:
+                type: string
+            budget_usd:
+              type: number
+
+    VerdictReachedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [verdict_id, signal_id, decision, confidence, cost_usd]
+          properties:
+            verdict_id:
+              type: string
+              format: uuid
+            signal_id:
+              type: string
+              format: uuid
+            decision:
+              type: string
+              enum: [approve, reject, defer, escalate]
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+            cost_usd:
+              type: number
+            dissents:
+              type: array
+              items:
+                type: string
+
+    TaskQueuedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [task_id, task_type, priority]
+          properties:
+            task_id:
+              type: string
+              format: uuid
+            task_type:
+              type: string
+            priority:
+              type: string
+              enum: [low, medium, high]
+            verdict_id:
+              type: string
+              format: uuid
+              nullable: true
+
+    TaskStartedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [task_id, worker_id]
+          properties:
+            task_id:
+              type: string
+              format: uuid
+            worker_id:
+              type: string
+
+    TaskCompletedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [task_id, duration_ms]
+          properties:
+            task_id:
+              type: string
+              format: uuid
+            duration_ms:
+              type: integer
+
+    TaskFailedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [task_id, error, retries_exhausted]
+          properties:
+            task_id:
+              type: string
+              format: uuid
+            error:
+              type: string
+            retries_exhausted:
+              type: boolean
+
+    ApprovalRequestedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [approval_id, entity_type, entity_id, action, requestor]
+          properties:
+            approval_id:
+              type: string
+              format: uuid
+            entity_type:
+              type: string
+            entity_id:
+              type: string
+              format: uuid
+            action:
+              type: string
+            requestor:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+
+    ApprovalResolvedPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [approval_id, resolution, resolved_by]
+          properties:
+            approval_id:
+              type: string
+              format: uuid
+            resolution:
+              type: string
+              enum: [approved, rejected]
+            resolved_by:
+              type: string
+
+    AuditEntryWrittenPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [audit_id, sequence, entity_type, entity_id, action, actor, chain_hash]
+          properties:
+            audit_id:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+            entity_type:
+              type: string
+            entity_id:
+              type: string
+              format: uuid
+            action:
+              type: string
+            actor:
+              type: string
+            chain_hash:
+              type: string
+
+    BudgetExceededPayload:
+      allOf:
+        - $ref: "#/components/schemas/BaseEvent"
+        - type: object
+          required: [context_type, context_id, budget_usd, actual_usd]
+          properties:
+            context_type:
+              type: string
+              enum: [council_session, agent_run, monthly_total]
+            context_id:
+              type: string
+              format: uuid
+            budget_usd:
+              type: number
+            actual_usd:
+              type: number

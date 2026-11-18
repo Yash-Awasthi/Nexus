@@ -4,9 +4,17 @@
   "description": "Fluent workflow chain API — typed multi-step workflows with suspend/resume",
   "type": "module",
   "main": "./src/index.ts",
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run --passWithNoTests"
+  },
   "publishConfig": {
     "main": "dist/index.js",
     "types": "dist/index.d.ts"
+  },
+  "dependencies": {
+    "@nexus/agent-core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

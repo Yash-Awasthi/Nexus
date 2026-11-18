@@ -1,0 +1,15 @@
+{
+  "id": "copilot",
+  "name": "GitHub Copilot CLI",
+  "adapter": "terminal",
+  "bin": "copilot",
+  "install": { "npm": "@github/copilot" },
+  "auth": { "login": ["login", "--device-code"] },
+  "chat": {
+    "args": ["--output-format", "json"],
+    "modelArg": ["--model"],
+    "format": "copilot-json",
+    "resumeIdArgs": ["--output-format", "json", "--resume={id}"],
+    "resumeArgs": ["--output-format", "json", "--continue"]
+  }
+}

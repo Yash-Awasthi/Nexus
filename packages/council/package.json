@@ -7,7 +7,10 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./debate-engine": "./src/debate-engine/index.ts",
+    "./best-of-n": "./src/best-of-n/index.ts",
+    "./gauntlet": "./src/gauntlet/index.ts"
   },
   "scripts": {
     "clean": "rm -rf dist coverage",
@@ -18,7 +21,6 @@
   },
   "dependencies": {
     "@nexus/contracts": "workspace:*",
-    "@nexus/debate-engine": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/shared": "workspace:*",
     "groq-sdk": "^1.6.0"
@@ -30,6 +32,18 @@
       ".": {
         "import": "./dist/index.js",
         "types": "./dist/index.d.ts"
+      },
+      "./debate-engine": {
+        "import": "./dist/debate-engine/index.js",
+        "types": "./dist/debate-engine/index.d.ts"
+      },
+      "./best-of-n": {
+        "import": "./dist/best-of-n/index.js",
+        "types": "./dist/best-of-n/index.d.ts"
+      },
+      "./gauntlet": {
+        "import": "./dist/gauntlet/index.js",
+        "types": "./dist/gauntlet/index.d.ts"
       }
     }
   }

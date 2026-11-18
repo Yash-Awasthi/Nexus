@@ -26,5 +26,8 @@
         "types": "./dist/index.d.ts"
       }
     }
+  },
+  "dependencies": {
+    "@nexus/agent-core": "workspace:*"
   }
 }

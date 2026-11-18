@@ -1,0 +1,10 @@
+{
+  "id": "cursor",
+  "name": "Cursor",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\cursor\\Cursor.exe",
+    "darwin": "/Applications/Cursor.app"
+  },
+  "docs": "https://cursor.com"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "shell",
+  "name": "PowerShell",
+  "adapter": "terminal",
+  "bin": "powershell.exe",
+  "check": "powershell.exe -NoProfile -Command $PSVersionTable.PSVersion.ToString()",
+  "install": {},
+  "platforms": {
+    "unix": {
+      "name": "Shell",
+      "bin": "$SHELL",
+      "check": "echo ${SHELL:-/bin/sh}"
+    }
+  }
+}

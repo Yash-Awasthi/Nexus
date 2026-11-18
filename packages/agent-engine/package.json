@@ -8,11 +8,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@nexus/agent-runtime": "workspace:*",
-    "@nexus/shared": "workspace:*"
+    "@nexus/agent-core": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"

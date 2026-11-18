@@ -7,6 +7,11 @@
  */
 export * from "./scrape.ts";
 export * from "./council.ts";
+export * from "./shared/models.ts";
+export * from "./shared/errors.ts";
+export * from "./shared/stm.ts";
+export * from "./shared/math.ts";
+export * from "./shared/untrusted.ts";
 
 // Generated from the live route table (openapi.yaml). Regenerate with
 // `pnpm types:generate`; CI fails when the committed copy drifts.

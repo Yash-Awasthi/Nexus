@@ -1,0 +1,9 @@
+{
+  "id": "opencode-desktop",
+  "name": "OpenCode Desktop",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\@opencode-aidesktop\\OpenCode.exe"
+  },
+  "docs": "https://opencode.ai"
+}

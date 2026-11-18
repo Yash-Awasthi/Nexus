@@ -1,0 +1,20 @@
+{
+  "id": "codex",
+  "name": "Codex CLI",
+  "adapter": "terminal",
+  "bin": "codex",
+  "install": { "npm": "@openai/codex" },
+  "auth": { "status": ["login", "status"], "login": ["login", "--device-auth"], "logout": ["logout"] },
+  "chat": {
+    "args": ["exec", "--json", "--skip-git-repo-check", "-"],
+    "modelArg": ["--model"],
+    "format": "codex-json",
+    "resumeArgs": ["exec", "--json", "--skip-git-repo-check", "resume", "--last", "-"],
+    "models": {
+      "gpt-5-codex": { "args": ["--model", "gpt-5-codex"] },
+      "gpt-5.1-codex": { "args": ["--model", "gpt-5.1-codex"] },
+      "gpt-5.2-codex": { "args": ["--model", "gpt-5.2-codex"] }
+    },
+    "resumeIdArgs": ["exec", "--json", "--skip-git-repo-check", "resume", "{id}", "-"]
+  }
+}

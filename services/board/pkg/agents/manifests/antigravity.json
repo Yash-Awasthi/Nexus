@@ -1,0 +1,10 @@
+{
+  "id": "antigravity",
+  "name": "Antigravity",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\antigravity\\Antigravity.exe",
+    "darwin": "/Applications/Antigravity.app"
+  },
+  "docs": "https://antigravity.google"
+}

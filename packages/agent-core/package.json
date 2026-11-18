@@ -1,0 +1,82 @@
+{
+  "name": "@nexus/agent-core",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Unified agent core: agents, engine, runtime, execution kernel, workflows, STM, context pruning, and tier gates",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agents": "./src/agents/index.ts",
+    "./engine": "./src/engine/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./kernel": "./src/kernel/index.ts",
+    "./workflow": "./src/workflow/index.ts",
+    "./stm": "./src/stm/index.ts",
+    "./pruner": "./src/pruner/index.ts",
+    "./tier-gate": "./src/tier-gate/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@nexus/contracts": "workspace:*",
+    "@nexus/council": "workspace:*",
+    "@nexus/llm": "workspace:*",
+    "@nexus/governance": "workspace:*",
+    "@nexus/memory": "workspace:*",
+    "@nexus/telemetry": "workspace:*",
+    "bullmq": "catalog:",
+    "js-yaml": "^4.3.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "fast-check": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      },
+      "./agents": {
+        "import": "./dist/agents/index.js",
+        "types": "./dist/agents/index.d.ts"
+      },
+      "./engine": {
+        "import": "./dist/engine/index.js",
+        "types": "./dist/engine/index.d.ts"
+      },
+      "./runtime": {
+        "import": "./dist/runtime/index.js",
+        "types": "./dist/runtime/index.d.ts"
+      },
+      "./kernel": {
+        "import": "./dist/kernel/index.js",
+        "types": "./dist/kernel/index.d.ts"
+      },
+      "./workflow": {
+        "import": "./dist/workflow/index.js",
+        "types": "./dist/workflow/index.d.ts"
+      },
+      "./stm": {
+        "import": "./dist/stm/index.js",
+        "types": "./dist/stm/index.d.ts"
+      },
+      "./pruner": {
+        "import": "./dist/pruner/index.js",
+        "types": "./dist/pruner/index.d.ts"
+      },
+      "./tier-gate": {
+        "import": "./dist/tier-gate/index.js",
+        "types": "./dist/tier-gate/index.d.ts"
+      }
+    }
+  }
+}

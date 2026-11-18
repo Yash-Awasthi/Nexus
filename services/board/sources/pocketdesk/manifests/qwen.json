@@ -1,0 +1,11 @@
+{
+  "id": "qwen",
+  "name": "Qwen Code",
+  "adapter": "terminal",
+  "bin": "qwen",
+  "install": { "npm": "@qwen-code/qwen-code" },
+  "chat": {
+    "args": [],
+    "format": "text"
+  }
+}

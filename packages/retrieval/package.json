@@ -17,7 +17,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@nexus/shared": "workspace:*"
+    "@nexus/search": "workspace:*"
   },
   "publishConfig": {
     "main": "./dist/index.js",

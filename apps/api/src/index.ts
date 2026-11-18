@@ -76,6 +76,10 @@ import { sharedKvBackend } from "./lib/shared-kv.ts";
   }
 })();
 
+// Offline-first: with no DATABASE_URL, use the embedded PGlite database so the
+// API boots with no Docker or external Postgres.
+process.env.DATABASE_URL ||= "pglite://.nexus/db";
+
 // PORT=0 (or empty/garbage) must never reach listen() — port 0 makes the OS
 // bind an ephemeral port and the whole stack comes up somewhere unreachable.
 const parsedPort = Number.parseInt(process.env.PORT ?? "", 10);

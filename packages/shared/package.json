@@ -14,6 +14,9 @@
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist coverage"
   },
+  "dependencies": {
+    "@nexus/contracts": "workspace:*"
+  },
   "devDependencies": {
     "vitest": "catalog:",
     "@vitest/coverage-v8": "catalog:"

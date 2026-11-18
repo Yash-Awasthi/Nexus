@@ -8,13 +8,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@nexus/mcp-client": "workspace:*"
+    "@nexus/search": "workspace:*"
   },
   "publishConfig": {
     "main": "./dist/index.js",

@@ -64,6 +64,7 @@ import { apiBridgeRoutes } from "./routes/api-bridge.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import { authUsersRoutes } from "./routes/auth-users.ts";
 import { billingRoutes } from "./routes/billing.ts";
+import { boardRoutes } from "./routes/board.ts";
 import { botsRoutes } from "./routes/bots.ts";
 import { briefRoutes } from "./routes/brief.ts";
 import { channelRoutes } from "./routes/channels.ts";
@@ -512,6 +513,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(adminRoutes);
       await api.register(featureFlagsRoutes);
       await api.register(channelRoutes);
+      await api.register(boardRoutes);
       await api.register(connectorsRoutes);
 
       // K — new backbone routes

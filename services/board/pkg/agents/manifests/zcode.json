@@ -1,0 +1,7 @@
+{
+  "id": "zcode",
+  "name": "ZCode (Z.ai)",
+  "adapter": "terminal",
+  "bin": "zcode",
+  "install": { "npm": "zcode" }
+}

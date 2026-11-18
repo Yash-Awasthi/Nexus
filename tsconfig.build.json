@@ -8,6 +8,9 @@
       "path": "packages/admin-gateway"
     },
     {
+      "path": "packages/agent-core"
+    },
+    {
       "path": "packages/agent-engine"
     },
     {
@@ -86,10 +89,10 @@
       "path": "packages/finetune-pipeline"
     },
     {
-      "path": "packages/gateway-log"
+      "path": "packages/gateway"
     },
     {
-      "path": "packages/gateway"
+      "path": "packages/gateway-log"
     },
     {
       "path": "packages/gauntlet"
@@ -123,6 +126,9 @@
     },
     {
       "path": "packages/lens"
+    },
+    {
+      "path": "packages/llm"
     },
     {
       "path": "packages/llm-accounts"
@@ -212,6 +218,9 @@
       "path": "packages/sdk"
     },
     {
+      "path": "packages/search"
+    },
+    {
       "path": "packages/search-orchestrator"
     },
     {
@@ -254,10 +263,10 @@
       "path": "packages/trigger-engine"
     },
     {
-      "path": "packages/wiki-updater"
+      "path": "packages/wiki"
     },
     {
-      "path": "packages/wiki"
+      "path": "packages/wiki-updater"
     },
     {
       "path": "packages/workflow-chain"

@@ -12,9 +12,6 @@
       "path": "../contracts"
     },
     {
-      "path": "../debate-engine"
-    },
-    {
       "path": "../mcp-client"
     },
     {

@@ -1,0 +1,10 @@
+{
+  "id": "windsurf",
+  "name": "Windsurf",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\Windsurf\\Windsurf.exe",
+    "darwin": "/Applications/Windsurf.app"
+  },
+  "docs": "https://windsurf.com"
+}

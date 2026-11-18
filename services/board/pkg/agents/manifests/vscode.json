@@ -1,0 +1,10 @@
+{
+  "id": "vscode",
+  "name": "Visual Studio Code",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe",
+    "darwin": "/Applications/Visual Studio Code.app"
+  },
+  "docs": "https://code.visualstudio.com"
+}

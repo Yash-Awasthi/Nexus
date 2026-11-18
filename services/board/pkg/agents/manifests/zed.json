@@ -1,0 +1,10 @@
+{
+  "id": "zed",
+  "name": "Zed",
+  "adapter": "gui",
+  "paths": {
+    "win32": "%LOCALAPPDATA%\\Programs\\Zed\\Zed.exe",
+    "darwin": "/Applications/Zed.app"
+  },
+  "docs": "https://zed.dev"
+}

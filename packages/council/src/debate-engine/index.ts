@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * @nexus/debate-engine — converging multi-agent debate.
+ *
+ * Agents answer, read each other's positions and revise until they agree or stop moving.
+ */
+
+export { majorityFinalAnswer, runMultiAgentDebate } from "./multiagent-debate.ts";
+export { answersAgree, lexicalSimilarity, positionalStability } from "./multiagent-debate.ts";
+export type {
+  AgentMessage,
+  AgentTranscript,
+  MultiAgentDebateOptions,
+  MultiAgentDebateResult,
+} from "./multiagent-debate.ts";

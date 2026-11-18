@@ -26,11 +26,11 @@ function isNeonUrl(url: string): boolean {
   return url.includes(".neon.tech") || url.includes(".neon.host");
 }
 
+/** Offline default so a fresh checkout needs no Docker or external Postgres. */
+export const DEFAULT_DATABASE_URL = "pglite://.nexus/db";
+
 function createClient(): NeonHttpDatabase {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is required — set it in .env or Doppler");
-  }
+  const url = process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
 
   if (isEmbeddedUrl(url)) {
     // Same instance the API's pool factory uses: PGlite is single-writer, so

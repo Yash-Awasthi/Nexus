@@ -1,0 +1,7 @@
+{
+  "id": "aider",
+  "name": "Aider",
+  "adapter": "terminal",
+  "bin": "aider",
+  "install": { "pip": "aider-chat" }
+}

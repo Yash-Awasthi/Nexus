@@ -1,0 +1,170 @@
+Mission: Build, Polish, and Complete the Product — Production-Ready V1
+
+Read all relevant project documentation, instructions, specifications, requirements, existing code, and project files. Then take ownership of bringing the product to the highest possible level of completion.
+
+Your objective is to deliver a fully functional, polished, cohesive, and production-ready V1 — not merely a prototype, partial implementation, or list of recommendations.
+
+You have broad authorization to make decisions, implement improvements, fix issues, expand functionality, and improve the overall product wherever doing so contributes to a better final result.
+
+1. Understand the Project First
+Thoroughly review the available documentation and project structure.
+Understand the product's purpose, architecture, intended users, workflows, and existing functionality.
+Inspect the existing implementation to identify incomplete, broken, inconsistent, or underdeveloped areas.
+Identify requirements that are documented, implied, or necessary for a complete product.
+Review existing dependencies, integrations, configurations, and development conventions.
+If useful, leverage relevant skills and resources available in C:\GITHUB\skills.
+Follow applicable skill instructions and project-specific guidelines.
+
+Do not make assumptions about functionality without first inspecting the relevant files and implementation.
+
+2. Take Full Ownership of Implementation
+
+Move beyond analysis and execute the work.
+
+Implement all documented and approved requirements.
+Complete unfinished features and partially implemented workflows.
+Fix bugs, broken functionality, integration issues, and inconsistencies.
+Replace placeholders, mock implementations, and temporary solutions with proper implementations wherever feasible.
+Connect frontend, backend, APIs, databases, authentication, and other integrations where applicable.
+Ensure all major features work together as a cohesive product.
+Handle loading states, empty states, validation, errors, edge cases, and success feedback.
+Remove unnecessary duplication, dead code, and outdated implementations.
+Improve architecture and maintainability where necessary.
+
+Do not stop at identifying problems. Fix them.
+
+3. Go Beyond the Original Requirements
+
+Treat the documentation as the baseline, not the ceiling.
+
+You are encouraged to identify and implement additional improvements that meaningfully elevate the product.
+
+This includes:
+
+Better user experience and interface design.
+More intuitive navigation and workflows.
+Missing functionality that users would reasonably expect.
+Better automation and intelligent features where appropriate.
+Improved performance, reliability, and scalability.
+Better accessibility and responsive design.
+Stronger validation, error handling, and security.
+Improved onboarding and user guidance.
+Useful quality-of-life enhancements.
+Better internal architecture and developer experience.
+
+Think like a product owner, senior engineer, designer, QA engineer, and architect working together.
+
+However, keep additions aligned with the product's purpose. Avoid unnecessary complexity, feature bloat, or changes that compromise existing functionality.
+
+4. UI/UX and Product Quality
+
+The finished product should feel intentional, complete, and professionally designed.
+
+Pay particular attention to:
+
+Visual consistency across the application.
+Typography, spacing, alignment, hierarchy, and color systems.
+Responsive layouts across desktop, tablet, and mobile.
+Clear navigation and intuitive interactions.
+Consistent components and reusable design patterns.
+Meaningful feedback for user actions.
+Well-designed loading, error, empty, and success states.
+Accessibility and usability.
+Elimination of awkward layouts, unfinished screens, and placeholder content.
+
+Do not settle for something that technically works but feels unfinished.
+
+5. Technical Quality and Reliability
+
+Ensure the implementation is technically sound.
+
+Follow the existing architecture unless there is a compelling reason to improve it.
+Use appropriate coding standards and established patterns.
+Avoid unnecessary dependencies.
+Ensure configuration and environment variables are handled correctly.
+Never expose secrets, credentials, or sensitive information.
+Implement appropriate security and permission checks.
+Validate inputs and handle unexpected failures.
+Avoid hardcoded temporary workarounds.
+Ensure database changes and migrations are safe and consistent.
+Maintain compatibility with the existing project wherever possible.
+
+Do not claim a feature is functional if it has not actually been implemented and verified.
+
+6. Test Everything
+
+Testing is part of implementation, not an optional final step.
+
+Run the relevant build commands.
+Run linting, type checks, and static analysis where available.
+Execute existing automated tests.
+Add tests for important new functionality.
+Test critical user journeys end to end.
+Verify API and integration behavior.
+Check responsive layouts and major UI interactions.
+Identify and fix regressions.
+Re-run relevant checks after making fixes.
+
+Where a test cannot be completed because of missing credentials, unavailable external services, infrastructure, or other limitations, document the exact limitation and what remains unverified.
+
+7. Execution Rules
+
+You have authorization to make reasonable implementation decisions and complete all work within the existing project's scope.
+
+Do not unnecessarily ask for permission for routine implementation decisions.
+Do not stop after creating a plan or providing recommendations.
+Do not leave easily solvable issues for someone else.
+Do not implement only the simplest or most visible parts.
+Do not remove working functionality just to simplify implementation.
+Do not silently skip difficult requirements.
+Do not fabricate successful test results.
+Preserve important existing project conventions and user data.
+Make sensible decisions when documentation is ambiguous, and document significant assumptions.
+Prioritize completing functional, high-value work over cosmetic perfection.
+
+If something is blocked, continue working on everything else that can be completed independently.
+
+8. Definition of Done — V1
+
+The project should reach the highest realistically achievable level of V1 completion.
+
+A successful result should have:
+
+All feasible documented requirements implemented.
+All major user workflows functional.
+No known critical or high-priority bugs left unresolved.
+No obvious unfinished screens or placeholder implementations.
+Consistent and polished UI/UX.
+Working integrations and data flows wherever accessible.
+Appropriate security, validation, and error handling.
+Successful build and relevant quality checks.
+Adequate test coverage for critical functionality.
+Clear documentation and setup instructions.
+A maintainable and coherent implementation.
+9. Final Deliverables
+
+Once implementation is complete, provide a concise but meaningful completion report covering:
+
+What was completed: Features and requirements implemented.
+What was improved: UI/UX, architecture, performance, reliability, and other enhancements.
+Additional features: Valuable improvements beyond the original documentation.
+Bugs fixed: Important issues resolved.
+Testing: Commands executed, results, and verified workflows.
+Remaining limitations: Anything genuinely blocked, incomplete, or requiring external access.
+How to run: Setup, configuration, and execution instructions.
+V1 readiness: An honest assessment of the product's current state.
+FINAL DIRECTIVE
+
+Your mission is to deliver the best possible finished V1, not just complete a coding assignment.
+
+Think independently, investigate deeply, make sensible decisions, and execute comprehensively.
+
+You are authorized to go beyond the explicitly requested work when it improves the product. Take initiative, identify opportunities, and implement meaningful upgrades.
+
+Work end to end. Build, integrate, refine, test, fix, and verify.
+
+Do not stop when the application merely runs. Stop when the product feels complete, works reliably, and is genuinely ready for its intended users — or when you have exhausted what can realistically be completed with the available resources.
+
+Prioritize actual working software over plans, promises, mockups, or superficial changes.
+
+The expected outcome is the strongest, most complete, polished, and functional V1 achievable within this project and environment.

@@ -1,0 +1,20 @@
+{
+  "id": "opencode",
+  "name": "OpenCode",
+  "adapter": "terminal",
+  "bin": "opencode",
+  "install": { "npm": "opencode-ai" },
+  "auth": { "status": ["auth", "list"], "login": ["auth", "login"], "logout": ["auth", "logout"] },
+  "chat": {
+    "args": ["run", "--format", "json"],
+    "modelArg": ["--model"],
+    "format": "opencode-json",
+    "resumeArgs": ["run", "--format", "json", "--continue"],
+    "models": {
+      "claude-sonnet-4-5": { "args": ["--model", "claude-sonnet-4-5"] },
+      "claude-opus-4-1": { "args": ["--model", "claude-opus-4-1"] },
+      "gemini-3-pro": { "args": ["--model", "gemini-3-pro"] }
+    },
+    "resumeIdArgs": ["run", "--format", "json", "--session", "{id}"]
+  }
+}

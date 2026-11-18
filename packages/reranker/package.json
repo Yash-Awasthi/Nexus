@@ -25,5 +25,8 @@
         "types": "./dist/index.d.ts"
       }
     }
+  },
+  "dependencies": {
+    "@nexus/search": "workspace:*"
   }
 }
