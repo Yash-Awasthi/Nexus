@@ -6,7 +6,7 @@
  * every real deliberation. These tests pin the two cases that matters: real
  * agreement is counted, and disagreement produces no majority claim at all.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { extractFinalAnswer, answerSimilarity, scoreAgreement } from "./agreement.ts";
 

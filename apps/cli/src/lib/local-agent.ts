@@ -6,7 +6,7 @@
  * `ToolAgentRuntime` directly over a workspace-confined `RuntimeToolSet` (the
  * same file + shell tools the worker exposes, minus the Docker sandbox — a
  * local run is on the user's own trusted machine). The LLM is a BYOK
- * `@nexus/llm-drivers` driver; the `llm` seam is injectable so the loop is
+ * `@nexus/llm/drivers` driver; the `llm` seam is injectable so the loop is
  * unit-tested with a mock (a live provider key is only needed for a real run).
  */
 import { spawn } from "node:child_process";
@@ -22,11 +22,11 @@ import {
   type LlmToolFn,
   type ToolRuntimeResult,
   type ToolStepRecord,
-} from "@nexus/agent-runtime";
+} from "@nexus/agent-core/runtime";
 import { toolTranscriptEvent, type CouncilTranscript } from "@nexus/council";
-import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
-import { AnthropicDriver, GroqDriver, OpenRouterDriver } from "@nexus/llm-drivers";
-import type { Reranker } from "@nexus/reranker";
+import { AnthropicDriver, GroqDriver, OpenRouterDriver } from "@nexus/llm/drivers";
+import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/search/hybrid-search";
+import type { Reranker } from "@nexus/search/reranker";
 
 import {
   councilRuntimeToolsFromLlm,

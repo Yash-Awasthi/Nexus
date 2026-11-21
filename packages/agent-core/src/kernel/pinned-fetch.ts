@@ -4,7 +4,7 @@
  * public at connect time — closing the DNS-rebinding window a static URL check
  * (`isSafeUrl`) cannot. `isSafeUrl` runs once, up front; between that check and
  * the actual connect an attacker-controlled hostname can re-resolve to a private
- * / IMDS address. `@nexus/runtime`'s `safeLookup` validates the RESOLVED address
+ * / IMDS address. `@nexus/agent-core/kernel`'s `safeLookup` validates the RESOLVED address
  * and hands the socket exactly those addresses, so there is no second resolution
  * to rebind.
  *

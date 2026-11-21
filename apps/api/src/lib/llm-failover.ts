@@ -36,7 +36,7 @@ import {
   type LlmRequestOptions,
   type LlmResponse,
   type StreamHandler,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 
 import { cachedDriver } from "./llm-cache-driver.ts";
 import { getCacheUserId } from "./user-context.ts";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { RuntimeToolSet } from "../runtime/index.ts";
 import type { LlmToolFn } from "../runtime/index.ts";
 

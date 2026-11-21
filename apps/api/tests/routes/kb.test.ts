@@ -8,7 +8,7 @@
  * pg-backed), and the module-level KB store is shared across tests in this
  * file, so each test cleans up the KBs it creates.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

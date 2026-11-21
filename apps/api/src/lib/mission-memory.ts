@@ -22,7 +22,7 @@
  * into a few hundred tokens of context.
  */
 
-import type { MissionRecord } from "@nexus/agent-engine";
+import type { MissionRecord } from "@nexus/agent-core/engine";
 
 import { getMission } from "./mission-store.ts";
 import { getSessionGraph, type GraphNode, type SessionGraph } from "./session-graph.ts";
@@ -57,7 +57,7 @@ export function outcomeSummary(record: MissionRecord): string {
 
 /**
  * True when a review issue is a harness artifact rather than a real defect.
- * The reviewer parse-failure path in @nexus/agent-runtime records the raw
+ * The reviewer parse-failure path in @nexus/agent-core records the raw
  * unparseable prose as the "issue" — that is a harness error, not something
  * the continuing agent can fix, so it must never be presented as work to do.
  */

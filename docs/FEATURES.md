@@ -86,7 +86,7 @@ single-round vote, and `POST /api/chat/stream` for the streamed multi-round deba
 
 **Runtime (orchestration)** — `PlanningEngine` turns a goal into a plan,
 `GovernanceEngine` applies constraints, and `TaskExecutor` runs each step with retry,
-backoff, and a circuit breaker. All in `@nexus/runtime`.
+backoff, and a circuit breaker. All in `@nexus/agent-core`.
 
 **Memory** — pgvector stores embeddings; `MemoryGraph` builds a relation graph traversed
 with a depth-decayed score; retrieval combines BM25 and RRF. Per-tenant ACL applies.
@@ -116,9 +116,9 @@ can erase their own data with `DELETE /api/v1/users/:id/data` — a content-free
 ## SDK usage
 
 ```typescript
-import { AgentRuntime } from "@nexus/agent-runtime";
+import { AgentRuntime } from "@nexus/agent-core";
 import { Council } from "@nexus/council";
-import { GroqDriver } from "@nexus/llm-drivers";
+import { GroqDriver } from "@nexus/llm";
 
 // Single agent
 const agent = new AgentRuntime({ driver: new GroqDriver() });

@@ -4,7 +4,7 @@
  * (buildServer + inject): auth gating, empty/junk input, ordering, and the
  * full create → list → patch → messages → delete lifecycle.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

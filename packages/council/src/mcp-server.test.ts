@@ -5,7 +5,7 @@
  * createCouncilMcpServer, with a single phase-routing transport scripting
  * every protocol prompt the tools fire.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createCouncilMcpServer } from "./mcp-server.ts";
 import type { Archetype } from "./archetypes.ts";
 import type { ILLMResponse, ILLMTransport } from "./engine.ts";

@@ -105,7 +105,7 @@ pnpm dev
 - Every adapter must have a contract test using `@nexus/plugin-sdk/testing`.
 
 ```bash
-pnpm test --filter @nexus/runtime        # single package
+pnpm test --filter @nexus/agent-core        # single package
 pnpm test --coverage                     # with coverage report
 ```
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHmac } from "node:crypto";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
-import type { LlmDriver } from "@nexus/llm-drivers";
+import type { LlmDriver } from "@nexus/llm/drivers";
 
 const state = vi.hoisted(() => ({ model: "openai/gpt-oss-120b" }));
 const savedConnection = () => [

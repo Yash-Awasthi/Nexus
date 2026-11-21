@@ -31,8 +31,8 @@ import {
   runFederationE2e,
   startRuntime,
   stopRuntime,
-} from "@nexus/runtime";
-import type { ConductorRuntimeContext, IExecutionContext } from "@nexus/runtime";
+} from "@nexus/agent-core/kernel";
+import type { ConductorRuntimeContext, IExecutionContext } from "@nexus/agent-core/kernel";
 import { metricsToPrometheus } from "@nexus/telemetry";
 
 // ─── Structured health response ──────────────────────────────────────────────
@@ -394,7 +394,7 @@ async function createConductorServer(repoRoot: string): Promise<ConductorServer>
 
 export async function startHttpServer(): Promise<http.Server> {
   const repoRoot = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const { loadConductorConfig } = await import("@nexus/runtime");
+  const { loadConductorConfig } = await import("@nexus/agent-core/kernel");
   loadConductorConfig(repoRoot);
   const gs = await createConductorServer(repoRoot);
   console.log(

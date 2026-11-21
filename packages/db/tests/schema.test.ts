@@ -10,7 +10,7 @@
  * For integration tests against a real DB, see packages/db/tests/integration/.
  */
 import * as fc from "fast-check";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   ingestedEvents,

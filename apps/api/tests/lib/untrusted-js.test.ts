@@ -3,7 +3,7 @@
  * The runner executes real child processes: what matters is what the code can
  * and cannot reach, which only running it shows.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { runSandboxedNode, runUntrustedJs, STARTED } from "../../src/lib/untrusted-js.ts";
 

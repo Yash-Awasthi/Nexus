@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vite-plus/test";
 
 import { MemoryStore } from "../../src/kernel/memory-store.ts";
 import type { MemoryEntry } from "../../src/kernel/memory-store.ts";

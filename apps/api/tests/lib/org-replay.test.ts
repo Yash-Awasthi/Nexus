@@ -3,7 +3,7 @@
  * Replaying a run sends its exact prompt to another model, bills the call to
  * the run's scopes, refuses when a hard stop could be crossed, and diffs the answers.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

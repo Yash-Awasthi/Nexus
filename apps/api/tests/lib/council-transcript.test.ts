@@ -4,7 +4,7 @@
 // JSON event — route evidence, one stage per vote, handler-consistent dissent
 // mapping, metrics/traces/total_ms, OR-of-five degradation verdict. Pure: no
 // DB, no LLM (imports only @nexus/council recorder + @nexus/contracts types).
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 
 import {
   buildCouncilRunTranscript,

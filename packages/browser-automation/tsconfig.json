@@ -9,7 +9,7 @@
   "include": ["src"],
   "references": [
     {
-      "path": "../runtime"
+      "path": "../agent-core"
     },
     {
       "path": "../stealth-browser"

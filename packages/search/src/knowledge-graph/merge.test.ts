@@ -4,7 +4,7 @@
  * laws directly — commutative, associative, idempotent — because that is what
  * lets two peers exchange snapshots in any order and end up equal.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { InMemoryKGStore, type KGEdge, type KGNode } from "./index.ts";
 import {

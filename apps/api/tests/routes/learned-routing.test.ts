@@ -5,10 +5,10 @@
  */
 import crypto from "node:crypto";
 
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 const SECRET = "learned-routing-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

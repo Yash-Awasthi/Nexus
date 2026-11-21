@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Every /api/v1 route is rate limited, including ones no named group covers. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 import { buildServer } from "../../src/server.ts";
 

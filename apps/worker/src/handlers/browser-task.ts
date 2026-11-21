@@ -13,6 +13,7 @@
  * on the session rather than failing silently.
  */
 
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 import {
   runBrowserAgentTask,
   browserDecisionMessages,
@@ -20,8 +21,7 @@ import {
   type BrowserAgentPage,
   type BrowserAgentSession,
 } from "@nexus/browser-automation";
-import { AnthropicDriver, GroqDriver, type LlmDriver } from "@nexus/llm-drivers";
-import { pinnedFetch } from "@nexus/runtime";
+import { AnthropicDriver, GroqDriver, type LlmDriver } from "@nexus/llm/drivers";
 import { isPatchrightAvailable, PatchrightDriver, StealthBrowser } from "@nexus/stealth-browser";
 import { Pool } from "pg";
 

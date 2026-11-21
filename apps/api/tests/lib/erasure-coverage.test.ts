@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Every table that names an account is erased with it, or deliberately kept. */
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:erasure-coverage";
 process.env.DATABASE_URL = DB;

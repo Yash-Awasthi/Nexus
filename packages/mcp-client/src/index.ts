@@ -187,7 +187,8 @@ export interface McpResourceTemplate {
 
 /** Reference passed to `completion/complete` — a prompt or a resource. */
 export type McpCompletionRef =
-  { type: "ref/prompt"; name: string } | { type: "ref/resource"; uri: string };
+  | { type: "ref/prompt"; name: string }
+  | { type: "ref/resource"; uri: string };
 
 /** Result of `completion/complete` — autocompletion candidates for one argument. */
 export interface McpCompletionResult {
@@ -537,3 +538,4 @@ export class McpClient {
 // MCP-over-HTTP server core (transport-agnostic JSON-RPC handler).
 export * from "./server.ts";
 export * from "./proxy.ts";
+export * from "./stdio.ts";

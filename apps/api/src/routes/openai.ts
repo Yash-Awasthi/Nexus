@@ -18,7 +18,7 @@ import type {
   LlmResponse,
   LlmToolCall,
   LlmToolDefinition,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { getProviderSnapshot, type FailoverDriver } from "../lib/llm-failover.ts";

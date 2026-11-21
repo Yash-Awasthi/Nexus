@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vite-plus/test";
 
 import { createAuthFetch } from "../../app/lib/install-auth-fetch";
 import { adoptStoredToken, getSessionToken, setSessionToken } from "../../app/lib/session-token";

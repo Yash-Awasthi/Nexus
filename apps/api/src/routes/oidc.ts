@@ -22,9 +22,9 @@
 
 import { createPublicKey, randomBytes, createVerify } from "node:crypto";
 
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
-import { pinnedFetch } from "@nexus/runtime";
 import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 

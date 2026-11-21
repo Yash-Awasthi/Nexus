@@ -7,7 +7,7 @@
  * enforces is enforced here too — the loop used to navigate anywhere it was
  * told to.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   applyBrowserAction,

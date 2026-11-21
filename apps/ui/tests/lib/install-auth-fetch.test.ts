@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // @vitest-environment jsdom — installAuthFetch patches window.fetch; the root
 // vitest config defaults to the node environment, where `window` is undefined.
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vite-plus/test";
 
 import { installAuthFetch } from "../../app/lib/install-auth-fetch";
 import { setSessionToken } from "../../app/lib/session-token";

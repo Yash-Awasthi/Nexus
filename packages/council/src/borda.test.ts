@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Borda-tallied peer rankings (llm-council-app v2 parity) — focused tests for
 // the pure tally core and the DeliberativeCouncil rankedReview/runRanked wiring.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { parseBordaRanking, tallyBorda, maxBordaPoints, formatBordaStandings } from "./borda.ts";
 import { DeliberativeCouncil } from "./deliberative.ts";
 import type { Archetype } from "./archetypes.ts";

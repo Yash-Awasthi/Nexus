@@ -24,10 +24,10 @@ response — see `docs/OPS.md` for the payload and the degraded probe semantics.
 
 ### Gateway (LLM streaming)
 
-| Method | Path                  | Description                                                              |
-| ------ | --------------------- | ------------------------------------------------------------------------ |
-| `POST` | `/v1/gateway/chat`    | Streaming LLM inference via SSE — provider routed by `@nexus/llm-router` |
-| `GET`  | `/v1/gateway/context` | Current context window contents                                          |
+| Method | Path                  | Description                                                       |
+| ------ | --------------------- | ----------------------------------------------------------------- |
+| `POST` | `/v1/gateway/chat`    | Streaming LLM inference via SSE — provider routed by `@nexus/llm` |
+| `GET`  | `/v1/gateway/context` | Current context window contents                                   |
 
 ### Agent runtime
 
@@ -145,7 +145,7 @@ LOG_LEVEL=info
 
 - **Streaming** — gateway and runtime routes use Fastify's `reply.raw` to write SSE frames directly; no response buffering
 - **Auth** — `@nexus/auth` preHandler hook validates every `/v1/` request; unauthenticated requests get `401` before reaching route logic
-- **Context pruning** — `@nexus/context-pruner` trims the context window to the token budget before forwarding to LLM providers
+- **Context pruning** — `@nexus/agent-core` trims the context window to the token budget before forwarding to LLM providers
 - **Worker hand-off** — routes that trigger async work (deliberation, corpus ingestion) enqueue BullMQ jobs and return a job ID immediately; callers poll `/v1/runtime/status` or subscribe to `/v1/sse/events`
 - **Code REPL** — `DockerReplExecutor` is used when Docker is available; falls back to `MockReplExecutor` automatically (no crash)
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Model Gateway routes — backed by @nexus/llm-drivers DriverRegistry.
+ * Model Gateway routes — backed by @nexus/llm DriverRegistry.
  *
  * POST /api/v1/gateway/messages  — Anthropic Messages-compatible proxy (15 providers)
  *                                   stream:true → text/event-stream SSE (Anthropic format)
@@ -16,24 +16,24 @@
  *   Errors wrapped by StreamRecoveryOrchestrator (continuation suffix + block close).
  */
 
-import { estimateMaxCost, lookupApiKey, QuotaChecker } from "@nexus/billing";
 import {
   PrunerChain,
   SlidingWindowPruner,
   NaiveTokenizer,
   type Message as PrunerMessage,
-} from "@nexus/context-pruner";
-import { computeAutoTuneParams } from "@nexus/drift";
-import { KVGatewayLog } from "@nexus/gateway-log";
+} from "@nexus/agent-core/pruner";
+import { makeTierGatePreHandler } from "@nexus/agent-core/tier-gate";
+import { estimateMaxCost, lookupApiKey, QuotaChecker } from "@nexus/billing";
 import {
   UltraplinianRunner,
   type SpeedTier,
   type UltraplinianMessage,
   type SamplingParams as UltraplinianSamplingParams,
-} from "@nexus/gauntlet";
+} from "@nexus/council/gauntlet";
+import { KVGatewayLog } from "@nexus/gateway-log";
 import { globalHooks } from "@nexus/hooks";
-import { AccountPool, type AccountState } from "@nexus/llm-accounts";
-import { compressAuto } from "@nexus/llm-compress";
+import { KVTokenBudget, BudgetExceededError } from "@nexus/llm/budget";
+import { compressAuto } from "@nexus/llm/compress";
 import {
   DriverRegistry,
   AnthropicDriver,
@@ -55,16 +55,13 @@ import {
   type LlmRequestOptions,
   type LlmRole,
   type VertexConfig,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
+import { ThinkTagParser } from "@nexus/llm/think-parser";
+import { AccountPool, type AccountState } from "@nexus/llm-accounts";
 import { registryFromEnv } from "@nexus/llm-oauth";
 import { FixedEmbedder, MemoryManager, createBestEmbedder } from "@nexus/memory";
-import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
-import { createDefaultPipeline } from "@nexus/stm";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
-import { ThinkTagParser } from "@nexus/think-parser";
 // oxlint-disable-next-line @typescript-eslint/no-unused-vars
-import { makeTierGatePreHandler } from "@nexus/tier-gate";
-import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
 import { createDefaultRegistry } from "@nexus/tool-registry";
 import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
@@ -119,8 +116,6 @@ const _tokenBudget = new KVTokenBudget(getSharedKV(), { limit: _RPM_LIMIT, windo
 // STM pipeline: hedge-reducer + directness-optimizer on every response.
 // Parseltongue: obfuscates trigger words when x-nexus-obfuscate header is set.
 // Memory: auto-ingests each assistant response for long-term recall.
-
-const _stmPipeline = createDefaultPipeline();
 
 const _memStore = getMemoryStore();
 const _memEmbedder = (() => {
@@ -609,53 +604,6 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         reply.header("X-Nexus-Compress-Saved-Tokens", String(_compress.savedTokens));
       }
 
-      // ── Parseltongue — obfuscate user messages when requested ─────────────
-      // Activated by header: x-nexus-obfuscate: true  OR feature flag.
-      if (request.headers["x-nexus-obfuscate"] === "true") {
-        const ptCfg = redteamDefaultConfig();
-        opts = {
-          ...opts,
-          messages: opts.messages.map((m) =>
-            m.role === "user"
-              ? { ...m, content: applyParseltongue(m.content, ptCfg).transformedText }
-              : m,
-          ),
-        };
-      }
-
-      // ── AutoTune — compute optimal sampling params pre-call ───────────────
-      // Detects the context type from the messages and blends its profile.
-      // temperature/top_p on the request body override the tuned values if set.
-      if (!request.body.temperature) {
-        try {
-          const allText = opts.messages.map((m) => m.content).join(" ");
-          const tuned = computeAutoTuneParams({
-            message: allText,
-            history: opts.messages.slice(-4).map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          });
-          opts = { ...opts, temperature: tuned.params.temperature, topP: tuned.params.top_p };
-        } catch {
-          /* non-fatal — proceed with defaults */
-        }
-      }
-
-      const _logStart = Date.now();
-      const _logIdent =
-        (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
-
-      // Hook: task.before — notify observers before dispatch
-      globalHooks
-        .emit("task.before", {
-          taskId: `gw-${_logStart}`,
-          taskType: "gateway.completion",
-          payload: { model: resolvedModel, provider: providerName },
-          attempt: 1,
-        })
-        .catch(() => {});
-
       // ── USD spend cap (best-effort pre-call guard) ───────────────────────────
       if (request.body.max_spend_usd !== undefined) {
         try {
@@ -697,6 +645,20 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           });
         }
       }
+
+      const _logStart = Date.now();
+      const _logIdent =
+        (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
+
+      // Hook: task.before — notify observers before dispatch
+      globalHooks
+        .emit("task.before", {
+          taskId: `gw-${_logStart}`,
+          taskType: "gateway.completion",
+          payload: { model: resolvedModel, provider: providerName },
+          attempt: 1,
+        })
+        .catch(() => {});
 
       // ── Streaming branch ────────────────────────────────────────────────────
       if (request.body.stream) {
@@ -921,14 +883,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           })
           .catch(() => {});
 
-        // ── STM post-processing (non-streaming) ──────────────────────────────
-        let finalContent = response.content;
-        try {
-          const stmResult = _stmPipeline.transform({ text: finalContent });
-          finalContent = stmResult.transformed;
-        } catch {
-          /* non-fatal */
-        }
+        const finalContent = response.content;
 
         const responseBody = {
           id: response.id,

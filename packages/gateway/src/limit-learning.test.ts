@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // FreeLLMAPI learned-ceiling port (row 212) — error-body ceiling learning +
 // 429 cooldown bench + Retry-After parsing.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   rateLimitWaitMs,
   CeilingStore,

@@ -11,7 +11,7 @@
     "5432": { "label": "Postgres" },
     "6379": { "label": "Redis" }
   },
-  "onCreateCommand": "corepack enable && corepack prepare pnpm@12.11.2 --activate",
+  "onCreateCommand": "npm install -g pnpm@12.21.0",
   "postCreateCommand": "pnpm install && cp -n .env.example .env || true",
   "customizations": {
     "vscode": {

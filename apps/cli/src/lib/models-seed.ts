@@ -4,16 +4,16 @@
  *
  * Converts a models.dev catalogue (api.json shape) into `provider_models` rows
  * and upserts them into the DB. No network here: the catalogue comes from a
- * file, stdin-style argument, or the built-in fixture; a live models.dev pull is
- * a Gate (ROADMAP §1.5) and stays out of this module.
+ * file, stdin-style argument, or the built-in fixture; a live models.dev pull
+ * stays out of this module.
  *
  * The models.dev fixture mirrors the trimmed catalogue shape already used by
- * @nexus/provider-registry's tests, so the default `nexus models seed` run is
+ * @nexus/llm's tests, so the default `nexus models seed` run is
  * deterministic and testable without network.
  */
 import type { NewProviderModelRow } from "@nexus/db/schema";
 
-// ── models.dev api.json shape (structural — @nexus/provider-registry no longer
+// ── models.dev api.json shape (structural — @nexus/llm no longer
 // exports a catalogue type; the trimmed shape mirrors what its tests use). ────
 
 interface ModelsDevModelCost {

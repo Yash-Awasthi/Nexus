@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Removed features stay removed: none of their endpoints is registered. */
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 import { buildServer } from "../../src/server.ts";
 

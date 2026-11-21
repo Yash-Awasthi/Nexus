@@ -26,8 +26,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 import type { ExecAction } from "@nexus/exec-policy";
-import { pinnedFetch } from "@nexus/runtime";
+import type { Runner } from "@nexus/sandbox";
 import spawn from "cross-spawn";
 
 import { priceKey } from "./cost-log.ts";
@@ -687,6 +688,12 @@ export function setSkillResolver(fn: (ownerId: string, ids: string[]) => SkillRe
   skillsFor = fn;
 }
 
+let skillRunner: Runner | undefined;
+/** Test seam for the sandbox runner; production resolves the Docker runner per run. */
+export function setSkillRunner(runner: Runner | undefined): void {
+  skillRunner = runner;
+}
+
 /**
  * Run each skill attached to the agent once, before its turn, and hand it the
  * real results. Skill code is code: it passes the exec gate like any process,
@@ -700,7 +707,7 @@ addPromptContributor(async ({ agent, run, log }) => {
     const why = gateCommand({ run, agent, log }, skillExecAction(s), `the skill "${s.name}"`);
     if (why) return { refuse: why };
   }
-  for (const r of await executeSkillsOnce(skills)) {
+  for (const r of await executeSkillsOnce(skills, skillRunner ? { runner: skillRunner } : {})) {
     log(
       r.ok ? "system" : "stderr",
       `Skill ${r.skillName}: ${r.ok ? "ran" : (r.error ?? "failed")}`,

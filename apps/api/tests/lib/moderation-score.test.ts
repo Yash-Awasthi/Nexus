@@ -3,7 +3,7 @@
  * Moderation scores come from OpenAI's moderation endpoint when a key is at hand, and from a
  * keyword heuristic when no model is reachable at all, so /moderation never has to 502.
  */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { heuristicScores, openaiScores } from "../../src/lib/moderation-score.ts";
 

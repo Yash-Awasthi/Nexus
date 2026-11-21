@@ -6,7 +6,7 @@
  * failure — never throws), and the skill text used for embedding.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   cosineSimilarity,

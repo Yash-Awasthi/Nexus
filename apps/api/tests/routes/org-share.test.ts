@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET = "org-share-test-secret";
 const DB = "pglite://:memory:org-share-test";

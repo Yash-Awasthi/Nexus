@@ -42,6 +42,9 @@ jobs:
           - service: ui
             dockerfile: apps/ui/Dockerfile
             image_suffix: ui
+          - service: web
+            dockerfile: infra/web/Dockerfile
+            image_suffix: web
 
     steps:
       - uses: actions/checkout@v7
@@ -86,7 +89,8 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           provenance: true
-          sbom: true
+          # SBOMs are release artifacts; generating them on every PR only slows the path.
+          sbom: ${{ github.event_name != 'pull_request' }}
 
   # ── Compose smoke test ────────────────────────────────────────────────────────
   smoke:

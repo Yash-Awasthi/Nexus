@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/runtime — public API
+ * @nexus/agent-core — public API
  *
  * Execution kernel: queue backends, council bridge, crash recovery,
  * OTel tracing, runtime wiring factory, and all supporting interfaces.

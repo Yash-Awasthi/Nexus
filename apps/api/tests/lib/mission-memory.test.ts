@@ -7,8 +7,8 @@
  * tool-trace failure marking, and the loader's ownership/terminal gates.
  */
 
-import { describe, it, expect } from "vitest";
-import type { MissionRecord } from "@nexus/agent-engine";
+import { describe, it, expect } from "vite-plus/test";
+import type { MissionRecord } from "@nexus/agent-core/engine";
 
 import {
   distillMissionMemory,

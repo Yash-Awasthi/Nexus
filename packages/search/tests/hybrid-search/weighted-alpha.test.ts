@@ -4,7 +4,7 @@
  * All expectations are hand-computed from the documented formula
  * `score = alpha × maxNorm(dense) + (1 − alpha) × maxNorm(sparse)`.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   HybridSearchEngine,
   weightedAlphaFusion,

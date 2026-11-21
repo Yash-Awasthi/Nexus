@@ -4,7 +4,7 @@
  * closing, the record outliving the process, and the cleanup that keeps the
  * store from growing forever. The clock is a parameter for exactly this reason.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vite-plus/test";
 
 import {
   APPROVAL_TTL_MS,

@@ -8,7 +8,7 @@ Orchestrates parallel queries to multiple LLM providers, synthesises their respo
 
 ## Installation
 
-Internal monorepo package. Consumed by `apps/api`, `apps/worker`, and `@nexus/runtime` via `CouncilBridge`.
+Internal monorepo package. Consumed by `apps/api`, `apps/worker`, and `@nexus/agent-core` via `CouncilBridge`.
 
 ```ts
 import { CouncilService, DeliberationEngine, summonArchetypes } from "@nexus/council";

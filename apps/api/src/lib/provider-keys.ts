@@ -52,7 +52,7 @@ import {
   VertexDriver,
   CompatibleEndpointDriver,
   type LlmDriver,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { IdleMap } from "./idle-map.ts";
@@ -65,7 +65,7 @@ import { userContext, type UserDriver } from "./user-context.ts";
 
 /** Providers we can construct an LLM driver for (openai included — the ChatGPT
  *  API is a plain OpenAI-compatible endpoint and its driver lives in
- *  @nexus/llm-drivers; REST-only consumers (image-gen/moderation) keep their
+ *  @nexus/llm; REST-only consumers (image-gen/moderation) keep their
  *  own direct calls). */
 const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   anthropic: (apiKey) => new AnthropicDriver({ apiKey }),

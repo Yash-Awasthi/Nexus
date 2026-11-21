@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agent-runtime — lifecycle hooks.
+ * @nexus/agent-core — lifecycle hooks.
  *
  * The hook system (PreToolUse / PostToolUse / SubagentStop / Stop)
  * is the seam that turns a coding agent from a fixed loop into an operator-

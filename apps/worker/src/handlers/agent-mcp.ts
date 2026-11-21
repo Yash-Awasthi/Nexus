@@ -12,7 +12,8 @@
  * The per-user encrypted MCP registry (apps/api `/mcp/servers`) is the eventual
  * source of these configs; for now they arrive on the job payload.
  */
-import type { RuntimeTool } from "@nexus/agent-runtime";
+import { pinnedFetch } from "@nexus/agent-core/kernel";
+import type { RuntimeTool } from "@nexus/agent-core/runtime";
 import {
   createCouncilMcpServer,
   recordToolTranscript,
@@ -21,24 +22,23 @@ import {
   type ILLMTransport,
   type ToolTranscriptHooks,
 } from "@nexus/council";
-import { runMultiAgentDebate, majorityFinalAnswer } from "@nexus/debate-engine";
-import { createGraphRagMcpServer } from "@nexus/graphrag-query";
-import type {
-  CommunityReport,
-  IndexedEntity,
-  IndexedRelation,
-  QueryRouter,
-} from "@nexus/graphrag-query";
-import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
-import { createHybridSearchMcpServer } from "@nexus/hybrid-search";
+import { runMultiAgentDebate, majorityFinalAnswer } from "@nexus/council/debate-engine";
 import {
   McpClient,
   type McpHttpServer,
   type McpCallResult,
   type McpToolDefinition,
 } from "@nexus/mcp-client";
-import type { Reranker } from "@nexus/reranker";
-import { pinnedFetch } from "@nexus/runtime";
+import { createGraphRagMcpServer } from "@nexus/search/graphrag-query";
+import type {
+  CommunityReport,
+  IndexedEntity,
+  IndexedRelation,
+  QueryRouter,
+} from "@nexus/search/graphrag-query";
+import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/search/hybrid-search";
+import { createHybridSearchMcpServer } from "@nexus/search/hybrid-search";
+import type { Reranker } from "@nexus/search/reranker";
 
 export interface McpServerConfig {
   /** Short label; also the tool-name prefix. */
@@ -268,7 +268,7 @@ export function councilRuntimeToolsFromTransport(
 /**
  * Serve the hybrid single-query tool (dense+BM25 legs, RRF/alpha fusion,
  * metadata/document filters, optional rerank — the pass-69 served surface in
- * @nexus/hybrid-search) as one RuntimeTool an agent can invoke like any
+ * @nexus/search) as one RuntimeTool an agent can invoke like any
  * built-in tool. Adaptors are injected by the caller (whoever owns the
  * corpus), mirroring how external MCP servers arrive config-driven.
  */
@@ -296,7 +296,7 @@ export async function hybridSearchRuntimeTools(opts: {
 
 /**
  * Serve the graphrag search tools (local entity-anchored + global map-reduce
- * over community reports — the pass-71 served surface in @nexus/graphrag-query)
+ * over community reports — the pass-71 served surface in @nexus/search)
  * as RuntimeTools an agent can invoke. The caller injects its indexed graph
  * and its loop transport (same ILLMTransport seam the council tools use); the
  * transport is adapted to graphrag's plain QueryRouter shape.

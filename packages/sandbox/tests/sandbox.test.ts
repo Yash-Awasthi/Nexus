@@ -2,7 +2,7 @@
 import { tmpdir } from "node:os";
 import { basename } from "node:path";
 import { EventEmitter } from "events";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import type { IExecutionContext } from "@nexus/plugin-sdk";
 
 import {
@@ -12,6 +12,7 @@ import {
   buildDockerArgs,
   HOST_TMP_MOUNT,
   createDockerRunner,
+  resolveUntrustedRunner,
   defaultRunner,
   sandboxAdapter,
   DEFAULT_TIMEOUT_MS,
@@ -780,5 +781,57 @@ describe("host temp mount", () => {
       Object.assign(inner, { inContainer: true }),
     );
     expect(seen[0]![0]!.startsWith(`${HOST_TMP_MOUNT}/`)).toBe(true);
+  });
+});
+
+// -- Untrusted default: Docker or fail closed ----------------------------------
+
+describe("resolveUntrustedRunner", () => {
+  // Every escape a host process would be able to attempt.
+  const escape =
+    'require("node:fs").readFileSync("/etc/passwd");' +
+    'require("node:net").connect(1,"1.1.1.1");' +
+    'require("node:child_process").execSync("id");';
+
+  it("refuses without an image and never spawns a host process", async () => {
+    spawnMock.mockClear();
+    const runner = await resolveUntrustedRunner({ image: "" });
+    const result = await executeCode(task({ language: "javascript", code: escape }), runner);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("NEXUS_SANDBOX_IMAGE");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses when Docker is absent and never spawns a host process", async () => {
+    spawnMock.mockClear();
+    const runner = await resolveUntrustedRunner({
+      image: "node:20-alpine",
+      probe: makeRunner({ exitCode: 1 }),
+    });
+    const result = await executeCode(task({ language: "javascript", code: escape }), runner);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Docker is not available");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("uses Docker with network and PID caps when available", async () => {
+    const spawnRunner = vi.fn(async () => ({
+      stdout: "ok",
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+    })) as unknown as Runner;
+    const runner = await resolveUntrustedRunner({
+      image: "nexus-sandbox:test",
+      probe: makeRunner({ exitCode: 0 }),
+      spawnRunner,
+    });
+    const result = await executeCode(task({ language: "bash", code: "echo ok" }), runner);
+    expect(result.ok).toBe(true);
+    const calls = (spawnRunner as unknown as { mock: { calls: [string, string[]][] } }).mock.calls;
+    expect(calls[0]![0]).toBe("docker");
+    expect(calls[0]![1]).toContain("--network=none");
+    expect(calls[0]![1]).toContain("--pids-limit=64");
+    expect(calls[0]![1]).toContain("nexus-sandbox:test");
   });
 });

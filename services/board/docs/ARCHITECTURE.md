@@ -1,4 +1,5 @@
 # System Architecture Document: Open Agent Board (`open-board` / `vb`)
+
 **Version:** 3.1 (Scratch-Built & Zero-Bloat Specification)  
 **Philosophy:** Custom Protocol, Minimal Imports, Zero Framework Bloat, Native Cloudflare Integration  
 **Date:** November 21, 2026
@@ -52,13 +53,17 @@
 ## 2. Zero-Bloat Technical Implementation Details
 
 ### 2.1 Our Own Custom MCP Server (`pkg/mcp/server.go`, `cmd/mcp-bridge/main.go`)
+
 Instead of pulling in large npm packages like `@modelcontextprotocol/sdk`, we write our own pure-Go stdio JSON-RPC 2.0 server:
+
 - Reads `{"jsonrpc": "2.0", "method": "tools/call", "params": {...}}` from standard input.
 - Writes immediate JSON responses to standard output.
 - Zero external runtime overhead for Claude Desktop.
 
 ### 2.2 Cloudflare Sync Layer (`pkg/cloud/cloudflare.go`)
+
 Reads credentials from the environment only; never from the repository or the database:
+
 - `CLOUDFLARE_ACCOUNT_ID` (the endpoint is derived from it when unset)
 - `CLOUDFLARE_R2_ENDPOINT`
 - `CLOUDFLARE_R2_ACCESS_KEY_ID`
@@ -69,9 +74,10 @@ Reads credentials from the environment only; never from the repository or the da
 
 > [!WARNING]
 > Credentials belong in the environment or a secret store. Do not write them into this
-document, `.board/`, or any committed file. If a key was ever committed, rotate it.
+> document, `.board/`, or any committed file. If a key was ever committed, rotate it.
 
 At sprint closure (the last open task in a thread finishes) or on demand (`vb sync`):
+
 1. Performs an atomic SQLite checkpoint and gzips it locally.
 2. Seals the gzip with AES-256-GCM using a key derived from
    `OPEN_BOARD_SNAPSHOT_PASSPHRASE` with PBKDF2-SHA256 (210,000 iterations, random

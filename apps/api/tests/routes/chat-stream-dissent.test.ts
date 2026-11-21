@@ -2,10 +2,10 @@
 /** Dissent is each user's own preference: turning it on changes only that user's council. */
 import crypto from "node:crypto";
 
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 const SECRET = "chat-stream-dissent-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

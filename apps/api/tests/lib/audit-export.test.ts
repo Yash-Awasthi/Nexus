@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import { MemoryKVStore } from "@nexus/kv";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:audit-export";
 process.env.DATABASE_URL = DB;

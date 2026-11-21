@@ -6,7 +6,7 @@
  * a call made without its capability fails loudly rather than resolving to
  * undefined.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vite-plus/test";
 
 import {
   HostUnsupportedError,

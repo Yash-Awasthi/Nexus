@@ -5,7 +5,7 @@
  * handling, and recovery of runs a restart interrupted.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

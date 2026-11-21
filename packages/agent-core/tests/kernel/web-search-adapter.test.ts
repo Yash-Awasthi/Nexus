@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import type { ILanguageModel } from "../../src/kernel/interfaces/language-model.interface.ts";
 import type { IExecutionContext } from "../../src/kernel/interfaces/execution.interface.ts";

@@ -6,8 +6,8 @@
  * Before D1 the transport ignored the model it was handed and always resolved
  * this.modelAlias, so per-member models were dropped on the floor.
  */
-import type { DriverRegistry } from "@nexus/llm-drivers";
-import { describe, it, expect } from "vitest";
+import type { DriverRegistry } from "@nexus/llm/drivers";
+import { describe, it, expect } from "vite-plus/test";
 
 import { LlmDriversTransport, resolveMemberModel } from "../../src/routes/council.ts";
 

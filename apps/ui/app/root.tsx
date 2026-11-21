@@ -2,18 +2,13 @@
 import {
   Activity,
   BarChart3,
-  BookOpen,
-  BookOpenCheck,
   Building2,
   ChevronsUpDown,
-  Columns3,
   Database,
   DollarSign,
-  FileText,
   Flag,
   FolderKanban,
   GitFork,
-  HardDrive,
   Hexagon,
   Key,
   KeyRound,
@@ -23,26 +18,18 @@ import {
   MessagesSquare,
   Moon,
   Network,
-  Plug,
   Plus,
-  ScanSearch,
   ScrollText,
-  Search,
-  Share2,
   Server,
   Settings,
   ShieldAlert,
   SquareTerminal,
-  Store,
   Sun,
   Terminal,
   Boxes,
   UserCircle,
   Users as UsersIcon,
   Wrench,
-  TrendingUp,
-  CloudSun,
-  Wand2,
 } from "lucide-react";
 import { useEffect } from "react";
 import {
@@ -88,9 +75,9 @@ import { TooltipProvider } from "~/components/ui/tooltip";
 import { AuthProvider, bootstrapSession, useAuth } from "~/context/AuthContext";
 import { NotificationsProvider } from "~/context/NotificationsContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
-import { useAppBuilderAvailable } from "~/lib/app-builder";
 import { hostCan } from "~/lib/host";
 import { installAuthFetch } from "~/lib/install-auth-fetch";
+import { useLocalPlane } from "~/lib/local-plane";
 import "./app.css";
 
 // Attach the session's token to same-origin /api/* calls made via raw fetch
@@ -129,7 +116,7 @@ interface NavEntry {
   label: string;
   end?: boolean;
   /** Shown only when the server can run it. */
-  requires?: "appBuilder";
+  requires?: "terminal";
 }
 
 // The council leads; everything else supports it. Admin shows to admins only.
@@ -156,32 +143,17 @@ const navGroups: { label: string; admin?: boolean; items: NavEntry[] }[] = [
     items: [
       { to: "/workflows", icon: GitFork, label: "Workflows" },
       { to: "/skills", icon: Wrench, label: "Skills" },
-      { to: "/prompts", icon: FileText, label: "Prompts" },
-      { to: "/marketplace", icon: Store, label: "Marketplace" },
     ],
   },
   {
     label: "Knowledge",
-    items: [
-      { to: "/search", icon: ScanSearch, label: "Search" },
-      { to: "/deep-research", icon: Search, label: "Deep research" },
-      { to: "/knowledge-bases", icon: Database, label: "Knowledge bases" },
-      { to: "/memory", icon: BookOpen, label: "Memory" },
-      { to: "/knowledge-graph", icon: Share2, label: "Knowledge graph" },
-      { to: "/markets", icon: TrendingUp, label: "Prediction markets" },
-      { to: "/standard-answers", icon: BookOpenCheck, label: "Curated answers" },
-      { to: "/connectors/sync", icon: Plug, label: "Connectors" },
-    ],
+    items: [{ to: "/knowledge", icon: Database, label: "Knowledge" }],
   },
   {
     label: "Tools",
     items: [
-      { to: "/playground/compare", icon: Columns3, label: "Model compare" },
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
-      { to: "/terminals", icon: SquareTerminal, label: "Terminals" },
-      { to: "/drive", icon: HardDrive, label: "Drive" },
-      { to: "/app-builder", icon: Wand2, label: "App builder", requires: "appBuilder" },
-      { to: "/weather", icon: CloudSun, label: "Weather" },
+      { to: "/terminals", icon: SquareTerminal, label: "Terminals", requires: "terminal" },
     ],
   },
   {
@@ -203,7 +175,7 @@ const navGroups: { label: string; admin?: boolean; items: NavEntry[] }[] = [
       { to: "/admin/traces", icon: Activity, label: "Traces" },
       { to: "/gateway", icon: Network, label: "Gateway" },
       { to: "/admin/audit", icon: ScrollText, label: "Audit log" },
-      { to: "/moderation", icon: ShieldAlert, label: "Moderation" },
+      { to: "/moderation", icon: ShieldAlert, label: "Content filter" },
       { to: "/admin/feedback", icon: MessageSquare, label: "Feedback" },
       { to: "/admin/feature-flags", icon: Flag, label: "Feature flags" },
       { to: "/admin/system", icon: Server, label: "System" },
@@ -316,7 +288,10 @@ function AppSidebar() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin" || user?.role === "owner";
-  const appBuilder = useAppBuilderAvailable() === true;
+  // Terminals spawn host processes, so the API serves them only to a local
+  // install. Hide the page on a hosted site instead of linking to a 403.
+  const localPlane = useLocalPlane() === true;
+  const shows = (item: NavEntry) => (item.requires === "terminal" ? localPlane : true);
 
   return (
     <Sidebar collapsible="icon">
@@ -345,11 +320,9 @@ function AppSidebar() {
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items
-                    .filter((item) => item.requires !== "appBuilder" || appBuilder)
-                    .map((item) => (
-                      <NavItem key={item.to} item={item} />
-                    ))}
+                  {group.items.filter(shows).map((item) => (
+                    <NavItem key={item.to} item={item} />
+                  ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

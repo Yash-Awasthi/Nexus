@@ -3,12 +3,12 @@ import { resolve } from "path";
 
 import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig, lazyPlugins } from "vite-plus";
 
 const API_TARGET = process.env.NEXUS_API_URL ?? "http://localhost:3000";
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter()],
+  plugins: lazyPlugins(() => [tailwindcss(), reactRouter()]),
   resolve: {
     // Deduplicate React (and react-router, which has two 7.18.x minors in the
     // pnpm tree) so nested copies don't hand radix-ui / lobehub / the router a
@@ -17,7 +17,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom", "react-is", "react-router"],
     alias: {
       "~": resolve(import.meta.dirname, "./app"),
-      // Force any react-router-dom resolution to react-router v7. A transitive
+      // Force any react-router-dom resolution to react-router v8. A transitive
       // (Docusaurus-era) react-router-dom@5 otherwise gets pulled in and explodes
       // on missing v5 exports. The UI never uses the v5 API.
       "react-router-dom": "react-router",
@@ -41,7 +41,7 @@ export default defineConfig({
     // (reading 'useContext')". With discovery off, the optimizer cannot rerun.
     noDiscovery: true,
     // A transitive dep drags in react-router-dom@5 (Docusaurus-era), which the
-    // app never imports. pnpm mis-links it against react-router@7, so pre-bundling
+    // app never imports. pnpm mis-links it against react-router@8, so pre-bundling
     // it explodes on missing v5 exports (Switch/useHistory/…). Skip it entirely.
     exclude: ["react-router-dom"],
     // Pre-bundle framer-motion + recharts at startup: both are imported by

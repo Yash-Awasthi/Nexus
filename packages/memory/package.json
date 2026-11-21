@@ -11,8 +11,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist coverage",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vp test run",
+    "test:watch": "vp test"
   },
   "dependencies": {
     "@neondatabase/serverless": "catalog:",
@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@types/pg": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

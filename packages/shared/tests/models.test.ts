@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { MODEL_KEYS, MODEL_REGISTRY, getModel, type ModelKey } from "../src/index.ts";
 

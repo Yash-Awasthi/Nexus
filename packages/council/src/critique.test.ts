@@ -4,7 +4,7 @@
  * transport: assertions target WHO each critic saw (never its own response),
  * WHICH framing reached the prompt, and anonymization, not model text.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runCritique, type CritiqueTarget } from "./critique.ts";
 import type { ILLMResponse, ILLMTransport } from "./engine.ts";
 

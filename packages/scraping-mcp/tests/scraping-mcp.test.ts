@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { MockScrapingBackend, SessionStore, ScrapingMcpServer } from "../src/index.ts";
 
 // ── MockScrapingBackend ───────────────────────────────────────────────────────

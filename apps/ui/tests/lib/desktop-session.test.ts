@@ -3,7 +3,7 @@
  * Under a host that owns the session, the token arrives over IPC after the
  * page's first effects run. API calls made in that gap must wait for it.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { bootstrapSession } from "../../app/context/AuthContext";
 import { createAuthFetch } from "../../app/lib/install-auth-fetch";

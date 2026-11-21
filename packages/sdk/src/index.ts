@@ -71,12 +71,22 @@ export interface SessionInfo {
 
 export class NexusError extends Error {
   public readonly code:
-    "AUTH_ERROR" | "RATE_LIMIT" | "NOT_FOUND" | "TIMEOUT" | "INVALID_REQUEST" | "SERVER_ERROR";
+    | "AUTH_ERROR"
+    | "RATE_LIMIT"
+    | "NOT_FOUND"
+    | "TIMEOUT"
+    | "INVALID_REQUEST"
+    | "SERVER_ERROR";
   public readonly statusCode?: number;
 
   constructor(
     code:
-      "AUTH_ERROR" | "RATE_LIMIT" | "NOT_FOUND" | "TIMEOUT" | "INVALID_REQUEST" | "SERVER_ERROR",
+      | "AUTH_ERROR"
+      | "RATE_LIMIT"
+      | "NOT_FOUND"
+      | "TIMEOUT"
+      | "INVALID_REQUEST"
+      | "SERVER_ERROR",
     message: string,
     statusCode?: number,
   ) {

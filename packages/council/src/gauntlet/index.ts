@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/gauntlet — ULTRAPLINIAN engine.
+ * @nexus/council — ULTRAPLINIAN engine.
  *
  * Races N commercial models in parallel via OpenRouter, scores each response
  * on substance / directness / completeness, and returns the winner with full

@@ -7,14 +7,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vp test run"
   },
   "devDependencies": {
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "dependencies": {
-    "patchright": "^1.63.0",
-    "playwright-core": "catalog:"
+    "patchright": "^1.63.0"
   },
   "publishConfig": {
     "main": "./dist/index.js",

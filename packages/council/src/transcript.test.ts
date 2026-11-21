@@ -3,7 +3,7 @@
 // createTranscript/recordStage/appendAudit/recordRouting build the run record;
 // finalizeTranscript computes the OR-of-five degraded verdict with faithful
 // warning strings, confidence clamping + failure-ratio capping, and metrics.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   createTranscript,
   recordStage,

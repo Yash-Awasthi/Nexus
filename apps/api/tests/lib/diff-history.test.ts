@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getDiffRecord, saveDiffRecord } from "../../src/lib/diff-history.ts";
 import { getSharedKV } from "../../src/lib/shared-kv.ts";

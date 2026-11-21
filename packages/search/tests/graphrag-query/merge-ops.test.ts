@@ -5,7 +5,7 @@
 // graph surgery — rewire relations off the sources, collapse redirected
 // duplicates (mentions max, descriptions join), drop self-loops. Inputs are
 // not mutated.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { mergeGraphEntities } from "../../src/graphrag-query/index.ts";
 import type { IndexedEntity, IndexedRelation } from "../../src/graphrag-query/index-graphrag.ts";
 

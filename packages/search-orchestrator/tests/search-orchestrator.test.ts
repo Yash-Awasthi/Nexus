@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import { searchExa, searchBrave, searchSerper, type FetchLike } from "../src/index.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 // §1.3 web-search providers — Exa / Brave / Serper

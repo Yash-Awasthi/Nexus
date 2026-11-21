@@ -9,10 +9,11 @@
     "./router": "./src/router/index.ts",
     "./registry": "./src/registry/index.ts",
     "./budget": "./src/budget/index.ts",
-    "./compress": "./src/compress/index.ts"
+    "./compress": "./src/compress/index.ts",
+    "./think-parser": "./src/think-parser.ts"
   },
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vp test run --passWithNoTests",
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
@@ -26,7 +27,7 @@
     "js-tiktoken": "^1.0.21"
   },
   "devDependencies": {
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",
@@ -55,6 +56,10 @@
       "./compress": {
         "import": "./dist/compress/index.js",
         "types": "./dist/compress/index.d.ts"
+      },
+      "./think-parser": {
+        "import": "./dist/think-parser.js",
+        "types": "./dist/think-parser.d.ts"
       }
     }
   }

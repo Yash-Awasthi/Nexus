@@ -8,7 +8,7 @@
  * wires DeliberativeCouncil behind a `council.deliberate` tool and drives
  * the full JSON-RPC surface: initialize → tools/list → tools/call → verdict.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { McpHttpServer, type McpCallResult } from "@nexus/mcp-client";
 import { DeliberativeCouncil } from "./deliberative.ts";
 import type { Archetype } from "./archetypes.ts";

@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:openai-compat";
 const SECRET = "openai-compat-secret";

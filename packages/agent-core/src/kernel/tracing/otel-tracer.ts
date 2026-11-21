@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * NexusOtelTracer — OpenTelemetry-compatible distributed tracing for @nexus/runtime.
+ * NexusOtelTracer — OpenTelemetry-compatible distributed tracing for @nexus/agent-core.
  *
  * Implements ITraceRecorder (the existing runtime interface) and adds:
  *   - W3C TraceContext header propagation (traceparent / tracestate)

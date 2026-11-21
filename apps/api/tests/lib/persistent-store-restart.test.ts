@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 vi.mock("../../src/lib/pg-pool.ts", () => ({ getPgPool: () => null }));
 process.env.NEXUS_DATA_DIR = mkdtempSync(join(tmpdir(), "store-restart-"));

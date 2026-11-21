@@ -11,13 +11,14 @@
     "./testing": "./src/testing.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
     "vitest": "catalog:",
-    "@vitest/coverage-v8": "catalog:"
+    "@vitest/coverage-v8": "catalog:",
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

@@ -24,7 +24,7 @@ env: {} (ELECTRON_RUN_AS_NODE=1 inside the desktop app)
 
 Runner, in order:
 
-1. `SANDBOX_PRELUDE` from `@nexus/agent-runtime` (clears `process.env`, stubs sockets, DNS,
+1. `SANDBOX_PRELUDE` from `@nexus/agent-core` (clears `process.env`, stubs sockets, DNS,
    `fetch`).
 2. Replace `process.binding` with a function that answers only `"constants"` (Pyodide's NODEFS
    reads `process.binding("constants").fs` at start-up, and the permission model forbids the real

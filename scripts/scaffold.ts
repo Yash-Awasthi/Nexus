@@ -301,14 +301,14 @@ export class ${Class} extends OpenAICompatibleDriver {
   );
 
   writeFileSync(file, src);
-  console.log(`  ~ packages/llm-drivers/src/index.ts (added ${Class} + ProviderName)`);
+  console.log(`  ~ packages/llm/src/drivers/index.ts (added ${Class} + ProviderName)`);
   console.log(`\n✓ Scaffolded driver ${Class}. Now wire it up:`);
   console.log("  1. set baseUrl + default model in the new class");
   console.log("  2. apps/api/src/lib/provider-keys.ts        → import + DRIVER_FACTORIES");
   console.log("  3. apps/api/src/routes/api-bridge.ts        → VALID_PROVIDERS");
   console.log("  4. apps/ui/app/routes/provider-keys.tsx     → PROVIDERS");
   console.log("  5. apps/ui/app/lib/council.ts               → API_PROVIDERS metadata");
-  console.log("  6. packages/llm-drivers/tests/llm-drivers.test.ts → add to describe.each");
+  console.log("  6. packages/llm/tests/drivers/llm-drivers.test.ts → add to describe.each");
 }
 
 // ── entry ─────────────────────────────────────────────────────────────────────

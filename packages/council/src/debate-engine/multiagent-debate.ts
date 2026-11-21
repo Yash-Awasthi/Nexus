@@ -3,7 +3,7 @@
  * Multi-agent debate — the parallel "answer, then revise from the others'
  * answers" protocol (Du et al., "Improving Factuality and Reasoning in
  * Language Models through Multiagent Debate", arXiv:2305.14325) for
- * @nexus/debate-engine.
+ * @nexus/council.
  *
  * {@link DebateSession} runs a judge-scored supporter/opposer contest. This
  * module is the other canonical debate shape: N agents each answer the question

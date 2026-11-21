@@ -436,7 +436,8 @@ export class RuntimeInspector implements IExtendedRuntimeInspector {
     if (!this.memoryStore) return [];
     const result = await this.memoryStore.query({
       types: query?.types as
-        ("error" | "observation" | "decision" | "result" | "state" | "knowledge")[] | undefined,
+        | ("error" | "observation" | "decision" | "result" | "state" | "knowledge")[]
+        | undefined,
       keyPrefix: query?.keyPrefix,
       limit: query?.limit || 20,
     });

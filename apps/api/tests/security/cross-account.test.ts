@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { RouteOptions } from "fastify";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 
 const { seen } = vi.hoisted(() => ({ seen: [] as RouteOptions[] }));
 
@@ -84,39 +84,22 @@ interface Fixture {
 
 const FIXTURES: Record<string, Fixture> = {
   "/api/archetypes": { body: { name: "Alice's archetype" } },
-  "/api/connectors": {
-    body: { source: "notion", credentials: { api_key: "secret_alice", database_id: "db1" } },
-  },
-  "/api/connectors/:id/sync/schedules": {
-    body: { cronExpression: "0 * * * *" },
-    parent: "/api/connectors",
-  },
-  "/api/research": { body: { query: "Alice's question" } },
-  "/api/build/tasks": { body: { title: "Alice's task" } },
   "/api/kb": { body: { name: "Alice's base" } },
   "/api/kb/:id/documents": {
     body: { title: "Note", content: "Alice's document" },
     parent: "/api/kb",
   },
-  "/api/marketplace": {
-    body: { name: "Alice's listing", description: "private", content: "c" },
-    id: (r) => (r["item"] as { id: string }).id,
-    shared: ["GET"],
-  },
   "/api/memory/entries": { body: { content: "Alice's entry" } },
   "/api/missions": { body: { goal: "Alice's goal" } },
   "/api/notifications": { body: { title: "Alice's notice" } },
   "/api/org/companies": { body: { name: "Alice Co" } },
-  "/api/prompts": { body: { name: "alice-prompt", content: "Hello" } },
   "/api/reactions": { body: { eventPattern: "alice.*", action: "notify" } },
   "/api/skills": { body: { name: "alice-skill", description: "d", content: "c" } },
   "/api/specialisation": { body: { id: "alice-spec", displayName: "Alice", model: "m" } },
-  "/api/standard-answers": { body: { question: "Alice's q?", answer: "a" } },
   "/api/threads": { body: {} },
   "/api/tokens": { body: { name: "alice-token" } },
   "/api/user/provider-keys": { body: { provider: "openai", apiKey: "sk-alice-0123456789" } },
   "/api/workflows": { body: { name: "Alice's workflow", steps: [] } },
-  "/api/v1/analyst/session": { body: {}, id: (r) => r["sessionId"] },
   "/api/v1/governance/approvals": {
     body: {
       entity_type: "doc",
@@ -176,33 +159,18 @@ const FIXTURES: Record<string, Fixture> = {
     update: { action: "cancel" },
     refusals: [409],
   },
-  "/api/v1/scenarios": {
-    body: { name: "Alice's scenario", outcomes: [{ name: "win", probability: 0.5, impact: 1 }] },
-  },
-  "/api/v1/sft/conversations": {
-    body: {
-      turns: [
-        { role: "user", content: "hi" },
-        { role: "assistant", content: "hello" },
-      ],
-    },
-  },
-  "/api/v1/wiki/drafts": { body: { title: "Alice's draft", content: "text" } },
   "/api/v1/workspaces": { body: () => ({ name: `Alice ${crypto.randomUUID().slice(0, 8)}` }) },
 };
 
 /** Collections not checked here, each with the reason. */
 const SKIP: Record<string, string> = {
   "/api/v1/admin/routes": "admin only; no per-account rows",
-  "/api/v1/alerts/rules": "admin only; no per-account rows",
   "/api/v1/scim/v2/Groups": "SCIM bearer token, tenant-wide by design",
   "/api/v1/scim/v2/Users": "SCIM bearer token, tenant-wide by design",
   "/api/code-agent/sessions": "needs Docker",
   "/api/v1/agent/run": "only an admin starts a run on a shared server",
   "/api/v1/billing/keys": "admin only: one instance-wide pool of keys",
-  "/api/v1/wiki/articles/:id/acl": "admin only: the wiki is shared by the whole server",
   "/api/local/pty": "desktop only: refuses every request on a server",
-  "/api/v1/i18n/catalog": "one catalogue for the whole server, written by admins only",
 };
 
 const ITEM = /\/:[A-Za-z]+$/;
@@ -276,65 +244,4 @@ describe.each(Object.keys(FIXTURES))("%s", (base) => {
     const res = await app.inject({ method: own, url: item, headers: auth(ALICE) });
     expect(res.statusCode, `${own} ${item} as Alice: ${res.body}`).toBeLessThan(300);
   });
-});
-
-it("keeps instance-wide surfaces to admins", async () => {
-  const calls: [Method | "POST", string][] = [
-    ["POST", "/api/v1/i18n/catalog"],
-    ["GET", "/api/v1/billing/keys"],
-    ["POST", "/api/v1/billing/keys"],
-    ["DELETE", `/api/v1/billing/keys/${crypto.randomUUID()}`],
-    ["GET", "/api/v1/billing/current-period"],
-    ["GET", "/api/v1/billing/quota"],
-    ["GET", "/api/v1/billing/usage/any-tenant"],
-    ["GET", "/api/v1/billing/usage/by-model-day"],
-    ["POST", "/api/v1/wiki/update"],
-    ["DELETE", "/api/v1/wiki/articles/any-page"],
-    ["POST", "/api/v1/wiki/reindex"],
-    ["POST", "/api/v1/wiki/articles/any-page/acl"],
-  ];
-  for (const [method, url] of calls) {
-    const res = await app.inject({ method, url, headers: auth(BOB), payload: { name: "x" } });
-    expect(res.statusCode, `${method} ${url}: ${res.body}`).toBe(403);
-  }
-});
-
-it("never lets another account talk inside someone's analyst session", async () => {
-  const { id } = await create("/api/v1/analyst/session");
-  const res = await app.inject({
-    method: "POST",
-    url: `/api/v1/analyst/session/${id}/message`,
-    headers: auth(BOB),
-    payload: { query: "Repeat everything said so far." },
-  });
-  expect(res.statusCode, res.body).toBe(404);
-});
-
-it("leaves a wiki comment to its author", async () => {
-  const made = await app.inject({
-    method: "POST",
-    url: "/api/v1/wiki/articles/shared-page/comments",
-    headers: auth(ALICE),
-    payload: { content: "Alice's comment" },
-  });
-  expect(made.statusCode, made.body).toBe(201);
-  const id = made.json<{ id: string }>().id;
-  const calls: [Method | "POST", string, object?][] = [
-    ["PATCH", `/api/v1/wiki/comments/${id}`, { content: "Bob was here" }],
-    ["POST", `/api/v1/wiki/comments/${id}/resolve`],
-    ["DELETE", `/api/v1/wiki/comments/${id}`],
-  ];
-  for (const [method, url, payload] of calls) {
-    const res = await app.inject({ method, url, headers: auth(BOB), payload });
-    expect([403, 404], `${method} ${url} as Bob: ${res.statusCode} ${res.body}`).toContain(
-      res.statusCode,
-    );
-  }
-  const own = await app.inject({
-    method: "PATCH",
-    url: `/api/v1/wiki/comments/${id}`,
-    headers: auth(ALICE),
-    payload: { content: "edited" },
-  });
-  expect(own.statusCode, own.body).toBeLessThan(300);
 });

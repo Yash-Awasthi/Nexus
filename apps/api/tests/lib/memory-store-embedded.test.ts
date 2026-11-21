@@ -3,7 +3,7 @@
  * The shared memory store on the embedded database: pgvector search, and the
  * one-time move of entries that older desktop builds kept in nexus_kv.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const DB = "pglite://:memory:memory-store-embedded";
 

@@ -14,7 +14,7 @@ services:
     dockerfilePath: ./infra/web/Dockerfile
     dockerContext: .
     plan: free
-    branch: main
+    branch: master
     autoDeploy: true
     # Readiness, not liveness: the early health server answers /health while the app still loads,
     # so a deploy or restart would switch traffic to an instance that cannot serve yet.

@@ -10,8 +10,8 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { PresetName } from "@nexus/agent-runtime";
-import type { LlmDriver } from "@nexus/llm-drivers";
+import type { PresetName } from "@nexus/agent-core/runtime";
+import type { LlmDriver } from "@nexus/llm/drivers";
 
 const QUEUE_HIGH = "nexus-high";
 const QUEUE_MEDIUM = "nexus-medium";

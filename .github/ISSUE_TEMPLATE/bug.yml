@@ -17,7 +17,7 @@ body:
     attributes:
       label: Affected package
       options:
-        - "@nexus/runtime"
+        - "@nexus/agent-core"
         - "@nexus/council"
         - "@nexus/governance"
         - "@nexus/db"

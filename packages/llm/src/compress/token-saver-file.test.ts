@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compressOutputForCommand } from "./token-saver.ts";
 
 function tsSource(n: number): string {
@@ -304,5 +304,92 @@ describe("fileContentProcessor — logs, docs, heuristics", () => {
     expect(r.wasCompressed).toBe(true);
     expect(r.output).toContain("root");
     expect(r.output).toMatch(/\(\d+ total lines\)$/m);
+  });
+
+  it("heuristic csv detection applies to extensionless files with stable columns", () => {
+    const rows = ["name,id,score"];
+    for (let i = 0; i < 120; i++) rows.push(`user_${i},${i},${i % 5}`);
+    const out = rows.join("\n");
+    const r = compressOutputForCommand("cat export", out);
+    expect(r.processor).toBe("file_content");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("name,id,score");
+    expect(r.output).toContain("... (115 rows omitted)");
+    expect(r.output).toContain("(120 data rows, 3 columns)");
+    expect(r.output).not.toContain("user_60,");
+  });
+});
+
+describe("fileContentProcessor — remaining lock and structured formats", () => {
+  it("extracts yarn.lock entries with versions", () => {
+    const lines = ["# yarn lockfile v1", ""];
+    for (let i = 0; i < 30; i++) {
+      lines.push(
+        `"pkg_${i}@^1.0.0":`,
+        `  version "1.${i}.0"`,
+        `  resolved "https://registry.yarnpkg.com/pkg_${i}/-/pkg_${i}-1.${i}.0.tgz"`,
+        "",
+      );
+    }
+    const out = lines.join("\n");
+    expect(out.split("\n").length).toBeGreaterThan(100);
+    const r = compressOutputForCommand("cat yarn.lock", out);
+    expect(r.processor).toBe("file_content");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toMatch(/^lock file \(\d+ entries, \d+ lines\):$/m);
+    expect(r.output).toContain("  pkg_0@^1.0.0 -> 1.0.0");
+    expect(r.output).toContain("  pkg_29@^1.0.0 -> 1.29.0");
+    expect(r.output).not.toContain("resolved");
+  });
+
+  it("extracts composer.lock package names and versions", () => {
+    const packages = Array.from({ length: 40 }, (_, i) => ({
+      name: `vendor/pkg_${i}`,
+      version: `1.${i}.0`,
+      source: { type: "git", url: `https://github.com/vendor/pkg_${i}.git` },
+    }));
+    const out = JSON.stringify({ packages, "packages-dev": [] }, null, 2);
+    expect(out.split("\n").length).toBeGreaterThan(100);
+    const r = compressOutputForCommand("cat composer.lock", out);
+    expect(r.processor).toBe("file_content");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toMatch(/^lock file \(40 packages, \d+ lines\):$/m);
+    expect(r.output).toContain("  vendor/pkg_0@1.0.0");
+    expect(r.output).toContain("  vendor/pkg_39@1.39.0");
+    expect(r.output).not.toContain("github.com");
+  });
+
+  it("keeps toml sections and top-level keys, omits nested lines", () => {
+    const lines = ["[package]", 'name = "demo"', 'version = "0.1.0"', ""];
+    for (let i = 0; i < 40; i++) lines.push(`key_${i} = "value_${i}"`);
+    for (let i = 0; i < 60; i++)
+      lines.push(`  dep_${i} = { version = "1.0", features = ["derive"] }`);
+    const out = lines.join("\n");
+    expect(out.split("\n").length).toBeGreaterThan(100);
+    const r = compressOutputForCommand("cat Cargo.toml", out);
+    expect(r.processor).toBe("file_content");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("[package]");
+    expect(r.output).toContain('name = "demo"');
+    expect(r.output).toContain("additional lines omitted");
+    expect(r.output).toMatch(/\(\d+ total lines\)$/m);
+    expect(r.output).not.toContain("dep_0");
+  });
+
+  it("keeps xml root/declaration lines and omits deep nesting", () => {
+    const lines = ['<?xml version="1.0"?>', "<root>"];
+    for (let i = 0; i < 60; i++)
+      lines.push(`    <item id="${i}">`, `        <name>n${i}</name>`, "    </item>");
+    lines.push("</root>");
+    const out = lines.join("\n");
+    expect(out.split("\n").length).toBeGreaterThan(100);
+    const r = compressOutputForCommand("cat config.xml", out);
+    expect(r.processor).toBe("file_content");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain('<?xml version="1.0"?>');
+    expect(r.output).toContain("<root>");
+    expect(r.output).toContain("nested lines omitted");
+    expect(r.output).toMatch(/\(\d+ total lines\)$/m);
+    expect(r.output).not.toContain("<name>n0</name>");
   });
 });

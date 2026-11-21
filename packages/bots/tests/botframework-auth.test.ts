@@ -2,7 +2,7 @@
 /** NX-SEC-005: a Teams activity is processed only when Bot Framework signed it for this bot and its service URL. */
 import { createSign, generateKeyPairSync } from "node:crypto";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { TeamsBotAdapter, type FetchFn } from "../src/index.ts";
 

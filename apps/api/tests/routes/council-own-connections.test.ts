@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A caller whose only connection is a custom endpoint still gets a council, on that endpoint. */
-import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
-import { describe, expect, it, vi } from "vitest";
+import type { LlmDriver, LlmRequestOptions } from "@nexus/llm/drivers";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 const asked: string[] = [];
 const custom = {
@@ -22,7 +22,7 @@ const custom = {
 
 let connections: { id: string; driver: LlmDriver }[] = [{ id: "tokenharbor", driver: custom }];
 vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => {
-  const { DriverRegistry } = await import("@nexus/llm-drivers");
+  const { DriverRegistry } = await import("@nexus/llm/drivers");
   return {
     ...(await importOriginal<typeof import("../../src/lib/provider-keys.ts")>()),
     // No key for any council alias provider.

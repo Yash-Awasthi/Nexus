@@ -197,7 +197,8 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
     // ── tools/call ──────────────────────────────────────────────────────────
     if (method === "tools/call") {
       const p = params as
-        { name?: string; arguments?: Record<string, unknown>; approvalId?: string } | undefined;
+        | { name?: string; arguments?: Record<string, unknown>; approvalId?: string }
+        | undefined;
       const toolName = p?.name;
       const args = p?.arguments ?? {};
 

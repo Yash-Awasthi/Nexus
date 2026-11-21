@@ -3,14 +3,14 @@
 # Build: docker build -t nexus-worker -f apps/worker/Dockerfile .
 
 # Debian rather than Alpine: the browser agent's Chromium needs glibc.
-FROM node:26-bookworm-slim AS deps
+FROM node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS deps
 WORKDIR /app
 
 # python3/make/g++ compile node-pty's native extension during pnpm install.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ \
  && rm -rf /var/lib/apt/lists/* \
- && npm install -g pnpm@12.11.2 --no-fund --no-audit
+ && npm install -g pnpm@12.21.0 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
@@ -37,7 +37,7 @@ RUN pnpm install --frozen-lockfile --prod --filter "@nexus/worker..." \
  && rm -rf packages/*/tests packages/*/dist apps/*/tests
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
-FROM node:26-bookworm-slim AS runner
+FROM node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS runner
 WORKDIR /app
 
 RUN groupadd -g 1001 nexus && useradd -u 1001 -g nexus -s /bin/sh -m nexus \

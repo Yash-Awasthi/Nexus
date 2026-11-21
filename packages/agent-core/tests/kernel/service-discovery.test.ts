@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { HealthMonitor, LocalServiceDiscovery } from "../../src/kernel/service-discovery.ts";
 import type { IConfigLoader } from "../../src/kernel/config-loader.ts";

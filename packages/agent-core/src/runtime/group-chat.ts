@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agent-runtime — conversational group chat (AutoGen AgentChat parity).
+ * @nexus/agent-core — conversational group chat (AutoGen AgentChat parity).
  *
  * AutoGen (row 48, microsoft/autogen — now in maintenance mode behind
  * Microsoft Agent Framework) is built on two primitives neither existing

@@ -14,8 +14,8 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import type { Tier } from "@nexus/agent-core/tier-gate";
 import { authenticate, AuthError, verifyJwtRS256 } from "@nexus/auth";
-import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 import { sha256hex } from "../lib/crypto-utils.ts";

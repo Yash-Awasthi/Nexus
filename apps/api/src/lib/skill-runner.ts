@@ -17,16 +17,19 @@
 
 import crypto from "node:crypto";
 
-import type { RuntimeTool, ToolContext } from "@nexus/agent-runtime";
+import type { RuntimeTool, ToolContext } from "@nexus/agent-core/runtime";
 import type { ExecAction } from "@nexus/exec-policy";
-import { compressForTool, injectSystemPrompt, type InjectorName } from "@nexus/llm-compress";
-import { executeCode, type Runner, type SandboxLanguage } from "@nexus/sandbox";
+import { compressForTool, injectSystemPrompt, type InjectorName } from "@nexus/llm/compress";
+import {
+  executeCode,
+  resolveUntrustedRunner,
+  type Runner,
+  type SandboxLanguage,
+} from "@nexus/sandbox";
 
 import { classifyAction } from "./exec-approvals.ts";
 import type { ExecutionStatus } from "./session-graph.ts";
 import { splitSkillCodeImports } from "./skill-imports.ts";
-import { runUntrustedJs } from "./untrusted-js.ts";
-import { runUntrustedPython } from "./untrusted-python.ts";
 
 /** Structural shape of a stored skill (matches StoredSkill in routes/skills.ts). */
 /** Output styles for mission agents — opt-in system-prompt injectors that cut
@@ -139,8 +142,8 @@ function outcomeDetail(r: {
 type RunCodeResult = Awaited<ReturnType<typeof executeCode>>;
 
 /**
- * Python and JavaScript run in the same restricted children as the Sandbox page: the host may
- * have no python3 (Render has none), and skill code should not run with the host's rights.
+ * Skill code is untrusted: it runs through the Docker sandbox, and fails closed when
+ * `NEXUS_SANDBOX_IMAGE` or Docker is missing instead of touching the host.
  */
 async function runSkillCode(
   language: SandboxLanguage,
@@ -148,23 +151,8 @@ async function runSkillCode(
   timeoutMs: number,
   runner?: Runner,
 ): Promise<RunCodeResult> {
-  if (runner || (language !== "python" && language !== "javascript"))
-    return executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, runner);
-  const r =
-    language === "python"
-      ? await runUntrustedPython(code, timeoutMs)
-      : await runUntrustedJs(code, timeoutMs);
-  const ok = r.exitCode === 0 && !r.timedOut;
-  return {
-    ok,
-    stdout: r.stdout,
-    stderr: r.stderr,
-    exitCode: r.exitCode,
-    timedOut: r.timedOut,
-    durationMs: r.durationMs,
-    language,
-    ...(ok ? {} : { error: r.timedOut ? "timed out" : `exit code ${r.exitCode}` }),
-  };
+  const effective = runner ?? (await resolveUntrustedRunner());
+  return executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, effective);
 }
 
 /**

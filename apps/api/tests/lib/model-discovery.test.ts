@@ -6,7 +6,7 @@
  * dead daemon never fails discovery.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { discoverModels, probeOllamaModels } from "../../src/lib/model-discovery.ts";
 

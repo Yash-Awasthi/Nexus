@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:session-revocation";
 process.env.NEXUS_JWT_SECRET = "session-revocation-secret";

@@ -3,8 +3,8 @@
  * k6 smoke test — fast sanity check before/after deploy
  * Usage: k6 run infra/k6/smoke-test.js -e BASE_URL=... -e API_KEY=...
  */
-import http from "k6/http";
 import { check } from "k6";
+import http from "k6/http";
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const API_KEY = __ENV.API_KEY || "dev-key";
@@ -21,10 +21,14 @@ export default function () {
   check(http.get(`${BASE_URL}/health`), { "health ok": (r) => r.status === 200 });
   check(http.get(`${BASE_URL}/health/ready`), { ready: (r) => r.status === 200 });
 
-  // Auth required
-  check(http.get(`${BASE_URL}/api/v1/runtime/tasks`), {
-    "requires auth": (r) => r.status === 401 || r.status === 200,
-  });
+  // Auth required. A 401 is the expected answer here, so it must not count as
+  // a failed request in the http_req_failed threshold.
+  check(
+    http.get(`${BASE_URL}/api/v1/runtime/tasks`, {
+      responseCallback: http.expectedStatuses(200, 401),
+    }),
+    { "requires auth": (r) => r.status === 401 || r.status === 200 },
+  );
 
   // Tasks list
   check(http.get(`${BASE_URL}/api/v1/runtime/tasks?limit=5`, { headers }), {

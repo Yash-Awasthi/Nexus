@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:env-key-pool";
 const SECRET = "env-key-pool-secret";

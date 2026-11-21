@@ -12,13 +12,15 @@ playwright-report/
 *.gen.ts
 *.gen.py
 pnpm-lock.yaml
-infra/helm/
 .docusaurus/
 REF/
 .claude/worktrees/
 
 # Local reference clones (inspiration material — never repo source)
 inspiration/
+
+# Vendored reference repositories checked in under the board's sources tree.
+services/board/sources/
 
 # Runtime store files written by the app, not source.
 apps/api/data/stores/

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:auth-account-ceiling";
 process.env.NEXUS_JWT_SECRET = "auth-account-ceiling-secret";

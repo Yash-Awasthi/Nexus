@@ -79,7 +79,13 @@ export const WAKE_SOURCES = [
 export type WakeSource = (typeof WAKE_SOURCES)[number];
 
 export type RunStatus =
-  "queued" | "running" | "succeeded" | "failed" | "cancelled" | "timed_out" | "skipped";
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out"
+  | "skipped";
 
 export interface RunLogLine {
   ts: string;

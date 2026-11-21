@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Rows from before owner scoping belong to no one on a shared server, and to the user on the desktop. */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { ownsRow } from "../../src/lib/owner.ts";
 

@@ -5,7 +5,7 @@
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 
-import { SANDBOX_PRELUDE } from "@nexus/agent-runtime";
+import { SANDBOX_PRELUDE } from "@nexus/agent-core/runtime";
 
 import { runSandboxedNode, STARTED, type SandboxRunResult } from "./untrusted-js.ts";
 

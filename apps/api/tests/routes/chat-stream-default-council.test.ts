@@ -3,10 +3,10 @@
  * A browser that never chose a council asks for the UI's built-in trio (ChatGPT, Gemini, Claude).
  * When the server holds none of those keys, NEXUS_DEFAULT_COUNCIL answers instead of an error.
  */
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 process.env.NEXUS_DEFAULT_COUNCIL = "groq:open-model-a, groq:open-model-b";
 const asked: string[] = [];

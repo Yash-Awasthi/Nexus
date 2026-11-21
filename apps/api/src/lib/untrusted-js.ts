@@ -12,7 +12,7 @@
 
 import { spawn } from "node:child_process";
 
-import { SANDBOX_PRELUDE } from "@nexus/agent-runtime";
+import { SANDBOX_PRELUDE } from "@nexus/agent-core/runtime";
 
 export interface SandboxRunResult {
   stdout: string;

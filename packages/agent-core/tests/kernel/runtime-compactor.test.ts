@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import type { EventBusStats } from "../../src/kernel/event-bus.ts";
 import type { IQueueBackend } from "../../src/kernel/interfaces/queue.interface.ts";
 import type { MetricsCollector } from "../../src/kernel/observability-manager.ts";
 import { MetricsCollector as RealMetricsCollector } from "../../src/kernel/observability-manager.ts";
-import { LeakDetector, ResourceQuotaManager, RuntimeCompactor } from "../../src/kernel/runtime-compactor.ts";
+import {
+  LeakDetector,
+  ResourceQuotaManager,
+  RuntimeCompactor,
+} from "../../src/kernel/runtime-compactor.ts";
 
 function stats(overrides: Partial<EventBusStats> = {}): EventBusStats {
   return {

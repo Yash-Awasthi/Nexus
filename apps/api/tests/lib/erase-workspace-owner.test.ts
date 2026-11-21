@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A workspace owner can erase their account: shared workspaces pass to a member, solo ones go. */
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:erase-workspace-owner";
 process.env.DATABASE_URL = DB;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A research run is found only by the account that made it. */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 const { loadRun, persistRun } = await import("../../src/routes/researcher.ts");
 

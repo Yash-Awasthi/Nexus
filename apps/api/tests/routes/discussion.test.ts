@@ -7,10 +7,10 @@
  * arriving as SSE frames, the caps a caller may set, and the errors a caller
  * gets before any stream is opened.
  */
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 
 /** Per-model reply scripts, one entry per turn; the last entry repeats. */
 const script: Record<string, string[]> = {};

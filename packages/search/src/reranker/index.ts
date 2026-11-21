@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/reranker — Cross-encoder reranker for RAG precision improvement.
+ * @nexus/search — Cross-encoder reranker for RAG precision improvement.
  *
  * Performs a reranking pass after initial vector + BM25 retrieval to dramatically
  * improve the final ranked list quality.
@@ -14,7 +14,7 @@
  * Usage
  * ─────
  * ```ts
- * import { BM25Reranker } from "@nexus/reranker";
+ * import { BM25Reranker } from "@nexus/search/reranker";
  * const reranker = new BM25Reranker();
  * const result = await reranker.rerank("authentication bug", documents, { topK: 5 });
  * ```

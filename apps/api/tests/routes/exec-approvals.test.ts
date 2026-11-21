@@ -13,7 +13,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET = "exec-approval-test-secret";
 
@@ -303,31 +303,11 @@ describe("a mission with attached skills", () => {
   });
 });
 
-describe("the drive's command runner", () => {
-  it("runs nothing in readonly mode and nothing a deny rule covers", async () => {
-    process.env.NEXUS_EXEC_MODE = "readonly";
-    try {
-      const r = await call("POST", "/api/v1/drive/exec", ALICE, { command: "echo hi" });
-      expect(r.statusCode).toBe(403);
-      expect(JSON.parse(r.payload).error).toBe("exec_denied");
-    } finally {
-      process.env.NEXUS_EXEC_MODE = "ask";
-    }
-    process.env.NEXUS_EXEC_DENY = "sh";
-    try {
-      const r = await call("POST", "/api/v1/drive/exec", ALICE, { command: "echo hi" });
-      expect(r.statusCode).toBe(403);
-    } finally {
-      delete process.env.NEXUS_EXEC_DENY;
-    }
-  });
-});
-
 describe("the code agent and build runners", () => {
   it("run nothing in readonly mode", async () => {
     process.env.NEXUS_EXEC_MODE = "readonly";
     try {
-      for (const url of ["/api/code-agent/execute", "/api/build/run", "/api/code-agent/run"]) {
+      for (const url of ["/api/code-agent/execute", "/api/code-agent/run"]) {
         const r = await call("POST", url, ALICE, {
           code: "print(1)",
           task: "print one",

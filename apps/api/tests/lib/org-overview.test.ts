@@ -4,7 +4,7 @@
  * and across the owner's portfolio, and never another owner's rows.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

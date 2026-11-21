@@ -20,7 +20,7 @@
  * Zero new external dependencies — wires onto existing OTel span attribute map.
  *
  * Usage:
- *   // At call site in @nexus/llm-drivers or @nexus/gateway:
+ *   // At call site in @nexus/llm or @nexus/gateway:
  *   const attrs = createLlmSpanAttributes({
  *     model: "claude-sonnet-4-5",
  *     provider: "anthropic",
@@ -463,7 +463,7 @@ export interface LlmGenerationRecord {
 
 /**
  * Build a durable LlmGenerationRecord from span input + timing.
- * Use this at the end of every LLM provider call in @nexus/llm-drivers
+ * Use this at the end of every LLM provider call in @nexus/llm
  * and @nexus/gateway to produce a structured audit record.
  */
 export function buildGenerationRecord(

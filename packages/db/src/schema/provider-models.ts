@@ -11,14 +11,14 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * provider_models — model catalog seeded from models.dev (ROADMAP §1.5).
+ * provider_models — model catalog seeded from models.dev.
  *
  * One row per model definition from the models.dev catalogue (or a curated
  * fixture). Rows are written by `nexus models seed [--file <path>]` — never by
  * a startup network pull — and read into the in-memory ProviderRegistry at API
- * boot (§1.5: "boot reads the table; zero network at startup").
+ * boot (zero network at startup).
  *
- * Shape mirrors the ModelDefinition type in @nexus/provider-registry: ids are
+ * Shape mirrors the ModelDefinition type in @nexus/llm: ids are
  * namespaced `provider/model`, prices are USD per token (per-million divided by
  * 1e6, null = free), and capabilities is the six-flag capability record.
  */

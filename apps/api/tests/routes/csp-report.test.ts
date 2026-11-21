@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** NX-FEAT-013: browsers report CSP violations to the API, which logs them without query strings. */
 import Fastify from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 import { cspReportRoutes, normalizeCspReports } from "../../src/routes/csp-report.ts";
 

@@ -12,6 +12,7 @@
  *   worker (queued) paths share a single transport implementation.
  */
 
+import { makeTierGatePreHandler } from "@nexus/agent-core/tier-gate";
 import type { CouncilRequest, CouncilResponse, ModelVote } from "@nexus/contracts";
 import { COUNCIL_TEMPLATES, CouncilService, detectTaskCategory } from "@nexus/council";
 import type {
@@ -23,8 +24,7 @@ import type {
 } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts, signals } from "@nexus/db/schema";
-import { OllamaDriver, type DriverRegistry, type LlmRole } from "@nexus/llm-drivers";
-import { makeTierGatePreHandler } from "@nexus/tier-gate";
+import { OllamaDriver, type DriverRegistry, type LlmRole } from "@nexus/llm/drivers";
 import { and, eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -109,7 +109,7 @@ export function resolveMemberModel(choice: string): { provider: string; model: s
 // ── LlmDriversTransport ───────────────────────────────────────────────────────
 
 /**
- * ILLMTransport backed by @nexus/llm-drivers DriverRegistry.
+ * ILLMTransport backed by @nexus/llm DriverRegistry.
  * Identical to the one in council-handler.ts — both code paths share the
  * same transport so provider behaviour is consistent.
  */

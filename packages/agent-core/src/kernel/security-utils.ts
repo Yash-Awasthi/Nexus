@@ -35,8 +35,7 @@ function parseIPv4ToOctets(host: string): [number, number, number, number] | nul
     if (p === "") return null;
     let n: number;
     if (/^0x[0-9a-f]+$/i.test(p)) n = parseInt(p, 16);
-    else if (/^0[0-7]+$/.test(p))
-      n = parseInt(p, 8); // leading-zero octal
+    else if (/^0[0-7]+$/.test(p)) n = parseInt(p, 8); // leading-zero octal
     else if (/^\d+$/.test(p)) n = parseInt(p, 10);
     else return null;
     return Number.isFinite(n) ? n : null;

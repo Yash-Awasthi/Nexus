@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A per-account cache lets go of accounts that went quiet, and releases what they held. */
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 
 import { IdleMap } from "../../src/lib/idle-map.ts";
 

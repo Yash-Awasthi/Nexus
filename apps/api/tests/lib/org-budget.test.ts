@@ -5,8 +5,8 @@
  * could cross a limit before any money is spent.
  */
 
-import type { LlmDriver } from "@nexus/llm-drivers";
-import { describe, it, expect } from "vitest";
+import type { LlmDriver } from "@nexus/llm/drivers";
+import { describe, it, expect } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

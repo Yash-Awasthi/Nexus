@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { ScoredChunk } from "@nexus/retrieval";
-import { describe, expect, it } from "vitest";
+import type { ScoredChunk } from "@nexus/search/retrieval";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   citedNumbers,

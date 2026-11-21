@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vite-plus/test";
 
 import { requireAuth } from "../../src/middleware/auth.ts";
 

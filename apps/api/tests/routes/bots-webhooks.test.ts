@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Bot webhooks act only on requests their platform can be shown to have sent. */
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 process.env.TEAMS_BOT_APP_ID = "teams-app";
 process.env.TEAMS_BOT_APP_PASSWORD = "teams-password";

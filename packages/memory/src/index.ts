@@ -2244,7 +2244,12 @@ export type UpdateMerge = {
 
 /** Union of all atomic update operations supported by IStream.update(). */
 export type UpdateOp =
-  UpdateSet | UpdateIncrement | UpdateDecrement | UpdateAppend | UpdateRemove | UpdateMerge;
+  | UpdateSet
+  | UpdateIncrement
+  | UpdateDecrement
+  | UpdateAppend
+  | UpdateRemove
+  | UpdateMerge;
 
 export interface StreamUpdateInput {
   stream_name: string;

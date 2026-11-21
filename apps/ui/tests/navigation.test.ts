@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 const appDir = path.resolve(__dirname, "../app");
 const read = (p: string) => fs.readFileSync(path.join(appDir, p), "utf8");
@@ -89,6 +89,11 @@ const SUBROUTES = [
   "/connectors/onboarding",
   "/profile",
   "/setup",
+  // The /knowledge tab shell renders these four; the standalone routes are deep links.
+  "/knowledge-bases",
+  "/knowledge-graph",
+  "/memory",
+  "/search",
 ];
 const PUBLIC = [
   "/",

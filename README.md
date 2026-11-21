@@ -169,7 +169,7 @@ output over SSE (`GET /api/local/pty/:id/stream`), and drives it with
 `write` / `resize` / `DELETE`. It spawns processes on the machine the API runs
 on, so it is hard-gated to loopback addresses (`127.*`, `::1`, `::ffff:127.*`)
 — a non-loopback caller always gets `403 local_only`, and only explicit
-`NEXUS_LOCAL_PTY_FORCE=1` (tests / remote debugging) opens it up.
+`NEXUS_LOCAL_PTY_FORCE=1` (tests / remote debugging) opens it up outside production; a deployed server ignores it and stays loopback-only.
 
 `GET /api/local/status` reports the live deployment surface — whether this
 request is loopback, whether the PTY plane is reachable, which agent CLIs are
@@ -209,7 +209,6 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 | [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore          |
 | [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown  |
 | [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
-| [ROADMAP.md](ROADMAP.md)                           | Shipped work, external gates, future direction          |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template            |
 
 ---

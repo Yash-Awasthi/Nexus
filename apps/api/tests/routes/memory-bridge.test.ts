@@ -11,7 +11,7 @@
  * The module-level memory manager is shared across tests in this file; each
  * mutating test ends with the delete-all endpoint to reset state.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

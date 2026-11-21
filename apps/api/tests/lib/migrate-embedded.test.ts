@@ -4,7 +4,7 @@
  * test is that the shipped `.sql` files apply to PGlite and leave the tables
  * sign-in needs, which only executing them can show.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vite-plus/test";
 
 import { migrateEmbedded } from "../../src/lib/migrate-embedded.ts";
 import { closePgPools, getPgPool } from "../../src/lib/pg-pool.ts";

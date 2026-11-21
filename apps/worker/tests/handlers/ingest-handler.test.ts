@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 // vi.mock() is hoisted to the top of the file by Vitest's transform, so any
 // variables it references must also be hoisted via vi.hoisted() — otherwise

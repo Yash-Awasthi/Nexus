@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 const DB = "pglite://:memory:browser-task-resume";
 const SECRET = "browser-task-resume-secret";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   BrowserUrlBlockedError,
@@ -196,5 +196,54 @@ describe("browserDecisionMessages", () => {
     expect(system).toMatch(/untrusted/i);
     expect(user.match(/<<<END PAGE>>>/g)).toHaveLength(1);
     expect(user.indexOf("New goal")).toBeLessThan(user.indexOf("<<<END PAGE>>>"));
+  });
+});
+
+// ── Failure handling ──────────────────────────────────────────────────────────
+
+class FailingClickPage extends FakePage {
+  override async click(): Promise<void> {
+    throw new Error("selector not found");
+  }
+}
+
+describe("runBrowserAgentTask failure handling", () => {
+  it("marks the run as error when the planner throws", async () => {
+    const page = new FakePage();
+    const out = await runBrowserAgentTask(session(), {
+      withPage: <T>(fn: (p: BrowserAgentPage) => Promise<T>) => fn(page),
+      decide: async () => {
+        throw new Error("planner down");
+      },
+      save: () => {},
+    });
+    expect(out.status).toBe("error");
+    expect(out.error).toContain("planner down");
+  });
+
+  it("stops after three identical failing actions", async () => {
+    const page = new FailingClickPage();
+    const out = await runBrowserAgentTask(session(), {
+      withPage: <T>(fn: (p: BrowserAgentPage) => Promise<T>) => fn(page),
+      decide: async () => ({ action: "click", target: "#ghost", description: "try" }),
+      save: () => {},
+    });
+    expect(out.status).toBe("error");
+    expect(out.error).toContain("no progress");
+    expect(out.steps).toHaveLength(3);
+  });
+
+  it("honours an already-aborted signal", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const page = new FakePage();
+    const out = await runBrowserAgentTask(session({ url: undefined }), {
+      withPage: <T>(fn: (p: BrowserAgentPage) => Promise<T>) => fn(page),
+      decide: async () => ({ action: "done", description: "never", done: true }),
+      save: () => {},
+      signal: controller.signal,
+    });
+    expect(out.status).toBe("error");
+    expect(out.error).toContain("aborted");
   });
 });

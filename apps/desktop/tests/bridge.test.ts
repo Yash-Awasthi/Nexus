@@ -7,7 +7,7 @@
  * unimplemented method, and a method must not be reachable without its
  * capability being declared.
  */
-import { describe, it, expect, vi, type Mock } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vite-plus/test";
 
 import {
   CAPABILITY_METHODS,

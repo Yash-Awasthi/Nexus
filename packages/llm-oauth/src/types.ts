@@ -62,7 +62,7 @@ export interface AuthProvider {
   /** Exchange a refresh token for a fresh access token. Throws if not refreshable. */
   refresh(tokens: OAuthTokens): Promise<OAuthTokens>;
   /**
-   * Map stored tokens into the credential object the matching @nexus/llm-drivers
+   * Map stored tokens into the credential object the matching @nexus/llm
    * driver consumes (e.g. Google → VertexConfig `{ apiKey, project, region }`).
    */
   toDriverCredentials(tokens: OAuthTokens): Record<string, unknown>;

@@ -26,7 +26,7 @@ body:
       options:
         - "Sense (nexus-ingest)"
         - "Think (@nexus/council)"
-        - "Decide (@nexus/runtime / @nexus/governance)"
+        - "Decide (@nexus/agent-core / @nexus/governance)"
         - "Act (@nexus/adapters)"
         - "Web UI (@nexus/web)"
         - "CLI (@nexus/cli)"

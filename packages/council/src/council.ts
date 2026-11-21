@@ -2,7 +2,7 @@
 /**
  * Council — the SDK's multi-model vote: every member driver answers the same question, and the
  * votes are tallied by the chosen mode (see tallyVotes). Members are any driver with
- * `complete`, such as those in @nexus/llm-drivers.
+ * `complete`, such as those in @nexus/llm.
  */
 import type { ModelVote } from "@nexus/contracts";
 

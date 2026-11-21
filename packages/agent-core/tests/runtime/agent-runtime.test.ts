@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   ToolStreamParser,
   StrReplaceProcessor,
@@ -10,6 +10,7 @@ import {
   AgentRuntime,
   ToolAgentRuntime,
   classifyTool,
+  AUTO_ALLOWED_TOOLS,
   compactMessages,
   estimateMessageTokens,
   estimateContextTokens,
@@ -362,6 +363,31 @@ describe("classifyTool", () => {
   });
   it("requires permission for mutating / unknown tools", () => {
     for (const n of ["write_file", "edit_file", "run_command", "mcp__do_thing"]) {
+      expect(classifyTool(n)).toBe("requires_permission");
+    }
+  });
+  it("allowlists only the read-only names the runtime ships", () => {
+    // Pinned so an auto-allow addition cannot land without changing this test.
+    expect([...AUTO_ALLOWED_TOOLS].sort()).toEqual(
+      [
+        "codesearch",
+        "conversation_search",
+        "glob",
+        "grep",
+        "list",
+        "list_files",
+        "ls",
+        "memory",
+        "read",
+        "read_file",
+        "session_search",
+        "todo",
+        "todoread",
+        "todowrite",
+      ].sort(),
+    );
+    for (const n of ["write", "write_file", "edit", "bash", "run_command"]) {
+      expect(AUTO_ALLOWED_TOOLS.has(n)).toBe(false);
       expect(classifyTool(n)).toBe("requires_permission");
     }
   });

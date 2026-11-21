@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A multi-part question searched as its sub-questions, each retrieved and merged. */
-import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
+import type { LlmDriver, LlmRequestOptions } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 const asked: string[] = [];
 const splitter = {

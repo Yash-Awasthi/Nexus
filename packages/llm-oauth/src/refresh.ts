@@ -26,6 +26,14 @@ export class TokenRefresher {
   }
 
   /**
+   * Drop any in-flight refresh for `accountKey`. Revocation calls this so a
+   * racing refresh cannot hand a revoked grant back to a waiting caller.
+   */
+  evict(accountKey: string): void {
+    this.inFlight.delete(accountKey);
+  }
+
+  /**
    * Return a still-valid token, refreshing first if it is expiring. `accountKey`
    * scopes the dedup — concurrent calls with the same key share one refresh.
    */

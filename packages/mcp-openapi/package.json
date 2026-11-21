@@ -11,13 +11,13 @@
   },
   "scripts": {
     "clean": "rm -rf dist coverage",
-    "test": "vitest run"
+    "test": "vp test run"
   },
   "dependencies": {
     "@nexus/mcp-client": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

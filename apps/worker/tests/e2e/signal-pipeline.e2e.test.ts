@@ -9,7 +9,7 @@
  * Skips automatically when DATABASE_URL is absent so unit test runs are unaffected.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 import { randomUUID } from "node:crypto";
 
 // Skip entire suite in environments without a live DB

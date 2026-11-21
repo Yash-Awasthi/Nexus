@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A browser task reaches the queue under an id BullMQ accepts, so the worker gets it. */
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 const added = vi.hoisted(() => [] as { name: string; opts: { jobId?: string } }[]);
 vi.mock("bullmq", () => ({

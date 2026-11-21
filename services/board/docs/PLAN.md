@@ -58,14 +58,14 @@
 
 New or extended HTTP routes:
 
-| Route | Purpose |
-| --- | --- |
-| `POST /api/agents/run` | Claim a task and launch its agent under supervision |
-| `GET /api/agents/logs` | SSE tail/follow of `<channel>/agents/<agent>-supervisor.log` |
-| `POST /api/agents/terminate` | End a supervised process tree |
-| `POST /api/tasks/requeue` | Force any task back to `queued` and release its locks |
-| `GET /api/agents` | Registered agents plus `running` supervisor processes |
-| `GET /api/overview` | Now includes `running` processes |
+| Route                        | Purpose                                                      |
+| ---------------------------- | ------------------------------------------------------------ |
+| `POST /api/agents/run`       | Claim a task and launch its agent under supervision          |
+| `GET /api/agents/logs`       | SSE tail/follow of `<channel>/agents/<agent>-supervisor.log` |
+| `POST /api/agents/terminate` | End a supervised process tree                                |
+| `POST /api/tasks/requeue`    | Force any task back to `queued` and release its locks        |
+| `GET /api/agents`            | Registered agents plus `running` supervisor processes        |
+| `GET /api/overview`          | Now includes `running` processes                             |
 
 ## 4. Milestone 6.3 — Verification
 

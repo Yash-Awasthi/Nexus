@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** NX-SEC-018: a host terminal session is visible and writable only by the account that started it. */
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 process.env.NEXUS_EXEC_MODE = "trusted";
 process.env.NEXUS_EXEC_ALLOW = "node";

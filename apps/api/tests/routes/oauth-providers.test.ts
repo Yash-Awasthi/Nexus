@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The sign-in page only offers the OAuth providers this server can complete. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 delete process.env.GOOGLE_CLIENT_ID;
 process.env.GITHUB_CLIENT_ID = "gh-client";

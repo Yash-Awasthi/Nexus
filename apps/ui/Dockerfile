@@ -5,14 +5,14 @@
 # Stage 2: nginx serves static files + proxies /api/* to nexus-api
 
 # ── Stage 1: builder ─────────────────────────────────────────────────────────
-FROM node:26-alpine AS builder
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS builder
 
 WORKDIR /app
 
 # python3/make/g++ are needed to compile node-pty's native extension during
 # pnpm install (no prebuilt binary for alpine/musl).
 RUN apk add --no-cache python3 make g++ \
- && npm install -g pnpm@12.11.2
+ && npm install -g pnpm@12.21.0
 
 # Copy workspace config
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -27,7 +27,7 @@ RUN pnpm install --frozen-lockfile --filter "@nexus/ui..."
 RUN pnpm --filter @nexus/ui build
 
 # ── Stage 2: nginx ────────────────────────────────────────────────────────────
-FROM nginx:1.31-alpine AS runner
+FROM nginx:1.31-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7 AS runner
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf

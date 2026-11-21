@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import {
   LlmError,
   type LlmDriver,
   type LlmRequestOptions,
   type LlmResponse,
   type StreamHandler,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 
 import {
   CallRefused,

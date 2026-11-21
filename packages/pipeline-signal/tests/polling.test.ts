@@ -3,7 +3,7 @@
  * Tests for SignalProcessor polling lifecycle (start / stop / scheduleNext).
  * Uses vi.useFakeTimers so no real I/O is performed.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
 import {
   SignalProcessor,

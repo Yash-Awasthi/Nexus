@@ -8,7 +8,7 @@ import path from "node:path";
 import type { DenoInvocation, SandboxExecutionResult } from "@nexus/plugin-sdk";
 import { SandboxUnavailableError } from "@nexus/plugin-sdk";
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const SECRET = "plugin-run-secret";
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-plugins-"));

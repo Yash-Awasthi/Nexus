@@ -87,32 +87,9 @@ docker compose -f docker-compose.prod.yml up -d
 
 ### 2.3 Kubernetes (Helm)
 
-```bash
-# Add chart repo (once published)
-helm repo add nexus https://charts.nexus.dev
-helm repo update
-
-# Install with custom values
-helm install nexus nexus/nexus \
-  --namespace nexus-system --create-namespace \
-  --values infra/helm/nexus/values.yaml \
-  --set api.env.NEXUS_API_KEY=$NEXUS_API_KEY \
-  --set db.url=$DATABASE_URL \
-  --set redis.url=$REDIS_URL
-
-# Check rollout
-kubectl rollout status deployment/nexus-api -n nexus-system
-```
-
-### 2.4 Terraform (Fly.io)
-
-```bash
-cd infra/terraform/examples/fly
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform plan
-terraform apply
-```
+Nexus deploys to Render as a single web service (`render.yaml`, image
+`infra/web/Dockerfile`). There is no Helm chart or Terraform tree any more; scale by raising the
+instance count and the plan in the Render dashboard, and let the platform roll the deploy.
 
 ---
 

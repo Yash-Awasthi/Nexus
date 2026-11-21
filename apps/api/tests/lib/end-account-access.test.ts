@@ -2,7 +2,7 @@
 /** An account that is suspended, deleted or claimed keeps no personal access token working. */
 import crypto from "node:crypto";
 
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:end-account-access";
 process.env.DATABASE_URL = DB;

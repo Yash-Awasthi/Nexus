@@ -53,6 +53,12 @@ export class OAuthTokenStore {
   private readonly vault: Vault;
   private readonly store: SealedTokenStore;
 
+  /**
+   * Bumped on revoke. A refresh that started before the bump must not re-save
+   * its result (that would resurrect a hard-deleted grant).
+   */
+  private readonly epochs = new Map<string, number>();
+
   constructor(vault: Vault, store: SealedTokenStore, opts: OAuthTokenStoreOptions = {}) {
     this.vault = vault;
     this.store = store;
@@ -86,14 +92,14 @@ export class OAuthTokenStore {
    * concurrent resolves share one upstream refresh.
    */
   async resolveFresh(userId: string, provider: AuthProvider): Promise<OAuthTokens | null> {
+    const accountKey = `${userId}:${provider.id}`;
+    const epoch = this.epochs.get(accountKey) ?? 0;
     const stored = await this.load(userId, provider.id);
     if (!stored) return null;
-    const fresh = await this.refresher.ensureFresh(
-      `${userId}:${provider.id}`,
-      stored,
-      provider,
-      this.now(),
-    );
+    const fresh = await this.refresher.ensureFresh(accountKey, stored, provider, this.now());
+    // Revoked while the refresh was in flight: drop the result instead of
+    // re-persisting a grant the user just disconnected.
+    if ((this.epochs.get(accountKey) ?? 0) !== epoch) return null;
     if (fresh !== stored) await this.save(userId, provider.id, fresh);
     return fresh;
   }
@@ -109,6 +115,10 @@ export class OAuthTokenStore {
     providerId: string,
     revokeUpstream?: (tokens: OAuthTokens) => Promise<void>,
   ): Promise<boolean> {
+    const accountKey = `${userId}:${providerId}`;
+    // Invalidate first: an in-flight refresh must not re-save after the delete.
+    this.epochs.set(accountKey, (this.epochs.get(accountKey) ?? 0) + 1);
+    this.refresher.evict(accountKey);
     if (revokeUpstream) {
       const stored = await this.load(userId, providerId).catch(() => null);
       if (stored) {

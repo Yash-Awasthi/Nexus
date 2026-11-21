@@ -31,6 +31,7 @@ interface Session {
 
 interface Status {
   agentClis: Record<string, boolean>;
+  deployment: "local" | "local_forced" | "hosted";
 }
 
 type Spawned = { session: Session } | { approvalId: string; message: string };
@@ -120,6 +121,12 @@ export default function Terminals() {
   useEffect(() => {
     apiFetch<Status>("/api/local/status")
       .then((s) => {
+        // A hosted server answers 403; this is the belt-and-braces check for a
+        // proxy that forwards the route and reports itself as hosted.
+        if (s.deployment === "hosted") {
+          setHosted(true);
+          return;
+        }
         setStatus(s);
         return refresh();
       })

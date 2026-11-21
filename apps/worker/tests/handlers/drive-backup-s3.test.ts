@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { gunzipSync } from "node:zlib";
 
 import { userDrivePath } from "@nexus/sandbox";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { handleDriveBackupJob, s3BackupStore } from "../../src/handlers/drive-lifecycle.ts";
 

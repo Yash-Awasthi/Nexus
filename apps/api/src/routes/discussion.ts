@@ -23,7 +23,7 @@ import {
   type DebateMember,
   type IStreamingTransport,
 } from "@nexus/council";
-import type { LlmRole } from "@nexus/llm-drivers";
+import type { LlmRole } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
 
 import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.ts";

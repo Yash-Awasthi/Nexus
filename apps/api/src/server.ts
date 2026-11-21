@@ -20,12 +20,6 @@ import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
 import swagger from "@fastify/swagger";
 import { getTracer, enableTracing } from "@nexus/llm-tracer";
-import {
-  InMemoryAnalyticsClient,
-  NexusAnalytics,
-  NexusEvents,
-  PostHogAnalyticsClient,
-} from "@nexus/posthog-analytics";
 import { startTracing, stopTracing } from "@nexus/telemetry";
 import {
   context,
@@ -59,37 +53,26 @@ import { adminTracesRoutes } from "./routes/admin-traces.ts";
 import { adminUsersRoutes } from "./routes/admin-users.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentsRoutes } from "./routes/agents.ts";
-import { alertsRoutes } from "./routes/alerts.ts";
 import { apiBridgeRoutes } from "./routes/api-bridge.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import { authUsersRoutes } from "./routes/auth-users.ts";
 import { billingRoutes } from "./routes/billing.ts";
 import { boardRoutes } from "./routes/board.ts";
 import { botsRoutes } from "./routes/bots.ts";
-import { briefRoutes } from "./routes/brief.ts";
 import { channelRoutes } from "./routes/channels.ts";
-import { chatAnalystRoutes } from "./routes/chat-analyst.ts";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.ts";
-import { connectorsRoutes } from "./routes/connectors.ts";
-import { contextRoutes } from "./routes/context.ts";
-import { conversationAnalysisRoutes } from "./routes/conversation-analysis.ts";
-import { corpusBuilderRoutes } from "./routes/corpus-builder.ts";
 import { councilRoutes } from "./routes/council.ts";
 import { cspReportRoutes } from "./routes/csp-report.ts";
 import { diagnosticsRoutes } from "./routes/diagnostics.ts";
 import { diffRoutes } from "./routes/diff.ts";
 import { discussionRoutes } from "./routes/discussion.ts";
 import { docPipelineRoutes } from "./routes/doc-pipeline.ts";
-import { driveRoutes } from "./routes/drive.ts";
 import { execApprovalRoutes } from "./routes/exec-approvals.ts";
 import { featureFlagsRoutes } from "./routes/feature-flags.ts";
-import { forecastRoutes } from "./routes/forecast.ts";
 import { gatewayRoutes } from "./routes/gateway.ts";
-import { geoipRoutes } from "./routes/geoip.ts";
 import { governanceRoutes } from "./routes/governance.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { hooksRoutes } from "./routes/hooks.ts";
-import { i18nRoutes } from "./routes/i18n.ts";
 import { ingestRoutes } from "./routes/ingest.ts";
 import { libertasRoutes } from "./routes/libertas.ts";
 import { llmOauthRoutes } from "./routes/llm-oauth.ts";
@@ -112,24 +95,18 @@ import { openaiRoutes } from "./routes/openai.ts";
 import { orgHookRoutes, orgRoutes } from "./routes/org.ts";
 import { pluginRegistryRoutes } from "./routes/plugin-registry.ts";
 import { pluginRunRoutes } from "./routes/plugin-run.ts";
-import { predictionMarketRoutes } from "./routes/prediction-market.ts";
 import { queueDashboardRoutes } from "./routes/queue-dashboard.ts";
-import { redteamRoutes } from "./routes/redteam.ts";
 import { researcherRoutes } from "./routes/researcher.ts";
 import { rlhfRoutes } from "./routes/rlhf.ts";
 import { runtimeRoutes } from "./routes/runtime.ts";
 import { samlRoutes } from "./routes/saml.ts";
-import { scenarioPlannerRoutes } from "./routes/scenario-planner.ts";
 import { scimRoutes } from "./routes/scim.ts";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.ts";
 import { secretRoutes } from "./routes/secrets.ts";
 import { sessionSyncRoutes } from "./routes/session-sync.ts";
-import { sftRoutes } from "./routes/sft.ts";
 import { sseRoutes } from "./routes/sse.ts";
-import { stmRoutes } from "./routes/stm.ts";
 import { threadsRoutes } from "./routes/threads.ts";
 import { userDataRoutes } from "./routes/user-data.ts";
-import { wikiRoutes } from "./routes/wiki.ts";
 import { workspacesRoutes } from "./routes/workspaces.ts";
 
 // Resolve pino-pretty to an absolute path so pino's transport worker can load it
@@ -195,13 +172,6 @@ function spaInlineScriptHashes(spaDir: string | undefined): string[] {
         .digest("base64")}'`,
   );
 }
-
-// ── Analytics singleton (PostHog in prod; InMemory in dev/CI) ─────────────────
-const _analyticsClient = process.env.POSTHOG_API_KEY
-  ? new PostHogAnalyticsClient({ apiKey: process.env.POSTHOG_API_KEY })
-  : new InMemoryAnalyticsClient();
-
-const analytics = new NexusAnalytics(_analyticsClient);
 
 export async function buildServer(): Promise<FastifyInstance> {
   // ── Tracing (zero-cost noop when disabled) ─────────────────────────────────
@@ -368,40 +338,6 @@ export async function buildServer(): Promise<FastifyInstance> {
     } catch {
       /* metrics not yet loaded */
     }
-
-    // AlertEngine: fire "http.5xx" metric on every 5xx response
-    if (reply.statusCode >= 500) {
-      try {
-        const { alertEngine } = await import("./routes/alerts.ts");
-        alertEngine.evaluate("http.5xx", 1).catch(() => {});
-      } catch {
-        /* non-fatal */
-      }
-    }
-
-    // PostHog analytics — fire-and-forget on successful mutations
-    if (request.method === "POST" && reply.statusCode === 201) {
-      const userId =
-        ((
-          (request as unknown as Record<string, unknown>)["user"] as
-            Record<string, unknown> | undefined
-        )?.["id"] as string | undefined) ?? "anonymous";
-      const path = request.url.split("?")[0] ?? request.url;
-
-      if (path.includes("/memory")) {
-        analytics
-          .agentTaskStarted(userId, `mem-${Date.now()}`, NexusEvents.MEMORY_STORED)
-          .catch(() => {});
-      } else if (path.includes("/researcher")) {
-        analytics
-          .agentTaskStarted(userId, `res-${Date.now()}`, NexusEvents.AGENT_TASK_STARTED)
-          .catch(() => {});
-      } else {
-        _analyticsClient
-          .track("api.mutation", userId, { path, status: reply.statusCode })
-          .catch(() => {});
-      }
-    }
   });
 
   // ── Defense in depth: IP + per-user rate limiting on high-value route groups ──
@@ -494,32 +430,21 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(auditRoutes);
       await api.register(gatewayRoutes);
       await api.register(sseRoutes);
-      await api.register(contextRoutes);
 
       // Extended platform
-      await api.register(stmRoutes);
       await api.register(chatSuggestionsRoutes);
-      await api.register(wikiRoutes);
-      await api.register(corpusBuilderRoutes);
-      await api.register(predictionMarketRoutes);
 
       // Full-feature pages
-      await api.register(conversationAnalysisRoutes);
       await api.register(nlpRoutes);
-      await api.register(geoipRoutes);
-      await api.register(i18nRoutes);
       await api.register(mailIngestRoutes);
       await api.register(billingRoutes);
       await api.register(adminRoutes);
       await api.register(featureFlagsRoutes);
       await api.register(channelRoutes);
       await api.register(boardRoutes);
-      await api.register(connectorsRoutes);
 
       // K — new backbone routes
       await api.register(memoryRoutes);
-      await api.register(briefRoutes);
-      await api.register(forecastRoutes);
       await api.register(sessionSyncRoutes);
       await api.register(researcherRoutes);
 
@@ -532,23 +457,18 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // R — hooks registry + alert engine
       await api.register(hooksRoutes);
-      await api.register(alertsRoutes);
 
       // S — librarian + file-explorer agents, bot webhooks
       await api.register(agentsRoutes);
       await api.register(botsRoutes);
-      await api.register(chatAnalystRoutes);
 
       // P — rlhf, sft-tagger, llm-router, scenario-planner
       await api.register(rlhfRoutes);
-      await api.register(sftRoutes);
       await api.register(pluginRegistryRoutes);
       await api.register(pluginRunRoutes);
       await api.register(llmRoutes);
-      await api.register(scenarioPlannerRoutes);
 
       // Y — redteam: input perturbation + Prometheus metrics
-      await api.register(redteamRoutes);
       await api.register(metricsRoutes);
 
       // Z — OAuth SSO (Google + GitHub)
@@ -561,7 +481,6 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(authUsersRoutes);
       await api.register(userDataRoutes);
       await api.register(workspacesRoutes);
-      await api.register(driveRoutes);
       await api.register(mfaRoutes);
 
       // AF — Libertas: public free-tier endpoint (no auth required)

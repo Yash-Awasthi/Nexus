@@ -4,7 +4,7 @@
 // RuntimeTool handler reaches createCouncilMcpServer over its real JSON-RPC
 // handle() seam and returns a parsed result, with the executor error path.
 // DB-free and offline (stub ILLMTransport drives every protocol call).
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   councilRuntimeToolsFromTransport,
   councilRuntimeTools,

@@ -4,7 +4,7 @@
  * each turn billed to its agent, and a budget that would be crossed silences
  * that agent instead of spending.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

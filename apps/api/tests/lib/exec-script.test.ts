@@ -3,7 +3,7 @@
  * Runs against a real embedded database: the claim is that a DDL script with
  * several statements applies to PGlite, which only executing it can show.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vite-plus/test";
 
 import { closePgPools, execScript, getPgPool } from "../../src/lib/pg-pool.ts";
 

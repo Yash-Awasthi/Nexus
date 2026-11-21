@@ -18,7 +18,7 @@
  * the dev DB in the playtest; the fake here pins the store's write/read
  * contract and argument shapes.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
 import { sha256hex } from "../../src/lib/crypto-utils.ts";
 

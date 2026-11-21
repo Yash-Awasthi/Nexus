@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Agent replies are Markdown; the thread shows their shape, never their syntax. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { markdownBlocks, markdownSpans } from "~/lib/markdown";
 

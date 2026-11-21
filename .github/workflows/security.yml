@@ -44,20 +44,27 @@ jobs:
           # history on every run, which is cheap and correct.
           GITLEAKS_LOG_OPTS: "--all --no-merges --first-parent"
 
-  codeql:
-    name: CodeQL analysis
+  trivy:
+    name: Vulnerability scan (Trivy)
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      actions: read
       contents: read
-    strategy:
-      matrix:
-        language: [typescript, python]
+      security-events: write
     steps:
       - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      # Lockfiles, manifests and IaC. Fixed findings are the ones a bump can clear.
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          languages: ${{ matrix.language }}
-      - uses: github/codeql-action/autobuild@v4
-      - uses: github/codeql-action/analyze@v4
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          timeout: 15m
+          exit-code: "1"
+          format: sarif
+          output: trivy-results.sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

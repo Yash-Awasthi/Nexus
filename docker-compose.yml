@@ -19,7 +19,7 @@ services:
   postgres:
     # pgvector ships Postgres 18 + the `vector` extension. A volume written by
     # Postgres 16 must be dumped and restored: data files do not cross majors.
-    image: pgvector/pgvector:pg18
+    image: pgvector/pgvector:0.8.7-pg18@sha256:38681dc6eaf55308e2a4c6de392d131652dcfac70e1263e35cd9b5ea3fe39782
     container_name: nexus-postgres
     restart: unless-stopped
     environment:
@@ -270,7 +270,7 @@ services:
         max-file: "3"
 
   ui-dev:
-    image: node:26-alpine
+    image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
     container_name: nexus-ui-dev
     working_dir: /app
     volumes:

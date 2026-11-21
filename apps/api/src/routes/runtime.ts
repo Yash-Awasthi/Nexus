@@ -7,17 +7,13 @@
  *   PATCH  /api/v1/runtime/tasks/:taskId   (cancel)
  *   POST   /api/v1/agent/run
  *   GET    /api/v1/agent/run/:sessionId
- *   POST   /api/v1/apps/generate
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
 
 import { db } from "@nexus/db";
 import { agentSessions, ingestedEvents, runtimeTasks, signals } from "@nexus/db/schema";
 import type { ExecAction } from "@nexus/exec-policy";
-import { hostTooSmallForCommands } from "@nexus/worker/agent-tools";
 import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -29,15 +25,6 @@ import {
   runAgentInProcess,
   type LaunchAgentInput,
 } from "../lib/agent-queue.ts";
-import {
-  appFolderName,
-  codegenInstruction,
-  DESIGN_FILE,
-  parseDesign,
-  pickDesign,
-  scaffoldApp,
-} from "../lib/app-scaffold.ts";
-import { ensureDrive } from "../lib/drive-durability.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { ownerScope } from "../lib/owner.ts";
 import { getUserDrivers } from "../lib/user-context.ts";
@@ -177,78 +164,6 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({ status: row.status, ...(row.error ? { error: row.error } : {}) });
     },
   );
-
-  // GET /apps/status — App builder installs and builds, so it is offered only where commands can run
-  app.get("/apps/status", { preHandler: requireAuth }, async (_request, reply) =>
-    reply.send({ available: !hostTooSmallForCommands() }),
-  );
-
-  // POST /apps/generate — scaffold a themed starter in the drive, then have an agent build on it
-  app.post<{
-    Body: {
-      prompt?: string;
-      design?: unknown;
-      provider?: string;
-      model?: string;
-      sessionId?: string;
-      approvalId?: string;
-    };
-  }>("/apps/generate", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const userId = request.nexusUserId;
-    if (!userId) return reply.code(401).send({ error: "auth_required" });
-    if (hostTooSmallForCommands())
-      return reply.code(403).send({
-        error: "app_builder_unavailable",
-        message: "App builder needs to install and build, so it runs only in the desktop app.",
-      });
-    const prompt = (request.body?.prompt ?? "").trim();
-    if (!prompt) return reply.code(400).send({ error: "prompt is required" });
-    const { provider, model, sessionId, approvalId } = request.body;
-
-    const name = appFolderName(userId, prompt);
-    const dir = path.join(await ensureDrive(userId), "apps", name);
-    // Kept from the first call, so a replay after approval builds on the same starter.
-    let design = await fs
-      .readFile(path.join(dir, DESIGN_FILE), "utf8")
-      .then((t) => parseDesign(JSON.parse(t)))
-      .catch(() => null);
-    if (!design) {
-      const own = getUserDrivers().find((d) => !provider || d.id === provider)?.driver;
-      design =
-        parseDesign(request.body.design) ??
-        (await pickDesign(
-          prompt,
-          own &&
-            (async (q) =>
-              (
-                await own.complete({
-                  model: model ?? own.model,
-                  messages: [{ role: "user", content: q }],
-                  maxTokens: 200,
-                })
-              ).content),
-        ));
-      await scaffoldApp(dir, name, design);
-    }
-    return launchAgent(
-      request,
-      reply,
-      {
-        instruction: codegenInstruction(prompt, design),
-        workspaceDir: dir,
-        maxSteps: 60,
-        commandTimeoutMs: 180_000,
-        // Every advertised tool is resent on each step; building an app needs only the coding set.
-        disableCouncilTools: true,
-        disablePtc: true,
-        ...(provider ? { provider } : {}),
-        ...(model ? { model } : {}),
-        ...(sessionId ? { sessionId } : {}),
-        ...(approvalId ? { approvalId } : {}),
-      },
-      { app: `apps/${name}`, design },
-    );
-  });
 
   // GET /runtime/tasks/:taskId
   app.get<{ Params: { taskId: string } }>(

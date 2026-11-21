@@ -11,7 +11,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist coverage",
-    "test": "vitest run --passWithNoTests"
+    "test": "vp test run --passWithNoTests"
   },
   "dependencies": {
     "@nexus/llm-translate": "workspace:*"

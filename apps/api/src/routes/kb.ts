@@ -27,15 +27,15 @@ import crypto from "node:crypto";
 
 import { RobotsChecker, type AdaptiveScraper } from "@nexus/adaptive-scraper";
 import { chunkText, DocumentConsumer, type DocClass } from "@nexus/doc-pipeline";
+import type { LlmRole } from "@nexus/llm/drivers";
+import type { MemoryManager } from "@nexus/memory";
 import {
   extractGraphFromChunks,
   strictTypeValidator,
   type EntityType,
   type KnowledgeGraph,
-} from "@nexus/knowledge-graph";
-import type { LlmRole } from "@nexus/llm-drivers";
-import type { MemoryManager } from "@nexus/memory";
-import { decompositionRetrieve, type SourceRetrieverFn } from "@nexus/retrieval";
+} from "@nexus/search/knowledge-graph";
+import { decompositionRetrieve, type SourceRetrieverFn } from "@nexus/search/retrieval";
 import type { FastifyInstance } from "fastify";
 
 import { extractText, isImageType } from "../lib/extract-text.ts";

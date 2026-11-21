@@ -14,7 +14,7 @@
  * and give the agent the https URL. The bearer token is the only gate — use a
  * long random one (openssl rand -hex 32).
  *
- * Zero new deps: node:http + the worker's existing @nexus/agent-runtime tool
+ * Zero new deps: node:http + the worker's existing @nexus/agent-core tool
  * set (createCodingToolSet) which confines every file/shell op to the bridge
  * root and rejects path/symlink escapes.
  *

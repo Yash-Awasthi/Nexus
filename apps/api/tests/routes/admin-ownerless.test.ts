@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const SECRET = "admin-ownerless-secret";
 const MASTER = "admin-ownerless-master-key-0123456789";
@@ -83,16 +83,4 @@ it("lets only an admin hand ownerless rows to one account", async () => {
   expect(await listFor(ADMIN)).not.toContain("legacy notes");
   const after = await call("GET", "/api/v1/admin/ownerless", tokenFor(ADMIN));
   expect(after.json<{ ownerless: Record<string, number> }>().ownerless.kb).toBe(0);
-});
-
-it("keeps legacy prompts from every account until an admin hands them over", async () => {
-  const made = await call("POST", "/api/prompts", MASTER, { name: "legacy prompt" });
-  expect(made.statusCode, made.body).toBeLessThan(300);
-  const listFor = async (u: string) => (await call("GET", "/api/prompts", tokenFor(u))).body;
-  expect(await listFor(MEMBER)).not.toContain("legacy prompt");
-  const counts = await call("GET", "/api/v1/admin/ownerless", tokenFor(ADMIN));
-  expect(counts.json<{ ownerless: Record<string, number> }>().ownerless.prompts).toBeGreaterThan(0);
-  await call("POST", "/api/v1/admin/ownerless/assign", tokenFor(ADMIN), { userId: MEMBER });
-  expect(await listFor(MEMBER)).toContain("legacy prompt");
-  expect(await listFor(ADMIN)).not.toContain("legacy prompt");
 });

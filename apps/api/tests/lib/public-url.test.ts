@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A caller-supplied URL is fetched through the pinned guard, and so is every redirect hop. */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 const calls: string[] = [];
 const replies: Response[] = [];
-vi.mock("@nexus/runtime", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@nexus/runtime")>()),
+vi.mock("@nexus/agent-core/kernel", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@nexus/agent-core/kernel")>()),
   pinnedFetch: async (url: string) => {
     calls.push(url);
     return replies.shift() ?? new Response("ok");

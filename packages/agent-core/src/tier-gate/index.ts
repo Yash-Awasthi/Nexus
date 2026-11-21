@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/tier-gate — Route-level feature gates by subscription tier.
+ * @nexus/agent-core — Route-level feature gates by subscription tier.
  *
  * Architecture
  * ─────────────
@@ -17,7 +17,7 @@
  * Usage
  * ─────
  * ```ts
- * import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
+ * import { globalTierGate, makeTierGatePreHandler } from "@nexus/agent-core/tier-gate";
  *
  * // Declarative route gate
  * fastify.addHook("preHandler", makeTierGatePreHandler({ feature: "gauntlet" }));

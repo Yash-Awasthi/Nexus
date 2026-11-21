@@ -51,6 +51,8 @@ const IGNORE_PATTERNS = [
   // openapi-typescript output, byte-compared against a fresh run by
   // `pnpm types:check` — a header here would fail that comparison instead.
   /src[\\/]generated[\\/]/,
+  // Vendored reference repositories (third-party, not this repo's source).
+  /^services[\\/]board[\\/]sources[\\/]/,
 ];
 
 function shouldIgnore(filePath: string): boolean {

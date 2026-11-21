@@ -4,7 +4,7 @@
  * page can show what steers a conversation and let the user turn it off.
  */
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const { buildServer } = await import("../../src/server.ts");
 

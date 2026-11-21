@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const { buildServer } = await import("../../src/server.ts");
 

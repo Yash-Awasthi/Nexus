@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A run the API was hosting dies with it, so a restart reports it failed instead of running forever. */
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:agent-interrupted";
 process.env.DATABASE_URL = DB;

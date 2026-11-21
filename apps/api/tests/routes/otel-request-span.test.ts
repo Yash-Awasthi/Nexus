@@ -6,7 +6,7 @@
 import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { startTracing } from "@nexus/telemetry";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 process.env.DATABASE_URL = "pglite://:memory:otel-request-span";
 const exporter = new InMemorySpanExporter();

@@ -11,11 +11,12 @@
   },
   "scripts": {
     "clean": "rm -rf dist coverage",
-    "test": "vitest run --passWithNoTests"
+    "test": "vp test run --passWithNoTests"
   },
   "devDependencies": {
     "vitest": "catalog:",
-    "@vitest/coverage-v8": "catalog:"
+    "@vitest/coverage-v8": "catalog:",
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

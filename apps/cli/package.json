@@ -7,30 +7,26 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "clean": "rm -rf dist coverage"
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "clean": "node -e \"for (const p of ['dist', 'coverage']) require('fs').rmSync(p, { recursive: true, force: true })\""
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vite-plus": "catalog:"
   },
   "bin": {
     "nexus": "./src/index.ts"
   },
   "dependencies": {
-    "@nexus/agent-runtime": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
-    "@nexus/debate-engine": "workspace:*",
-    "@nexus/graphrag-query": "workspace:*",
-    "@nexus/hybrid-search": "workspace:*",
-    "@nexus/llm-drivers": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
-    "@nexus/provider-registry": "workspace:*",
-    "@nexus/reranker": "workspace:*",
-    "@nexus/runtime": "workspace:*",
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "@nexus/llm": "workspace:*",
+    "@nexus/search": "workspace:*",
+    "@nexus/agent-core": "workspace:*"
   }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * CrashRecovery — deterministic startup recovery for the @nexus/runtime.
+ * CrashRecovery — deterministic startup recovery for the @nexus/agent-core.
  *
  * Problem:
  *   If the process crashes or is killed while tasks are in "running" state,

@@ -11,7 +11,7 @@ import { inflateRawSync } from "node:zlib";
 
 import { signSamlPost } from "@node-saml/node-saml/lib/saml-post-signing.js";
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,

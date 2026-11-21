@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compressOutputForCommand } from "./token-saver.ts";
 
 function bigDiff(additions: number): string {
@@ -200,5 +200,82 @@ describe("gitOutputProcessor — status/branch/log/transfer/blame", () => {
     const lines = Array.from({ length: 15 }, (_, i) => `aaaa000${i} HEAD@{${i}}: commit: msg ${i}`);
     const r = compressOutputForCommand("git reflog", lines.join("\n"));
     expect(r.output).toContain("... (5 more entries)");
+  });
+});
+
+describe("gitOutputProcessor — show/stash/remote/stat grouping", () => {
+  it("keeps the commit header and compressed diff for git show", () => {
+    const out = [
+      "commit abc1234567890",
+      "Author: Dev <dev@x.io>",
+      "Date:   Sat Nov 22 10:00:00 2026 +0000",
+      "",
+      "    fix: correct the parser",
+      "",
+      "diff --git a/src/a.ts b/src/a.ts",
+      "index 1111111..2222222 100644",
+      "--- a/src/a.ts",
+      "+++ b/src/a.ts",
+      "@@ -1,3 +1,3 @@",
+      "-const old = 1;",
+      "+const next = 2;",
+      " const keep = 3;",
+    ].join("\n");
+    const r = compressOutputForCommand("git show HEAD", out);
+    expect(r.processor).toBe("git");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("commit abc1234567890");
+    expect(r.output).toContain("fix: correct the parser");
+    expect(r.output).toContain("+const next = 2;");
+    expect(r.output).not.toContain("Author:");
+    expect(r.output).not.toContain("Date:");
+  });
+
+  it("returns git show output with no diff unchanged", () => {
+    const out = ["commit abc123", "Author: Dev", "", "    docs only"].join("\n");
+    const r = compressOutputForCommand("git show --stat HEAD", out);
+    expect(r.output).toBe(out);
+  });
+
+  it("caps a long stash list and counts the rest", () => {
+    const lines = Array.from(
+      { length: 8 },
+      (_, i) => `stash@{${i}}: WIP on main: aaaa${i} fix item ${i}`,
+    );
+    const r = compressOutputForCommand("git stash list", lines.join("\n"));
+    expect(r.processor).toBe("git");
+    expect(r.output).toContain("stash@{0}");
+    expect(r.output).toContain("stash@{4}");
+    expect(r.output).not.toContain("stash@{5}");
+    expect(r.output).toContain("... (3 more stashes)");
+  });
+
+  it("deduplicates fetch/push pairs in a long remote list", () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      lines.push(`origin\thttps://github.com/org/repo-${i}.git (fetch)`);
+      lines.push(`origin\thttps://github.com/org/repo-${i}.git (push)`);
+    }
+    const r = compressOutputForCommand("git remote -v", lines.join("\n"));
+    expect(r.processor).toBe("git");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("https://github.com/org/repo-0.git");
+    expect(r.output).not.toContain("(push)");
+    expect(r.output.split("\n")).toHaveLength(7);
+    expect(r.output).toContain("(12 total lines, fetch/push deduplicated)");
+  });
+
+  it("rolls a >20-line diff --stat up per directory, listing small dirs raw", () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 22; i++) lines.push(` src/gen/f${i}.ts | 10 ++++------`);
+    for (let i = 0; i < 3; i++) lines.push(` docs/guide${i}.md | 4 ++--`);
+    lines.push(" 25 files changed, 180 insertions(+), 130 deletions(-)");
+    const r = compressOutputForCommand("git diff --stat", lines.join("\n"));
+    expect(r.processor).toBe("git");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain(" src/gen/ (22 files, ~220 changes)");
+    expect(r.output).toContain(" docs/guide0.md | 4");
+    expect(r.output).toContain("25 files changed, 180 insertions(+)");
+    expect(r.output).not.toContain("src/gen/f0.ts");
   });
 });

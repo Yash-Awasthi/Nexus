@@ -10,7 +10,7 @@ into your laptop to read files, run commands, and write results.
 - Server: `apps/worker/src/bridge.ts` (~150 LOC, zero new deps — `node:http` +
   the same confinement-safe tool set the worker's agent loop uses).
 - Every file/shell operation is **confined to the bridge root** (`path escapes
-workspace` + symlink guards from `agent-tools.ts`). It cannot touch anything
+  workspace` + symlink guards from `agent-tools.ts`). It cannot touch anything
   outside the configured root.
 - Auth: a **bearer token** (`NEXUS_BRIDGE_TOKEN`, ≥ 12 chars) on every request
   except `/health`. Constant-time compare.

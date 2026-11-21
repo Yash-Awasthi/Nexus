@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { afterAll, expect, it } from "vitest";
+import { afterAll, expect, it } from "vite-plus/test";
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "nexus-durable-"));
 process.env.NEXUS_DRIVE_ROOT = path.join(root, "drives");

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import type { IRuntimePersistence } from "../../src/kernel/interfaces/persistence.interface.ts";
 import type { IApprovalWorkflow } from "../../src/kernel/interfaces/governance.interface.ts";

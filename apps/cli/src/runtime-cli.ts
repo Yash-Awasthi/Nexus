@@ -23,8 +23,8 @@ import {
   specToWorkflowDefinition,
   startRuntime,
   stopRuntime,
-} from "@nexus/runtime";
-import type { ITaskSynthesisResult, QueueJob } from "@nexus/runtime";
+} from "@nexus/agent-core/kernel";
+import type { ITaskSynthesisResult, QueueJob } from "@nexus/agent-core/kernel";
 
 const repoRoot = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 

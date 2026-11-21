@@ -68,7 +68,7 @@ log.error({ err }, "council deliberation failed");
 
 ### `ObservabilityManager`
 
-Bootstraps OpenTelemetry: registers the OTLP exporter, sets service name/version, and wires `@nexus/runtime`'s `NexusOtelTracer` into the global TracerProvider.
+Bootstraps OpenTelemetry: registers the OTLP exporter, sets service name/version, and wires `@nexus/agent-core`'s `NexusOtelTracer` into the global TracerProvider.
 
 ```ts
 const obs = new ObservabilityManager({
@@ -84,7 +84,7 @@ await obs.start();
 
 ### `DisasterRecovery`
 
-Wraps `@nexus/runtime`'s `CrashRecovery` with a DB-backed store for cross-process durability. On startup, replays unfinished checkpoints.
+Wraps `@nexus/agent-core`'s `CrashRecovery` with a DB-backed store for cross-process durability. On startup, replays unfinished checkpoints.
 
 ```ts
 const dr = new DisasterRecovery({ db, maxCheckpointAgeMs: 3_600_000 });

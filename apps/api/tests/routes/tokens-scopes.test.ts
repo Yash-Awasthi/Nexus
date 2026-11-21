@@ -8,7 +8,7 @@
  * through authenticate() and the nxk_ path. Semantics live in
  * lib/pat-scopes.ts and are unit-tested separately.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

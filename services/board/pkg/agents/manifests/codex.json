@@ -4,7 +4,11 @@
   "adapter": "terminal",
   "bin": "codex",
   "install": { "npm": "@openai/codex" },
-  "auth": { "status": ["login", "status"], "login": ["login", "--device-auth"], "logout": ["logout"] },
+  "auth": {
+    "status": ["login", "status"],
+    "login": ["login", "--device-auth"],
+    "logout": ["logout"]
+  },
   "chat": {
     "args": ["exec", "--json", "--skip-git-repo-check", "-"],
     "modelArg": ["--model"],

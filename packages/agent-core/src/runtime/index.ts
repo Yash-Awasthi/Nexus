@@ -11,10 +11,11 @@
  *   • AgentRuntime              — multi-step loop with abort handling
  *   • RuntimeToolSet            — assemble a typed tool set for a run
  *   • MockLlmStream             — injectable streaming LLM test double
- *   • LlmStreamDriver           — structural interface for @nexus/llm-drivers drivers
+ *   • LlmStreamDriver           — structural interface for @nexus/llm drivers
  *   • llmDriverToStreamFn       — bridge: LlmDriver.stream() → AsyncIterable<string>
  */
 
+import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/contracts";
 import { BestOfNGenerator } from "@nexus/council/best-of-n";
 import {
   compressForTool,
@@ -25,7 +26,7 @@ import {
   type CompressFilter,
   type StructuredFormat,
 } from "@nexus/llm/compress";
-import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/contracts";
+import { withToolSpan, withTurnSpan } from "@nexus/telemetry";
 
 import { HookDispatcher, type AgentHooks, type HookDecision } from "./hooks.ts";
 
@@ -421,9 +422,9 @@ export class MockLlmStream {
 // ── LlmStreamDriver adapter ───────────────────────────────────────────────────
 
 /**
- * Structural interface matching the stream() signature of @nexus/llm-drivers drivers.
+ * Structural interface matching the stream() signature of @nexus/llm drivers.
  * Defined here (not imported) to avoid circular workspace dependencies.
- * Any LlmDriver from @nexus/llm-drivers satisfies this interface structurally.
+ * Any LlmDriver from @nexus/llm satisfies this interface structurally.
  */
 export interface LlmStreamDriver {
   readonly model: string;
@@ -527,7 +528,7 @@ export class AgentStepExecutor {
 
 // ── AgentRuntime ──────────────────────────────────────────────────────────────
 
-/** Any driver with complete(), such as those in @nexus/llm-drivers. */
+/** Any driver with complete(), such as those in @nexus/llm. */
 export interface RuntimeDriver {
   complete(opts: {
     messages: { role: "user"; content: string }[];
@@ -647,7 +648,7 @@ export class AgentRuntime {
 // each step), this loop uses the provider's NATIVE tool-calling and keeps a real
 // growing message history, so multi-step coding sessions retain full context.
 //
-// It is decoupled from @nexus/llm-drivers via the structural LlmToolDriver
+// It is decoupled from @nexus/llm via the structural LlmToolDriver
 // interface + llmDriverToToolFn bridge (no cross-package import).
 
 /** Token usage accumulated across a run. */
@@ -759,7 +760,7 @@ export type LlmToolFn = (
 ) => Promise<LlmTurnResult>;
 
 /**
- * Structural interface matching @nexus/llm-drivers' LlmDriver (native tool-calling
+ * Structural interface matching @nexus/llm' LlmDriver (native tool-calling
  * variant). Defined here to avoid a workspace import cycle; any real driver whose
  * stream() sends `tools` and returns `toolCalls` satisfies it structurally.
  */
@@ -1173,6 +1174,10 @@ export class ToolAgentRuntime {
   }
 
   async run(instruction: string, signal?: AbortSignal): Promise<ToolRuntimeResult> {
+    return withTurnSpan(() => this.runTurn(instruction, signal));
+  }
+
+  private async runTurn(instruction: string, signal?: AbortSignal): Promise<ToolRuntimeResult> {
     const t0 = Date.now();
     let messages: RuntimeMessage[] =
       this.resumeTurn && this.initialMessages?.length
@@ -1291,20 +1296,24 @@ export class ToolAgentRuntime {
               error: `permission_denied: ${decision.reason ?? "tool call was not approved"}`,
             };
           } else {
-            result = await this.toolSet.invoke(call.name, call.arguments, {
+            result = await withToolSpan(call.name, tier, () =>
+              this.toolSet.invoke(call.name, call.arguments, {
+                sessionId: this.sessionId,
+                toolCallId: call.callId,
+                signal,
+                workingDir: this.workingDir,
+              }),
+            );
+          }
+        } else {
+          result = await withToolSpan(call.name, tier, () =>
+            this.toolSet.invoke(call.name, call.arguments, {
               sessionId: this.sessionId,
               toolCallId: call.callId,
               signal,
               workingDir: this.workingDir,
-            });
-          }
-        } else {
-          result = await this.toolSet.invoke(call.name, call.arguments, {
-            sessionId: this.sessionId,
-            toolCallId: call.callId,
-            signal,
-            workingDir: this.workingDir,
-          });
+            }),
+          );
         }
 
         result.callId = call.callId;
@@ -1485,7 +1494,8 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
           };
           // SubagentStop hooks — may veto the child's verdict.
           const decision = (await hookDispatcher?.dispatch("subagentStop", sub)) as
-            HookDecision | undefined;
+            | HookDecision
+            | undefined;
           if (decision?.continue === false) {
             return {
               ...sub,
@@ -2378,7 +2388,7 @@ export async function gatedInvoke(
       throw new Error(`permission_denied: ${decision.reason ?? "tool call was not approved"}`);
     }
   }
-  const result = await toolSet.invoke(name, args, ctx);
+  const result = await withToolSpan(name, tier, () => toolSet.invoke(name, args, ctx));
   if (result.error) throw new Error(result.error);
   return result.output;
 }

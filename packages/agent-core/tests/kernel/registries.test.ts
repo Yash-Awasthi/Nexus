@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { LocalAgentRegistry } from "../../src/kernel/agent-registry.ts";
 import { MCPServerRegistry } from "../../src/kernel/mcp-registry.ts";

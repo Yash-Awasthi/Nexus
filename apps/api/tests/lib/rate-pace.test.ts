@@ -3,7 +3,7 @@
  * A provider that reports a spent rate-limit window is not called again until the window resets:
  * the next calls get a local 429 naming the wait, which the failover chain benches and skips.
  */
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 
 import { pacedFetch } from "../../src/lib/rate-pace.ts";
 

@@ -9,7 +9,7 @@
  * header, so the freshly rotated token never got attached and the retry 401'd
  * again. Retries must rebuild from the caller's ORIGINAL init.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 import { createAuthFetch } from "./install-auth-fetch";
 import { setSessionToken } from "./session-token";

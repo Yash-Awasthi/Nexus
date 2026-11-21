@@ -3,7 +3,7 @@
  * The daily inbox: waiting reviews, blocked work, stale approvals and budgets past their
  * warning share, gathered into one notification a day with no model call.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

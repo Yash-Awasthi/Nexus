@@ -141,7 +141,7 @@ export class GoogleVertexAuthProvider implements AuthProvider {
   }
 
   toDriverCredentials(tokens: OAuthTokens): Record<string, unknown> {
-    // Shape = VertexConfig from @nexus/llm-drivers. Stored as the same JSON blob
+    // Shape = VertexConfig from @nexus/llm. Stored as the same JSON blob
     // the BYOK vertex path already understands, so no new driver wiring.
     return {
       apiKey: tokens.accessToken,

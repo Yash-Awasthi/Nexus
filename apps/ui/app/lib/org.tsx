@@ -16,9 +16,20 @@ export const canManage = (c: { can: string[] }) => c.can.includes("manage");
 
 export type CompanyStatus = "active" | "paused" | "archived";
 export type AgentStatus =
-  "idle" | "running" | "paused" | "error" | "pending_approval" | "terminated";
+  | "idle"
+  | "running"
+  | "paused"
+  | "error"
+  | "pending_approval"
+  | "terminated";
 export type AdapterType =
-  "nexus" | "claude_code" | "codex" | "gemini" | "opencode" | "shell" | "http";
+  | "nexus"
+  | "claude_code"
+  | "codex"
+  | "gemini"
+  | "opencode"
+  | "shell"
+  | "http";
 
 export interface Company {
   id: string;
@@ -104,7 +115,13 @@ export interface Goal {
 }
 
 export type TaskStatus =
-  "backlog" | "todo" | "in_progress" | "in_review" | "blocked" | "done" | "cancelled";
+  | "backlog"
+  | "todo"
+  | "in_progress"
+  | "in_review"
+  | "blocked"
+  | "done"
+  | "cancelled";
 export type Priority = "critical" | "high" | "medium" | "low";
 
 export interface Actor {
@@ -167,7 +184,13 @@ export const PRIORITY_TONE: Record<Priority, string> = {
 };
 
 export type RunStatus =
-  "queued" | "running" | "succeeded" | "failed" | "cancelled" | "timed_out" | "skipped";
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out"
+  | "skipped";
 
 export interface LlmStep {
   provider: string;

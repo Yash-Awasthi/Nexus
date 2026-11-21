@@ -19,7 +19,7 @@ Consumes the `nexus:signals` queue. For each job:
 
 Consumes the `nexus:tasks` queue. For each job:
 
-1. Wraps execution in `@nexus/runtime`'s CircuitBreaker
+1. Wraps execution in `@nexus/agent-core`'s CircuitBreaker
 2. Creates a crash-recovery checkpoint before execution
 3. Runs the task handler
 4. Clears the checkpoint on success; leaves it for auto-resume on crash
@@ -43,9 +43,5 @@ LOG_LEVEL=info
 
 Each worker process handles one queue. To scale horizontally:
 
-```bash
-# In Kubernetes — adjust replicas in values.yaml
-helm upgrade nexus ./infra/helm/nexus --set worker.replicaCount=4
-```
-
-The HPA in `infra/helm/nexus/templates/hpa.yaml` auto-scales based on CPU utilisation (target: 80%).
+Raise the Render instance count for the service. The worker shares the API image and only
+starts a queue consumer when `REDIS_URL` is set, so scale the API and the worker together.

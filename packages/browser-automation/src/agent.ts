@@ -4,9 +4,9 @@
  * page, and of the loop those steps run in (§15.4).
  *
  * The browser agent shipped twice: the LLM task loop in routes/api-bridge.ts
- * and @nexus/runtime's BrowserExecutionAdapter, each with its own action shape
+ * and @nexus/agent-core's BrowserExecutionAdapter, each with its own action shape
  * and its own idea of which URLs are allowed. `BrowserAction` from
- * @nexus/runtime is now the one vocabulary; this module is the one executor
+ * @nexus/agent-core is now the one vocabulary; this module is the one executor
  * for the live-page side of it, so the loop and the manual step endpoint can
  * no longer drift apart the way they had.
  *
@@ -16,9 +16,9 @@
  * caller has to agree with the other about which of those it has.
  */
 
-import { isSafeUrl, type BrowserAction, type BrowserActionType } from "@nexus/runtime";
+import { isSafeUrl, type BrowserAction, type BrowserActionType } from "@nexus/agent-core/kernel";
 
-export type { BrowserAction, BrowserActionType } from "@nexus/runtime";
+export type { BrowserAction, BrowserActionType } from "@nexus/agent-core/kernel";
 
 /** The page surface an action touches. `StealthPage` satisfies it. */
 export interface BrowserActionPage {
@@ -64,7 +64,7 @@ export class BrowserUrlBlockedError extends Error {
 /**
  * Apply one action to a live page.
  *
- * Navigation is checked against the same SSRF policy @nexus/runtime's adapter
+ * Navigation is checked against the same SSRF policy @nexus/agent-core's adapter
  * applies: an LLM choosing the next URL is an untrusted source of URLs, and
  * the loop used to have no check at all — `file://` and the cloud metadata
  * address were both reachable. `extract`, `screenshot` and `done` read the
@@ -122,9 +122,42 @@ export interface BrowserAgentDeps {
   /** Persist the session after every step, so a reader sees progress. */
   save(session: BrowserAgentSession): void | Promise<void>;
   maxSteps?: number;
+  /** Cap on a single perceive/decide/act step. A hung provider or page must not hold a run open. */
+  stepTimeoutMs?: number;
+  /** Abort a run from the outside (shutdown, user cancel). */
+  signal?: AbortSignal;
 }
 
 export const DEFAULT_MAX_AGENT_STEPS = 8;
+export const DEFAULT_STEP_TIMEOUT_MS = 30_000;
+
+/** Reject after `ms`, or when `signal` aborts, so no single step can stall a run. */
+export function withStepTimeout<T>(work: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) return Promise.reject(new Error("browser run aborted"));
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`browser step timed out after ${ms}ms`)), ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error("browser run aborted"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+/** Three identical failing actions in a row means the page does not offer what the model assumes. */
+const MAX_REPEATED_FAILURES = 3;
 
 /** How much of the page the model is shown. */
 const PAGE_TEXT_BUDGET = 2000;
@@ -142,69 +175,107 @@ export async function runBrowserAgentTask(
   deps: BrowserAgentDeps,
 ): Promise<BrowserAgentSession> {
   const maxSteps = deps.maxSteps ?? DEFAULT_MAX_AGENT_STEPS;
+  const stepTimeoutMs = deps.stepTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
+  const step = <T>(work: Promise<T>): Promise<T> =>
+    withStepTimeout(work, stepTimeoutMs, deps.signal);
   session.status = "running";
+  session.error = undefined;
   await deps.save(session);
 
-  await deps.withPage(async (page) => {
-    if (session.url) {
-      await applyBrowserAction(page, { type: "navigate", selector: session.url });
-      if (session.steps.length === 0) {
+  let repeatedFailures = 0;
+  let lastFailureKey = "";
+
+  try {
+    await deps.withPage(async (page) => {
+      if (session.url) {
+        await step(applyBrowserAction(page, { type: "navigate", selector: session.url }));
+        if (session.steps.length === 0) {
+          session.steps.push({
+            action: "navigate",
+            target: session.url,
+            description: "open start URL",
+            success: true,
+          });
+          await deps.save(session);
+        }
+      }
+
+      while (session.steps.length < maxSteps) {
+        if (deps.signal?.aborted) throw new Error("browser run aborted");
+
+        const title = await step(page.title().catch(() => ""));
+        const text = await step(
+          page.evaluate<string>("document.body?.innerText ?? ''").catch(() => ""),
+        );
+
+        const decision = await step(
+          deps.decide({
+            task: session.task,
+            url: page.url,
+            title,
+            text: text.slice(0, PAGE_TEXT_BUDGET),
+            history: session.steps,
+          }),
+        );
+
+        if (decision.done || decision.action === "done") {
+          session.result = decision.result ?? text.slice(0, 1000);
+          break;
+        }
+
+        let success = true;
+        let failureReason = "";
+        try {
+          await step(
+            applyBrowserAction(page, {
+              type: decision.action,
+              selector: decision.target,
+              value: decision.value,
+            }),
+          );
+        } catch (error) {
+          success = false;
+          failureReason = error instanceof Error ? error.message : String(error);
+        }
         session.steps.push({
-          action: "navigate",
-          target: session.url,
-          description: "open start URL",
-          success: true,
+          action: decision.action,
+          target: decision.target,
+          value: decision.value,
+          description: decision.description,
+          success,
         });
         await deps.save(session);
-      }
-    }
 
-    while (session.steps.length < maxSteps) {
-      const title = await page.title().catch(() => "");
-      const text = await page.evaluate<string>("document.body?.innerText ?? ''").catch(() => "");
+        if (success) {
+          repeatedFailures = 0;
+          lastFailureKey = "";
+          continue;
+        }
 
-      const decision = await deps.decide({
-        task: session.task,
-        url: page.url,
-        title,
-        text: text.slice(0, PAGE_TEXT_BUDGET),
-        history: session.steps,
-      });
-
-      if (decision.done || decision.action === "done") {
-        session.result = decision.result ?? text.slice(0, 1000);
-        break;
+        const key = `${decision.action}:${decision.target ?? ""}`;
+        repeatedFailures = key === lastFailureKey ? repeatedFailures + 1 : 1;
+        lastFailureKey = key;
+        if (repeatedFailures >= MAX_REPEATED_FAILURES) {
+          throw new Error(
+            `no progress: ${decision.action} ${decision.target ?? ""} failed ${repeatedFailures} times (${failureReason})`,
+          );
+        }
       }
 
-      let success = true;
       try {
-        await applyBrowserAction(page, {
-          type: decision.action,
-          selector: decision.target,
-          value: decision.value,
-        });
+        const shot = await step(page.screenshot({ fullPage: false }));
+        session.screenshot = shot.toString("base64");
       } catch {
-        success = false;
+        /* a screenshot is diagnostic, never worth failing a run over */
       }
-      session.steps.push({
-        action: decision.action,
-        target: decision.target,
-        value: decision.value,
-        description: decision.description,
-        success,
-      });
-      await deps.save(session);
-    }
+    });
 
-    try {
-      const shot = await page.screenshot({ fullPage: false });
-      session.screenshot = shot.toString("base64");
-    } catch {
-      /* a screenshot is not worth failing a completed run over */
-    }
-  });
+    session.status = "completed";
+  } catch (error) {
+    session.status = "error";
+    session.error = error instanceof Error ? error.message : String(error);
+  }
 
-  session.status = "completed";
   await deps.save(session);
   return session;
 }

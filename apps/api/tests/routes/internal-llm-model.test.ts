@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** With no default model configured, internal calls ask the first provider for its own model. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 process.env.GROQ_API_KEY = "gsk_test";
 delete process.env.NEXUS_DEFAULT_MODEL;

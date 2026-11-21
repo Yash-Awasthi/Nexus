@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 const SECRET = "agent-run-gate-test-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

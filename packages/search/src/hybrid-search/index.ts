@@ -4,7 +4,7 @@ import { whereMatches, whereDocumentMatches } from "../retrieval/index.ts";
 import type { WhereClause, WhereDocumentClause } from "../retrieval/index.ts";
 
 /**
- * @nexus/hybrid-search — Hybrid vector + BM25 search with RRF fusion.
+ * @nexus/search — Hybrid vector + BM25 search with RRF fusion.
  *
  * Run pgvector (dense) and BM25 (sparse) retrieval in parallel, merge ranked
  * lists via Reciprocal Rank Fusion (RRF), then optionally pass through a

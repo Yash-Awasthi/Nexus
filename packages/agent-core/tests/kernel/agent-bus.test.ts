@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { AgentBus, TaskDelegationAgent, type AgentMessage } from "../../src/kernel/agent-bus.ts";
 import { EventBus } from "../../src/kernel/event-bus.ts";

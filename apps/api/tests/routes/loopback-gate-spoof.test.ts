@@ -5,7 +5,7 @@
  */
 import crypto from "node:crypto";
 
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const SECRET = "loopback-spoof-secret";
 process.env.NEXUS_TRUST_PROXY = "true";

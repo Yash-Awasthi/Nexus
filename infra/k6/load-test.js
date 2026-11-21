@@ -5,22 +5,21 @@
  * Usage:
  *   k6 run infra/k6/load-test.js \
  *     -e BASE_URL=http://localhost:3000 \
- *     -e API_KEY=your-api-key \
- *     --vus 50 --duration 60s
+ *     -e API_KEY=your-api-key
  *
  * Scenarios:
- *   - health:      constant 10 VUs (baseline)
- *   - api_read:    ramp up to 50 VUs (GET tasks, approvals)
- *   - api_write:   ramp up to 20 VUs (POST ingest/events)
- *   - council:     constant 5 VUs (deliberation — expensive)
+ *   - health:      constant 5 VUs, GET /health
+ *   - api_read:    ramp up to 50 VUs (tasks and audit reads)
+ *   - api_write:   ramp up to 20 VUs (POST ingest/events; a 429 counts as accepted)
+ *   - council_load: constant 3 VUs, only with -e COUNCIL=1 (needs an LLM provider key)
  *
  * Thresholds (SLO-aligned):
  *   - http_req_duration p99 < 500ms
  *   - http_req_failed < 1%
  */
 
-import http from "k6/http";
 import { check, sleep } from "k6";
+import http from "k6/http";
 import { Rate, Trend } from "k6/metrics";
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
@@ -38,55 +37,58 @@ const ingestSuccessRate = new Rate("ingest_success_rate");
 
 // ── Scenarios ─────────────────────────────────────────────────────────────────
 
-export const options = {
-  scenarios: {
-    health: {
-      executor: "constant-vus",
-      vus: 5,
-      duration: "60s",
-      exec: "healthCheck",
-    },
-    api_read: {
-      executor: "ramping-vus",
-      startVUs: 5,
-      stages: [
-        { duration: "10s", target: 25 },
-        { duration: "40s", target: 50 },
-        { duration: "10s", target: 0 },
-      ],
-      exec: "apiRead",
-    },
-    api_write: {
-      executor: "ramping-vus",
-      startVUs: 2,
-      stages: [
-        { duration: "15s", target: 20 },
-        { duration: "30s", target: 20 },
-        { duration: "15s", target: 0 },
-      ],
-      exec: "apiWrite",
-    },
-    council_load: {
-      executor: "constant-vus",
-      vus: 3,
-      duration: "30s",
-      startTime: "30s",
-      exec: "councilLoad",
-    },
+const scenarios = {
+  health: {
+    executor: "constant-vus",
+    vus: 5,
+    duration: "60s",
+    exec: "healthCheck",
   },
-
-  thresholds: {
-    // SLO-1: API availability
-    http_req_failed: ["rate<0.01"],
-    // SLO-2: API latency p99 < 500ms
-    http_req_duration: ["p(99)<500", "p(95)<200"],
-    // Council-specific
-    council_success_rate: ["rate>0.95"],
-    council_duration_ms: ["p(99)<8000"],
-    // Ingest
-    ingest_success_rate: ["rate>0.99"],
+  api_read: {
+    executor: "ramping-vus",
+    startVUs: 5,
+    stages: [
+      { duration: "10s", target: 25 },
+      { duration: "40s", target: 50 },
+      { duration: "10s", target: 0 },
+    ],
+    exec: "apiRead",
+  },
+  api_write: {
+    executor: "ramping-vus",
+    startVUs: 2,
+    stages: [
+      { duration: "15s", target: 20 },
+      { duration: "30s", target: 20 },
+      { duration: "15s", target: 0 },
+    ],
+    exec: "apiWrite",
   },
 };
+
+const thresholds = {
+  // SLO-1: API availability
+  http_req_failed: ["rate<0.01"],
+  // SLO-2: API latency p99 < 500ms
+  http_req_duration: ["p(99)<500", "p(95)<200"],
+  // Ingest
+  ingest_success_rate: ["rate>0.99"],
+};
+
+// Deliberation needs a configured model provider, so it stays opt-in.
+if (__ENV.COUNCIL === "1") {
+  scenarios.council_load = {
+    executor: "constant-vus",
+    vus: 3,
+    duration: "30s",
+    startTime: "30s",
+    exec: "councilLoad",
+  };
+  thresholds.council_success_rate = ["rate>0.95"];
+  thresholds.council_duration_ms = ["p(99)<8000"];
+}
+
+export const options = { scenarios, thresholds };
 
 // ── Scenario functions ────────────────────────────────────────────────────────
 
@@ -108,8 +110,8 @@ export function healthCheck() {
 export function apiRead() {
   const endpoints = [
     "/api/v1/runtime/tasks?limit=20",
-    "/api/v1/governance/approvals?status=pending&limit=20",
     "/api/v1/audit/log?limit=50",
+    "/api/v1/audit/log/verify",
   ];
   const url = endpoints[Math.floor(Math.random() * endpoints.length)];
   const res = http.get(`${BASE_URL}${url}`, { headers });

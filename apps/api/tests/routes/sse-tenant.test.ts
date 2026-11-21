@@ -25,7 +25,16 @@
  *   single build can exceed 10s (observed 2026-09-08).
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+  vi,
+} from "vite-plus/test";
 import { createHmac } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { InjectOptions } from "light-my-request";
@@ -158,6 +167,8 @@ async function buildWithAuth(): Promise<FastifyInstance> {
   // The pg mock catches all queries.
   process.env.DATABASE_URL =
     "postgresql://test:test@ep-test-sse.us-east-2.aws.neon.tech/sse_test?sslmode=require";
+  // Server build itself runs DDL (persistent-store), so the pool must answer.
+  poolQuery.mockResolvedValue({ rows: [] });
 
   const { buildServer } = await import("../../src/server.ts");
   const server = await buildServer();
@@ -165,17 +176,30 @@ async function buildWithAuth(): Promise<FastifyInstance> {
   return server;
 }
 
+// One server for the whole file: each build registers the full route table, and
+// under a parallel full-suite run 14 builds were enough to blow the 30s budget.
+// Auth and ownership read process.env per request, so per-test env still applies.
+// The single build imports the whole server module graph, which can take tens of
+// seconds while 50+ vitest workers compete for the CPU — hence the long hook timeout.
+beforeAll(async () => {
+  app = await buildWithAuth();
+}, 120_000);
+
 beforeEach(async () => {
   vi.clearAllMocks();
   poolQuery.mockReset();
   poolEnd.mockReset().mockResolvedValue(undefined);
   delete process.env.NEXUS_API_KEY;
-  delete process.env.NEXUS_JWT_SECRET;
-  delete process.env.DATABASE_URL;
+  process.env.NEXUS_JWT_SECRET = JWT_SECRET;
+  process.env.DATABASE_URL =
+    "postgresql://test:test@ep-test-sse.us-east-2.aws.neon.tech/sse_test?sslmode=require";
 });
 
-afterEach(async () => {
+afterEach(() => {
   vi.restoreAllMocks();
+});
+
+afterAll(async () => {
   if (app) {
     try {
       await app.close();
@@ -197,7 +221,6 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
     { timeout: 30_000 },
     async () => {
       setPgRows([{ user_id: USER_B }]);
-      app = await buildWithAuth();
 
       const res = await injectRejected(app, {
         method: "GET",
@@ -215,7 +238,6 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
     { timeout: 30_000 },
     async () => {
       setPgRows([]);
-      app = await buildWithAuth();
 
       const res = await injectSse(app, {
         method: "GET",
@@ -230,7 +252,6 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
 
   it("proceeds (hijacks) when user matches session owner", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
-    app = await buildWithAuth();
 
     const res = await injectSse(app, {
       method: "GET",
@@ -243,7 +264,6 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
 
   it("fails closed (403) when DB is unreachable", { timeout: 30_000 }, async () => {
     setPgError(new Error("ECONNREFUSED"));
-    app = await buildWithAuth();
 
     const res = await injectRejected(app, {
       method: "GET",
@@ -263,7 +283,6 @@ describe("SSE has no stream that carries other accounts' events", () => {
   for (const url of ["/api/v1/sse/tasks", "/api/v1/sse/signals", "/api/v1/sse/verdicts"]) {
     it(`${url} is gone`, { timeout: 30_000 }, async () => {
       setPgRows([]);
-      app = await buildWithAuth();
       const res = await injectRejected(app, {
         method: "GET",
         url,
@@ -275,7 +294,6 @@ describe("SSE has no stream that carries other accounts' events", () => {
 
   it("treats /sse/agent/all as a session another account owns", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_B }]);
-    app = await buildWithAuth();
     const res = await injectRejected(app, {
       method: "GET",
       url: "/api/v1/sse/agent/all",
@@ -290,7 +308,6 @@ describe("SSE has no stream that carries other accounts' events", () => {
 describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
   it("returns 403 when task belongs to a different user", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_B }]);
-    app = await buildWithAuth();
 
     const res = await injectRejected(app, {
       method: "GET",
@@ -304,7 +321,6 @@ describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
 
   it("allows when user owns the task", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
-    app = await buildWithAuth();
 
     const res = await injectSse(app, {
       method: "GET",
@@ -321,7 +337,6 @@ describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
 describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
   it("returns 403 when verdict task belongs to a different user", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_B }]);
-    app = await buildWithAuth();
 
     const res = await injectRejected(app, {
       method: "GET",
@@ -335,7 +350,6 @@ describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
 
   it("allows when user owns the verdict task", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
-    app = await buildWithAuth();
 
     const res = await injectSse(app, {
       method: "GET",
@@ -353,7 +367,6 @@ describe("SSE routes require authentication", () => {
   it("GET /api/v1/sse/tasks/:taskId returns 401 without auth", { timeout: 30_000 }, async () => {
     process.env.NEXUS_API_KEY = "required-key";
     setPgRows([]);
-    app = await buildWithAuth();
 
     const res = await injectRejected(app, {
       method: "GET",
@@ -366,7 +379,6 @@ describe("SSE routes require authentication", () => {
   it("GET /api/v1/sse/agent/:stream returns 401 without auth", { timeout: 30_000 }, async () => {
     process.env.NEXUS_API_KEY = "required-key";
     setPgRows([]);
-    app = await buildWithAuth();
 
     const res = await injectRejected(app, {
       method: "GET",

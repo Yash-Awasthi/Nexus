@@ -4,7 +4,7 @@
 // engine — lexical query→entity anchoring, hop expansion, graphrag's two-tier
 // relationship filter (in-network first, mutual-link priority outside), token-
 // budgeted tables, report attachment, single-pass answer.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { LocalSearchEngine } from "../../src/graphrag-query/index.ts";
 import type { QueryRouter } from "../../src/graphrag-query/index.ts";
 import type { IndexedEntity, IndexedRelation } from "../../src/graphrag-query/index-graphrag.ts";

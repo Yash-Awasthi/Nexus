@@ -2,7 +2,7 @@
 /**
  * agent-handler — `agent.run` BullMQ job: drive the native tool-calling agent loop.
  *
- * Builds a @nexus/llm-drivers driver (BYOK: key from the payload or env), bridges
+ * Builds a @nexus/llm driver (BYOK: key from the payload or env), bridges
  * it to the loop's tool-aware LLM via `llmDriverToToolFn`, assembles the coding +
  * MCP tool set, applies a permission policy (Phase 2), and runs a
  * `ToolAgentRuntime`. Returns the final content + token usage; per-step progress
@@ -18,6 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 import {
   ToolAgentRuntime,
   llmDriverToToolFn,
@@ -30,7 +31,7 @@ import {
   type RuntimeMessage,
   type CompactionResult,
   type PresetName,
-} from "@nexus/agent-runtime";
+} from "@nexus/agent-core/runtime";
 import { toolTranscriptEvent, type CouncilTranscript, type ILLMTransport } from "@nexus/council";
 import { db } from "@nexus/db";
 import { agentSessions, userProviderCredentials } from "@nexus/db/schema";
@@ -47,9 +48,8 @@ import {
   OllamaDriver,
   type LlmDriver,
   type LlmRole,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 import { FixedEmbedder, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
-import { pinnedFetch } from "@nexus/runtime";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { publishAgentEvent } from "./agent-events.ts";

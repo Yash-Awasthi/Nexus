@@ -10,11 +10,11 @@
  * `resolveOAuthDriver(userId, driverProvider)` loads the user's linked account
  * for the llm-oauth provider that can serve a given driver-provider id, refreshes
  * an expiring access token, and hands the provider's `toDriverCredentials()`
- * output straight to the matching @nexus/llm-drivers constructor — no new driver
+ * output straight to the matching @nexus/llm constructor — no new driver
  * wiring. Returns null whenever nothing is linked / configured, so callers treat
  * it exactly like "no key": a missing account is not an error.
  */
-import { AzureOpenAIDriver, VertexDriver, type LlmDriver } from "@nexus/llm-drivers";
+import { AzureOpenAIDriver, VertexDriver, type LlmDriver } from "@nexus/llm/drivers";
 import { registryFromEnv, type OAuthTokens } from "@nexus/llm-oauth";
 
 import { createOAuthTokenStore } from "./oauth-token-store.ts";

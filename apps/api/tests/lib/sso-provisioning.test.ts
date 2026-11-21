@@ -8,7 +8,7 @@
  * accounts, and where the address matches an existing user, takes that account
  * over. These pin the refusal.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   SsoPolicyError,

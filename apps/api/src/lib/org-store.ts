@@ -68,7 +68,12 @@ export interface Company {
 }
 
 export type AgentStatus =
-  "idle" | "running" | "paused" | "error" | "pending_approval" | "terminated";
+  | "idle"
+  | "running"
+  | "paused"
+  | "error"
+  | "pending_approval"
+  | "terminated";
 
 export const ADAPTER_TYPES = [
   "nexus",

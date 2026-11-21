@@ -121,7 +121,9 @@ export default function ProfilePage() {
         return r.ok ? ((await r.json()) as unknown) : null;
       };
       const list = (await get("/api/threads?limit=1000")) as
-        { threads?: { id: string }[] } | { id: string }[] | null;
+        | { threads?: { id: string }[] }
+        | { id: string }[]
+        | null;
       const threads = Array.isArray(list) ? list : (list?.threads ?? []);
       const conversations = await Promise.all(
         threads.map(async (t) => ({

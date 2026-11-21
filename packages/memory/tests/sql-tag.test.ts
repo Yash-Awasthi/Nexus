@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** PgVectorStore can run on any Postgres client: its tagged-template SQL becomes a numbered query. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { sqlFromQuery } from "../src/index.ts";
 

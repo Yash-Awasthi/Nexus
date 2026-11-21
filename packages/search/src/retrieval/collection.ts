@@ -3,7 +3,7 @@
  * collection — chroma-shaped vector collection facade (pass 76, row 60).
  *
  * Row 60 (chroma) names a collection add/query facade with include/projection
- * as its honest remainder: @nexus/retrieval's stores and where-ops (pass 50)
+ * as its honest remainder: @nexus/search's stores and where-ops (pass 50)
  * are primitives, but nobody composes them into chroma's ergonomic NAMED API —
  * `add(ids, documents, metadatas)` → embed + persist in one call, `query`
  * returning the per-query result envelope with `include` projection

@@ -2,7 +2,7 @@
 /**
  * durable — Temporal-style activities + signals for workflow bodies (pass 75).
  *
- * Row 218 (temporal) credits @nexus/workflow-chain with saga compensation
+ * Row 218 (temporal) credits @nexus/agent-core with saga compensation
  * (pass 24) and @nexus/task-queue with retries/timers/cron, but not
  * Temporal's two other core workflow mechanics:
  *

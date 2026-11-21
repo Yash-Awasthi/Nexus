@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { CouncilRequest } from "@nexus/contracts";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 import type { ILLMTransport, ILLMResponse } from "../src/engine.ts";
 import { CouncilService, type OnResultFn } from "../src/council-service.ts";

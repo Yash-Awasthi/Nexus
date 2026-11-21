@@ -7,7 +7,7 @@
 import crypto from "node:crypto";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET = "governance-test-secret";
 const DB = "pglite://:memory:governance-test";

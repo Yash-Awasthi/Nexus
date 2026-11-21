@@ -8,7 +8,7 @@
  * documented third-party path are skip-with-TODO (see providers.ts DESCRIPTORS).
  *
  * Integration: a completed login yields tokens whose `toDriverCredentials()`
- * output matches an existing @nexus/llm-drivers config (Google → VertexConfig),
+ * output matches an existing @nexus/llm config (Google → VertexConfig),
  * so an authed account is stored as the same encrypted JSON-blob credential the
  * BYOK path already routes — no new driver wiring required.
  *
@@ -17,9 +17,9 @@
  * to the `oauth_credentials` table (@nexus/db). `resolveFresh()` refreshes +
  * re-persists at resolve time; `revoke()` hard-deletes.
  *
- * Not yet wired: the API login/callback routes themselves + the concrete drizzle
- * `SealedTokenStore` adapter. TODO(P5-routes): add apps/api routes that start the
- * login, persist via OAuthTokenStore.save(), and resolve via resolveFresh().
+ * Wired: apps/api/src/routes/llm-oauth.ts serves the login, callback and revoke
+ * routes, and apps/api/src/lib/oauth-token-store.ts binds the
+ * `SealedTokenStore` port to drizzle (`DrizzleSealedTokenStore`).
  */
 export * from "./types.ts";
 export { AesGcmVault, generatePkce, randomState, type Pkce } from "./crypto.ts";

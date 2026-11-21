@@ -3,7 +3,7 @@
 // pass-58 inspectable transcript artifact from a real council job's inputs —
 // route evidence, one stage per vote, handler-consistent dissent mapping,
 // metrics/traces/total_ms, OR-of-five degradation verdict. Pure: no DB, no LLM.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { buildCouncilRunTranscript, councilTranscriptJson } from "@nexus/council";
 import type { CouncilRequest, ProposalResult, ModelVote } from "@nexus/contracts";
 

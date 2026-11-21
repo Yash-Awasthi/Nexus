@@ -10,7 +10,7 @@
  * showed "server-backed" rows that were actually per-browser. listThreads must
  * push those ghosts to the server on the first successful contact.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { listThreads } from "./deliberate";
 

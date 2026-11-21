@@ -15,7 +15,7 @@ import path from "node:path";
 
 import { TypedNexusClient } from "@nexus/sdk";
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 import { maturityForPath, type Maturity } from "../../src/lib/api-maturity.ts";
 

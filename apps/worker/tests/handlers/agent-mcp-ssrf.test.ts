@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A run's MCP servers are caller-named URLs: on a server none may reach a private address. */
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 
 import { mcpToolsFromServers } from "../../src/handlers/agent-mcp.ts";
 

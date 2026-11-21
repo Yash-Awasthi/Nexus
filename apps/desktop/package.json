@@ -9,15 +9,15 @@
     "build": "tsc --project tsconfig.json && rolldown src/preload.ts --file dist/preload.js --format cjs --platform node --external electron",
     "start": "electron dist/main.js",
     "dev": "pnpm build && electron dist/main.js",
-    "test": "vitest run",
+    "test": "vp test run",
     "clean": "rm -rf dist coverage",
     "smoke": "node scripts/smoke.cjs",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "electron": "45.0.0-beta.6",
+    "electron": "45.4.1",
     "rolldown": "^1.2.13",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   }
 }

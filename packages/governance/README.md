@@ -8,7 +8,7 @@ Enforces safety boundaries around every task before it executes. Used by `apps/a
 
 ## Installation
 
-Internal monorepo package. Consumed by `apps/api`, `apps/worker`, and `@nexus/runtime`.
+Internal monorepo package. Consumed by `apps/api`, `apps/worker`, and `@nexus/agent-core`.
 
 ```ts
 import {

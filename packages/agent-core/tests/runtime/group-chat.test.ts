@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Conversational group chat (AutoGen AgentChat parity) — focused tests for the
-// GroupChat module in @nexus/agent-runtime.
-import { describe, expect, it } from "vitest";
+// GroupChat module in @nexus/agent-core.
+import { describe, expect, it } from "vite-plus/test";
 import {
   GroupChat,
   roundRobinPicker,

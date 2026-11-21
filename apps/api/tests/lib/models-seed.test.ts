@@ -10,7 +10,7 @@
  * findModel), so assertions go through findModel + computeCost semantics
  * (per-1M-token prices) rather than the deprecated ModelDefinition methods.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 const selectMock = vi.fn();
 
@@ -21,7 +21,7 @@ vi.mock("@nexus/db", () => ({
 }));
 
 import { loadProviderModelsIntoRegistry } from "../../src/lib/models-seed.ts";
-import { globalRegistry } from "@nexus/provider-registry";
+import { globalRegistry } from "@nexus/llm/registry";
 
 const ROWS = [
   {

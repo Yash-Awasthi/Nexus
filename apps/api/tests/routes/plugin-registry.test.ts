@@ -5,7 +5,7 @@
  * fail-closed manifest validation (400 invalid_manifest) and 409 on duplicate
  * id+version.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 

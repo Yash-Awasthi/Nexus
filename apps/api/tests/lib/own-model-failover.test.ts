@@ -3,8 +3,8 @@
  * A saved connection that lists several models falls back across them before
  * leaving the connection: one model's spent allowance is not the key's.
  */
-import { LlmError, type LlmDriver, type LlmRequestOptions } from "@nexus/llm-drivers";
-import { describe, expect, it } from "vitest";
+import { LlmError, type LlmDriver, type LlmRequestOptions } from "@nexus/llm/drivers";
+import { describe, expect, it } from "vite-plus/test";
 
 import { resetFailover } from "../../src/lib/llm-failover.ts";
 import { userContext } from "../../src/lib/user-context.ts";

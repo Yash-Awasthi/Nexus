@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** NX-FEAT-001: the security check names each gap a deployment's settings leave open. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { checkPosture, summarize } from "../../src/lib/security-posture.ts";
 

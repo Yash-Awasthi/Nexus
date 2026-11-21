@@ -2,9 +2,12 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
-import type { ILanguageModel, ChatMessage } from "../../src/kernel/interfaces/language-model.interface.ts";
+import type {
+  ILanguageModel,
+  ChatMessage,
+} from "../../src/kernel/interfaces/language-model.interface.ts";
 import type { IExecutionContext } from "../../src/kernel/interfaces/execution.interface.ts";
 import { CodeAgentPool } from "../../src/kernel/code-agent-pool.ts";
 

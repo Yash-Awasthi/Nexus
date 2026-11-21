@@ -21,9 +21,8 @@ does not repeat it.
 
 Live cloud deployment: one Render web service (`render.yaml`, image `infra/web/Dockerfile`) that
 runs the API with the UI on the same origin, `NODE_ENV=production`, `NEXUS_TRUST_PROXY=uniquelocal`,
-open registration, Neon Postgres, no Redis. `vercel.json` proxies `/api/*` to it. `fly.toml` and
-`infra/helm` describe alternative deployments (Fly runs two machines, so per-process state is not
-shared there).
+open registration, Neon Postgres, no Redis. It is the only deployed target: the Vercel proxy,
+the Fly config and the Helm/Terraform trees were removed so there is one path to production.
 
 ## Route scopes and how each is authenticated
 
@@ -89,17 +88,17 @@ only where the runtime really isolates:
 | `/api/sandbox/execute` Python          | `lib/untrusted-python.ts`: Pyodide in a fresh child Node per run, `--permission` reading only the Pyodide package, empty env, network prelude, 256 MB heap, 512 MB WASM, deadline | Good (was in-process until NX-SEC-001)                         |
 | Code agent build/run (Python)          | same `runViaPyodide` → `lib/untrusted-python.ts`                                                                                                                                  | Good                                                           |
 | `/api/sandbox/execute` other languages | Piston at `PISTON_URL` (self-hosted)                                                                                                                                              | Piston's container                                             |
-| Programmatic tool calling              | `@nexus/agent-runtime` `ptc-sandbox.ts`: child Node, permission model                                                                                                             | Good                                                           |
+| Programmatic tool calling              | `@nexus/agent-core` `ptc-sandbox.ts`: child Node, permission model                                                                                                                | Good                                                           |
 | Drive shell `/api/v1/drive/exec`       | Docker (`runOnDrive`), tmpfs sized to quota, gVisor/Kata optional; host shell only with `ALLOW_UNSANDBOXED_EXEC=true` and never in production                                     | Good                                                           |
 | Python/R/Julia kernels                 | `@nexus/code-repl` Docker REPL                                                                                                                                                    | Container                                                      |
-| Host PTY `/api/local/pty`              | `@nexus/pty`, loopback-only (or `NEXUS_LOCAL_PTY_FORCE`), inherits server env                                                                                                     | By design a host shell; sessions not owner-scoped (NX-SEC-018) |
+| Host PTY `/api/local/pty`              | `@nexus/pty`, loopback-only (`NEXUS_LOCAL_PTY_FORCE` outside production only), inherits server env                                                                                | By design a host shell; sessions not owner-scoped (NX-SEC-018) |
 | Skills                                 | `lib/skill-runner.ts` → `@nexus/sandbox` child process; gated as `pty`                                                                                                            | Approval / admin on shared servers                             |
 | Org CLI runtimes                       | `lib/org-cli-adapters.ts`; exec policy once per agent and command; no inherited env                                                                                               | Policy                                                         |
 | Workflow `transform` expressions       | `new Function` in the API process                                                                                                                                                 | Desktop only; refused on shared servers                        |
 
 ## Where requests leave the server
 
-- `@nexus/runtime` `pinnedFetch`: resolves, refuses private/reserved addresses
+- `@nexus/agent-core` `pinnedFetch`: resolves, refuses private/reserved addresses
   (`security-utils.ts` `isPrivateAddress`), and pins the socket to the checked address, so DNS
   rebinding fails at connect time. Does not follow redirects.
 - `apps/api/src/lib/public-url.ts`: `unsafeUrlReason` (string check), `callerFetch` (pinned off

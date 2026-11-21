@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Cypher-subset query engine for @nexus/knowledge-graph.
+ * Cypher-subset query engine for @nexus/search.
  *
  * The graph-DB semantics the stores/traversal layer lacks: a tiny, honest
  * Cypher subset you can run against any {@link KGStore} — the InMemory

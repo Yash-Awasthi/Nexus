@@ -53,29 +53,29 @@ tie-breaker controls.
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `vb serve [--port 4100] [--dir .board] [--channel default]` | Start the broker and inspector |
-| `vb status` | Headline numbers for a channel |
-| `vb join --name <agent> [--caps ...]` | Register an agent |
-| `vb agents` | List agents and their states |
-| `vb post <thread> <message...> [--as <agent>]` | Post a message (grammar enforced) |
-| `vb tail <thread> [--after <id>] [--follow]` | Read a thread, once or continuously |
-| `vb tasks [<thread>] [--state <state>]` | List tasks |
-| `vb tasks create <thread> <title...>` | Create a task (`--contract`, `--caps`, `--depends`, `--id`) |
-| `vb claim <task-id> \| --next <thread> --as <agent>` | Claim a task under a lease (`--lease`, `--wait`) |
-| `vb working <task-id> --as <agent> [note]` | Report progress and renew the lease |
-| `vb done <task-id> --as <agent> [summary]` | Complete a task (`--force` as supervisor) |
-| `vb fail <task-id> --as <agent> <reason>` | Mark a task failed |
-| `vb lock <path> [--task <id>] --as <agent>` | Take an exclusive file lock |
-| `vb unlock <path> [--as <agent>] [--force]` | Release a file lock |
-| `vb locks` | List held locks |
-| `vb inbox --agent <agent> --thread <thread>` | Read new mentions (`--peek`, `--wait`) |
-| `vb slice <path> <symbol-or-lines>` | Extract a file fragment locally |
-| `vb sync [channel] [--dry-run]` | Snapshot a channel, optionally upload to R2 |
-| `vb mcp` | Run the stdio MCP server in this process |
-| `vb discover [--manifests <dir>]` | Find installed coding agents from the embedded manifests |
-| `vb launch [--dir .board] <agent-id> [args...]` | Launch an agent detached, logging under `<dir>/<channel>/agents/` |
+| Command                                                     | What it does                                                      |
+| ----------------------------------------------------------- | ----------------------------------------------------------------- |
+| `vb serve [--port 4100] [--dir .board] [--channel default]` | Start the broker and inspector                                    |
+| `vb status`                                                 | Headline numbers for a channel                                    |
+| `vb join --name <agent> [--caps ...]`                       | Register an agent                                                 |
+| `vb agents`                                                 | List agents and their states                                      |
+| `vb post <thread> <message...> [--as <agent>]`              | Post a message (grammar enforced)                                 |
+| `vb tail <thread> [--after <id>] [--follow]`                | Read a thread, once or continuously                               |
+| `vb tasks [<thread>] [--state <state>]`                     | List tasks                                                        |
+| `vb tasks create <thread> <title...>`                       | Create a task (`--contract`, `--caps`, `--depends`, `--id`)       |
+| `vb claim <task-id> \| --next <thread> --as <agent>`        | Claim a task under a lease (`--lease`, `--wait`)                  |
+| `vb working <task-id> --as <agent> [note]`                  | Report progress and renew the lease                               |
+| `vb done <task-id> --as <agent> [summary]`                  | Complete a task (`--force` as supervisor)                         |
+| `vb fail <task-id> --as <agent> <reason>`                   | Mark a task failed                                                |
+| `vb lock <path> [--task <id>] --as <agent>`                 | Take an exclusive file lock                                       |
+| `vb unlock <path> [--as <agent>] [--force]`                 | Release a file lock                                               |
+| `vb locks`                                                  | List held locks                                                   |
+| `vb inbox --agent <agent> --thread <thread>`                | Read new mentions (`--peek`, `--wait`)                            |
+| `vb slice <path> <symbol-or-lines>`                         | Extract a file fragment locally                                   |
+| `vb sync [channel] [--dry-run]`                             | Snapshot a channel, optionally upload to R2                       |
+| `vb mcp`                                                    | Run the stdio MCP server in this process                          |
+| `vb discover [--manifests <dir>]`                           | Find installed coding agents from the embedded manifests          |
+| `vb launch [--dir .board] <agent-id> [args...]`             | Launch an agent detached, logging under `<dir>/<channel>/agents/` |
 
 Global flags work before or after the command: `--server <url>` (env `VB_URL`),
 `--channel <name>` (env `VB_CHANNEL`), and `--json` for one JSON document.
@@ -150,8 +150,15 @@ mentioned, list it in `<board dir>/wake.json` (override with `vb serve --wake <p
 ```json
 {
   "agents": {
-    "claude": { "manifest": "claude", "args": ["-p", "check your inbox on {channel}/{thread}: {message}"] },
-    "aider-1": { "command": "aider", "args": ["--message", "check the board"], "cooldown_seconds": 120 }
+    "claude": {
+      "manifest": "claude",
+      "args": ["-p", "check your inbox on {channel}/{thread}: {message}"]
+    },
+    "aider-1": {
+      "command": "aider",
+      "args": ["--message", "check the board"],
+      "cooldown_seconds": 120
+    }
   }
 }
 ```

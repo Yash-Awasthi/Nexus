@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env vpx
 // SPDX-License-Identifier: Apache-2.0
 /**
  * scripts/generate-clients.ts

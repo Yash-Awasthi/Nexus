@@ -16,7 +16,7 @@
  * available; otherwise every call refuses rather than returning a made-up page.
  */
 
-import { pinnedFetch } from "@nexus/runtime";
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 import { ScrapingMcpServer, SessionStore, type ScrapingBackend } from "@nexus/scraping-mcp";
 import { createStealthBackend, isPatchrightAvailable } from "@nexus/stealth-browser";
 import type { FastifyInstance, FastifyReply } from "fastify";

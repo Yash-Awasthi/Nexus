@@ -4,8 +4,7 @@
  *
  * Loads the `provider_models` table into the in-memory ProviderRegistry the
  * billing cost model prices from. No network: the table is written offline by
- * `nexus models seed [--file <path>]`; boot only reads rows (ROADMAP §1.5:
- * "boot reads the table; zero network at startup").
+ * `nexus models seed [--file <path>]`; boot only reads rows.
  *
  * Best-effort by design: with no DATABASE_URL, an unreachable DB, or an empty
  * table this resolves to a count of 0 and the registry keeps its curated
@@ -15,7 +14,7 @@ import {
   globalRegistry,
   registerFromProviderModelRows,
   type ProviderModelRowLike,
-} from "@nexus/provider-registry";
+} from "@nexus/llm/registry";
 
 /** Number of models loaded into the registry (0 when the table is absent/empty). */
 export async function loadProviderModelsIntoRegistry(): Promise<number> {

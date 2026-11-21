@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { stripVTControlCharacters } from "node:util";
 
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { renderPosture } from "../../src/lib/security.ts";
 

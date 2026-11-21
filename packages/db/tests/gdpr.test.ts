@@ -6,7 +6,7 @@
  * assert the cascade covers every user-scoped table, targets user_id columns,
  * and removes the `users` row last.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import type { PgTable } from "drizzle-orm/pg-core";
 
 import {

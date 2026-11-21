@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { LlmToolFn, RuntimeMessage } from "@nexus/agent-runtime";
-import { describe, expect, it, vi } from "vitest";
+import type { LlmToolFn, RuntimeMessage } from "@nexus/agent-core/runtime";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   appendUnifiedDiff,

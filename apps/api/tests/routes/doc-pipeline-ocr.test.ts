@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 vi.mock("tesseract.js", () => ({
   createWorker: async () => ({

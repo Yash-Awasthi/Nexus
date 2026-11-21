@@ -7,7 +7,7 @@
  * non-2xx answer turns into, and that an endpoint with no body is not treated
  * as a failure.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { TypedNexusClient, TypedRequestError, buildUrl } from "../src/typed.ts";
 

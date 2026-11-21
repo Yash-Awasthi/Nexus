@@ -8,7 +8,7 @@
  * cross-product), returning a structured boolean verdict: is this response
  * correct, complete, and well reasoned? Each verifier vote is tallied per
  * candidate and the candidate with the most approving votes is the verified
- * answer. Distinct from {@link @nexus/best-of-n}: there the same judge scores
+ * answer. Distinct from {@link @nexus/council}: there the same judge scores
  * samples on a numeric scale; here many independent verifiers each make a
  * yes/no verification decision, so a hallucination that fools one judge can
  * still be caught by the others.

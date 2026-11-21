@@ -6,7 +6,7 @@
  * Contract: the raw `nxk_` value is returned only at creation time; listing
  * exposes prefix + scopes but never the token or its hash.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

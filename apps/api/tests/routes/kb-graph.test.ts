@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A knowledge base read into the caller's knowledge graph, optionally limited to some entity types. */
-import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
+import type { LlmDriver, LlmRequestOptions } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 let failing = false;
 const extractor = {

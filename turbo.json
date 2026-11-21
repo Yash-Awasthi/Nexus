@@ -10,18 +10,17 @@
       "persistent": true,
       "cache": false
     },
-    "test": {
-      "outputs": ["coverage/**"]
-    },
+    "test": {},
     "clean": {
       "cache": false
     },
     "db:migrate": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "db:generate": {
-      "cache": false
-    },
-    "docs:check": {}
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
+    }
   }
 }

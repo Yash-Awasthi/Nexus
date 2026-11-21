@@ -364,7 +364,7 @@ async function execute(task: SandboxTask, ctx: IExecutionContext): Promise<Sandb
   // that reference env vars. For now the sandbox runs unauthenticated.
   void requireEnv; // imported for potential future use
 
-  return executeCode(task);
+  return executeCode(task, await resolveUntrustedRunner());
 }
 
 /** Sandbox adapter. */
@@ -586,6 +586,66 @@ export function createDockerRunner(
     return result;
   };
   return Object.assign(run, { inContainer: true });
+}
+
+// ── Untrusted-code default ────────────────────────────────────────────────────
+
+export class SandboxUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SandboxUnavailableError";
+  }
+}
+
+/**
+ * A runner that refuses to execute. Returned when the container runtime is not
+ * usable, so untrusted code fails closed instead of running on the host.
+ */
+export function createFailClosedRunner(reason: string): Runner {
+  return async () => {
+    throw new SandboxUnavailableError(reason);
+  };
+}
+
+/** Produce whether a Docker daemon answers. Never throws. */
+export function dockerAvailable(probe: Runner = defaultRunner): Promise<boolean> {
+  return probe("docker", ["info", "--format", "{{.ServerVersion}}"], {
+    timeoutMs: 5_000,
+    env: {},
+  })
+    .then((result) => result.exitCode === 0 && !result.timedOut)
+    .catch(() => false);
+}
+
+export interface UntrustedRunnerOptions extends DockerSandboxConfig {
+  /** Docker probe override for tests. */
+  probe?: Runner;
+  /** Spawn override for tests. */
+  spawnRunner?: Runner;
+}
+
+/**
+ * Runner for untrusted code (model-written shell, skill code, missions).
+ *
+ * Docker (or gVisor via `SANDBOX_RUNTIME=runsc`) is the only executor. It
+ * requires `NEXUS_SANDBOX_IMAGE` to name an image with the needed runtimes;
+ * without that image, or without a Docker daemon, the returned runner fails
+ * closed. It never falls back to `defaultRunner` (child_process).
+ */
+export async function resolveUntrustedRunner(opts: UntrustedRunnerOptions = {}): Promise<Runner> {
+  const image = opts.image ?? process.env["NEXUS_SANDBOX_IMAGE"];
+  if (!image) {
+    return createFailClosedRunner(
+      "untrusted code needs NEXUS_SANDBOX_IMAGE and Docker; host execution is disabled",
+    );
+  }
+  if (!(await dockerAvailable(opts.probe))) {
+    return createFailClosedRunner(
+      "Docker is not available, so untrusted code cannot run in a sandbox",
+    );
+  }
+  const { probe: _probe, spawnRunner, ...config } = opts;
+  return createDockerRunner({ ...config, image }, spawnRunner);
 }
 
 // ── Re-exports for testing ────────────────────────────────────────────────────

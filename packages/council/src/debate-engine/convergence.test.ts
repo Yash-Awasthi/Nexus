@@ -6,7 +6,7 @@
  * deterministically: each agent reads its answer from a per-agent script
  * indexed by round.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   answersAgree,
   lexicalSimilarity,

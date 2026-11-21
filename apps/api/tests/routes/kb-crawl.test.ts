@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A knowledge base can take in a website: each crawled page becomes one document. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 const importSite = vi.fn(async (_url: string, _opts: { maxPages: number }) => ({
   pages: [

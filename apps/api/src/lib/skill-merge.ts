@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { LlmRole } from "@nexus/llm-drivers";
+import type { LlmRole } from "@nexus/llm/drivers";
 
 import { withTimeout } from "./shared-kv.ts";
 import { splitSkillCodeImports } from "./skill-imports.ts";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { BFIndex, HNSWIndex, makeDistance, type HnswSpace } from "./hnsw-index.ts";
 
 /** Deterministic pseudo-random vectors (mulberry32) so tests are stable. */

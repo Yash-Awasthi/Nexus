@@ -17,7 +17,7 @@
 
 import { randomBytes } from "node:crypto";
 
-import type { MissionRecord, MissionStore } from "@nexus/agent-engine";
+import type { MissionRecord, MissionStore } from "@nexus/agent-core/engine";
 
 import { extractMissionInsights } from "./memory-extractor.ts";
 import { getSharedKV } from "./shared-kv.ts";

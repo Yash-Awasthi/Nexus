@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** MCP tools generated from an OpenAPI spec, and the calls they make. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { openApiToMcp } from "../src/index.ts";
 

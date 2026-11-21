@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll, beforeAll, vi } from "vitest";
+import { afterAll, beforeAll, vi } from "vite-plus/test";
 
 /** Point the stores at a fresh directory for this file; `env` sets (or, with undefined, clears) more variables. */
 export function useOrgDataDir(env: Record<string, string | undefined> = {}): void {

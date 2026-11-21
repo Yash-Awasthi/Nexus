@@ -2,7 +2,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 
 import type { QueueJob } from "../../src/kernel/interfaces/queue.interface.ts";
 import { MetricsCollector } from "../../src/kernel/observability-manager.ts";

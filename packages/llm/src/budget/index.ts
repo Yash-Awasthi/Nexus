@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/token-budget — Per-identity token rate limiting and budget tracking.
+ * @nexus/llm — Per-identity token rate limiting and budget tracking.
  *
  * TokenBudget        — core interface.
  *

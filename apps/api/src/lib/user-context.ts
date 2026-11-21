@@ -14,7 +14,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
-import type { LlmDriver } from "@nexus/llm-drivers";
+import type { LlmDriver } from "@nexus/llm/drivers";
 
 import type { LlmStep } from "./request-traces.ts";
 

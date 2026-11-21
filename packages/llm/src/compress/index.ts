@@ -56,7 +56,7 @@ export function encodeStructured(value: unknown, format: StructuredFormat = "jso
 }
 
 // ── Token estimation ────────────────────────────────────────────────────────────
-// Same 4-chars/token heuristic used across @nexus/llm-drivers and prompt-cache,
+// Same 4-chars/token heuristic used across @nexus/llm and prompt-cache,
 // so savings numbers are comparable across packages.
 
 /** Rough estimate: 1 token ≈ 4 chars. */
@@ -77,7 +77,8 @@ export interface CompressFilter {
 
 // CSI / SGR ANSI escape sequences (colors, cursor moves). Pure terminal noise to an LLM.
 
-const ANSI_RE = /\[[0-9;?]*[ -/]*[@-~]/g;
+// eslint-disable-next-line no-control-regex -- the escape is what this matches
+const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 /** Strip ANSI escape codes (color/cursor sequences). Lossless. */
 export const stripAnsi: CompressFilter = {
@@ -239,7 +240,8 @@ export function compressPreset(input: string, preset: PresetName = "lossless"): 
 /** Structural traits a chunk of tool output can exhibit. A chunk may have several. */
 export type OutputTrait = "ansi" | "trailing-ws" | "blank-runs" | "repeat-runs";
 
-const ANSI_DETECT = /\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
+// eslint-disable-next-line no-control-regex -- the escape is what this matches
+const ANSI_DETECT = /\x1b\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
 const TRAILING_WS_DETECT = /[ \t]\r?(?:\n|$)/;
 const BLANK_RUNS_DETECT = /(\r?\n)[ \t]*(\r?\n)[ \t]*(\r?\n)/;
 

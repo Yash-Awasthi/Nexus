@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The server operator makes an account an admin from inside the deployment. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 const DB = "pglite://:memory:grant-admin";
 process.env.DATABASE_URL = DB;

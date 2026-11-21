@@ -5,7 +5,7 @@
  * tally, majority pick, tie-break, anonymization, and parse-fallback paths
  * are all exercised without any real model.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { parseVerdict, runMavVerification } from "./verify.ts";
 import type { CandidateAnswer, VerifierVerdict } from "./verify.ts";
 import type { ILLMResponse, ILLMTransport } from "./engine.ts";

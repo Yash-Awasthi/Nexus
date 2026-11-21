@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/knowledge-graph — community detection (Leiden/Louvain parity slice).
+ * @nexus/search — community detection (Leiden/Louvain parity slice).
  *
  * knowledge-graph stores and traverses graphs; it never *clusters* them.
  * This module ports the classic modularity-optimization family behind the

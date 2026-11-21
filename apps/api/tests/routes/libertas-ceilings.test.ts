@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** NX-SEC-007: the public completion endpoint spends the operator's key, so no header or address change lifts its ceiling. */
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const { libertasRoutes } = await import("../../src/routes/libertas.ts");
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/context-pruner — Active token budget management for agent pipelines.
+ * @nexus/agent-core — Active token budget management for agent pipelines.
  *
  * Prevents silent context overflow by truncating message history before
  * it reaches the LLM's context window limit.

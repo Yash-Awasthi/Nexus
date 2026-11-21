@@ -5,7 +5,7 @@
 -- One row per model definition from the models.dev catalogue (or a curated
 -- fixture). Rows are written by `nexus models seed [--file <path>]` — never by
 -- a startup network pull — and read into the in-memory ProviderRegistry at API
--- boot. Shape mirrors the ModelDefinition type in @nexus/provider-registry:
+-- boot. Shape mirrors the ModelDefinition type in @nexus/llm:
 -- prices are USD per 1M tokens (null = free), ids are namespaced provider/model.
 
 CREATE TABLE IF NOT EXISTS "provider_models" (

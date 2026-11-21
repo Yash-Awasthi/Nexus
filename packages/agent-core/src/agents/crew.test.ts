@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Role-based Crew orchestration (crewAI/CAMEL parity) — focused tests for the
-// RoleAgent/Task/Crew module in @nexus/agents.
-import { describe, expect, it } from "vitest";
+// RoleAgent/Task/Crew module in @nexus/agent-core.
+import { describe, expect, it } from "vite-plus/test";
 import { RoleAgent, Crew, type CrewLlm, type CrewLlmMessage } from "./crew.ts";
 import { AgentError } from "./index.ts";
 

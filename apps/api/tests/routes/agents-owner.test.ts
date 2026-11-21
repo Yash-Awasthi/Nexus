@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const SECRET = "agents-owner-secret";
 const DB = "pglite://:memory:agents-owner";

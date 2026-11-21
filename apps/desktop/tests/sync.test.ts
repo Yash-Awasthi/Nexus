@@ -6,7 +6,7 @@
  * The conflict cases are the reason this file exists — a sync that quietly
  * picks a side is indistinguishable from one that loses data.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   LEDGER_LIMIT,

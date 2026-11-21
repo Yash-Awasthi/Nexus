@@ -3,7 +3,7 @@
  * GraphRAG indexing pipeline — builds the community reports that
  * {@link GraphRAGQueryEngine} queries (Microsoft-GraphRAG-style).
  *
- * @nexus/graphrag-query previously only *consumed* pre-built community
+ * @nexus/search previously only *consumed* pre-built community
  * reports; nothing turned documents into them. This module closes the loop for
  * the GraphRAG-family repos in the absorption ledger (graphrag, lightrag,
  * nano-graphrag, …):

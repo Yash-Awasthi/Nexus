@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Without a browser engine, the scraping endpoints say so instead of returning a canned page. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 delete process.env.STEALTH_BROWSER_URL;
 vi.mock("@nexus/stealth-browser", async (importOriginal) => ({

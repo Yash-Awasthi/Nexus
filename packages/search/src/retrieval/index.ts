@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/retrieval — Memory-specific RAG retrieval.
+ * @nexus/search — Memory-specific RAG retrieval.
  *
  * Different from general pgvector similarity search: tuned for agent memory
  * with recency weighting, importance scoring, and multi-stage
@@ -341,7 +341,7 @@ export class RagtimeRetriever {
 //   rag/advanced_rag/tree_structured_query_decomposition_retrieval.py)
 //
 // Fills the gap between "@nexus/doc-pipeline documents ingested" and
-// "@nexus/retrieval high-precision retrieval". ragflow covers:
+// "@nexus/search high-precision retrieval". ragflow covers:
 //   1. Chunking strategy taxonomy
 //   2. Typed RetrievalResult with document-level aggregation
 //   3. Citation insertion into LLM output

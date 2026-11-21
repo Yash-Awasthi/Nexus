@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as os from "node:os";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   WorkspaceRunner,

@@ -15,7 +15,7 @@
     "./reranker": "./src/reranker/index.ts"
   },
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vp test run --passWithNoTests",
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
@@ -23,8 +23,7 @@
     "@nexus/mcp-client": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "catalog:",
-    "@vitest/coverage-v8": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

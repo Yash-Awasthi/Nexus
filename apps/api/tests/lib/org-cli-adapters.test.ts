@@ -9,7 +9,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 
@@ -290,6 +290,14 @@ describe("http adapter", () => {
 describe("agent skills", () => {
   it("run once per turn after the exec gate allows them, and feed their output to the prompt", async () => {
     const { cli, exec, rt, work, org } = await boot();
+    // The sandbox is exercised in @nexus/sandbox; this test is about the gate and the prompt.
+    cli.setSkillRunner(async () => ({
+      stdout: "42\n",
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 1,
+    }));
     cli.setSkillResolver((owner, ids) =>
       owner === "alice" && ids.includes("sk1")
         ? [{ id: "sk1", name: "Count", language: "javascript", code: "console.log(6 * 7)" }]
@@ -334,5 +342,6 @@ describe("agent skills", () => {
     expect(prompts).toHaveLength(1);
     expect(rt.getRun("alice", edited.id).error).toMatch(/Waiting for you to allow the skill/);
     cli.setSkillResolver(() => []);
+    cli.setSkillRunner(undefined);
   }, 60_000);
 });

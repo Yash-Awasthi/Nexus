@@ -3,7 +3,7 @@
  * Council task handler — processes `council.deliberate` jobs.
  *
  * Phase 1 — LLM backbone:
- *   LlmDriversTransport wraps @nexus/llm-drivers DriverRegistry so council
+ *   LlmDriversTransport wraps @nexus/llm DriverRegistry so council
  *   deliberation can use any configured provider (Groq, Anthropic, Gemini, …)
  *   controlled by COUNCIL_MODEL env var (default: nexus/smart → Groq 70b).
  *
@@ -35,7 +35,7 @@ import {
   MistralDriver,
   OpenRouterDriver,
   type LlmRole,
-} from "@nexus/llm-drivers";
+} from "@nexus/llm/drivers";
 import { eq } from "drizzle-orm";
 
 // ── Council config ─────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ if (!Object.hasOwn(COUNCIL_DRIVER_ALIASES, COUNCIL_MODEL)) {
 // ── LlmDriversTransport ────────────────────────────────────────────────────────
 
 /**
- * ILLMTransport backed by @nexus/llm-drivers DriverRegistry.
+ * ILLMTransport backed by @nexus/llm DriverRegistry.
  * Lets CouncilService use any registered provider, not just Groq SDK directly.
  */
 class LlmDriversTransport implements ILLMTransport {

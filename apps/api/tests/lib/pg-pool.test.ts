@@ -7,7 +7,7 @@
  * of the adapter is that callers cannot tell it from node-postgres, and only a
  * real query proves the result shape matches.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vite-plus/test";
 
 import { closePgPools, getPgPool, isEmbeddedUrl } from "../../src/lib/pg-pool.ts";
 

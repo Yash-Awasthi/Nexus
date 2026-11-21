@@ -3,8 +3,8 @@
  * Graph extraction is two model calls per document or chunk, so NEXUS_EXTRACT_MODEL can name a
  * cheap model for it. Hermetic: the drivers are stubs behind a mocked api-bridge.
  */
-import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LlmDriver, LlmRequestOptions } from "@nexus/llm/drivers";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const pinned = vi.fn();
 const fallback = vi.fn();

@@ -7,13 +7,13 @@
 # package exports its source, so the image runs apps/api/src directly.
 
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
-FROM node:26-alpine AS deps
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS deps
 WORKDIR /app
 
 # python3/make/g++ are needed to compile node-pty's native extension during
 # pnpm install (no prebuilt binary for alpine/musl).
 RUN apk add --no-cache python3 make g++ \
- && npm install -g pnpm@12.11.2 --no-fund --no-audit
+ && npm install -g pnpm@12.21.0 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
@@ -44,7 +44,7 @@ RUN pnpm install --frozen-lockfile --prod --filter "@nexus/api..." \
  && rm -rf packages/*/tests packages/*/dist apps/*/tests
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
-FROM node:26-alpine AS runner
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runner
 WORKDIR /app
 
 # Non-root user for security

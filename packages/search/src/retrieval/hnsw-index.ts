@@ -2,7 +2,7 @@
 
 import { dot, normalize, mulberry32 } from "@nexus/contracts";
 /**
- * @nexus/retrieval — HNSW approximate nearest-neighbor index (hnswlib port).
+ * @nexus/search — HNSW approximate nearest-neighbor index (hnswlib port).
  *
  * Faithful TypeScript port of hnswlib's layered-graph ANN index and its
  * brute-force reference index (nmslib/hnswlib, Malkov & Yashunin 2018).

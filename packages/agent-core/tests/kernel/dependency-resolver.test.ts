@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { TaskDependencyResolver } from "../../src/kernel/dependency-resolver.ts";
 import type { Task } from "../../src/kernel/task-router.ts";

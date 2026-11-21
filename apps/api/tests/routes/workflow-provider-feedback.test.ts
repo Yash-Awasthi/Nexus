@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import Fastify from "fastify";
-import { DriverRegistry, type LlmDriver } from "@nexus/llm-drivers";
-import { expect, it, vi } from "vitest";
+import { DriverRegistry, type LlmDriver } from "@nexus/llm/drivers";
+import { expect, it, vi } from "vite-plus/test";
 import { workflowsRoutes } from "../../src/routes/workflows.ts";
 
 it("does not send an explicitly selected missing provider's model to the default provider", async () => {

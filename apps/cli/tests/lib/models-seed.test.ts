@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Unit tests for the §1.5 models.dev seed (ROADMAP).
+ * Unit tests for the models.dev seed.
  *
  * Covers the catalogue→rows conversion (the exact mapping `modelsDevToDefinitions`
  * performs for the in-memory registry) and the upsert against a stub DB — no
  * real Postgres, no network. The fixture mirrors the trimmed models.dev
- * api.json shape already used by @nexus/provider-registry's tests.
+ * api.json shape already used by @nexus/llm's tests.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
+
+// Load the schema up front: `upsertProviderModels` imports it lazily, and a cold
+// import under a full parallel test run can take longer than the 5s test budget.
+import "@nexus/db/schema";
+import { rowToModelDefinition } from "@nexus/llm/registry";
 
 import {
   MODELS_DEV_FIXTURE,
@@ -16,7 +21,6 @@ import {
   upsertProviderModels,
   type SeedDb,
 } from "../../src/lib/models-seed.ts";
-import { rowToModelDefinition } from "@nexus/provider-registry";
 
 /** Capture the insert calls a stub DB receives. */
 function makeStubDb(): { db: SeedDb; calls: { row: unknown; set: unknown }[] } {

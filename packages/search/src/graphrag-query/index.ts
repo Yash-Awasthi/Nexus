@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/graphrag-query — GraphRAG query with community reports.
+ * @nexus/search — GraphRAG query with community reports.
  *
  * Inspired by Microsoft's GraphRAG.
  * Provides hierarchical community-based retrieval for question answering,

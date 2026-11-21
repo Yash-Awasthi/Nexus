@@ -3,7 +3,7 @@
 # `@nexus/llm-oauth` — Security & Threat Model
 
 Security review for the official-authentication framework. This is the **hard
-gate** for any OAuth live-token work (ROADMAP §4): no live-token persistence or
+gate** for any OAuth live-token work: no live-token persistence or
 resolve path ships until the mitigations here are in place. It reviews the code
 as it exists in `src/`, and flags what is **not yet built** so the gaps are
 explicit rather than assumed-covered.
@@ -13,9 +13,10 @@ explicit rather than assumed-covered.
 **What this package does.** Authenticate to an LLM provider through a mechanism
 the provider _officially_ supports for third-party apps (the operator's own
 registered OAuth app), exchange the code for tokens, keep the access token fresh,
-and map tokens to an existing `@nexus/llm-drivers` credential blob. It is a
-library — it holds no server, no routes, no DB (those are the caller's, and are
-not built yet; see `index.ts` `TODO(P5-routes)`).
+and map tokens to an existing `@nexus/llm` credential blob. It is a library —
+it holds no server, no routes, no DB. The API layer that consumes it lives in
+`apps/api/src/routes/llm-oauth.ts` (routes) and
+`apps/api/src/lib/oauth-token-store.ts` (drizzle adapter).
 
 **Assets, most sensitive first:**
 
@@ -84,13 +85,14 @@ secret and the only asset that _must_ be encrypted at rest.
 - **PKCE S256 + CSRF state:** `startLogin` issues a per-flow PKCE verifier
   (`generatePkce`) and random `state` (`randomState`, 24 CSPRNG bytes).
   `completeLogin` refuses a login with no stored verifier.
-- **Caller obligations at the (not-yet-built) route layer — required before go-live:**
+- **Caller obligations at the route layer — implemented in `apps/api/src/routes/llm-oauth.ts`:**
   1. **Validate `state`** on the callback against the persisted `PendingAuth`
-     (constant-time compare) — the library carries it but cannot enforce the check.
-  2. **Allowlist `redirectUri`.** It is passed in by the caller and echoed into the
-     auth URL and the token exchange; an open redirect_uri is a token-theft vector.
-     Pin it to a fixed registered callback, do not accept it from the user.
-  3. Persist `PendingAuth` **server-side**, bound to the session, single-use, TTL'd.
+     (constant-time compare, provider match). The pending entry is read and
+     deleted in the same request, so a replayed state is rejected.
+  2. **Server-derived `redirectUri`.** `callbackUri()` builds it from
+     `OAUTH_REDIRECT_BASE` + a fixed path; it is never accepted from the user.
+  3. **Server-side `PendingAuth`.** Stored in the shared KV keyed by `state`,
+     TTL 600s, delete-on-read, bound to the authenticated user id.
 
 ## 5. Refresh path (`refresh.ts`)
 
@@ -124,40 +126,45 @@ secret and the only asset that _must_ be encrypted at rest.
     refresh/exchange calls are not an SSRF surface. Keep them constant — do not make
     the token endpoint configurable from user data.
 
-## 7. Revocation — **NOT YET IMPLEMENTED (blocking gap)**
+## 7. Revocation — implemented
 
-There is no revoke path in the package today. Before persisting live refresh
-tokens (ROADMAP §4 item 3), implement:
+`OAuthTokenStore.revoke()` is the single revoke path; the authenticated
+`POST /llm-oauth/:provider/revoke` route calls it. Ordering matters:
 
-1. **Delete-at-rest:** remove (or crypto-shred) the sealed refresh-token row on
-   user disconnect / account delete. Hard delete, not a soft flag — a soft-deleted
-   sealed token is still a live credential.
-2. **Provider-side revoke:** best-effort `POST https://oauth2.googleapis.com/revoke`
-   with the refresh token so the grant is killed upstream, not just forgotten
-   locally. Treat failure as non-fatal but logged (the local delete still must
-   succeed).
-3. **Invalidate in-flight:** evict the `accountKey` from any `TokenRefresher` so a
-   racing refresh cannot resurrect a revoked grant.
+1. **Invalidate in-flight first.** The store bumps a per-account epoch and evicts
+   the key from `TokenRefresher`; a refresh already running returns `null`
+   instead of re-persisting the grant it just fetched.
+2. **Provider-side revoke.** `google-vertex` posts the refresh (or access) token
+   to `https://oauth2.googleapis.com/revoke`. Failure is swallowed and logged;
+   the local delete below is authoritative.
+3. **Delete-at-rest.** Hard delete of the sealed row — never a soft flag, since
+   a soft-deleted sealed token is still a live credential.
+
+**Residual:** revocation is per-process. An in-flight refresh on another API
+instance is not signalled; it is bounded by the access-token lifetime and the
+next revoke/rotation. Coordinate through the DB if multi-instance revocation
+latency matters.
 
 ## 8. Threat checklist (summary)
 
-| Threat                                         | Mitigation                           | Status                                   |
-| ---------------------------------------------- | ------------------------------------ | ---------------------------------------- |
-| DB exfil / backup theft reveals refresh tokens | AES-256-GCM at rest, authenticated   | ✅ in code                               |
-| Tampered ciphertext accepted                   | GCM auth tag verified on `open()`    | ✅ in code                               |
-| Vault key shared across purposes               | Dedicated env key, no fallback chain | ⚠️ operator config — document & enforce  |
-| CSRF on callback                               | `state` issued; check is caller's    | ⚠️ route layer (not built)               |
-| Open redirect / token theft                    | `redirect_uri` allowlist             | ⚠️ route layer (not built)               |
-| Auth-code interception                         | PKCE S256                            | ✅ in code                               |
-| Refresh stampede / double-rotation             | Per-key single-flight                | ✅ in code (per-process)                 |
-| Tokens in logs                                 | Errors carry no token material       | ✅ code; ⚠️ enforce in routes/middleware |
-| SSRF via token endpoint                        | Endpoints are constants              | ✅ by construction                       |
-| Lingering access after disconnect              | Local delete + provider revoke       | ❌ **not built — §7**                    |
+| Threat                                         | Mitigation                             | Status                                   |
+| ---------------------------------------------- | -------------------------------------- | ---------------------------------------- |
+| DB exfil / backup theft reveals refresh tokens | AES-256-GCM at rest, authenticated     | ✅ in code                               |
+| Tampered ciphertext accepted                   | GCM auth tag verified on `open()`      | ✅ in code                               |
+| Vault key shared across purposes               | Dedicated env key, no fallback chain   | ⚠️ operator config — document & enforce  |
+| CSRF on callback                               | `state` single-use, TTL, constant-time | ✅ routes (`llm-oauth.ts`)               |
+| Open redirect / token theft                    | Server-derived `redirect_uri`          | ✅ routes (`llm-oauth.ts`)               |
+| Auth-code interception                         | PKCE S256                              | ✅ in code                               |
+| Refresh stampede / double-rotation             | Per-key single-flight                  | ✅ in code (per-process)                 |
+| Tokens in logs                                 | Errors carry no token material         | ✅ code; ⚠️ enforce in routes/middleware |
+| SSRF via token endpoint                        | Endpoints are constants                | ✅ by construction                       |
+| Lingering access after disconnect              | Local delete + provider revoke         | ✅ `store.revoke()` + revoke route (§7)  |
 
 ## 9. Sign-off condition
 
-Live refresh-token persistence may proceed once §4 caller-obligations (state check,
-redirect allowlist, server-side single-use `PendingAuth`) and §7 revocation are
-implemented and tested, and a **dedicated** vault key is provisioned. Until then
-the package is safe to build and unit-test against mock transports (no live calls),
-which is its current state.
+Revocation (§7) and the §4 route obligations are implemented and unit-tested, so
+live refresh-token persistence is unblocked at the code level. Remaining gates
+are operational, not code: provision a **dedicated** vault key
+(`NEXUS_OAUTH_VAULT_KEY`, not `NEXUS_SECRETS_KEY`), and run the live E2E once the
+provider console has the fixed callback URI registered. Unit tests continue to
+run against mocked transports — no live calls.

@@ -10,8 +10,9 @@
  *     that a human answers through /api/v1/exec/approvals, and the same request
  *     replayed with that id spawns exactly the command that was approved.
  *   - Every route 403s unless the request comes from a loopback address
- *     (127.0.0.0/8, ::1, or ::ffff:127.x) OR NEXUS_LOCAL_PTY_FORCE=1 is set
- *     (deliberate, for tests / remote debugging — never in production).
+ *     (127.0.0.0/8, ::1, or ::ffff:127.x). NEXUS_LOCAL_PTY_FORCE=1 is honoured
+ *     only outside production (tests / remote debugging); a deployed server
+ *     cannot opt into serving host shells, whatever its environment says.
  *   - Command names are validated by @nexus/pty (isSafeCommandName) before
  *     PATH resolution; metacharacters never reach a shell.
  *   - Sessions are per-process (in-memory) and die with the API — there is
@@ -45,7 +46,10 @@ const mine = (request: FastifyRequest, id: string) => owners.get(id) === ownerId
 
 // ── Localhost gate ───────────────────────────────────────────────────────────
 
-const FORCE_LOCAL = process.env.NEXUS_LOCAL_PTY_FORCE === "1";
+// Development escape hatch only: in production the loopback requirement is
+// absolute, so a stray env var can never expose host terminals on a deployed site.
+const FORCE_LOCAL =
+  process.env.NEXUS_LOCAL_PTY_FORCE === "1" && process.env.NODE_ENV !== "production";
 
 async function gateLocal(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (FORCE_LOCAL || peerIsLoopback(request)) return;

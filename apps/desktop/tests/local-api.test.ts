@@ -6,7 +6,7 @@
  * never comes up — a window that loads against a dead API is the failure this
  * guards.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import {
   localApiEnv,

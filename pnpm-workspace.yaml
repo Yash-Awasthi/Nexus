@@ -17,15 +17,16 @@ catalog:
   # `typescript` name, as the TypeScript 7 release recommends.
   "@typescript/native": npm:typescript@7.0.2
   typescript: npm:@typescript/typescript6@^6.0.2
-  "@vitest/coverage-v8": 5.0.4
+  "@vitest/coverage-v8": 5.1.0
   bullmq: ^6.3.13
-  drizzle-orm: 1.0.0-rc.4
+  drizzle-orm: 1.0.0-rc.6
   fast-check: ^4.10.2
   fastify: ^5.12.5
   ioredis: ^6.0.0
   pg: ^8.23.1
-  playwright-core: 1.64.0
-  vitest: 5.0.4
+  vitest: 5.1.0
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
+  vite-plus: 1.7.0
 
 # Transitive packages lifted to their first patched release in the same major, for advisories
 # their parents have not picked up yet. Drop an entry once every parent requires the fix.
@@ -39,9 +40,9 @@ overrides:
   "brace-expansion@5": ^5.0.12
   "sharp@0": ^0.35.5
   "adm-zip@0": ^0.6.1
-  "just-bash>sql.js": "-"
-  "just-bash>typescript": "-"
   "guarded-fetch>undici": ^7.30.0
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
 
 engineStrict: true
 strictPeerDependencies: false
@@ -137,3 +138,11 @@ minimumReleaseAgeExclude:
   - radix-ui@1.8.0
   - "@electric-sql/pglite-pgvector@0.0.10"
   - bullmq@6.3.13
+permissions:
+  drizzle-kit:
+    skills: true
+peerDependencyRules:
+  allowAny:
+    - vitest
+  allowedVersions:
+    vitest: "*"

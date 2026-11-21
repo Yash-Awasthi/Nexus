@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 // No sessionId is used below, so the db layer is never touched — mock it inert
 // to avoid a real pool/connection on import.
@@ -15,7 +15,7 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 
 // Fake driver: one turn, no tool calls → the loop ends after a single step.
 // Defined inside the factory because vi.mock is hoisted above module scope.
-vi.mock("@nexus/llm-drivers", () => {
+vi.mock("@nexus/llm/drivers", () => {
   class FakeDriver {
     readonly model = "fake-model";
     async stream(): Promise<{

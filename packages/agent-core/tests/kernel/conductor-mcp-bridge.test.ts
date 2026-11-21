@@ -2,7 +2,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   resolveFlociEndpoint: vi.fn(() => "http://localhost:4566"),
@@ -18,7 +18,10 @@ vi.mock("../../src/kernel/e2e-federation.ts", () => ({
   runFederationE2e: mocks.runFederationE2e,
 }));
 
-import { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "../../src/kernel/conductor-mcp-bridge.ts";
+import {
+  registerConductorMcpBridge,
+  GHOSTSTACK_MCP_TOOLS,
+} from "../../src/kernel/conductor-mcp-bridge.ts";
 import { WorkflowRegistry } from "../../src/kernel/workflow-engine.ts";
 import { RuntimeGraph } from "../../src/kernel/runtime-graph.ts";
 

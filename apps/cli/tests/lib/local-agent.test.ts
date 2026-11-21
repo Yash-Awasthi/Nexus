@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { LlmToolFn } from "@nexus/agent-runtime";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LlmToolFn } from "@nexus/agent-core/runtime";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { buildLocalCodingTools, makeLocalLlm, runLocalAgent } from "../../src/lib/local-agent.ts";
 

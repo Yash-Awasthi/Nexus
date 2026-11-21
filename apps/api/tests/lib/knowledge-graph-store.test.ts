@@ -6,10 +6,10 @@
  * Hermetic: the driver is a stub, so these assert the wiring (message shape,
  * response passthrough, graph write) rather than any model's output.
  */
-import { InMemoryKGStore, KnowledgeGraph } from "@nexus/knowledge-graph";
-import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm-drivers";
+import { InMemoryKGStore, KnowledgeGraph } from "@nexus/search/knowledge-graph";
+import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm/drivers";
 import { extractEntities, extractRelationships } from "@nexus/nlp-utils";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { getKG, nlpClientFromDriver } from "../../src/lib/knowledge-graph-store.ts";
 

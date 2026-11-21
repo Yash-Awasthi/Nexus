@@ -10,7 +10,7 @@ import {
   type RetrievalSource,
   type ScoredChunk,
   type SourceRetrieverFn,
-} from "@nexus/retrieval";
+} from "@nexus/search/retrieval";
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
 export interface CitedSource {

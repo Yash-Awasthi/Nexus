@@ -13,6 +13,8 @@
  * because the caller asked to store a document and the graph is an enrichment of it.
  */
 
+import type { LlmDriver, LlmRole } from "@nexus/llm/drivers";
+import { extractEntities, extractRelationships, type NlpLlmClient } from "@nexus/nlp-utils";
 import {
   InMemoryKGStore,
   NeonKGStore,
@@ -22,9 +24,7 @@ import {
   type NeonQueryFn,
   type EntityExtractor,
   type RelationshipExtractor,
-} from "@nexus/knowledge-graph";
-import type { LlmDriver, LlmRole } from "@nexus/llm-drivers";
-import { extractEntities, extractRelationships, type NlpLlmClient } from "@nexus/nlp-utils";
+} from "@nexus/search/knowledge-graph";
 
 import { ANON_OWNER, claimable } from "./owner.ts";
 import { getPgPool } from "./pg-pool.ts";

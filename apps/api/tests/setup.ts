@@ -17,7 +17,7 @@
  *    hermetic by default; a file that needs real pg behavior can re-mock or
  *    `vi.unmock("pg")` (hoisting means per-file mocks still win).
  */
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 
 // Prevent @nexus/db from throwing "DATABASE_URL is required" at import time.
 // Tests that hit DB-backed routes will receive 500/502; tests targeting

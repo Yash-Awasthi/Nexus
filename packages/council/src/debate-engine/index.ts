@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/debate-engine — converging multi-agent debate.
+ * @nexus/council — converging multi-agent debate.
  *
  * Agents answer, read each other's positions and revise until they agree or stop moving.
  */

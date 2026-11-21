@@ -5,7 +5,7 @@
  * server is the user's own machine, so local addresses are theirs to reach.
  */
 
-import { isSafeUrl, pinnedFetch } from "@nexus/runtime";
+import { isSafeUrl, pinnedFetch } from "@nexus/agent-core/kernel";
 
 /** An error message when `url` must not be fetched, otherwise null. */
 export function unsafeUrlReason(url: unknown): string | null {

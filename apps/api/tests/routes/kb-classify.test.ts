@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Every document added to a knowledge base is classified and tagged. */
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const savedDb = process.env.DATABASE_URL;
 const { buildServer } = await import("../../src/server.ts");

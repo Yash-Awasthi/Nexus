@@ -4,7 +4,7 @@
  * model cost, recall ranks them by relevance, and later runs see them.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { bootOrg, useOrgDataDir } from "./org-test-env.ts";
 

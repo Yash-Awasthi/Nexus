@@ -10,7 +10,7 @@
  *   • StealthProfile      — fingerprint spoofing configuration
  *   • BrowserDriver       — injectable interface (real: patchright, test: MockDriver)
  *   • MockDriver          — in-memory driver for testing
- *   • PatchrightDriver    — real stealth browser via patchright (optional dep)
+ *   • PatchrightDriver    — real stealth browser via patchright
  *   • PatchrightPage      — BrowserPage wrapper around patchright Page
  *   • isPatchrightAvailable — probe whether patchright is installed
  *   • PagePool            — reusable page pool with max-size cap
@@ -238,19 +238,13 @@ export class MockBrowserDriver implements BrowserDriver {
  * Used at startup to decide whether to activate real browser execution.
  */
 export async function isPatchrightAvailable(): Promise<boolean> {
-  // A remote CDP endpoint means we can drive a hosted browser regardless of
-  // which local client lib is present.
+  // A remote CDP endpoint means we can drive a hosted browser.
   if (process.env.BROWSER_CDP_URL) return true;
   try {
     await import("patchright");
     return true;
   } catch {
-    try {
-      await import("playwright-core");
-      return true;
-    } catch {
-      return false;
-    }
+    return false;
   }
 }
 
@@ -351,13 +345,11 @@ class PatchrightPage implements BrowserPage {
 /**
  * Real stealth browser driver backed by patchright (an undetected Chromium fork).
  *
- * patchright is an optional peer dependency — install with:
- *   pnpm add patchright
+ * patchright is a dependency — install the browser with:
  *   npx patchright install chromium
  *
- * Dynamically imported on first use so the package stays optional.
- * Falls back gracefully: throws if patchright is not found so the caller
- * can substitute MockBrowserDriver.
+ * Dynamically imported on first use so importing this module stays cheap.
+ * Throws if patchright is not found so the caller can substitute MockBrowserDriver.
  *
  * Usage:
  *   const available = await isPatchrightAvailable();
@@ -531,19 +523,13 @@ export class PatchrightDriver implements BrowserDriver {
   private async ensureOpen(): Promise<PatchrightBrowserType> {
     if (this._browser) return this._browser;
 
-    // Resolve a browser client lib: patchright (preferred) → playwright-core.
+    // patchright is the only browser client; there is no fallback.
     // oxlint-disable-next-line @typescript-eslint/no-explicit-any
     let lib: any;
     try {
       lib = await import("patchright");
     } catch {
-      try {
-        lib = await import("playwright-core");
-      } catch {
-        throw new Error(
-          "stealth-browser: no browser client found. Install `patchright` or `playwright-core`.",
-        );
-      }
+      throw new Error("stealth-browser: patchright is not installed.");
     }
 
     // oxlint-disable-next-line @typescript-eslint/no-unsafe-member-access

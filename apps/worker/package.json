@@ -13,32 +13,26 @@
   },
   "scripts": {
     "dev": "node --watch src/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vite-plus": "catalog:"
   },
   "dependencies": {
-    "@nexus/agent-runtime": "workspace:*",
     "@nexus/browser-automation": "workspace:*",
     "@nexus/contracts": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
-    "@nexus/debate-engine": "workspace:*",
     "@nexus/governance": "workspace:*",
-    "@nexus/graphrag-query": "workspace:*",
-    "@nexus/hybrid-search": "workspace:*",
-    "@nexus/llm-drivers": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/memory": "workspace:*",
     "@nexus/pipeline-signal": "workspace:*",
-    "@nexus/reranker": "workspace:*",
-    "@nexus/runtime": "workspace:*",
     "@nexus/sandbox": "workspace:*",
     "@nexus/sse": "workspace:*",
     "@nexus/stealth-browser": "workspace:*",
@@ -47,6 +41,9 @@
     "bullmq": "catalog:",
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
-    "pg": "catalog:"
+    "pg": "catalog:",
+    "@nexus/llm": "workspace:*",
+    "@nexus/search": "workspace:*",
+    "@nexus/agent-core": "workspace:*"
   }
 }

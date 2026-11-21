@@ -373,7 +373,12 @@ export type TraderAction = "Buy" | "Hold" | "Sell";
 
 /** 6-tier sentiment band (Sentiment Analyst). */
 export type SentimentBand =
-  "Bullish" | "Mildly Bullish" | "Neutral" | "Mixed" | "Mildly Bearish" | "Bearish";
+  | "Bullish"
+  | "Mildly Bullish"
+  | "Neutral"
+  | "Mixed"
+  | "Mildly Bearish"
+  | "Bearish";
 
 /**
  * Structured investment plan from the Research Manager.

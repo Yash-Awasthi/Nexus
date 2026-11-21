@@ -7,7 +7,7 @@
  * config.defaultModel for every vote, so a custom archetype could never speak
  * and the per-member model and temperature the UI collected were ignored.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import type { Archetype } from "./archetypes.ts";
 import { DeliberationEngine, type ILLMMessage, type ILLMResponse } from "./engine.ts";

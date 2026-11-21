@@ -7,7 +7,7 @@
  * via the defineAdapter factory.
  *
  * Compatible with Ghoststack's IExecutionAdapter so adapters can be
- * dropped straight into @nexus/runtime (M6) without changes.
+ * dropped straight into @nexus/agent-core (M6) without changes.
  */
 
 // ── Logging ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** NX-SEC-024: a bucket's expiry is set in the same request that creates it, so it can never be left without one. */
 import Fastify from "fastify";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 
 import { makeRateLimitPreHandler } from "../../src/lib/rate-limiter.ts";
 

@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it, vi } from "vite-plus/test";
 
 const DB = "pglite://:memory:oauth-browser-finish";
 process.env.NEXUS_JWT_SECRET = "oauth-browser-finish-secret";

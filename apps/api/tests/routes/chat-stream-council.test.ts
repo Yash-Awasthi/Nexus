@@ -8,10 +8,10 @@
  * matter how much the members agreed. These tests drive the real route with a
  * scripted driver and assert on the SSE frames it writes.
  */
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 
 /** Per-model reply scripts, one entry per turn. Set by each test. */
 const script: Record<string, string[]> = {};

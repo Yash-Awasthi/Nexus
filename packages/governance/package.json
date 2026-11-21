@@ -10,13 +10,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
     "fast-check": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

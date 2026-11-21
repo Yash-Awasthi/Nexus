@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/llm-router — Multi-provider LLM abstraction layer.
+ * @nexus/llm — Multi-provider LLM abstraction layer.
  *
  * Core concepts
  * ─────────────

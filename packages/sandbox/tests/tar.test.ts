@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { extractTarGz, tarGzDirectory } from "../src/tar.ts";
 

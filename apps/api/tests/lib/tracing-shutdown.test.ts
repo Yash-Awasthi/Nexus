@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Closing the server flushes the tracer and the request traces still queued for storage. */
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 const stopTracing = vi.fn(async () => {});
 vi.mock("@nexus/telemetry", async (importOriginal) => ({

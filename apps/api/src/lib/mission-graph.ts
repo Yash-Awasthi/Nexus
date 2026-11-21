@@ -15,7 +15,7 @@
  * trace of the agent's thinking pipeline.
  */
 
-import type { RuntimeTool } from "@nexus/agent-runtime";
+import type { RuntimeTool } from "@nexus/agent-core/runtime";
 
 import { appendGraphEvent, type ExecutionStatus, type GraphEvent } from "./session-graph.ts";
 

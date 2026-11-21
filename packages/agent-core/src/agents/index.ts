@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agents — Librarian, Researcher, and FileExplorer specialized agents.
+ * @nexus/agent-core — Librarian, Researcher, and FileExplorer specialized agents.
  *
  * All three agents are fully injectable — they accept minimal structural
- * interfaces compatible with @nexus/memory, @nexus/knowledge-graph, and
+ * interfaces compatible with @nexus/memory, @nexus/search, and
  * @nexus/hooks without creating hard inter-package dependencies.
  *
  * LibrarianAgent   — semantic memory recall + KG entity queries + context
@@ -76,7 +76,7 @@ export interface AgentMemorySearchResult {
 }
 
 /**
- * Minimal KG interface — structurally compatible with @nexus/knowledge-graph
+ * Minimal KG interface — structurally compatible with @nexus/search
  * KnowledgeGraph.  Only the methods used by agents are declared.
  */
 export interface AgentKG {

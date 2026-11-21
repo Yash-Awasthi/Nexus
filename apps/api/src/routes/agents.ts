@@ -7,8 +7,8 @@
  * POST /agents/file/write         — write / overwrite a file
  * GET  /agents/file/list          — list directory entries (optional pattern + query filter)
  *
- * Adapters bridge @nexus/memory + @nexus/knowledge-graph into the lightweight
- * AgentMemory / AgentKG interfaces expected by @nexus/agents — no additional
+ * Adapters bridge @nexus/memory + @nexus/search into the lightweight
+ * AgentMemory / AgentKG interfaces expected by @nexus/agent-core — no additional
  * packages required.
  *
  * FileExplorerAgent is wired to Node fs (fs/promises) via a thin AgentFileSystem
@@ -27,7 +27,7 @@ import {
   type AgentKGNode,
   type AgentKGEdge,
   type AgentFileSystem,
-} from "@nexus/agents";
+} from "@nexus/agent-core/agents";
 import { globalHooks } from "@nexus/hooks";
 import { MemoryManager, createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -58,7 +58,8 @@ const _agentMemory: AgentMemory = {
   async recall(query, limit = 5, filter) {
     if (!_memManager) return [];
     const userId = (filter as Record<string, unknown> | undefined)?.["userId"] as
-      string | undefined;
+      | string
+      | undefined;
     const memFilter = userId ? { metadata: { userId } } : undefined;
     const results = await _memManager.recall(query, limit, memFilter);
     return results.map((r): AgentMemorySearchResult => ({

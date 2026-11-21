@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/best-of-n — Best-of-N generation.
+ * @nexus/council — Best-of-N generation.
  *
  * Generates N completions for the same prompt, scores each one, and returns
  * the best.  Applied to both "thinker" and "editor" roles — any single-shot

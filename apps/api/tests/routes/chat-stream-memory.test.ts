@@ -2,11 +2,11 @@
 /** A deliberation remembers each member's final position, not its whole transcript. */
 import crypto from "node:crypto";
 
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import { MemoryManager } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 const SECRET = "chat-stream-memory-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

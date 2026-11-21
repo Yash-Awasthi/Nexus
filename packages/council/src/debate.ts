@@ -12,7 +12,7 @@
  * Round 0 is independent and parallel. Each later round hands every member the
  * other members' latest answers and asks for a revised answer, with each member
  * keeping its own cumulative history — the protocol from
- * `@nexus/debate-engine`'s multi-agent debate.
+ * `@nexus/council/debate-engine`'s multi-agent debate.
  *
  * Transport is injected, as with `ILLMTransport`, so this package stays free of
  * provider drivers.

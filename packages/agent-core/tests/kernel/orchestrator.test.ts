@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { ConductorOrchestrator } from "../../src/kernel/orchestrator.ts";
 import { TaskRouter } from "../../src/kernel/task-router.ts";

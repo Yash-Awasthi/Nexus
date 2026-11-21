@@ -4,7 +4,7 @@
  * watermark, a supervisor that only keeps the record, and caps that are part of
  * the loop condition rather than a hope.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import type { DebateMember, IStreamingTransport } from "./debate.ts";
 import { runDiscussion, SUPERVISOR_PROMPT, type DiscussionOptions } from "./discussion.ts";

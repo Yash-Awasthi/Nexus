@@ -19,7 +19,7 @@ import {
   type Vault,
 } from "@nexus/llm-oauth";
 import Fastify, { type FastifyInstance } from "fastify";
-import { beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
+import { beforeAll, beforeEach, describe, it, expect, vi } from "vite-plus/test";
 
 import { makeLlmOauthRoutes } from "../../src/routes/llm-oauth.ts";
 

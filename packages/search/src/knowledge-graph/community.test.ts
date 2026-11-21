@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Community detection (Leiden/Louvain parity) — focused tests.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { detectCommunities, modularity } from "./community.ts";
 import { KnowledgeGraph, InMemoryKGStore, type KGNode, type KGEdge } from "./index.ts";
 

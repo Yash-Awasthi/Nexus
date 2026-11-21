@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { beforeEach, describe, expect, it } from "vitest";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import { MemoryPromptCache } from "@nexus/llm-cache";
 
 import {

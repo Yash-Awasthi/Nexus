@@ -12,7 +12,7 @@
 
 import crypto from "node:crypto";
 
-import { pinnedFetch } from "@nexus/runtime";
+import { pinnedFetch } from "@nexus/agent-core/kernel";
 
 import { createNotification } from "./notifications-store.ts";
 import { PersistentStore } from "./persistent-store.ts";

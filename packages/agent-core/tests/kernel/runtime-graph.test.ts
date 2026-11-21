@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
-import { GraphConsistencyError, GraphMutationError, RuntimeGraph } from "../../src/kernel/runtime-graph.ts";
+import {
+  GraphConsistencyError,
+  GraphMutationError,
+  RuntimeGraph,
+} from "../../src/kernel/runtime-graph.ts";
 import type { IEventBus } from "../../src/kernel/event-bus.ts";
 import type { IRuntimePersistence } from "../../src/kernel/interfaces/persistence.interface.ts";
 

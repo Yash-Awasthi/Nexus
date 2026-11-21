@@ -4,7 +4,7 @@
 // tool-call round-trip produces the artifact with route evidence, per-agent
 // answer stages, metrics/total_ms, and the OR-of-five degradation verdict;
 // failed calls still leave a degraded transcript before the error rethrows.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   councilRuntimeTools,
   debateRuntimeTool,

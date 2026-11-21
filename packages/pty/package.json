@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "vitest run"
+    "test": "vp test run"
   },
   "dependencies": {
     "node-pty": "1.2.0-beta.15"

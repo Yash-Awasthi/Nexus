@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The prompt editor (Monaco) loads its stylesheet and icon font from jsDelivr; the CSP must let them in. */
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 vi.mock("@nexus/db", () => ({ db: { execute: vi.fn().mockResolvedValue([]) } }));
 vi.mock("pg", () => {

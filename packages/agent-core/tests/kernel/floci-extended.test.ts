@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 
 import { EXTENDED_FLOCI_ACTIONS, dispatchExtendedAction } from "../../src/kernel/floci-extended.ts";
 

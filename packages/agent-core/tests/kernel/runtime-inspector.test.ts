@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { RuntimeInspector } from "../../src/kernel/runtime-inspector.ts";
 import type { RuntimeInspector as Insp } from "../../src/kernel/runtime-inspector.ts";

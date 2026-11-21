@@ -16,8 +16,6 @@ these describe the work.
 | [architecture.md](architecture.md)           | The system as it is, seen from a security angle: boundaries, flows  |
 | [security-findings.md](security-findings.md) | Findings register (`NX-SEC-*`) with evidence, severity, fix, status |
 | [design.md](design.md)                       | How each fix and new feature is built, and why that way             |
-| [roadmap.md](roadmap.md)                     | Phased plan with per-item status; the next thing to do is here      |
-| [enrichment.md](enrichment.md)               | Feature backlog (`NX-FEAT-*`) beyond the fixes                      |
 
 ## Conventions
 
@@ -32,8 +30,8 @@ these describe the work.
 - **Evidence is a path and line.** `apps/api/src/routes/sandbox.ts:150` style, as of the commit
   the finding was recorded against. Lines drift; the function name next to it does not.
 - **Update in the same commit.** A change that fixes a finding or ships a feature updates the
-  register, the roadmap and, when behaviour changes for operators, `docs/STATUS.md` or the
-  relevant public doc in the same commit.
+  register and, when behaviour changes for operators, `docs/STATUS.md` or the relevant public
+  doc in the same commit.
 - **Public repository.** This repository is public. A finding is described in full only in the
   same push that carries its fix. Open items that are not yet fixed stay at the level of detail
   an operator needs to mitigate them, not a recipe.

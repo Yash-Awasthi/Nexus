@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 
 import { appLink, mailConfigured, sendMail } from "../../src/lib/mailer.ts";
 

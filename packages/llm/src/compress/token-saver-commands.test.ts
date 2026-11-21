@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compressOutputForCommand } from "./token-saver.ts";
 
 describe("lintOutputProcessor", () => {
@@ -262,5 +262,117 @@ describe("searchProcessor", () => {
     expect(r.output).toContain("24 files found:");
     expect(r.output).toContain("  lib/ (12 files: *.ts:12)");
     expect(r.output).toContain("  bin/ (12 files: *.ts:12)");
+  });
+});
+
+describe("testOutputProcessor — language runners", () => {
+  it("summarizes cargo test output and drops compile noise", () => {
+    const out = [
+      "   Compiling serde v1.0.0",
+      "    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.5s",
+      "     Running unittests src/lib.rs (target/debug/deps/app-abc)",
+      "test tests::it_works ... ok",
+      "test tests::second ... ok",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out",
+    ].join("\n");
+    const r = compressOutputForCommand("cargo test", out);
+    expect(r.processor).toBe("test");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("[2 tests passed]");
+    expect(r.output).toContain("test result: ok. 2 passed");
+    expect(r.output).not.toContain("Compiling");
+    expect(r.output).not.toContain("Running unittests");
+  });
+
+  it("keeps go test failures and the package outcome lines", () => {
+    const out = [
+      "=== RUN   TestAlpha",
+      "--- PASS: TestAlpha (0.00s)",
+      "=== RUN   TestBeta",
+      "--- FAIL: TestBeta (0.01s)",
+      "    beta_test.go:12: got 1, want 2",
+      "FAIL\tpkg/thing\t0.02s",
+      "ok  \tpkg/other\t0.01s",
+    ].join("\n");
+    const r = compressOutputForCommand("go test ./...", out);
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("[1 tests passed]");
+    expect(r.output).toContain("--- FAIL: TestBeta");
+    expect(r.output).toContain("beta_test.go:12");
+    expect(r.output).toContain("FAIL\tpkg/thing");
+    expect(r.output).toContain("ok  \tpkg/other");
+    expect(r.output).not.toContain("=== RUN");
+  });
+
+  it("counts rspec dots and keeps the failure block + summary", () => {
+    const out = [
+      "..F",
+      "",
+      "Failure/Error: expect(1).to eq(2)",
+      "",
+      "  expected: 2",
+      "       got: 1",
+      "",
+      "3 examples, 1 failure",
+    ].join("\n");
+    const r = compressOutputForCommand("bundle exec rspec", out);
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("[2 examples passed]");
+    expect(r.output).toContain("Failure/Error: expect(1).to eq(2)");
+    expect(r.output).toContain("3 examples, 1 failure");
+  });
+
+  it("summarizes dotnet test passes and keeps a failed test block", () => {
+    const out = [
+      "Determining projects to restore...",
+      "  Passed Alpha.One [12 ms]",
+      "  Failed Alpha.Two [10 ms]",
+      "  Error Message:",
+      "   Assert.Equal() Failure",
+      "",
+      "Total tests: 2",
+      "     Failed: 1",
+    ].join("\n");
+    const r = compressOutputForCommand("dotnet test", out);
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("[1 tests passed]");
+    expect(r.output).toContain("Failed Alpha.Two");
+    expect(r.output).toContain("Assert.Equal() Failure");
+    expect(r.output).toContain("Total tests: 2");
+    expect(r.output).not.toContain("Determining projects");
+  });
+
+  it("keeps swift failures and the executed summary", () => {
+    const out = [
+      "Compiling MyApp",
+      "Test Case '-[MyAppTests testTwo]' failed (0.002 seconds).",
+      "Executed 2 tests, with 1 failure (0 failures) in 0.003 seconds",
+    ].join("\n");
+    const r = compressOutputForCommand("swift test", out);
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("testTwo]' failed");
+    expect(r.output).toContain("Executed 2 tests");
+    expect(r.output).not.toContain("Compiling MyApp");
+  });
+
+  it("counts mix dots and keeps the summary + duration", () => {
+    const out = [
+      "Compiling 12 files (.ex)",
+      "....",
+      "4 tests, 0 failures",
+      "Finished in 0.1 seconds",
+    ].join("\n");
+    const r = compressOutputForCommand("mix test", out);
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("[4 tests passed]");
+    expect(r.output).toContain("4 tests, 0 failures");
+    expect(r.output).toContain("Finished in 0.1 seconds");
+    expect(r.output).not.toContain("Compiling 12 files");
+  });
+
+  it("falls back to the generic runner for phpunit", () => {
+    const r = compressOutputForCommand("phpunit", "All 4 tests passed");
+    expect(r.processor).toBe("test");
+    expect(r.output).toContain("[1 tests passed]");
   });
 });

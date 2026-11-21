@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Missions — long-horizon autonomous agent runs, wired to the
- * @nexus/agent-engine MissionRunner over the
- * @nexus/agent-runtime self-loop harness.
+ * @nexus/agent-core MissionRunner over the
+ * @nexus/agent-core self-loop harness.
  *
  * A mission is a goal the agent pursues across multiple harness iterations
  * (think → act → spawn → review → improve → … → done), with a reviewer agent
@@ -19,7 +19,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { MissionRunner, type MissionRecord } from "@nexus/agent-engine";
+import { MissionRunner, type MissionRecord } from "@nexus/agent-core/engine";
 import {
   AgentTemplateRegistry,
   createEditFileTool,
@@ -33,10 +33,10 @@ import {
   RuntimeToolSet,
   type CommandExecutor,
   type LlmToolFn,
-} from "@nexus/agent-runtime";
+} from "@nexus/agent-core/runtime";
 import { EscalationBreaker, type BreakerAction } from "@nexus/escalation-breaker";
 import type { ExecAction } from "@nexus/exec-policy";
-import { executeCode } from "@nexus/sandbox";
+import { executeCode, resolveUntrustedRunner } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
 import { APPROVAL_TTL_MS, classifyAction } from "../lib/exec-approvals.ts";
@@ -89,12 +89,15 @@ export function missionExec(shellApproved: boolean): CommandExecutor {
         timedOut: false,
       };
     }
-    const r = await executeCode({
-      taskType: "sandbox.execute",
-      language: "bash",
-      code: command,
-      timeoutMs: opts.timeoutMs,
-    });
+    const r = await executeCode(
+      {
+        taskType: "sandbox.execute",
+        language: "bash",
+        code: command,
+        timeoutMs: opts.timeoutMs,
+      },
+      await resolveUntrustedRunner(),
+    );
     return { stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, timedOut: r.timedOut };
   };
 }
@@ -265,7 +268,7 @@ async function startMission(
     // The distilled memory is an ACTIONABLE directive that must land on the
     // acting USER turn (the improve-loop channel) — not the system prompt,
     // which the local model ignores. The runner seeds it ahead of the goal on
-    // iteration 0; see @nexus/agent-engine memoryDirective.
+    // iteration 0; see @nexus/agent-core memoryDirective.
     memoryDirective: opts.memory?.text,
     thinkPrompt: opts.think === false ? undefined : MISSION_THINK_PROMPT,
     maxIterations: record.maxIterations,

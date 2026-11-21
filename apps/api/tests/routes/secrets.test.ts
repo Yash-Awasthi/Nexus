@@ -10,7 +10,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET_JWT = "secrets-route-test-secret";
 const VALUE = "sk-live-this-must-never-be-returned";

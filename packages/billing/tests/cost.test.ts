@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
-import { ProviderRegistry } from "@nexus/provider-registry";
+import { describe, it, expect } from "vite-plus/test";
+import { ProviderRegistry } from "@nexus/llm/registry";
 import { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from "../src/cost.ts";
 
 // Local registry so tests don't depend on the evolving global catalogue.

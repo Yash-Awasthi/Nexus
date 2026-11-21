@@ -2,7 +2,7 @@
 /**
  * Crew planner — decompose a goal into an executable task plan.
  *
- * @nexus/agents Crew executes pre-authored tasks (crew.ts). This module adds
+ * @nexus/agent-core Crew executes pre-authored tasks (crew.ts). This module adds
  * the layer the role-based frameworks name as their planner: semantic-kernel's
  * planner picks an ordered set of calls for an ask, and CAMEL's task-inception
  * protocol breaks a high-level instruction into subtasks. Here the "functions"

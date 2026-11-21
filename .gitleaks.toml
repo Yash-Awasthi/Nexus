@@ -28,7 +28,6 @@ paths = [
   "CONTRIBUTING.md",
   "apps/api/tests/",
   "packages/.*/tests/",
-  "infra/terraform/examples/",
 ]
 
 # Custom rules on top of defaults

@@ -352,7 +352,10 @@ test("an agent's earlier config can be restored from its history", async ({ page
     .toBe("Write plainly.");
 });
 
-test("a skill attached to an agent asks once, then runs before its turn", async ({ page, api }) => {
+test("a skill attached to an agent asks once, then reports the sandbox it needs", async ({
+  page,
+  api,
+}) => {
   const skillName = unique("Echo skill");
   await api.post("/api/skills", {
     name: skillName,
@@ -392,7 +395,7 @@ test("a skill attached to an agent asks once, then runs before its turn", async 
       },
       { timeout: 60_000 },
     )
-    .toContain("Skill " + skillName + ": ran");
+    .toContain("Skill " + skillName + ": untrusted code needs NEXUS_SANDBOX_IMAGE");
 });
 
 test("an agent can name a cheaper model for quick work", async ({ page, api }) => {

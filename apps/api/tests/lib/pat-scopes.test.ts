@@ -8,7 +8,7 @@
  * tokens reach only endpoints inside their areas, with segment-boundary-safe
  * prefix matching.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { isValidPatScope, patScopesAllow } from "../../src/lib/pat-scopes.ts";
 

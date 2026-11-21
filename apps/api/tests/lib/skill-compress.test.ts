@@ -7,7 +7,7 @@
  * mission-prompt stub optimization (executed-OK skills collapse to a line).
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   compressSkillsForTask,

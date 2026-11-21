@@ -5,7 +5,7 @@
  * These tests use only the in-memory MemoryAuditStore so they require no
  * database and no @fast-check — they run in the standard vitest unit job.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vite-plus/test";
 
 import {
   AuditLog,

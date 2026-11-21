@@ -4,7 +4,7 @@
  * must come from a search. With no key it searches DuckDuckGo; when nothing answers it says so.
  */
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vite-plus/test";
 
 const { buildServer } = await import("../../src/server.ts");
 

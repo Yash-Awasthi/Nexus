@@ -91,3 +91,6 @@ inspiration/
 
 # The workspace installs from the root pnpm-lock.yaml only.
 **/package-lock.json
+
+# Generated agent skill bundles
+.agents/

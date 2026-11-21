@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A scraping browser session is its opener's: others neither see nor close it. */
 import Fastify from "fastify";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {

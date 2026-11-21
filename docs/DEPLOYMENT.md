@@ -66,26 +66,19 @@ security notices. Set `NEXUS_PUBLIC_URL` to the service URL for passkeys and mai
 deploy does not go live, Render's Events show `update_failed` and the start-up log says why.
 
 > The dashboard talks to two route layers: `/api/v1/*` are the real, DB-backed handlers
-> (auth, council, memory, connectors, billing, feature-flags, projects, image-gen, voice,
-> scraping). The broader `/api/*` surface is served by an in-memory bridge for
+> (auth, council, memory, billing, feature-flags, projects, image-gen, voice, scraping). The broader `/api/*` surface is served by an in-memory bridge for
 > demonstration and returns synthetic data.
 
-## Docker Compose (production)
+## Docker Compose (local only)
+
+Compose is the local development stack, not a deployment target:
 
 ```bash
 docker compose -f docker-compose.yml up -d
 ```
 
-## Kubernetes
-
-```bash
-helm upgrade --install nexus infra/helm/nexus \
-  --set image.tag=latest \
-  --set env.DATABASE_URL="$DATABASE_URL" \
-  --set env.NEXUS_API_KEY="$NEXUS_API_KEY"
-```
-
-Terraform modules for GKE/EKS are in `infra/terraform/`.
+Render is the single supported deployment. The Vercel proxy, the Fly config and the
+Helm/Terraform trees were deleted; do not reintroduce a second target.
 
 ## Observability stack
 
@@ -103,8 +96,8 @@ docker compose -f docker-compose.yml -f infra/docker/docker-compose.observabilit
 
 ## Scaling
 
-See [ROADMAP.md](../ROADMAP.md#14-production-multi-tenant-hardening) for production
-hardening — connection pooling, worker scaling, observability, and pgvector tuning at scale.
+See [`runbook.md`](runbook.md) for production operations: connection pooling, worker
+scaling, observability, and pgvector tuning at scale.
 
 ## Free-tier rebuild
 
@@ -134,5 +127,5 @@ curl $B/health                                    # 200
 EM="t$(date +%s)@x.co"
 TOK=$(curl -s -X POST $B/api/v1/auth/register -H 'Content-Type: application/json' \
   -d "{\"email\":\"$EM\",\"password\":\"Test12345!\",\"name\":\"t\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
-curl $B/api/v1/drive/status -H "Authorization: Bearer $TOK"   # 401-free authed response
+curl $B/api/v1/auth/me -H "Authorization: Bearer $TOK"   # 401-free authed response
 ```

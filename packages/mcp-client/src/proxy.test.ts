@@ -4,7 +4,7 @@
  * merging, collision namespacing, call routing, per-server error isolation,
  * and the unknown-tool contract.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { McpClient, McpProxyClient } from "./index.ts";
 import type { McpToolDefinition, McpTransport } from "./index.ts";
 

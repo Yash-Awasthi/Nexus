@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const SECRET = "admin-config-guards-secret";
 const DB = "pglite://:memory:admin-config-guards";
@@ -94,9 +94,6 @@ describe("instance settings", () => {
       ["GET", "/api/v1/system/diagnostics"],
       ["GET", "/api/v1/mail-ingest/status"],
       ["GET", "/api/v1/mail-ingest/messages"],
-      ["GET", "/api/v1/alerts/rules"],
-      ["GET", "/api/v1/alerts/history"],
-      ["POST", "/api/v1/alerts/evaluate", { metric: "task.errors", value: 1 }],
       ["GET", "/api/v1/hooks/log"],
       ["GET", "/api/v1/hooks/handlers"],
       ["POST", "/api/v1/hooks/emit", { event: "agent.observe" }],
@@ -105,25 +102,7 @@ describe("instance settings", () => {
     ] as [string, string, object?][]) {
       expect((await as(method, url, MEMBER, payload)).statusCode, `${method} ${url}`).toBe(403);
     }
-    for (const url of ["/api/v1/system/diagnostics", "/api/v1/alerts/rules", "/api/v1/hooks/log"])
+    for (const url of ["/api/v1/system/diagnostics", "/api/v1/hooks/log"])
       expect((await as("GET", url, ADMIN)).statusCode, url).toBe(200);
-  });
-
-  it("count only the caller's own tokens in token usage", async () => {
-    const { costLogStore } = await import("../../src/lib/cost-log.ts");
-    costLogStore.record({
-      ts: new Date().toISOString(),
-      model: "groq/secret-model",
-      inputTokens: 500,
-      outputTokens: 500,
-      costUsd: 0,
-      userId: ADMIN,
-    });
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/token-usage",
-      headers: { authorization: `Bearer ${tokenFor(MEMBER)}` },
-    });
-    expect(res.json<{ used: number; byModel: object }>()).toMatchObject({ used: 0, byModel: {} });
   });
 });

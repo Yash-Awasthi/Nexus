@@ -4,7 +4,7 @@
  *
  * Mirrors the worker's agent-mcp.ts builders (passes 60-62) with the same
  * conventions, adapted to the CLI's seam: the local agent drives an injected
- * {@link LlmToolFn} (no `@nexus/llm-drivers` driver object), so every served
+ * {@link LlmToolFn} (no `@nexus/llm/drivers` driver object), so every served
  * protocol — council deliberate/vote/debate/critique/verify behind
  * `createCouncilMcpServer` plus debate-engine's converging `runMultiAgentDebate`
  * — is bridged over that function. An `onTranscript` hook (the pass-58/59
@@ -14,7 +14,7 @@
  * The builders take an injected `ILLMTransport`/transport (deterministic to
  * test); `transportFromLlm` adapts a real `LlmToolFn` to both shapes.
  */
-import type { RuntimeTool, LlmToolFn, RuntimeMessage } from "@nexus/agent-runtime";
+import type { RuntimeTool, LlmToolFn, RuntimeMessage } from "@nexus/agent-core/runtime";
 import {
   createCouncilMcpServer,
   recordToolTranscript,
@@ -23,18 +23,18 @@ import {
   type ILLMTransport,
   type ToolTranscriptHooks,
 } from "@nexus/council";
-import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/debate-engine";
-import { createGraphRagMcpServer } from "@nexus/graphrag-query";
+import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/council/debate-engine";
+import type { McpHttpServer, McpCallResult, McpToolDefinition } from "@nexus/mcp-client";
+import { createGraphRagMcpServer } from "@nexus/search/graphrag-query";
 import type {
   CommunityReport,
   IndexedEntity,
   IndexedRelation,
   QueryRouter,
-} from "@nexus/graphrag-query";
-import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
-import { createHybridSearchMcpServer } from "@nexus/hybrid-search";
-import type { McpHttpServer, McpCallResult, McpToolDefinition } from "@nexus/mcp-client";
-import type { Reranker } from "@nexus/reranker";
+} from "@nexus/search/graphrag-query";
+import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/search/hybrid-search";
+import { createHybridSearchMcpServer } from "@nexus/search/hybrid-search";
+import type { Reranker } from "@nexus/search/reranker";
 
 /** Provider tool names must match ^[a-zA-Z0-9_-]{1,64}$ (Anthropic + OpenAI). */
 function toToolName(server: string, tool: string): string {
@@ -210,7 +210,7 @@ export function councilRuntimeToolsFromLlm(
 /**
  * Serve the hybrid single-query tool (dense+BM25 legs, RRF/alpha fusion,
  * metadata/document filters, optional rerank — the pass-69 served surface in
- * @nexus/hybrid-search) as one RuntimeTool a CLI local agent can invoke.
+ * @nexus/search) as one RuntimeTool a CLI local agent can invoke.
  * Mirrors the worker's agent-mcp.ts builder (pass 69); no LLM seam needed —
  * the caller supplies its corpus adapters, exactly like the deliberation
  * builders inject their transport.

@@ -5,7 +5,7 @@
   "description": "browser-use style actor model (numbered-element perceive→plan→act) on @nexus/stealth-browser drivers",
   "main": "src/index.ts",
   "dependencies": {
-    "@nexus/runtime": "workspace:*",
-    "@nexus/stealth-browser": "workspace:*"
+    "@nexus/stealth-browser": "workspace:*",
+    "@nexus/agent-core": "workspace:*"
   }
 }

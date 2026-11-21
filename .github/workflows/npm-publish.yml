@@ -4,9 +4,10 @@
 # What this publishes:
 #   @nexus/cli      — nexus CLI (apps/cli)
 #   @nexus/billing  — Stripe billing helpers (packages/billing)
-#   @nexus/tier-gate — tier gating middleware (packages/tier-gate)
-#   @nexus/context-pruner — context pruning lib (packages/context-pruner)
-#   @nexus/llm-drivers    — LLM provider drivers (packages/llm-drivers)
+#   @nexus/llm      — LLM drivers, routing, registry, budget, compression (packages/llm)
+#   @nexus/council  — debate engine, best-of-n, gauntlet (packages/council)
+#   @nexus/search   — retrieval, hybrid search, GraphRAG, KG, reranker (packages/search)
+#   @nexus/agent-core — agents, engine, runtime kernel, workflow, STM (packages/agent-core)
 #   @nexus/gateway-log    — gateway request log (packages/gateway-log)
 #
 # Secrets required (set in repo settings → Secrets → Actions):
@@ -42,12 +43,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           node-version: "26"
-          cache: pnpm
+          cache: true
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The documented SDK form: an AgentRuntime built on a driver, run on a task. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { AgentRuntime } from "../../src/runtime/index.ts";
 

@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET = "workspaces-test-secret";
 const DB = "pglite://:memory:workspaces-test";

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /** One search over knowledge bases and the graph, with numbered sources and a cited answer on request. */
-import type { LlmDriver, LlmRequestOptions } from "@nexus/llm-drivers";
+import type { LlmDriver, LlmRequestOptions } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 const prompts: string[] = [];
 const model = {

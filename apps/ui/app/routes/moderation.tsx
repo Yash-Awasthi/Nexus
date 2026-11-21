@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Moderation — content moderation check and configuration.
+ * Content filter — the configuration behind the chat's "block adult content"
+ * preference, plus a console for testing text against it.
  *
- * Tab 1: Check — test a piece of text against moderation rules
+ * Tab 1: Check — test a piece of text against the configured categories
  * Tab 2: Batch — check multiple texts at once
- * Tab 3: Config — view/adjust moderation thresholds per category
+ * Tab 3: Config — categories and thresholds the chat filter enforces
  *
  * API:
  *   POST /api/moderation/check
@@ -101,7 +102,8 @@ function CheckTab() {
         body: JSON.stringify({ text: text.trim() }),
       });
       const d = (await r.json().catch(() => null)) as
-        (ModerationResult & { error?: string }) | null;
+        | (ModerationResult & { error?: string })
+        | null;
       if (r.ok) setResult(d);
       else setErr(d?.error ?? "Moderation check failed");
     } catch {
@@ -387,8 +389,8 @@ export default function Moderation() {
   return (
     <Page width="default">
       <PageHeader
-        title="Moderation"
-        description="Test text against the moderation categories and tune the thresholds the explicit-content filter uses."
+        title="Content filter"
+        description="Categories and thresholds that the chat's block-adult-content preference enforces, with a console to test text against them."
       />
 
       <Tabs defaultValue="check">

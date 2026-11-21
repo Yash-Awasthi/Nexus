@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import http from "node:http";
 
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 
 const DB = "pglite://:memory:provider-keys-compatible";
 process.env.DATABASE_URL = DB;

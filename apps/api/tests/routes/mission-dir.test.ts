@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { missionDir } from "../../src/routes/missions.ts";
 

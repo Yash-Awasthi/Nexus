@@ -11,6 +11,7 @@ export default {
         "governance",
         "db",
         "memory",
+        "llm",
         "auth",
         "shared",
         "contracts",

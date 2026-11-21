@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { globalBus, type SseEvent } from "@nexus/sse";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { handleAgentEventMessage } from "../../src/lib/agent-events-bridge.ts";
 

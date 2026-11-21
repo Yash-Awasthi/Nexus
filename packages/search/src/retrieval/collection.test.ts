@@ -5,7 +5,7 @@
 // deterministic: docs are space-free with disjoint letter buckets (a/b vs c/d
 // vs a/c), so ordering and distance assertions are exact (space-free matters —
 // a space char would bucket into a shared slot and break orthogonality).
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { FixedRagtimeEmbedder, VectorCollection } from "./index.ts";
 

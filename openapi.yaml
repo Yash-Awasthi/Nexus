@@ -462,20 +462,6 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/apps/status:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/apps/generate:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
   /api/v1/runtime/tasks/{taskId}:
     get:
       tags:
@@ -739,64 +725,6 @@ paths:
           content:
             application/json:
               schema: {}
-  /api/v1/context-pack:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/stm/drift:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/stm/modules:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/stm/transform:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/stm/transform/partial:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - text
-              properties:
-                text:
-                  type: string
-      responses:
-        "200":
-          description: Default Response
   /api/v1/chat-suggestions:
     post:
       tags:
@@ -823,619 +751,6 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-  /api/v1/wiki/articles:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/wiki/articles/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/wiki/search:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/wiki/update:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/wiki/reindex:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/wiki/articles/{id}/comments:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/wiki/comments/{commentId}:
-    patch:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: commentId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: commentId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/wiki/comments/{commentId}/resolve:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: commentId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/wiki/drafts:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/wiki/drafts/{draftId}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: draftId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: draftId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/wiki/articles/{id}/acl:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/wiki/articles/{id}/acl/{userId}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: userId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/wiki/articles/{id}/acl/{userId}/role:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: userId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/corpus/batches:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/corpus/batches/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/corpus/batches/{id}/jsonl:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/corpus/samples:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/corpus/query:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/corpus/flush:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/corpus/pending:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/prediction-markets:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/prediction-markets/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/prediction-markets/refresh/{id}:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/prediction-markets/{id}/book:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/prediction-markets/{id}/forecast:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/prediction-markets/cache/status:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/conversation-analysis/analyze:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/conversation-analysis/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/conversation-analysis:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
   /api/v1/nlp/chunk:
     post:
       tags:
@@ -1466,89 +781,6 @@ paths:
           description: Default Response
   /api/v1/nlp/relationships:
     post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/geoip/resolve:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/geoip/me:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/geoip/batch:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/locale:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/locales:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/translate:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/translate/batch:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/catalog:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/catalog/{locale}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: locale
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/format/number:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/i18n/format/date:
-    get:
       tags:
         - durable
       responses:
@@ -2069,219 +1301,26 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/connectors:
+  /api/v1/board/status:
     get:
       tags:
         - durable
       responses:
         "200":
           description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}:
+  /api/v1/board/tasks:
     get:
       tags:
         - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
       responses:
         "200":
           description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    patch:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/connectors/connect:
     post:
       tags:
         - durable
       responses:
         "200":
           description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}/health:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}/reconnect:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}/disconnect:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}/oauth/start:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/connectors/{id}/oauth/callback:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/connectors/{id}/oauth/credential:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "404":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
   /api/v1/memory:
     get:
       tags:
@@ -2382,83 +1421,6 @@ paths:
                     type: number
                   kept:
                     type: number
-  /api/v1/brief/{domain}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: domain
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/brief/{domain}/events:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: domain
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/brief/{domain}/share/{digest}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: domain
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: digest
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/forecast/weather:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/forecast/{domain}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: domain
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/forecast/{domain}/history:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: domain
-          required: true
-      responses:
-        "200":
-          description: Default Response
   /api/v1/session-sync/{sessionId}/push:
     post:
       tags:
@@ -2887,89 +1849,6 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/alerts/rules:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/alerts/rules/{id}:
-    patch:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/alerts/history:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/alerts/evaluate:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
   /api/v1/agents/librarian/query:
     post:
       tags:
@@ -3030,89 +1909,6 @@ paths:
         - durable
       responses:
         "200":
-          description: Default Response
-  /api/v1/analyst/query:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/analyst/session:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/analyst/session/{sessionId}/message:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: sessionId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/analyst/session/{sessionId}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: sessionId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: sessionId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
           description: Default Response
   /api/v1/rlhf/feedback:
     post:
@@ -3217,77 +2013,6 @@ paths:
         "200":
           description: Default Response
   /api/v1/rlhf/stats:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/sft/conversations:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/sft/conversations/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/sft/export:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/sft/pipeline/export:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/sft/stats:
     get:
       tags:
         - durable
@@ -3462,199 +2187,6 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-  /api/v1/scenarios/plan/rank:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/scenarios:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/scenarios/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "204":
-          description: Default Response
-  /api/v1/scenarios/{id}/predict:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/scenarios/{id}/sensitivity:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/redteam/transform:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - text
-              properties:
-                text:
-                  type: string
-                  minLength: 1
-                  maxLength: 50000
-                technique:
-                  type: string
-                  enum:
-                    - leetspeak
-                    - unicode
-                    - zwj
-                    - mixedcase
-                    - phonetic
-                    - random
-                intensity:
-                  type: string
-                  enum:
-                    - light
-                    - medium
-                    - heavy
-                customTriggers:
-                  type: array
-                  items:
-                    type: string
-                enabled:
-                  type: boolean
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/redteam/techniques:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-  /api/v1/redteam/triggers:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "201":
-          description: Default Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
   /api/v1/metrics:
     get:
       tags:
@@ -3764,113 +2296,10 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/auth/passkeys:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/auth/passkeys/register/options:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/auth/passkeys/register:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - response
-              properties:
-                name:
-                  type: string
-                  maxLength: 64
-                response:
-                  type: object
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/auth/passkeys/{id}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/auth/passkeys/login/options:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/auth/passkeys/login:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - challengeId
-                - response
-              properties:
-                challengeId:
-                  type: string
-                  maxLength: 64
-                response:
-                  type: object
-                  required:
-                    - id
-                  properties:
-                    id:
-                      type: string
-      responses:
-        "200":
-          description: Default Response
   /api/v1/auth/register:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                  maxLength: 320
-                password:
-                  type: string
-                  minLength: 8
-                  maxLength: 128
-                name:
-                  type: string
-                  maxLength: 100
       responses:
         "200":
           description: Default Response
@@ -3878,26 +2307,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  minLength: 1
-                  maxLength: 128
-                code:
-                  type: string
-                  maxLength: 16
       responses:
         "200":
           description: Default Response
@@ -3905,16 +2314,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                refreshToken:
-                  type: string
-                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -3922,16 +2321,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                refreshToken:
-                  type: string
-                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -3945,23 +2334,6 @@ paths:
     patch:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  maxLength: 100
-                email:
-                  type: string
-                  format: email
-                  maxLength: 320
-                currentPassword:
-                  type: string
-                  maxLength: 128
       responses:
         "200":
           description: Default Response
@@ -3969,19 +2341,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-              properties:
-                email:
-                  type: string
-                  format: email
-                  maxLength: 320
       responses:
         "200":
           description: Default Response
@@ -3989,23 +2348,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - token
-                - password
-              properties:
-                token:
-                  type: string
-                  minLength: 1
-                password:
-                  type: string
-                  minLength: 8
-                  maxLength: 128
       responses:
         "200":
           description: Default Response
@@ -4047,18 +2389,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - token
-              properties:
-                token:
-                  type: string
-                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -4075,38 +2405,7 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/workspaces:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
-                  minLength: 1
-                  maxLength: 64
-                slug:
-                  type: string
-                  minLength: 1
-                  maxLength: 48
-                  pattern: ^[a-z0-9-]+$
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/{id}:
+  /api/v1/workspaces{*}:
     get:
       tags:
         - durable
@@ -4114,7 +2413,19 @@ paths:
         - schema:
             type: string
           in: path
-          name: id
+          name: "*"
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: "*"
           required: true
       responses:
         "200":
@@ -4122,27 +2433,11 @@ paths:
     patch:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  minLength: 1
-                  maxLength: 64
-                slug:
-                  type: string
-                  minLength: 1
-                  maxLength: 48
-                  pattern: ^[a-z0-9-]+$
       parameters:
         - schema:
             type: string
           in: path
-          name: id
+          name: "*"
           required: true
       responses:
         "200":
@@ -4154,243 +2449,8 @@ paths:
         - schema:
             type: string
           in: path
-          name: id
+          name: "*"
           required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/{id}/members:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/{id}/invitations:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-              properties:
-                email:
-                  type: string
-                  format: email
-                role:
-                  type: string
-                  enum:
-                    - admin
-                    - member
-                    - viewer
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/{id}/invitations/{invitationId}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-            format: uuid
-          in: path
-          name: invitationId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/invitations/{token}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: token
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/workspaces/{id}/members/{userId}:
-    patch:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - role
-              properties:
-                role:
-                  type: string
-                  enum:
-                    - admin
-                    - member
-                    - viewer
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: userId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: userId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/status:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/exec:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/ls:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/read:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/upload:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - path
-                - content
-              properties:
-                path:
-                  type: string
-                content:
-                  type: string
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/export:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/link:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/file:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/links:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/links/{id}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/drive/destroy:
-    delete:
-      tags:
-        - durable
       responses:
         "200":
           description: Default Response
@@ -4412,18 +2472,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -4431,18 +2479,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -4450,18 +2486,6 @@ paths:
     post:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -4605,28 +2629,7 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/admin/ownerless:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/ownerless/assign:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users/{id}:
+  /api/v1/admin/users{*}:
     get:
       tags:
         - durable
@@ -4634,7 +2637,19 @@ paths:
         - schema:
             type: string
           in: path
-          name: id
+          name: "*"
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: "*"
           required: true
       responses:
         "200":
@@ -4642,36 +2657,11 @@ paths:
     patch:
       tags:
         - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                tier:
-                  type: string
-                  enum:
-                    - free
-                    - pro
-                    - enterprise
-                role:
-                  type: string
-                  enum:
-                    - owner
-                    - admin
-                    - member
-                    - viewer
-                emailVerified:
-                  type: boolean
-                name:
-                  type: string
-                  maxLength: 100
       parameters:
         - schema:
             type: string
           in: path
-          name: id
+          name: "*"
           required: true
       responses:
         "200":
@@ -4683,76 +2673,7 @@ paths:
         - schema:
             type: string
           in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users/{id}/suspend:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users/{id}/restore:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users/{id}/sessions:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/v1/admin/users/{id}/sessions/{sid}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: sid
+          name: "*"
           required: true
       responses:
         "200":
@@ -4836,53 +2757,6 @@ paths:
     post:
       tags:
         - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/ab/run:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/ab:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/ab/stats:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/ab/{id}:
-    get:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/ab/{id}/preference:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
       responses:
         "200":
           description: Default Response
@@ -5353,522 +3227,24 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/sandbox/status:
-    get:
-      tags:
-        - dedicated-volatile
-      responses:
-        "200":
-          description: Default Response
-  /api/sandbox/execute:
-    post:
-      tags:
-        - dedicated-volatile
-      responses:
-        "200":
-          description: Default Response
-  /api/sandbox/status/{id}:
-    get:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/admin/audit-logs:
+  /api/analytics/daily:
     get:
       tags:
         - bridge
       responses:
         "200":
           description: Default Response
-  /api/billing/plans:
+  /api/analytics/providers:
     get:
       tags:
         - bridge
       responses:
         "200":
           description: Default Response
-  /api/billing/checkout:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/billing/subscription/{tid}:
+  /api/analytics/models:
     get:
       tags:
         - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: tid
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/billing/usage/{tid}:
-    get:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: tid
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/billing/cancel/{tid}:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: tid
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/user/provider-keys:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/user/provider-keys/{id}:
-    delete:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/feedback/stats:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/feedback/export:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors:
-    get:
-      tags:
-        - dedicated-volatile
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - dedicated-volatile
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}:
-    delete:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync:
-    post:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync/jobs:
-    get:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync-jobs:
-    get:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync/jobs/{jobId}:
-    delete:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: jobId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync/schedules:
-    get:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/connectors/{id}/sync/schedules/{scheduleId}:
-    put:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: scheduleId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    patch:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: scheduleId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - dedicated-volatile
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-        - schema:
-            type: string
-          in: path
-          name: scheduleId
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/skills:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/skills/{id}:
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/skills/merge:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/skills/compress:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/token-usage:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/research:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/research/related-questions:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/research/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/research/{id}/stream:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/code-agent/execute:
-    post:
-      tags:
-        - bridge
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  maxLength: 32768
-                language:
-                  type: string
-                  enum:
-                    - python
-                    - r
-                    - julia
-                timeoutMs:
-                  type: number
-                  minimum: 100
-                  maximum: 30000
-      responses:
-        "200":
-          description: Default Response
-  /api/code-agent/sessions:
-    post:
-      tags:
-        - bridge
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                language:
-                  type: string
-                  enum:
-                    - python
-                    - r
-                    - julia
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/code-agent/sessions/{id}/execute:
-    post:
-      tags:
-        - bridge
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  maxLength: 32768
-                timeoutMs:
-                  type: number
-                  minimum: 100
-                  maximum: 30000
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/code-agent/sessions/{id}:
-    delete:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/code-agent/run:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/build/run:
-    post:
-      tags:
-        - bridge
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - code
-              properties:
-                code:
-                  type: string
-                  maxLength: 32768
-                language:
-                  type: string
-                  enum:
-                    - python
-                    - r
-                    - julia
-                timeoutMs:
-                  type: number
-                  minimum: 100
-                  maximum: 60000
       responses:
         "200":
           description: Default Response
@@ -5987,6 +3363,277 @@ paths:
           in: path
           name: id
           required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/sandbox/status:
+    get:
+      tags:
+        - dedicated-volatile
+      responses:
+        "200":
+          description: Default Response
+  /api/sandbox/execute:
+    post:
+      tags:
+        - dedicated-volatile
+      responses:
+        "200":
+          description: Default Response
+  /api/sandbox/status/{id}:
+    get:
+      tags:
+        - dedicated-volatile
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/code-agent/execute:
+    post:
+      tags:
+        - bridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  maxLength: 32768
+                language:
+                  type: string
+                  enum:
+                    - python
+                    - r
+                    - julia
+                timeoutMs:
+                  type: number
+                  minimum: 100
+                  maximum: 30000
+      responses:
+        "200":
+          description: Default Response
+  /api/code-agent/sessions:
+    post:
+      tags:
+        - bridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                  enum:
+                    - python
+                    - r
+                    - julia
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/code-agent/sessions/{id}/execute:
+    post:
+      tags:
+        - bridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  maxLength: 32768
+                timeoutMs:
+                  type: number
+                  minimum: 100
+                  maximum: 30000
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/code-agent/sessions/{id}:
+    delete:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/code-agent/run:
+    post:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/audit-logs:
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/billing/plans:
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/billing/checkout:
+    post:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/billing/subscription/{tid}:
+    get:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: tid
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/billing/usage/{tid}:
+    get:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: tid
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/billing/cancel/{tid}:
+    post:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: tid
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/user/provider-keys:
+    post:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/user/provider-keys/{id}:
+    delete:
+      tags:
+        - bridge
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/feedback/stats:
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/feedback/export:
+    get:
+      tags:
+        - bridge
+      responses:
+        "200":
+          description: Default Response
+  /api/skills:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/skills/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/skills/merge:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/skills/compress:
+    post:
+      tags:
+        - durable
       responses:
         "200":
           description: Default Response
@@ -6162,54 +3809,6 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/marketplace/adapters:
-    post:
-      tags:
-        - durable
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-                - capabilities
-              properties:
-                name:
-                  type: string
-                  maxLength: 64
-                capabilities:
-                  type: array
-                  items:
-                    type: string
-                  minItems: 1
-                  maxItems: 20
-                description:
-                  type: string
-                  maxLength: 512
-      responses:
-        "200":
-          description: Default Response
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace/execute/{name}:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: name
-          required: true
-      responses:
-        "200":
-          description: Default Response
   /api/negation/add:
     post:
       tags:
@@ -6287,108 +3886,7 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/hallucination/thresholds:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/hallucination/score:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/hallucination/groundedness:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/hallucination/batch-score:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/speculative/config:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/speculative/stats:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/speculative/run:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/speculative/classify:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
   /api/tts:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/standard-answers:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/standard-answers/{id}:
-    put:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/standard-answers/match:
     post:
       tags:
         - bridge
@@ -6417,27 +3915,6 @@ paths:
         "200":
           description: Default Response
   /api/context/web:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/auth/login:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/auth/register:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/auth/me:
     get:
       tags:
         - bridge
@@ -6479,27 +3956,6 @@ paths:
           in: path
           name: id
           required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/analytics/daily:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/analytics/providers:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/analytics/models:
-    get:
-      tags:
-        - bridge
       responses:
         "200":
           description: Default Response
@@ -6760,142 +4216,6 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/build/tasks:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/steal:
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/{id}/status:
-    patch:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/{id}/claim:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/{id}/release:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/{id}/submit:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/build/tasks/{id}:
-    delete:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/prompts:
-    get:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - bridge
-      responses:
-        "200":
-          description: Default Response
-  /api/prompts/{id}:
-    get:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/prompts/{id}/versions:
-    post:
-      tags:
-        - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
   /api/archetypes:
     get:
       tags:
@@ -6946,77 +4266,6 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/stm/history:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/stm/active:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/stm:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/stm/project/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/stm/toggle:
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
   /api/traces:
     get:
       tags:
@@ -7028,89 +4277,6 @@ paths:
     get:
       tags:
         - bridge
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace/me:
-    get:
-      tags:
-        - durable
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace/{id}:
-    get:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace/{id}/star:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-  /api/marketplace/{id}/install:
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    delete:
-      tags:
-        - durable
       parameters:
         - schema:
             type: string

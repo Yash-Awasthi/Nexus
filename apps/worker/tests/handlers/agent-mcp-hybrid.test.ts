@@ -5,9 +5,13 @@
 // seam (the same localMcpToolsFromServer bridge the council/debate tools use)
 // and returns a parsed fused result, with the executor error path. DB-free and
 // offline: deterministic in-memory dense + BM25 adapters drive the search.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { hybridSearchRuntimeTools } from "../../src/handlers/agent-mcp.ts";
-import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
+import {
+  InMemoryBM25,
+  type SearchHit,
+  type VectorSearchAdapter,
+} from "@nexus/search/hybrid-search";
 
 const CORPUS = [
   {

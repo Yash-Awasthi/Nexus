@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 const SECRET = "user-context-hook-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

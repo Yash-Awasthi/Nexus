@@ -15,7 +15,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { applyEdit, RuntimeToolSet } from "@nexus/agent-runtime";
+import { applyEdit, RuntimeToolSet } from "@nexus/agent-core/runtime";
 import {
   buildSafeEnv,
   createDockerRunner,

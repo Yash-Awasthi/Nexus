@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { AdaptiveScraper, RobotsChecker, type ScrapeResult } from "@nexus/adaptive-scraper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { importSite, sameSiteLinks } from "../../src/lib/site-import.ts";
 

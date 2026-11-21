@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { extractMissionInsights, sanitizeInsights } from "../../src/lib/memory-extractor.ts";
 
 /** Ollama /api/chat-shaped responder over a scripted content body. */

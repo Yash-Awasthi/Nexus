@@ -8,7 +8,7 @@
  * contract (failed runs surface as recoverable errors, never throws).
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import type { Runner, RunnerResult } from "@nexus/sandbox";
 
 import {
@@ -165,16 +165,13 @@ describe("withOutputStyle", () => {
 });
 
 describe("executeSkillsOnce", () => {
-  it("runs Python in the restricted Pyodide child, so a host without python3 still runs it", async () => {
-    vi.stubEnv("PATH", "");
-    vi.stubEnv("Path", "");
+  it("fails closed without a sandbox image instead of running Python on the host", async () => {
     const [r] = await executeSkillsOnce([
       { id: "fib", name: "Fib", language: "python", code: "print(sum(range(10)))" },
     ]);
-    vi.unstubAllEnvs();
-    expect(r?.output).toContain("45");
-    expect(r?.ok).toBe(true);
-  }, 120_000);
+    expect(r?.ok).toBe(false);
+    expect(r?.error).toContain("NEXUS_SANDBOX_IMAGE");
+  });
 
   it("runs every skill's code deterministically and returns real outcomes", async () => {
     const results = await executeSkillsOnce([PYTHON_SKILL, TS_SKILL], {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * CouncilBridge — wires the @nexus/runtime planner to @nexus/council.
+ * CouncilBridge — wires the @nexus/agent-core planner to @nexus/council.
  *
  * Responsibility:
  *   When the planner determines a task requires multi-agent deliberation,
@@ -13,7 +13,7 @@
  *     6. Returns the RuntimeVerdict to the planner
  *
  * The bridge is transport-agnostic: the DeliberationEngine is injected
- * via ICouncilEngine, decoupling @nexus/runtime from @nexus/council at
+ * via ICouncilEngine, decoupling @nexus/agent-core from @nexus/council at
  * the import level (ADR-0004: TS/Python boundary via interfaces).
  */
 

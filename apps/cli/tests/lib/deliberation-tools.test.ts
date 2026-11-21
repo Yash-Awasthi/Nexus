@@ -5,8 +5,8 @@
 // LlmToolFn seam, with the pass-58/59 transcript sink attached. DB-free and
 // offline: a scripted LlmToolFn drives every protocol call (the same
 // DeliberativeCouncil-convention scripts the worker's pass-60 test uses).
-import { describe, it, expect, vi } from "vitest";
-import type { LlmToolFn } from "@nexus/agent-runtime";
+import { describe, it, expect, vi } from "vite-plus/test";
+import type { LlmToolFn } from "@nexus/agent-core/runtime";
 import type { ILLMMessage, ILLMTransport } from "@nexus/council";
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -22,7 +22,11 @@ import {
   transportFromLlm,
 } from "../../src/lib/deliberation-tools.ts";
 import { runLocalAgent, type ToolTranscriptEvent } from "../../src/lib/local-agent.ts";
-import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
+import {
+  InMemoryBM25,
+  type SearchHit,
+  type VectorSearchAdapter,
+} from "@nexus/search/hybrid-search";
 
 const CORPUS = [
   {

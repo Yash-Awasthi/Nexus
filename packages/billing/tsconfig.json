@@ -12,7 +12,7 @@
       "path": "../db"
     },
     {
-      "path": "../provider-registry"
+      "path": "../llm"
     }
   ]
 }

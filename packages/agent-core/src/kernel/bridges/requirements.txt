@@ -1,7 +1,7 @@
 # GhostStack Python bridge dependencies
 # Install before flipping GHOSTSTACK_OFFLINE_MODE=false:
 #
-#   cd packages/runtime/src/bridges
+#   cd packages/agent-core/src/kernel/bridges
 #   pip install -r requirements.txt
 #
 # All deps are optional — each bridge starts even when its deps are missing

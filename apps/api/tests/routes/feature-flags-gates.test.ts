@@ -2,10 +2,10 @@
 /** Admin feature flags are one registry, persisted, and real behaviour reads it. */
 import crypto from "node:crypto";
 
-import { DriverRegistry } from "@nexus/llm-drivers";
-import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm-drivers";
+import { DriverRegistry } from "@nexus/llm/drivers";
+import type { LlmDriver, LlmRequestOptions, LlmResponse, StreamHandler } from "@nexus/llm/drivers";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 const SECRET = "feature-flags-gates-secret";
 const DB = "pglite://:memory:feature-flags-gates";
@@ -142,19 +142,6 @@ describe("behaviour behind the flags", () => {
     });
     expect(res.json()).toMatchObject({ results: [], message: expect.stringMatching(/turned off/) });
     await resetFlag("search.web");
-  });
-
-  it("drive.exec off refuses drive commands", async () => {
-    await setFlag("drive.exec", false);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/drive/exec",
-      headers: auth(),
-      payload: { command: "echo hi" },
-    });
-    expect(res.statusCode).toBe(403);
-    expect(res.json()).toMatchObject({ error: "drive_exec_disabled" });
-    await resetFlag("drive.exec");
   });
 
   it("council.max_debate_rounds caps the rounds a council asks for", async () => {

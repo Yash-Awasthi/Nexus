@@ -55,7 +55,11 @@ import { PersistentStore } from "./persistent-store.ts";
 export const APPROVAL_TYPES = ["hire_agent", "budget_override", "plan", "action"] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 export type ApprovalStatus =
-  "pending" | "revision_requested" | "approved" | "rejected" | "cancelled";
+  | "pending"
+  | "revision_requested"
+  | "approved"
+  | "rejected"
+  | "cancelled";
 
 export interface CouncilReview {
   status: "running" | "done" | "failed";

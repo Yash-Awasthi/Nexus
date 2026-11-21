@@ -6,7 +6,7 @@
  * These tests run against the shared process store, so each one creates its own
  * archetype and cleans it up rather than asserting on the whole collection.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

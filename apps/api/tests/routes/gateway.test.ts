@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { signJwt } from "@nexus/auth";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vite-plus/test";
 import { buildServer } from "../../src/server.ts";
 import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import type { FastifyInstance } from "fastify";

@@ -3,7 +3,7 @@
  * Runs against a real embedded database: the desktop app keeps chat threads in
  * this store, so what matters is that values, TTLs and counters survive SQL.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vite-plus/test";
 
 import { closePgPools, getPgPool } from "../../src/lib/pg-pool.ts";
 import { PgKVStore } from "../../src/lib/shared-kv.ts";

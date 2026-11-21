@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { MemoryQueueBackend } from "../../src/kernel/queue-backend.ts";
 import type { QueueJob } from "../../src/kernel/interfaces/queue.interface.ts";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/workflow-chain — Fluent workflow chain API.
+ * @nexus/agent-core — Fluent workflow chain API.
  *
  * Provides a builder-pattern API for composing multi-step workflows with
  * typed data flow between steps, suspend/resume support, branching, loops,

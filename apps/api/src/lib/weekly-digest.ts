@@ -15,7 +15,7 @@
  *   - A week with zero activity is marked silently (no "nothing happened"
  *     noise) — the digest only reports when there is something to report.
  *
- * Scope note: the underlying stores (_costLog, research jobs, org runs)
+ * Scope note: the underlying stores (_costLog, org runs)
  * are workspace-level, so the digest rolls up the workspace and delivers the
  * notification per user. That matches the product's actual shape (one
  * workspace per install); a per-user cost log would be the follow-up.
@@ -30,7 +30,6 @@ export interface WeeklyStats {
   costUsd: number;
   /** Model with the highest spend in the window, if any. */
   topModel?: string;
-  researchCount: number;
   /** Company agent runs that finished in the window. */
   agentRuns: number;
   /** Approvals waiting in the user's companies right now. */
@@ -81,19 +80,12 @@ export async function maybeEmitWeeklyDigest(
   const weekStart = start.toISOString().slice(0, 10);
 
   const stats = await computeStats(weekStart, currentWeek);
-  if (
-    stats.requests === 0 &&
-    stats.researchCount === 0 &&
-    stats.agentRuns === 0 &&
-    !stats.pendingApprovals
-  ) {
+  if (stats.requests === 0 && stats.agentRuns === 0 && !stats.pendingApprovals) {
     return null; // quiet week — marked, but no noise
   }
 
   const parts: string[] = [];
   if (stats.requests > 0) parts.push(`${stats.requests} request${stats.requests > 1 ? "s" : ""}`);
-  if (stats.researchCount > 0)
-    parts.push(`${stats.researchCount} deep research run${stats.researchCount > 1 ? "s" : ""}`);
   if (stats.agentRuns > 0)
     parts.push(`${stats.agentRuns} agent run${stats.agentRuns > 1 ? "s" : ""}`);
   if (stats.pendingApprovals)

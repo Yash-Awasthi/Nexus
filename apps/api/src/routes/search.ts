@@ -8,7 +8,7 @@
  * Mounted inside apiBridgeRoutes (same /api/* scope, same auth hooks).
  */
 import type { MemoryManager } from "@nexus/memory";
-import type { RetrievalSource, ScoredChunk, SourceRetrieverFn } from "@nexus/retrieval";
+import type { RetrievalSource, ScoredChunk, SourceRetrieverFn } from "@nexus/search/retrieval";
 import type { FastifyInstance } from "fastify";
 
 import { citedNumbers, numberSources, sourcesPrompt } from "../lib/citations.ts";

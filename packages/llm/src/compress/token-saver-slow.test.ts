@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Tool output can hold one very long line; no processor may go superlinear on it. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { defaultOutputProcessors } from "./token-saver.ts";
 

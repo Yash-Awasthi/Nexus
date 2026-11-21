@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** JSON-RPC batch invocation on the MCP server. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { McpHttpServer } from "../src/index.ts";
 

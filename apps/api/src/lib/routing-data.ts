@@ -2,10 +2,10 @@
 /**
  * Routing samples from council runs: for each question where members
  * converged, which models held the council's position and which did not.
- * @nexus/llm-router's KNN, MLP, SVM and MF routers train on them, and only
+ * @nexus/llm's KNN, MLP, SVM and MF routers train on them, and only
  * once an account has asked MIN_ROUTING_QUESTIONS such questions.
  */
-import { trainRouters, type RoutingSample, type TrainedRouters } from "@nexus/llm-router";
+import { trainRouters, type RoutingSample, type TrainedRouters } from "@nexus/llm/router";
 
 import { PersistentStore } from "./persistent-store.ts";
 

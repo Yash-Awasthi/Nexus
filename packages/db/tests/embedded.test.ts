@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, expect, it } from "vitest";
+import { afterAll, expect, it } from "vite-plus/test";
 
 import { closeEmbeddedDb, getEmbeddedDb } from "../src/embedded.ts";
 

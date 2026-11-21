@@ -5,7 +5,7 @@
  * overturn a deny, or an unknown action that falls through to allow, is a gate
  * that does not gate.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   decide,

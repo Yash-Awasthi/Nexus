@@ -5,7 +5,7 @@ import { detectCommunities, type CommunityOptions } from "./community.ts";
 import { isDeleted, mergeEdge, mergeNode, tombstoneEdge, tombstoneNode } from "./merge.ts";
 import { runCypher, type CypherResult } from "./query.ts";
 /**
- * @nexus/knowledge-graph — entity/relationship graph over agent memory.
+ * @nexus/search — entity/relationship graph over agent memory.
  *
  * Zero external dependencies.  Entity and relationship extraction is fully
  * injectable — wire in @nexus/nlp-utils extractEntities / extractRelationships

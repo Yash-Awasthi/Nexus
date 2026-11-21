@@ -29,7 +29,7 @@ import {
   OpenAIProvider,
   type LLMMessage,
   type RoutingStrategy,
-} from "@nexus/llm-router";
+} from "@nexus/llm/router";
 import type { FastifyInstance } from "fastify";
 
 import { discoverModels, type ReasoningTier } from "../lib/model-discovery.ts";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import Fastify from "fastify";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 process.env.NEXUS_EXEC_MODE = "trusted";
 process.env.NEXUS_EXEC_ALLOW = "node";

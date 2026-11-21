@@ -8,7 +8,7 @@
  * actionable setup hint — the public emkc.org endpoint is whitelist-only).
  * Pyodide (network/WASM) is intentionally not exercised here.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { buildServer } from "../../src/server.ts";

@@ -150,7 +150,7 @@ export function checkPosture(env: Env, facts: PostureFacts): PostureCheck[] {
     "Host terminals stay loopback-only",
     env.NEXUS_LOCAL_PTY_FORCE !== "1" || desktop,
     "fail",
-    "NEXUS_LOCAL_PTY_FORCE=1 serves host terminals to remote callers.",
+    "NEXUS_LOCAL_PTY_FORCE=1 serves host terminals to remote callers. A production server ignores it, but leaving it set means a dev box's setting leaked into a deployment.",
     "Unset NEXUS_LOCAL_PTY_FORCE.",
   );
 

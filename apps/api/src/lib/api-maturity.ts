@@ -32,21 +32,17 @@ export type Maturity = "durable" | "dedicated-volatile" | "bridge";
  */
 const DEDICATED_UNDER_API: readonly string[] = [
   "/api/archetypes",
-  "/api/connectors",
   "/api/costs",
   "/api/diff",
   "/api/kb",
   "/api/kg",
-  "/api/marketplace",
   "/api/memory",
   "/api/missions",
   "/api/notifications",
   "/api/pty",
-  "/api/research",
   "/api/sandbox",
   "/api/search",
   "/api/skills",
-  "/api/stm",
   "/api/threads",
   "/api/tokens",
   "/api/workflows",
@@ -56,7 +52,7 @@ const DEDICATED_UNDER_API: readonly string[] = [
  * Dedicated handlers whose store is a module-level Map or array. Checked before
  * `DEDICATED_UNDER_API` so the more specific answer wins.
  */
-const VOLATILE: readonly string[] = ["/api/sandbox", "/api/connectors"];
+const VOLATILE: readonly string[] = ["/api/sandbox"];
 
 function startsWithSegment(url: string, prefix: string): boolean {
   return url === prefix || url.startsWith(`${prefix}/`);

@@ -3,7 +3,7 @@
  * The BullMQ dashboard is a browser page, so it is guarded by HTTP Basic auth rather than the
  * API's bearer tokens; without the password configured it is not mounted at all.
  */
-import { afterAll, expect, it, vi } from "vitest";
+import { afterAll, expect, it, vi } from "vite-plus/test";
 
 // No Redis in unit tests; Bull Board accepts any queue that reports a bullmq version.
 vi.mock("bullmq", () => ({

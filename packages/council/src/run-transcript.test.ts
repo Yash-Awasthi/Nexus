@@ -4,7 +4,7 @@
 // agent, API council routes) imports these from @nexus/council instead of
 // carrying its own copy — these tests pin the shared artifact contract so a
 // change here is one change, not four.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   buildCouncilRunTranscript,

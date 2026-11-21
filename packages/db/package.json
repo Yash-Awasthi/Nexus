@@ -15,8 +15,8 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "clean": "rm -rf dist coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -24,17 +24,17 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.9",
-    "@electric-sql/pglite-pgvector": "0.0.10",
+    "@electric-sql/pglite": "0.5.17",
+    "@electric-sql/pglite-pgvector": "0.0.18",
     "@neondatabase/serverless": "catalog:",
     "drizzle-orm": "catalog:",
     "pg": "catalog:"
   },
   "devDependencies": {
     "@types/pg": "catalog:",
-    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-kit": "1.0.0-rc.6",
     "fast-check": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "publishConfig": {
     "main": "./dist/index.js",

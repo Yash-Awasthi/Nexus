@@ -40,7 +40,7 @@ export class CacheError extends Error {
   }
 }
 
-// ── LLM types (minimal — compatible with @nexus/llm-router) ──────────────────
+// ── LLM types (minimal — compatible with @nexus/llm) ──────────────────
 
 export type MessageRole = "system" | "user" | "assistant";
 

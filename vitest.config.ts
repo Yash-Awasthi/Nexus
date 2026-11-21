@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { resolve } from "path";
 
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   resolve: {
@@ -72,7 +72,7 @@ export default defineConfig({
         // Infrastructure packages — require live Docker / Redis / Postgres to
         // exercise meaningfully. Covered by the dedicated e2e CI job instead.
         "packages/conductor/**",
-        "packages/runtime/**",
+        "packages/agent-core/src/kernel/**",
         // Telemetry bootstrap (OTel init, pino logger, SLO tracker) and LLM
         // evaluation framework require live providers; excluded from unit coverage.
         "packages/telemetry/**",
@@ -81,7 +81,7 @@ export default defineConfig({
         // integration level, not unit. Same rationale as runtime/conductor above.
         "packages/stealth-browser/**",
         "packages/sandbox/**",
-        "packages/agent-runtime/**",
+        "packages/agent-core/src/runtime/**",
       ],
       thresholds: {
         // Re-baselined 2026-10 for Vitest 5, whose AST-aware v8 remapping

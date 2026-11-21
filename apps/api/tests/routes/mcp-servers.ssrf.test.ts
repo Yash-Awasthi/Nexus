@@ -8,7 +8,7 @@
  * (file:, gopher:). These assert the attack inputs are rejected, not just that
  * a normal https URL passes.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { validateMcpEndpoint } from "../../src/routes/mcp-servers.ts";
 

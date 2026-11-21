@@ -7,8 +7,8 @@
  * argument/result summaries (a runaway tool can't flood the graph).
  */
 
-import { describe, it, expect } from "vitest";
-import type { RuntimeTool } from "@nexus/agent-runtime";
+import { describe, it, expect } from "vite-plus/test";
+import type { RuntimeTool } from "@nexus/agent-core/runtime";
 
 import {
   MissionGraphRecorder,

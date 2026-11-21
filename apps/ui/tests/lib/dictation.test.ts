@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Dictation hands each final phrase to the caller and reports when listening ends. */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { dictationSupported, startDictation } from "../../app/lib/dictation";
 

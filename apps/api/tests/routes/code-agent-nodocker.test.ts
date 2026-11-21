@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 
 const SECRET = "code-agent-test-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
@@ -55,7 +55,6 @@ describe("code-agent kernels without Docker", () => {
     for (const [url, body] of [
       ["/api/code-agent/execute", { code: "print(1)" }],
       ["/api/code-agent/sessions", { language: "python" }],
-      ["/api/build/run", { code: "print(1)" }],
     ] as const) {
       const r = await call("POST", url, ALICE, body);
       expect(r.statusCode, url).toBe(503);

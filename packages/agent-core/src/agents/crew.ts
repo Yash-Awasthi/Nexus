@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agents — role-based Crew orchestration (crewAI / CAMEL parity).
+ * @nexus/agent-core — role-based Crew orchestration (crewAI / CAMEL parity).
  *
  * The three existing agents (Librarian / Researcher / FileExplorer) are
  * specialised *tools*; the agent-framework repos mapped to this package

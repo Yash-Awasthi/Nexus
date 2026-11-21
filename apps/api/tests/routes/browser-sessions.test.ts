@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 const SECRET = "browser-sessions-test-secret";
 const MASTER = "browser-sessions-master-key-0123456789";

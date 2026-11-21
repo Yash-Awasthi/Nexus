@@ -3,7 +3,7 @@ import * as childProcess from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   probeFlociHealth: vi.fn(),

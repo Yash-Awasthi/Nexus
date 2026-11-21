@@ -12,7 +12,7 @@
  *   5. Arbitrary well-typed bodies never cause 5xx
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vite-plus/test";
 
 // ── Module mocks (hoisted before imports) ─────────────────────────────────────
 vi.mock("@nexus/db", () => ({

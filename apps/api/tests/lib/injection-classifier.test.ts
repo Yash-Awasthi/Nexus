@@ -2,7 +2,7 @@
 /** The model-backed injection check: one numbered prompt out, line numbers back. */
 import type { NlpLlmClient } from "@nexus/nlp-utils";
 import { REMOVED } from "@nexus/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { classifierFromClient, screenForPrompt } from "../../src/lib/injection-classifier.ts";
 

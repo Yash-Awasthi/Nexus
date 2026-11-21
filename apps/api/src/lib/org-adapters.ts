@@ -8,7 +8,7 @@
  * test can hand it a fake driver.
  */
 
-import type { LlmResponse } from "@nexus/llm-drivers";
+import type { LlmResponse } from "@nexus/llm/drivers";
 
 import type { FailoverDriver } from "./llm-failover.ts";
 import { CallRefused } from "./llm-failover.ts";

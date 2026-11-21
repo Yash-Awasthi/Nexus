@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { TaskExecutor } from "../../src/kernel/task-executor.ts";
 import type { IEventBus } from "../../src/kernel/event-bus.ts";

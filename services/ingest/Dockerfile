@@ -2,10 +2,11 @@
 # nexus-ingest — production Dockerfile
 # Multi-stage: builder installs the locked deps with uv, final image is minimal
 
+# The FROM digest pins 3.14-slim; bump it whenever PYTHON_VERSION changes.
 ARG PYTHON_VERSION=3.14
 
 # ── Builder stage ─────────────────────────────────────────────────────────────
-FROM python:${PYTHON_VERSION}-slim AS builder
+FROM python:${PYTHON_VERSION}-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/uv
 
 # The venv lives at /venv, the same path as in the final stage, so console-script
@@ -25,7 +26,7 @@ COPY services/ingest/ ./
 RUN uv sync --locked --no-dev --no-editable
 
 # ── Final stage ───────────────────────────────────────────────────────────────
-FROM python:${PYTHON_VERSION}-slim AS final
+FROM python:${PYTHON_VERSION}-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS final
 
 WORKDIR /app
 

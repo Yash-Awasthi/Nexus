@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compressOutputForCommand } from "./token-saver.ts";
 
 describe("kubectlOutputProcessor — get/describe/logs", () => {
@@ -244,5 +244,41 @@ describe("dockerProcessor — ps/images/logs/inspect", () => {
     expect(r.output).toContain("Digest: sha256:abcdef123456");
     expect(r.output).not.toContain("Downloading");
     expect(r.output).not.toContain("45%");
+  });
+
+  it("keeps only the latest docker stats table", () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 20; i++) lines.push(`old sample ${i}  1.0%  10MiB / 1GiB`);
+    lines.push(
+      "CONTAINER ID   NAME        CPU %   MEM USAGE / LIMIT",
+      "abc123         demo-api    0.5%    120MiB / 1GiB",
+      "def456         demo-db     1.2%    80MiB / 1GiB",
+    );
+    const r = compressOutputForCommand("docker stats --no-stream", lines.join("\n"));
+    expect(r.processor).toBe("docker");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output.startsWith("CONTAINER ID")).toBe(true);
+    expect(r.output).toContain("demo-api");
+    expect(r.output).not.toContain("old sample");
+  });
+
+  it("keeps stopped/removed lines from docker compose down", () => {
+    const lines = [
+      " Container demo-api-1  Stopping",
+      " Container demo-api-1  Stopped",
+      " Container demo-db-1  Removing",
+      " Container demo-db-1  Removed",
+      " Network demo_default  Removed",
+      " Volume demo_data  Removed",
+    ];
+    for (let i = 0; i < 12; i++) lines.push(`progress noise ${i}`);
+    const r = compressOutputForCommand("docker compose down", lines.join("\n"));
+    expect(r.processor).toBe("docker");
+    expect(r.wasCompressed).toBe(true);
+    expect(r.output).toContain("demo-api-1  Stopped");
+    expect(r.output).toContain("demo-db-1  Removed");
+    expect(r.output).toContain("Network demo_default  Removed");
+    expect(r.output).toContain("Volume demo_data  Removed");
+    expect(r.output).not.toContain("progress noise");
   });
 });

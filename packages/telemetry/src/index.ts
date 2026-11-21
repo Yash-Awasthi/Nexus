@@ -11,3 +11,4 @@ export * from "./prometheus-format.ts";
 export * from "./environment-telemetry.ts";
 export * from "./llm-observability.ts";
 export * from "./otel.ts";
+export * from "./tool-span.ts";

@@ -43,7 +43,13 @@ interface FileRow {
 }
 
 type Status =
-  "validating" | "in_progress" | "finalizing" | "completed" | "failed" | "cancelling" | "cancelled";
+  | "validating"
+  | "in_progress"
+  | "finalizing"
+  | "completed"
+  | "failed"
+  | "cancelling"
+  | "cancelled";
 
 interface BatchError {
   code: string;

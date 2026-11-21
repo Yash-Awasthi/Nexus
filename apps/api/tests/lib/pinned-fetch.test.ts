@@ -8,8 +8,12 @@
  * exactly the rebinding case a static URL check misses. Scheme rejection is a
  * plain pre-connect guard.
  */
-import { createPinnedFetch, makeSafeLookup, type AllAddressResolver } from "@nexus/runtime";
-import { describe, it, expect } from "vitest";
+import {
+  createPinnedFetch,
+  makeSafeLookup,
+  type AllAddressResolver,
+} from "@nexus/agent-core/kernel";
+import { describe, it, expect } from "vite-plus/test";
 
 /** A DNS resolver stub that always returns `address` for any hostname. */
 function resolverReturning(address: string, family = 4): AllAddressResolver {

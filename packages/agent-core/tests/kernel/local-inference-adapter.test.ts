@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   url: vi.fn(),
@@ -12,7 +12,10 @@ vi.mock("../../src/kernel/bridge-manager.ts", () => ({
 }));
 
 import type { IExecutionContext } from "../../src/kernel/interfaces/execution.interface.ts";
-import { LocalInferenceAdapter, LocalLanguageModel } from "../../src/kernel/local-inference-adapter.ts";
+import {
+  LocalInferenceAdapter,
+  LocalLanguageModel,
+} from "../../src/kernel/local-inference-adapter.ts";
 
 const ctx = {
   taskId: "li-1",

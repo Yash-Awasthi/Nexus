@@ -3,7 +3,7 @@
  * PgVectorStore tests — uses a mocked neon SQL function so no real DB is needed.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import type { MemoryEntry } from "../src/index.ts";
 
 // ── Mock @neondatabase/serverless ─────────────────────────────────────────────

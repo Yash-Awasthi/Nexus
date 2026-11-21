@@ -2,7 +2,7 @@
 import * as os from "os";
 import * as path from "path";
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { assertPathDescendsFrom, resolvePathInRoot } from "../../src/kernel/path-boundary.ts";
 

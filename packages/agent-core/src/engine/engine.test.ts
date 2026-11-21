@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // agent-engine tool-execution loop + registry — focused tests with a
 // stubbed fetch driving the OpenAI tool-calling protocol.
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 import { OpenAIEngine, EngineRegistry, type EngineConfig, type ToolCall } from "./index.ts";
 
 const CFG: EngineConfig = {

@@ -3,7 +3,7 @@
  * NX-SEC-001: Python from users and models must never run inside the API
  * process, where Pyodide's `js` module is the host's globalThis.
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 import { runViaPyodide } from "../../src/routes/sandbox.ts";
 

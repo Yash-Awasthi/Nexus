@@ -4,7 +4,7 @@
  *
  * /workflows CRUD + /workflows/:id/run. A workflow with a `schedule` (five-field
  * cron, server local time) also runs from a minute tick. Runs are built on
- * @nexus/workflow-chain (createWorkflowChain, dynamically imported); agent
+ * @nexus/agent-core (createWorkflowChain, dynamically imported); agent
  * steps delegate to an LLM via @nexus/gateway's runFallbackChain with BYOK
  * registry semantics. Response shapes are byte-identical to the
  * pre-extraction handlers.
@@ -18,7 +18,7 @@
 
 import crypto from "node:crypto";
 
-import type { DriverRegistry, LlmDriver, LlmRole } from "@nexus/llm-drivers";
+import type { DriverRegistry, LlmDriver, LlmRole } from "@nexus/llm/drivers";
 import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 import type { FastifyInstance } from "fastify";
 
@@ -164,7 +164,7 @@ export async function workflowsRoutes(
     userId: string | undefined,
     stepsOverride?: unknown[],
   ): Promise<{ status: string } & Record<string, unknown>> {
-    const { createWorkflowChain } = await import("@nexus/workflow-chain");
+    const { createWorkflowChain } = await import("@nexus/agent-core/workflow");
 
     // Build chain from stored steps definition. A steps array in the body
     // overrides the stored definition so a run right after (or while)

@@ -4,7 +4,7 @@
 // delivery that wakes a waiting workflow or buffers pre-wait signals until the
 // workflow waits on that name. Fast backoff intervals keep the retry tests
 // sub-second; everything is in-process and offline.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { ActivityNotFoundError, DurableRuntime, type ActivityDefinition } from "./durable.ts";

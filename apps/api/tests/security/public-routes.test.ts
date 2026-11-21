@@ -4,7 +4,7 @@
  * preHandlers is a `require*` guard. Every public one must be listed here on purpose (NX-FEAT-007).
  */
 import type { RouteOptions } from "fastify";
-import { beforeAll, expect, it, vi } from "vitest";
+import { beforeAll, expect, it, vi } from "vite-plus/test";
 
 const { seen } = vi.hoisted(() => ({ seen: [] as (RouteOptions & { prefix?: string })[] }));
 
@@ -46,7 +46,6 @@ const PUBLIC_V1 = new Set<string>([
   "POST /api/v1/auth/saml/callback",
   "GET /api/v1/llm-oauth/providers",
   "GET /api/v1/llm-oauth/:provider/callback",
-  "GET /api/v1/connectors/:id/oauth/callback",
   // Browsers send CSP violation reports without credentials.
   "POST /api/v1/csp-report",
   // SCIM discovery documents (RFC 7644 lets these be public).
@@ -58,8 +57,6 @@ const PUBLIC_V1 = new Set<string>([
   "POST /api/v1/bots/telegram/webhook",
   "POST /api/v1/org/hooks/:hookId",
   // Signed links.
-  "GET /api/v1/drive/file",
-  "GET /api/v1/brief/:domain/share/:digest",
   // Deliberately public, bounded by their own limits.
   "GET /api/v1/libertas",
   "POST /api/v1/libertas/complete",

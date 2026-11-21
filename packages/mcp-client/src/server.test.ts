@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // MCP-over-HTTP server core — focused tests.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { McpHttpServer } from "./server.ts";
 import type { McpToolDefinition } from "./index.ts";
 

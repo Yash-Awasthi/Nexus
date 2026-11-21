@@ -180,7 +180,8 @@ function KBDetail({
           })
           .then(async (r) => {
             const d = (await r.json().catch(() => null)) as
-              (KBDocument & { error?: string }) | null;
+              | (KBDocument & { error?: string })
+              | null;
             if (!r.ok || !d) throw new Error(d?.error ?? `Upload failed (${r.status})`);
             onDocumentAdd(kb.id, d);
           })

@@ -3,7 +3,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 import { fetchModelCatalog } from "../../src/routes/api-bridge.ts";
 

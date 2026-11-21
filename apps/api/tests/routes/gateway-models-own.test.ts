@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const SECRET = "gateway-models-own-secret";
 const DB = "pglite://:memory:gateway-models-own-test";

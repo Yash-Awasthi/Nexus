@@ -7,13 +7,13 @@
  * validated DNS answer to close the DNS-rebinding window (same pattern as
  * connectors.ts's token-exchange sink).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import { buildServer } from "../../src/server.ts";
 import type { FastifyInstance } from "fastify";
 
 const pinnedFetchMock = vi.fn();
-vi.mock("@nexus/runtime", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@nexus/runtime")>()),
+vi.mock("@nexus/agent-core/kernel", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@nexus/agent-core/kernel")>()),
   pinnedFetch: (...args: unknown[]) => pinnedFetchMock(...args),
 }));
 

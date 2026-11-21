@@ -5,7 +5,7 @@
  * column name shims. The live-DB path is exercised by the OAuth route
  * integration tests, which self-skip on missing DATABASE_URL.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import type { NexusDB } from "@nexus/db";
 import type { SealedRecord } from "@nexus/llm-oauth";
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getSharedKV } from "../../src/lib/shared-kv.ts";
 import { maybeEmitWeeklyDigest, weekKey, type WeeklyStats } from "../../src/lib/weekly-digest.ts";
@@ -9,7 +9,6 @@ const SOME_STATS: WeeklyStats = {
   tokens: 2200,
   costUsd: 0.32,
   topModel: "groq/llama-3.1-8b-instant",
-  researchCount: 1,
   agentRuns: 0,
 };
 
@@ -17,7 +16,6 @@ const ZERO_STATS: WeeklyStats = {
   requests: 0,
   tokens: 0,
   costUsd: 0,
-  researchCount: 0,
   agentRuns: 0,
 };
 
@@ -49,7 +47,6 @@ describe("weekly-digest", () => {
     expect(n!.type).toBe("digest");
     expect(n!.title).toBe("Your week in Nexus");
     expect(n!.message).toContain("12 requests");
-    expect(n!.message).toContain("1 deep research run");
     expect(n!.message).toContain("$0.32");
     expect(n!.message).toContain("groq/llama-3.1-8b-instant");
     // Window is the completed week before now (Mon Sep 7): Aug 31 … Sep 6

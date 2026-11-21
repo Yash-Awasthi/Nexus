@@ -15,10 +15,10 @@
  * server-side (the /test path) and never returned over HTTP — responses expose
  * `keyPrefix` only.
  */
+import { isSafeUrl, pinnedFetch } from "@nexus/agent-core/kernel";
 import { db } from "@nexus/db";
 import { mcpServers } from "@nexus/db/schema";
 import { McpClient } from "@nexus/mcp-client";
-import { isSafeUrl, pinnedFetch } from "@nexus/runtime";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -53,7 +53,7 @@ const SAFE_COLUMNS = {
  * SSRF guard for user-supplied MCP endpoint URLs. Returns an error message to
  * send to the client, or null when the endpoint is safe.
  *
- * Delegates host safety to `@nexus/runtime`'s shared `isSafeUrl`, so this now
+ * Delegates host safety to `@nexus/agent-core/kernel`'s shared `isSafeUrl`, so this now
  * blocks — in addition to the old localhost/127 list — RFC1918 private ranges
  * (10/8, 172.16/12, 192.168/16), link-local 169.254/16 (cloud metadata / IMDS),
  * CGNAT, multicast/reserved, cloud-metadata hostnames, IPv6 loopback/ULA/

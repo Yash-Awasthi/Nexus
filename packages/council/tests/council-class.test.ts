@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The documented SDK: a council of drivers, each with a weight, voting on a question. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Council } from "../src/index.ts";
 

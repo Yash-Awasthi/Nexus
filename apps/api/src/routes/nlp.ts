@@ -12,7 +12,7 @@
  * when no API key is configured.
  */
 
-import { ClaudeProvider, GroqProvider, LLMRouter, OpenAIProvider } from "@nexus/llm-router";
+import { ClaudeProvider, GroqProvider, LLMRouter, OpenAIProvider } from "@nexus/llm/router";
 import {
   chunkByStrategy,
   detectLanguage,

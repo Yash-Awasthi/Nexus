@@ -7,7 +7,7 @@
 import crypto from "node:crypto";
 
 import Fastify, { type FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 
 const SECRET = "audit-test-secret";
 const MASTER = "audit-test-master-key-0123456789";

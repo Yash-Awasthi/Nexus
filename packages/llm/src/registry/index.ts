@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/provider-registry — AI provider catalog with free-tier budget tracking.
+ * @nexus/llm — AI provider catalog with free-tier budget tracking.
  *
  * Inspired by OmniRoute's provider registry that catalogs 352+ providers,
  * 150+ free tiers, and computes ~1.51B free tokens/mo across 38 pool keys.
@@ -859,8 +859,8 @@ export interface ProviderRateLimits {
 
 /**
  * Shared singleton registry. Curated defaults register lazily on first access
- * — the module must never require network or DB at import time (ROADMAP §1.5:
- * boot hydrates from the table, zero startup network). BUILTIN_MODELS fills
+ * — the module must never require network or DB at import time (boot
+ * hydrates from the table, zero startup network). BUILTIN_MODELS fills
  * alongside it; explicit registrations (e.g. the §1.5 "seeded" entry) still
  * work — only the default catalogue itself is registered once.
  */
@@ -872,9 +872,9 @@ export const BUILTIN_MODELS: ModelDefinition[] = [];
 
 /**
  * Shared singleton registry with the curated defaults pre-registered. Static
- * data only — no network, no DB at import time (ROADMAP §1.5: boot hydrates
+ * data only — no network, no DB at import time (boot hydrates
  * from the provider_models table, zero startup network). Explicit
- * registrations (e.g. the §1.5 "seeded" entry) work as usual.
+ * registrations (e.g. the "seeded" entry) work as usual.
  */
 export const globalRegistry: ProviderRegistry = new ProviderRegistry().registerDefaults();
 for (const { provider, model } of globalRegistry.allModels()) {
@@ -964,7 +964,7 @@ export function registerFromModelsDev(
   catalogue?: ModelsDevCatalogue,
   opts: RegisterFromModelsDevOptions = {},
 ): number {
-  if (!catalogue) return 0; // live fetch stays a Gate (ROADMAP §1.5)
+  if (!catalogue) return 0; // live fetch stays out of the boot path
   const defs = modelsDevToDefinitions(catalogue).filter((d) => !d.capabilities?.deprecated);
   const now = new Date().toISOString();
   const byProvider = new Map<string, ProviderModel[]>();

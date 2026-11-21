@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vite-plus/test";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { MemoryKVStore } from "@nexus/kv";
 

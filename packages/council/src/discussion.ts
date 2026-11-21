@@ -157,7 +157,11 @@ export interface DiscussionEvents {
 }
 
 export type DiscussionStopReason =
-  "settled" | "contribution-cap" | "time-cap" | "token-cap" | "participants-failed";
+  | "settled"
+  | "contribution-cap"
+  | "time-cap"
+  | "token-cap"
+  | "participants-failed";
 
 export interface DiscussionOutcome {
   entries: LedgerEntry[];

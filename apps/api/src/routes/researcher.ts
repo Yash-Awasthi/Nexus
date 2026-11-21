@@ -17,9 +17,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 
-import { ResearcherAgent, type ResearchRunner, type ResearchRunResult } from "@nexus/agents";
+import {
+  ResearcherAgent,
+  type ResearchRunner,
+  type ResearchRunResult,
+} from "@nexus/agent-core/agents";
 import { globalFlags } from "@nexus/feature-flags";
-import { BM25Reranker } from "@nexus/reranker";
 import {
   CitationIndex,
   ResearchSession,
@@ -28,6 +31,7 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
+import { BM25Reranker } from "@nexus/search/reranker";
 import { searchBrave, searchExa, searchSearxNG, searchSerper } from "@nexus/search-orchestrator";
 import type { FastifyInstance } from "fastify";
 

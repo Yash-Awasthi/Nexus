@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
 import type { QueueJob } from "../../src/kernel/interfaces/queue.interface.ts";
 import { RedisQueueBackend } from "../../src/kernel/redis-queue-backend.ts";

@@ -25,13 +25,14 @@
  *                  candidate list and the run's duration.
  */
 import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
+
 import type { Reranker } from "../reranker/index.ts";
 import type { WhereClause, WhereDocumentClause } from "../retrieval/index.ts";
 
 import { HybridSearchEngine, type BM25SearchAdapter, type VectorSearchAdapter } from "./index.ts";
 
 export interface HybridSearchMcpServerOptions {
-  /** Dense leg: any @nexus/hybrid-search VectorSearchAdapter implementation. */
+  /** Dense leg: any @nexus/search VectorSearchAdapter implementation. */
   vector: VectorSearchAdapter;
   /** Sparse leg: any BM25SearchAdapter (e.g. the package's InMemoryBM25). */
   bm25: BM25SearchAdapter;

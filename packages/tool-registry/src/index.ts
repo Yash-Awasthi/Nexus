@@ -14,7 +14,13 @@
 // ── JSON Schema subset ────────────────────────────────────────────────────────
 
 export type JsonSchemaType =
-  "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "array"
+  | "object"
+  | "null";
 
 /** Json schema interface definition. */
 export interface JsonSchema {

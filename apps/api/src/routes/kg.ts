@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * POST /kg/sync exchanges knowledge-graph state with a federated peer over the
- * CRDT join in @nexus/knowledge-graph, so one round trip converges both sides.
+ * CRDT join in @nexus/search, so one round trip converges both sides.
  * GET /kg/communities, GET /kg/search and GET /kg/graph read the caller's own graph;
  * DELETE /kg/nodes/:id and DELETE /kg/edges/:id remove from it, leaving tombstones that
  * a sync carries to peers so a deleted fact does not come back.
@@ -16,7 +16,7 @@ import {
   type KGEdge,
   type KGNode,
   type KGSearchType,
-} from "@nexus/knowledge-graph";
+} from "@nexus/search/knowledge-graph";
 import type { FastifyInstance } from "fastify";
 
 import { getKGStore } from "../lib/knowledge-graph-store.ts";

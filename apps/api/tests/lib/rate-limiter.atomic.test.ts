@@ -9,7 +9,7 @@
  * to simulate Upstash REST responses.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vite-plus/test";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { MemoryKVStore } from "@nexus/kv";
 

@@ -5,11 +5,15 @@
 // use): initialize, tools/list advertises the tool schema, and tools/call runs
 // the full pipeline — parallel dense+BM25 legs, metadata filter pre-fusion,
 // RRF/alpha fusion, rerank opt-out — against deterministic in-memory adapters.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { BM25Reranker } from "../../src/reranker/index.ts";
 
 import { createHybridSearchMcpServer } from "../../src/hybrid-search/mcp-server.ts";
-import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "../../src/hybrid-search/index.ts";
+import {
+  InMemoryBM25,
+  type SearchHit,
+  type VectorSearchAdapter,
+} from "../../src/hybrid-search/index.ts";
 
 /** Deterministic lexical dense leg: overlap of query tokens with doc tokens. */
 function makeDense(

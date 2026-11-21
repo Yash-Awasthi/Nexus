@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Every request a page makes is answered by the server's guard, never by the browser's own connection. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { routeThrough, type RequestVia, type RouteLike } from "../src/index.ts";
 

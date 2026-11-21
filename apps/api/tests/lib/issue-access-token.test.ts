@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { generateKeyPairSync } from "node:crypto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { verifyJwt, verifyJwtRS256 } from "@nexus/auth";
 import { issueAccessToken, toNexusRole } from "../../src/lib/issue-access-token.ts";

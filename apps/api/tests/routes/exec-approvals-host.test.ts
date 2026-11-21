@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 const SECRET = "exec-approvals-host-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;

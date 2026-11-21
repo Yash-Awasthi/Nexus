@@ -10,7 +10,7 @@
  * The module-level workflow store is shared across tests in this file, so each
  * test uses a unique name and cleans up after itself.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
 import { runDueWorkflows } from "../../src/routes/workflows.ts";

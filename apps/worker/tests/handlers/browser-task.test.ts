@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { BrowserAgentPage, BrowserAgentSession } from "@nexus/browser-automation";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { handleBrowserTaskJob } from "../../src/handlers/browser-task.ts";
 

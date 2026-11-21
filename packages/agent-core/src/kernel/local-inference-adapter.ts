@@ -114,7 +114,7 @@ export class LocalLanguageModel implements ILanguageModel {
   private async callBridge(endpoint: string, body: Record<string, unknown>): Promise<string> {
     // Honour offline mode so LocalLanguageModel doesn't throw when bridges aren't installed.
     // Callers that need a real response should set GHOSTSTACK_OFFLINE_MODE=false AND install
-    // packages/runtime/src/bridges/requirements.txt first.
+    // packages/agent-core/src/kernel/bridges/requirements.txt first.
     const isOffline =
       process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
       (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true";

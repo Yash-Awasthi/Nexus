@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agent-engine — Pluggable agent engine abstraction.
+ * @nexus/agent-core — Pluggable agent engine abstraction.
  *
  * Inspired by containarium's engine interface.
  * Provides a harness-agnostic interface for running agents across

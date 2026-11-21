@@ -5,7 +5,7 @@
  * BFS cascade), and the RRF hybrid-search + query-expansion helpers. All pure /
  * deterministic — no live services.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import {
   TurboQuantStore,

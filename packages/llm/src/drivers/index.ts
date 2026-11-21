@@ -342,7 +342,7 @@ function toAnthropicTools(tools?: LlmToolDefinition[]): Record<string, unknown>[
  * response/usage helpers. Extend it directly for providers that are NOT
  * OpenAI-chat-completions-shaped (e.g. Anthropic, Gemini). For OpenAI-compatible
  * endpoints, extend {@link OpenAICompatibleDriver} instead. See
- * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ * `packages/llm/README.md` for the add-a-driver recipe.
  */
 abstract class BaseDriver implements LlmDriver {
   abstract readonly provider: string;
@@ -707,7 +707,7 @@ export class AnthropicDriver extends BaseDriver {
  * chat-completions endpoint. Subclass it and set `provider`, `model`, and
  * `baseUrl`; override {@link chatCompletionsUrl} / {@link authHeaders} for
  * non-standard paths or auth schemes (e.g. Azure's `api-key` header). See
- * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ * `packages/llm/README.md` for the add-a-driver recipe.
  */
 abstract class OpenAICompatibleDriver extends BaseDriver {
   protected apiKey: string;
@@ -752,7 +752,8 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     const content = (choice?.message?.["content"] as string) ?? "";
     const toolCalls = parseOpenAIToolCalls(choice?.message);
     const usage = raw["usage"] as
-      { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      | { prompt_tokens?: number; completion_tokens?: number }
+      | undefined;
     const inputTokens =
       usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
     const outputTokens = usage?.completion_tokens ?? estimateTokens(content);
@@ -840,7 +841,8 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       if (fr) finishReason = fr as LlmResponse["finishReason"];
 
       const usage = event["usage"] as
-        { prompt_tokens?: number; completion_tokens?: number } | undefined;
+        | { prompt_tokens?: number; completion_tokens?: number }
+        | undefined;
       if (usage?.prompt_tokens) promptTokens = usage.prompt_tokens;
       if (usage?.completion_tokens) completionTokens = usage.completion_tokens;
     }
@@ -1137,7 +1139,8 @@ export class GeminiDriver extends BaseDriver {
     const content = parts.map((p) => p.text ?? "").join("");
     const toolCalls = this.parseFunctionCalls(parts);
     const usage = raw["usageMetadata"] as
-      { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
+      | { promptTokenCount?: number; candidatesTokenCount?: number }
+      | undefined;
     const inputTokens =
       usage?.promptTokenCount ?? estimateTokens(contents.map((c) => JSON.stringify(c)).join(" "));
     const outputTokens = usage?.candidatesTokenCount ?? estimateTokens(content);

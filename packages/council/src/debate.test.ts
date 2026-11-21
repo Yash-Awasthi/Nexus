@@ -3,7 +3,7 @@
  * Stage D2 — the streamed debate lives in the council package, applies the
  * personas it is given, and ends with an honest agreement result.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import type { ILLMMessage } from "./engine.ts";
 import {

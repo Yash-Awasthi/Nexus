@@ -8,7 +8,7 @@
  * lands in plaintext, a cancelled window leaves nothing behind, a refresh needs
  * no window at all, and no error message carries the authorization code.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { KeychainUnavailableError, OsKeychainVault } from "../src/auth/keychain";
 import {

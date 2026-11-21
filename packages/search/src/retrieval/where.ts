@@ -45,7 +45,9 @@ type FieldOperand =
   | { $not_contains?: Scalar };
 
 export type WhereClause =
-  { $and: WhereClause[] } | { $or: WhereClause[] } | Record<string, Scalar | FieldOperand>;
+  | { $and: WhereClause[] }
+  | { $or: WhereClause[] }
+  | Record<string, Scalar | FieldOperand>;
 
 export type WhereDocumentClause =
   | { $and: WhereDocumentClause[] }

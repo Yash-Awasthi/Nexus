@@ -11,7 +11,11 @@
  * error so the loop adapts instead of crashing. Kept dependency-light (no db) so
  * it is unit-testable in isolation.
  */
-import type { PermissionDecision, PermissionGate, PermissionRequest } from "@nexus/agent-runtime";
+import type {
+  PermissionDecision,
+  PermissionGate,
+  PermissionRequest,
+} from "@nexus/agent-core/runtime";
 import { GovernanceEngine, type ITaskSynthesisResult } from "@nexus/governance";
 
 /** Shell fragments that make a command destructive/exfiltrating enough to gate. */

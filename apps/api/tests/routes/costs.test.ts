@@ -13,7 +13,7 @@
  * and the assertions exact at the same time: other tests' entries belong to
  * other owners and are excluded.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import { createHmac } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 

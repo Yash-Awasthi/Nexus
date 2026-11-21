@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compressOutputForCommand } from "./token-saver.ts";
 
 /** Build a terraform plan fixture: legend + N resource change blocks (+ noise init lines). */

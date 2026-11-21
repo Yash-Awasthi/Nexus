@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Hybrid single-query where-filter seam (weaviate/pgvectorscale parity, pass 51):
 // HybridSearchEngine now accepts chroma/weaviate-grammar `where`/`whereDocument`
-// clauses (pass-50 @nexus/retrieval vocabulary) and filters each leg's
+// clauses (pass-50 @nexus/search vocabulary) and filters each leg's
 // candidates BEFORE fusion. These tests pin the filter seam across both fusion
 // modes, the chroma missing-key semantics, and the legacy no-filter path.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   HybridSearchEngine,
   InMemoryBM25,

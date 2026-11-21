@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Two research requests in flight at once each get their own results. */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 vi.mock("@nexus/researcher", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@nexus/researcher")>()),
@@ -14,7 +14,7 @@ vi.mock("@nexus/researcher", async (importOriginal) => ({
   },
 }));
 // The agent awaits more work after its runner returns, as the real one does.
-vi.mock("@nexus/agents", () => ({
+vi.mock("@nexus/agent-core/agents", () => ({
   ResearcherAgent: class {
     constructor(
       private readonly cfg: {

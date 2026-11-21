@@ -5,7 +5,7 @@
 // tools/list advertises both tools, local search round-trips the grounded
 // answer (single LLM pass, no-match never calls the model), global search runs
 // the map-reduce over community reports, and the error paths hold.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { createGraphRagMcpServer } from "../../src/graphrag-query/mcp-server.ts";
 import type { QueryRouter } from "../../src/graphrag-query/index.ts";

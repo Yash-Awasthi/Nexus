@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Rated responses belong to the account that rated them, whatever userId a caller names. */
 import Fastify from "fastify";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: async (req: { headers: Record<string, string>; nexusUserId?: string }) => {

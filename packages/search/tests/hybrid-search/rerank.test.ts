@@ -3,9 +3,18 @@
 // "orchestrates vector search + BM25 + RRF + reranker" but took no reranker —
 // these tests pin the seam that makes the advertised stage real, mirroring
 // weaviate's hybrid rerank tool: fused candidates are reranked and cut to limit.
-import { describe, it, expect } from "vitest";
-import { HybridSearchEngine, InMemoryBM25, type VectorSearchAdapter } from "../../src/hybrid-search/index.ts";
-import { NullReranker, FunctionReranker, BM25Reranker, type Reranker } from "../../src/reranker/index.ts";
+import { describe, it, expect } from "vite-plus/test";
+import {
+  HybridSearchEngine,
+  InMemoryBM25,
+  type VectorSearchAdapter,
+} from "../../src/hybrid-search/index.ts";
+import {
+  NullReranker,
+  FunctionReranker,
+  BM25Reranker,
+  type Reranker,
+} from "../../src/reranker/index.ts";
 
 interface Doc {
   id: string;

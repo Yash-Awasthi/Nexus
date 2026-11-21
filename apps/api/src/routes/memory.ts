@@ -24,7 +24,7 @@ import {
   type IEmbedder as IRagtimeEmbedder,
   type IMemoryStore as IRagtimeMemoryStore,
   type MemoryFilter as RetrievalMemoryFilter,
-} from "@nexus/retrieval";
+} from "@nexus/search/retrieval";
 import type { FastifyInstance } from "fastify";
 
 import { getMemoryStore } from "../lib/memory-store.ts";
@@ -40,7 +40,7 @@ const manager = new MemoryManager({ store, embedder });
 
 // RagtimeRetriever — two-stage recall+rerank for the GET /memory endpoint.
 // Store and embedder from @nexus/memory are structurally compatible with
-// @nexus/retrieval's IMemoryStore / IEmbedder interfaces.
+// @nexus/search's IMemoryStore / IEmbedder interfaces.
 const retriever = new RagtimeRetriever({
   store: store as unknown as IRagtimeMemoryStore,
   embedder: embedder as unknown as IRagtimeEmbedder,

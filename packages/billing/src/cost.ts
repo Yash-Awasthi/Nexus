@@ -2,7 +2,7 @@
 /**
  * USD cost model + billing lifecycle (estimate → reserve → settle).
  *
- * Pricing comes from @nexus/provider-registry (seedable from models.dev), so a
+ * Pricing comes from @nexus/llm (seedable from models.dev), so a
  * single source feeds both the model picker and the bill. This module is pure
  * and in-memory — no DB, no network — so it tests deterministically and can run
  * on the request hot path without I/O.
@@ -18,7 +18,7 @@
  *      partials settle the same way: settle once with the final usage.
  */
 
-import { globalRegistry, type ProviderRegistry } from "@nexus/provider-registry";
+import { globalRegistry, type ProviderRegistry } from "@nexus/llm/registry";
 
 // ── Cost model ──────────────────────────────────────────────────────────────────
 

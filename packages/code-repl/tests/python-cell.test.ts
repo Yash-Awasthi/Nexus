@@ -2,7 +2,7 @@
 /** A kernel is one long-lived interpreter: names persist, earlier cells never rerun. */
 import { spawnSync } from "node:child_process";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   InterpreterProcess,

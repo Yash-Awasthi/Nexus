@@ -4,7 +4,7 @@
  * and tolerant parsing, role assignment, format-ignoring degradation, and the
  * end-to-end plan-then-execute loop through {@link Crew}.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { Crew } from "./crew.ts";
 import { parsePlan, planTasks, type PlanResult } from "./planner.ts";
 

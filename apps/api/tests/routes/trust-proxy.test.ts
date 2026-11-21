@@ -3,7 +3,7 @@
  * Behind a reverse proxy every request arrives from the proxy's address, so per-IP limits would
  * be shared by every user. NEXUS_TRUST_PROXY names the proxies whose X-Forwarded-For is believed.
  */
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 
 process.env.NEXUS_TRUST_PROXY = "loopback";
 const { buildServer } = await import("../../src/server.ts");

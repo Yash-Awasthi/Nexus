@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { beforeEach, describe, expect, it } from "vitest";
-import type { MissionRecord } from "@nexus/agent-engine";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type { MissionRecord } from "@nexus/agent-core/engine";
 
 import {
   createMission,
