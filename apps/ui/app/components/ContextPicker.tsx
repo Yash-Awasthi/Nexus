@@ -2,12 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { useContextMention } from "~/hooks/useContextMention";
+import { lspSymbolsAvailable, lspUnavailableReason, useLspStatus } from "~/hooks/useLspStatus";
 import { cn } from "~/lib/utils";
 
 interface PickerResult {
   label: string;
   value: string;
   meta?: string;
+  source?: string;
 }
 
 const ENDPOINT = { file: "files", symbol: "symbols", web: "web", kb: "kb" } as const;
@@ -31,6 +33,9 @@ export function ContextPicker({
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = results.length ? Math.min(mention.selectedIndex, results.length - 1) : 0;
+  const lspStatus = useLspStatus();
+  const symbolsAvailable = lspSymbolsAvailable(lspStatus);
+  const symbolsReason = lspUnavailableReason(lspStatus);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -54,6 +59,7 @@ export function ContextPicker({
           kind?: string;
           file?: string;
           domain?: string;
+          source?: string;
         }
         const data = (await res.json()) as { results?: Row[] } | Row[];
         const rows: (Row | string)[] = Array.isArray(data) ? data : (data.results ?? []);
@@ -65,6 +71,7 @@ export function ContextPicker({
                   label: r.name ?? r.title ?? r.path ?? "",
                   value: r.path ?? r.url ?? r.name ?? "",
                   meta: r.kind ?? r.file ?? r.domain,
+                  source: r.source,
                 },
           ),
         );
@@ -95,12 +102,17 @@ export function ContextPicker({
       </div>
       {!mention.mentionType ? (
         <ul className="p-1">
-          {KINDS.map(([cmd, hint]) => (
+          {KINDS.filter(([cmd]) => cmd !== "@symbol:" || symbolsAvailable).map(([cmd, hint]) => (
             <li key={cmd} className="flex gap-3 rounded-md px-2 py-1.5">
               <code className="w-16 shrink-0 text-xs text-primary">{cmd}</code>
               <span className="text-muted-foreground">{hint}</span>
             </li>
           ))}
+          {!symbolsAvailable && (
+            <li title={symbolsReason} className="px-2 py-1.5 text-xs text-muted-foreground">
+              Symbol search unavailable
+            </li>
+          )}
         </ul>
       ) : results.length === 0 && !loading ? (
         <p className="px-3 py-3 text-muted-foreground">
@@ -119,7 +131,14 @@ export function ContextPicker({
                   i === active && "bg-accent",
                 )}
               >
-                <span className="truncate">{r.label}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{r.label}</span>
+                  {r.source === "lsp" && (
+                    <span className="shrink-0 rounded border px-1 text-[10px] uppercase text-muted-foreground">
+                      lsp
+                    </span>
+                  )}
+                </span>
                 {r.meta && <span className="truncate text-xs text-muted-foreground">{r.meta}</span>}
               </button>
             </li>

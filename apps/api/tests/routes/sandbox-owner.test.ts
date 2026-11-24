@@ -51,4 +51,26 @@ describe("sandbox results", () => {
     expect((await read(alice)).body).toContain("alice secret output");
     expect((await read(bob)).json()).toEqual({ executionId: id, status: "not_found" });
   });
+
+  it("keeps helper-recorded runs in the owner's own history", async () => {
+    const alice = `alice-${crypto.randomUUID()}`;
+    const bob = `bob-${crypto.randomUUID()}`;
+    const recorded = await call("/api/sandbox/runs", alice, {
+      language: "python",
+      stdout: "alice local output",
+      exitCode: 0,
+      durationMs: 3,
+    });
+    expect(recorded.statusCode).toBe(201);
+    const id = recorded.json<{ executionId: string }>().executionId;
+
+    const list = (u: string) =>
+      app.inject({
+        method: "GET",
+        url: "/api/sandbox/runs",
+        headers: { authorization: `Bearer ${tokenFor(u)}` },
+      });
+    expect((await list(alice)).body).toContain("alice local output");
+    expect((await list(bob)).body).not.toContain(id);
+  });
 });

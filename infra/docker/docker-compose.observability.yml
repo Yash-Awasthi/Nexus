@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# docker-compose.observability.yml — Local observability stack
+# docker-compose.observability.yml â€” Local observability stack
 #
 # Usage:
 #   docker compose \
@@ -17,7 +17,7 @@
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.162.0
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
     profiles: !reset []
     restart: unless-stopped
     volumes:
@@ -30,7 +30,7 @@ services:
       - "127.0.0.1:8889:8889" # Prometheus exporter
 
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: !reset []
     restart: unless-stopped
     volumes:
@@ -45,7 +45,7 @@ services:
       - "--web.enable-lifecycle"
 
   grafana:
-    image: grafana/grafana:13.2.3
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
     profiles: !reset []
     restart: unless-stopped
     environment:
@@ -63,7 +63,7 @@ services:
 
   jaeger:
     # Jaeger v2 is built on the OTel Collector: it takes OTLP on 4317 by default.
-    image: jaegertracing/jaeger:2.22.0
+    image: jaegertracing/jaeger:2.22.0@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17
     profiles: !reset []
     restart: unless-stopped
     ports:
@@ -76,7 +76,7 @@ services:
       OTEL_SERVICE_NAME: nexus-api
       OTEL_TRACES_EXPORTER: otlp
       # Allow Prometheus to scrape /api/v1/metrics without a Bearer token in local dev.
-      # Remove or set to false in production — use bearer_token in prometheus.yml instead.
+      # Remove or set to false in production â€” use bearer_token in prometheus.yml instead.
       METRICS_NO_AUTH: "true"
 
   worker:

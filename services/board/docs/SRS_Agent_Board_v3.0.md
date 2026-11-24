@@ -121,10 +121,10 @@ All communications adhere to the human-and-agent status verb grammar:
 
 ## 6. Acceptance Criteria for Manual & Refinement Stages
 
-1. [x] Sources cataloged and staged in `C:\GITHUB\open\sources\`.
+1. [x] Sources cataloged and staged in `sources/`.
 2. [x] Cloudflare credentials identified and mapped in architecture.
 3. [x] You write and construct the core modules/logic in `C:\GITHUB\open`.
 4. [x] Antigravity reviews, optimizes, verifies concurrency, and refines the implementation for maximum speed and memory efficiency.
 
-All four criteria are met in this repository (build, tests and the race suite in `docs/PLAN.md`).
-The only validation left is external; it is tracked in [`PLAN.md`](PLAN.md).
+All four criteria are met in this repository (build, tests and the race suite). The only validation
+left is external; it is tracked in the repository [`plan.md`](../../../plan.md).

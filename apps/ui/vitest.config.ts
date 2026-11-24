@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { defineConfig } from "vite-plus";
 import { resolve } from "path";
+
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   resolve: {
@@ -11,6 +12,6 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
   },
 });

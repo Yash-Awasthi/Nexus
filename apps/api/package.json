@@ -59,6 +59,7 @@
     "@nexus/llm-cache": "workspace:*",
     "@nexus/llm-oauth": "workspace:*",
     "@nexus/llm-tracer": "workspace:*",
+    "@nexus/lsp": "workspace:*",
     "@nexus/mail-ingest": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/mcp-openapi": "workspace:*",

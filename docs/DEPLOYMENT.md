@@ -8,12 +8,12 @@ development see the [README Quick Start](../README.md#quick-start). For day-2 op
 
 ## Environment variables
 
-Minimum required to start:
+Minimum for the hosted deployment:
 
 | Variable                                         | Description                                                                                                                                                                                     |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NEXUS_API_KEY`                                  | Master API key for all `/api/v1/*` requests                                                                                                                                                     |
-| `DATABASE_URL`                                   | PostgreSQL connection string (with pgvector)                                                                                                                                                    |
+| `DATABASE_URL`                                   | PostgreSQL connection string (with pgvector); unset falls back to embedded PGlite, which is development only                                                                                    |
 | `REDIS_URL`                                      | Redis connection string for BullMQ (in-memory fallback if unset)                                                                                                                                |
 | `NEXUS_JWT_SECRET`                               | HS256 signing secret for user auth tokens (default alg)                                                                                                                                         |
 | `NEXUS_JWT_ALG`                                  | `HS256` (default, shared secret) or `RS256` (asymmetric key pair)                                                                                                                               |

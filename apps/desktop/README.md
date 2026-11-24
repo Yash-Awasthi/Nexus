@@ -9,10 +9,10 @@ behind the host bridge, and the navigation rules.
 It has the shell and preload bridge, the local API with its own database, and
 sync. The tray is here too: closing
 the window hides it, so companies keep running on their schedules until "Quit
-Nexus" in the tray menu, and a second launch shows the running app. An installer
-and auto-update are not: the API runs from the workspace with the `tsx` loader,
-so a package first needs the API bundled into one tree, then code-signing
-certificates and a release channel for updates, which are operator decisions.
+Nexus" in the tray menu, and a second launch shows the running app. It can also
+build the API and UI it ships (`build:api`). An installer and auto-update are
+not here yet: those need code-signing certificates and a release channel for
+updates, which are operator decisions.
 
 ## Running it
 
@@ -33,6 +33,27 @@ and no network are involved.
 The child runs `apps/api/src/index.ts` directly: every workspace package exports
 its TypeScript source and uses only erasable syntax, so Node's own type
 stripping loads the whole API without a compile step or loader.
+
+### The packaged build
+
+A checkout is not what an install has, so `pnpm --filter @nexus/desktop build:api`
+produces everything the shell needs to run without one:
+
+```bash
+pnpm --filter @nexus/ui build
+pnpm --filter @nexus/desktop build:api
+```
+
+`scripts/build-desktop-api.mjs` bundles the API and every `@nexus/*` package into
+`apps/desktop/resources/api`, stages the production npm dependencies beside it,
+copies the database migrations, and copies the built UI to
+`apps/desktop/resources/ui`. The shell prefers those two directories whenever
+they exist and falls back to the checkout otherwise, so `dev`, the tests and the
+e2e run are unchanged.
+
+The bundle is JavaScript rather than TypeScript because Node's type stripping
+does not apply inside `node_modules`, where a deployed tree keeps its workspace
+packages.
 
 The embedded database is migrated at boot, so a first launch asks for a local
 account (email and password) and keeps its session in the OS keychain. PGlite

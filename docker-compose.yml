@@ -52,7 +52,7 @@ services:
           memory: 1G
 
   redis:
-    image: redis:8.10-alpine
+    image: redis:8.10-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     container_name: nexus-redis
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
@@ -94,12 +94,29 @@ services:
       postgres:
         condition: service_healthy
 
+  # ── Untrusted-code image ──────────────────────────────────────────────────────
+
+  # Built, never started: the API starts containers from it on the host daemon.
+  #   docker compose --profile tools build sandbox
+  # Without the image, skill and mission code fails closed instead of running here.
+  sandbox:
+    profiles: ["tools"]
+    build:
+      context: ./infra/sandbox
+    image: nexus-sandbox:local
+    command: ["true"]
+    network_mode: "none"
+    restart: "no"
+
   # ── Nexus API ─────────────────────────────────────────────────────────────────
 
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        # The socket mount below is useless without the client.
+        WITH_DOCKER_CLI: "true"
     container_name: nexus-api
     restart: unless-stopped
     ports:
@@ -153,6 +170,9 @@ services:
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
       POLYMARKET_ENABLED: ${POLYMARKET_ENABLED:-false}
       SEARXNG_BASE_URL: http://searxng:8080
+      # What the API reads when it picks a search backend; the lines above only
+      # configure the SearXNG container itself.
+      SEARXNG_URL: http://searxng:8080
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4173,http://localhost:5173,http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AUTH_LOGIN_RATE_LIMIT: ${AUTH_LOGIN_RATE_LIMIT:-10}
@@ -169,8 +189,17 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       # Shared with the worker, whose agent runs build generated apps inside users' drives.
       NEXUS_DRIVE_ROOT: /data/drives
+      # Skill, mission and shell code run only inside this image (dev only: see volumes).
+      NEXUS_SANDBOX_IMAGE: ${NEXUS_SANDBOX_IMAGE:-nexus-sandbox:local}
     volumes:
       - drives:/data/drives
+      # Lets the API start sandbox containers on the host daemon. Never expose this socket
+      # outside a developer machine: access to it is root on the host.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      # The socket is root-owned; Docker Desktop presents it as root:root (gid 0), a Linux
+      # host as root:docker. Set DOCKER_SOCKET_GID to the host's group there.
+      - "${DOCKER_SOCKET_GID:-0}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -225,6 +254,7 @@ services:
       OTEL_SERVICE_NAME: nexus-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       SEARXNG_BASE_URL: http://searxng:8080
+      SEARXNG_URL: http://searxng:8080
       NEXUS_DRIVE_ROOT: /data/drives
     volumes:
       - drives:/data/drives
@@ -343,7 +373,7 @@ services:
   # ── SearXNG self-hosted metasearch ────────────────────────────────────────────
 
   searxng:
-    image: searxng/searxng:2026.9.25-12f8b6515
+    image: searxng/searxng:2026.9.25-12f8b6515@sha256:5286edb35782454ab8a102c5eff6b54bff745853191b46aeead95f225aa6dfb6
     container_name: nexus-searxng
     restart: unless-stopped
     ports:
@@ -383,7 +413,7 @@ services:
   # ── Observability (optional) ──────────────────────────────────────────────────
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.162.0
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
     container_name: nexus-otel
     command: ["--config=/etc/otel/config.yaml"]
     volumes:

@@ -2,171 +2,85 @@
 
 # Nexus Service Level Objectives (SLOs)
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Review cadence:** Quarterly  
 **Owner:** Yash Awasthi
 
-SLIs and SLOs for each production service. Alert rules reference Prometheus metric names.
+SLIs and SLOs for the hosted deployment. The API exports these series at
+`/api/v1/metrics`; Grafana is pre-provisioned against them. Where a signal is not
+instrumented, the table says so rather than inventing a metric.
 
 ---
 
-## SLO-1: API Availability
+## SLO-1: API availability
 
-**Service:** `nexus-api`  
-**SLI:** `(1 - rate(http_requests_total{job="nexus-api",status=~"5.."}[5m])) / rate(http_requests_total{job="nexus-api"}[5m])`  
-**SLO target:** 99.5% over 30-day rolling window  
-**Error budget:** 0.5% = ~3.6 hours/month
-
-**Alert rules:**
+**SLI:** `nexus_slo_availability` (gauge, 0–1) and `nexus_slo_error_rate`
+**SLO target:** 99.5% over a 30-day rolling window
+**Error budget:** 0.5% ≈ 3.6 hours/month
 
 ```yaml
-# Warn: burn rate 2x over 1h
 - alert: NexusAPIAvailabilityWarn
-  expr: |
-    (
-      rate(http_requests_total{job="nexus-api",status=~"5.."}[1h]) /
-      rate(http_requests_total{job="nexus-api"}[1h])
-    ) > 0.01
+  expr: nexus_slo_availability < 0.995
   for: 5m
   labels:
     severity: warning
-  annotations:
-    summary: "Nexus API error rate elevated ({{ $value | humanizePercentage }})"
 
-# Page: burn rate 14x over 5min (will exhaust monthly budget in 2h)
 - alert: NexusAPIAvailabilityPage
-  expr: |
-    (
-      rate(http_requests_total{job="nexus-api",status=~"5.."}[5m]) /
-      rate(http_requests_total{job="nexus-api"}[5m])
-    ) > 0.07
+  expr: nexus_slo_availability < 0.99
   for: 2m
   labels:
     severity: critical
-  annotations:
-    summary: "Nexus API availability SLO breach — immediate action required"
 ```
 
 ---
 
-## SLO-2: API Latency (p99)
+## SLO-2: API latency (p99)
 
-**Service:** `nexus-api`  
-**SLI:** `histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job="nexus-api"}[5m]))`  
-**SLO target:** p99 < 500ms  
+**SLI:** `nexus_slo_p99_latency_ms` (gauge)
+**SLO target:** p99 < 500ms
 **Measurement window:** 5-minute rolling
-
-**Alert rules:**
 
 ```yaml
 - alert: NexusAPILatencyWarn
-  expr: |
-    histogram_quantile(0.99,
-      rate(http_request_duration_seconds_bucket{job="nexus-api"}[5m])
-    ) > 0.5
+  expr: nexus_slo_p99_latency_ms > 500
   for: 5m
   labels:
     severity: warning
 
 - alert: NexusAPILatencyPage
-  expr: |
-    histogram_quantile(0.99,
-      rate(http_request_duration_seconds_bucket{job="nexus-api"}[5m])
-    ) > 1.0
-  for: 5m
-  labels:
-    severity: critical
-  annotations:
-    summary: "Nexus API p99 latency > 1s"
-```
-
----
-
-## SLO-3: Council Deliberation Success Rate
-
-**Service:** `nexus-council` (via `nexus-api`, `nexus-worker`)  
-**SLI:** Ratio of deliberations completing with `ok: true` within 60s  
-**SLO target:** 99% over 7-day rolling window  
-**Measurement:** `nexus_council_success_total / nexus_council_attempts_total`
-
-**Alert rules:**
-
-```yaml
-- alert: NexusCouncilSuccessRateWarn
-  expr: |
-    rate(nexus_council_success_total[15m]) /
-    rate(nexus_council_attempts_total[15m]) < 0.97
-  for: 10m
-  labels:
-    severity: warning
-  annotations:
-    summary: "Council success rate below 97% ({{ $value | humanizePercentage }})"
-
-- alert: NexusCouncilSuccessRatePage
-  expr: |
-    rate(nexus_council_success_total[15m]) /
-    rate(nexus_council_attempts_total[15m]) < 0.90
-  for: 5m
+  expr: nexus_slo_p99_latency_ms > 5000
+  for: 3m
   labels:
     severity: critical
 ```
 
 ---
 
-## SLO-4: Queue Job Processing Latency (p99)
+## SLO-3: Council deliberation success rate
 
-**Service:** `nexus-worker` (BullMQ)  
-**SLI:** Time from job enqueue to job completion (p99)  
-**SLO target:** p99 < 30 seconds for `nexus-medium`; p99 < 10 seconds for `nexus-high`  
-**Measurement:** BullMQ job metrics exported to Prometheus via worker instrumentation
-
-**Alert rules:**
-
-```yaml
-- alert: NexusQueueDepthHigh
-  expr: bullmq_queue_waiting{queue="nexus-high"} > 100
-  for: 5m
-  labels:
-    severity: warning
-  annotations:
-    summary: "nexus-high queue depth > 100 jobs"
-
-- alert: NexusQueueDepthCritical
-  expr: bullmq_queue_waiting{queue="nexus-medium"} > 500
-  for: 10m
-  labels:
-    severity: critical
-
-- alert: NexusDLQGrowing
-  expr: increase(bullmq_queue_failed_total[1h]) > 20
-  for: 1m
-  labels:
-    severity: warning
-  annotations:
-    summary: "DLQ received {{ $value }} jobs in the last hour"
-```
+**SLI:** successful council completions ÷ attempts
+**SLO target:** 99% over a 7-day rolling window
+**Status:** not exported as a dedicated series. Council outcomes are in the
+per-request transcript and the audit log; use `nexus_gateway_requests_total{status="error"}`
+as a coarse proxy until a council counter exists.
 
 ---
 
-## SLO-5: Audit Log Chain Integrity
+## SLO-4: Queue job processing
 
-**Service:** All (audit log is system-wide)  
-**SLI:** Boolean — `GET /api/v1/audit/log/verify` returns `{ "valid": true }`  
-**SLO target:** 100% — zero tolerance for chain breaks  
-**Measurement:** Run verify probe every 5 minutes
+**SLI:** enqueue-to-completion time, p99
+**SLO target:** p99 < 30s for `nexus-medium`, p99 < 10s for `nexus-high`
+**Status:** BullMQ does not export to Prometheus in this tree. Read depth from Redis
+(`llen bull:nexus-<queue>:wait`) or the BullMQ dashboard.
 
-**Alert rules:**
+---
 
-```yaml
-- alert: NexusAuditChainBroken
-  expr: nexus_audit_chain_valid == 0
-  for: 0m
-  labels:
-    severity: critical
-  annotations:
-    summary: "Nexus audit log chain integrity breach — security incident"
-    runbook: "https://github.com/Yash-Awasthi/Nexus/blob/master/docs/runbook.md#p4--audit-chain-broken-t3-incident"
-```
+## SLO-5: Audit log chain integrity
+
+**SLI:** `GET /api/v1/audit/log/verify` returns `{ "valid": true }`
+**SLO target:** 100% — zero tolerance for chain breaks
+**Measurement:** run the verify probe every 5 minutes; the result is not a Prometheus
+series, so the alert is a synthetic probe rather than a metric expression.
 
 ---
 
@@ -180,4 +94,4 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 | Queue p99        | Violations × 10min | —                         |
 | Audit integrity  | 0                  | —                         |
 
-Review error budget consumption in weekly ops review. Freeze feature work if >50% of monthly budget consumed by week 2.
+Review error-budget consumption in the weekly ops review.

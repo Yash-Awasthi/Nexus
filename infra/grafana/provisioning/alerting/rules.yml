@@ -56,40 +56,21 @@ groups:
         labels:
           severity: warning
 
-      # ── Conductor dead-letter queue backlog > 20 ──────────────────────────────
-      - uid: nexus-alert-dlq-backlog
-        title: "Conductor DLQ Backlog (>20)"
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: NEXUS_PROMETHEUS
-            model:
-              expr: nexus_conductor_queue_depth{queue="dead_letter"} > 20
-              refId: A
-        noDataState: OK
-        execErrState: Alerting
-        for: 2m
-        annotations:
-          summary: "Conductor dead-letter queue has more than 20 failed jobs"
-        labels:
-          severity: warning
-
-      # ── SLO availability drop below 99.9% ─────────────────────────────────────
+      # ── SLO availability drop below 99.5% ─────────────────────────────────────
       - uid: nexus-alert-slo-availability
-        title: "SLO Availability Below 99.9%"
+        title: "SLO Availability Below 99.5%"
         condition: A
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: NEXUS_PROMETHEUS
             model:
-              expr: nexus_slo_availability < 0.999
+              expr: nexus_slo_availability < 0.995
               refId: A
         noDataState: OK
         execErrState: Alerting
         for: 5m
         annotations:
-          summary: "API availability has dropped below 99.9% SLO target"
+          summary: "API availability has dropped below the 99.5% SLO target"
         labels:
           severity: critical

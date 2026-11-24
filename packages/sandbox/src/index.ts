@@ -6,7 +6,7 @@
  *  • Hard timeouts (AbortController → SIGKILL)
  *  • Environment scrubbing (credentials stripped, PATH-only allowlist)
  *  • Output truncation (64 KiB cap on stdout + stderr)
- *  • Language routing: JavaScript, TypeScript (tsx), Python, Bash
+ *  • Language routing: JavaScript, TypeScript (tsx), Python, Bash, Go, Rust, Ruby
  *  • Injectable runner for full unit-test coverage without spawning real processes
  *
  * createDockerRunner adds container isolation (no network, memory/PID caps, seccomp,
@@ -17,16 +17,24 @@
 
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import { writeFile, unlink } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
 import { fileURLToPath } from "url";
 
 import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin-sdk";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type SandboxLanguage = "javascript" | "typescript" | "python" | "bash";
+/** Every language the sandbox image runs, and the only source of that list. */
+export const SANDBOX_LANGUAGES = [
+  "javascript",
+  "typescript",
+  "python",
+  "bash",
+  "go",
+  "rust",
+  "ruby",
+] as const;
+
+export type SandboxLanguage = (typeof SANDBOX_LANGUAGES)[number];
 
 /** Sandbox task interface definition. */
 export interface SandboxTask {
@@ -151,23 +159,24 @@ export interface PreparedExecution {
   args: string[];
   /** If set, code is passed via stdin instead of a CLI arg */
   useStdin: boolean;
-  /** If set, the host path the caller must write the code to and delete after */
-  tempFilePath?: string;
 }
 
-/** Where every container sees the host temp dir, read-only. */
-export const HOST_TMP_MOUNT = "/nexus-host-tmp";
+/**
+ * Write stdin to a writable scratch file, then run it. Used by every compiled or
+ * interpreted language that cannot read a script from argv safely.
+ */
+function scratchExecution(extension: string, run: string): PreparedExecution {
+  return {
+    cmd: "sh",
+    args: ["-c", 'f="${TMPDIR:-/tmp}/nexus-sandbox.' + extension + '"; cat > "$f" && ' + run],
+    useStdin: true,
+  };
+}
 
 /**
  * Determine the command, args, and code delivery mechanism for a given language.
- * For TypeScript, a temp file path is returned (callers write + delete it); the
- * args name it as the process will see it, inside a container or not.
  */
-export function prepareExecution(
-  language: SandboxLanguage,
-  code: string,
-  inContainer = false,
-): PreparedExecution {
+export function prepareExecution(language: SandboxLanguage, code: string): PreparedExecution {
   switch (language) {
     case "javascript":
       return {
@@ -176,16 +185,15 @@ export function prepareExecution(
         useStdin: false,
       };
 
-    case "typescript": {
-      const name = `nexus-sandbox-${randomUUID()}.ts`;
-      const tmpPath = join(tmpdir(), name);
+    case "typescript":
+      // The shell writes stdin to the writable scratch tmpfs, then runs it. Handing
+      // tsx a host path instead only works while the API shares the daemon's
+      // filesystem view, which stops being true once the API runs in a container.
       return {
-        cmd: "tsx",
-        args: [inContainer ? `${HOST_TMP_MOUNT}/${name}` : tmpPath],
-        useStdin: false,
-        tempFilePath: tmpPath,
+        cmd: "sh",
+        args: ["-c", 'f="${TMPDIR:-/tmp}/nexus-sandbox.ts"; cat > "$f" && tsx "$f"'],
+        useStdin: true,
       };
-    }
 
     case "python":
       // Code via stdin (`python3 -`), NOT `-c` argv: on Windows the
@@ -205,6 +213,17 @@ export function prepareExecution(
         args: ["-c", code],
         useStdin: false,
       };
+
+    case "go":
+      // GOCACHE and GOPATH point at the scratch tmpfs in the image, so `go run`
+      // builds without touching the read-only rootfs.
+      return scratchExecution("go", 'go run "$f"');
+
+    case "rust":
+      return scratchExecution("rs", 'rustc "$f" -o "$f.bin" && "$f.bin"');
+
+    case "ruby":
+      return scratchExecution("rb", 'ruby "$f"');
   }
 }
 
@@ -303,18 +322,9 @@ export async function executeCode(
   const start = Date.now();
   const timeoutMs = Math.min(task.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
   const env = buildSafeEnv(task.extraEnv);
-  const prep = prepareExecution(task.language, task.code, runner.inContainer);
-
-  let tempFileWritten = false;
+  const prep = prepareExecution(task.language, task.code);
 
   try {
-    // Write temp file for TypeScript
-    if (prep.tempFilePath) {
-      // Use exclusive flag to prevent TOCTOU on the randomised temp path
-      await writeFile(prep.tempFilePath, task.code, { encoding: "utf8", flag: "wx" });
-      tempFileWritten = true;
-    }
-
     const result = await runner(prep.cmd, prep.args, {
       stdin: prep.useStdin ? task.code : task.stdin,
       timeoutMs,
@@ -341,11 +351,6 @@ export async function executeCode(
       language: task.language,
       error: err instanceof Error ? err.message : "Unknown execution error",
     };
-  } finally {
-    // Always clean up temp files
-    if (prep.tempFilePath && tempFileWritten) {
-      await unlink(prep.tempFilePath).catch(() => void 0);
-    }
   }
 }
 
@@ -502,7 +507,11 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     // advertised via TMPDIR so tsx/esbuild/python temp writes land there rather
     // than on the now read-only rootfs. nosuid/nodev harden the scratch mount.
     args.push("--read-only");
-    args.push(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=${scratchMb}m`);
+    // mode=1777: Docker's tmpfs default is root-owned 0755, so the uid-1000
+    // container user could not create tsx's IPC directory without it.
+    // exec is explicit: some hosts mount tmpfs noexec, which breaks `go run`,
+    // `rustc` output and anything else that writes a binary here.
+    args.push(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,exec,size=${scratchMb}m,mode=1777`);
     args.push(`--env=TMPDIR=${SCRATCH_DIR}`);
   }
 
@@ -520,13 +529,7 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     args.push(`--workdir=${config.workdir ?? WORKSPACE_MOUNT}`);
   }
 
-  args.push(
-    // TypeScript temp files written by executeCode, read-only.
-    `-v`,
-    `${tmpdir()}:${HOST_TMP_MOUNT}:ro`,
-    ...(config.interactive === false ? [] : ["-i"]),
-    image,
-  );
+  args.push(...(config.interactive === false ? [] : ["-i"]), image);
 
   return args;
 }

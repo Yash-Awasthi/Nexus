@@ -14,6 +14,9 @@ import {
 } from "../../src/compress/index.ts";
 
 const N = 64 * 1024;
+// A shared CI runner is several times slower than a laptop, so the ceiling is
+// looser there. It still fails on quadratic work, which takes seconds at this size.
+const BUDGET_MS = process.env["CI"] ? 1500 : 250;
 const INPUTS: Record<string, string> = {
   spaces: " ".repeat(N) + "x",
   tabs: "\t".repeat(N) + "x",
@@ -50,7 +53,7 @@ it.each(RUNS)(
       const t = performance.now();
       run(input);
       const ms = performance.now() - t;
-      if (ms > 250) slow.push(`${shape} ${Math.round(ms)}ms`);
+      if (ms > BUDGET_MS) slow.push(`${shape} ${Math.round(ms)}ms`);
     }
     expect(slow).toEqual([]);
   },

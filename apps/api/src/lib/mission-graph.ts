@@ -132,6 +132,8 @@ export class MissionGraphRecorder {
   onToolCall?: (toolName: string, args: Record<string, unknown>) => void;
   /** Optional error observer — fed when a wrapped tool handler THROWS. */
   onToolError?: (toolName: string, error: string) => void;
+  /** Optional success observer — fed after a wrapped handler RETURNS. */
+  onToolSuccess?: (toolName: string) => void;
 
   wrapTool(tool: RuntimeTool): RuntimeTool {
     // oxlint-disable-next-line @typescript-eslint/no-this-alias -- the returned object's arrow handlers must capture this instance
@@ -157,6 +159,7 @@ export class MissionGraphRecorder {
         let error: string | undefined;
         try {
           outcome = await handler(args, ctx);
+          recorder.onToolSuccess?.(tool.name);
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
           recorder.onToolError?.(tool.name, error);

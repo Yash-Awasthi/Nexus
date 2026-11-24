@@ -2,16 +2,16 @@
 
 # Nexus — Testing
 
-Install with Node >=22.12 and `pnpm install --frozen-lockfile`, then `pnpm build`.
+Install with Node >=24 and `pnpm install --frozen-lockfile`, then `pnpm build`.
 On Windows PowerShell, use `pnpm.cmd` if the PowerShell shim does not execute.
-See [LOCAL-READINESS.md](LOCAL-READINESS.md) for the latest local evidence and limitations.
+The measured results on this tree are in [plan.md](../plan.md#measured-on-this-tree).
 
 ## Unit and integration suites
 
 CI runs these distinct owners; a root Vitest pass is not an API/UI/desktop pass:
 
 ```sh
-pnpm exec vitest run --coverage
+pnpm exec vp test run --coverage
 pnpm --filter @nexus/api test
 pnpm --filter @nexus/ui test
 pnpm --filter @nexus/desktop test
@@ -32,8 +32,8 @@ pnpm --filter @nexus/api exec vitest run tests/routes/health.test.ts
 ```
 
 Some suites override mocks or require infrastructure: inspect their prerequisites
-before running them. The worker signal-pipeline CI job provisions PostgreSQL 16
-with pgvector, applies the schema in its disposable database, then runs:
+before running them. The worker signal-pipeline CI job provisions pgvector on
+PostgreSQL 18, applies the schema in its disposable database, then runs:
 
 ```sh
 pnpm --filter @nexus/worker test -- --reporter=verbose tests/e2e/
@@ -62,6 +62,22 @@ Model-dependent specs are skipped unless `E2E_MODELS` is set; do not set it for 
 offline harness. This suite does not verify paid providers or live model behavior.
 There is no root `test:unit` or `test:a11y` script. Browser tests include phone-width
 layout assertions, not a comprehensive accessibility audit.
+
+## Offline acceptance
+
+```sh
+pnpm check:offline
+```
+
+One pass/fail line per offline-track check: the API boots with `DATABASE_URL` unset
+(PGlite) and outbound sockets blocked, the sandbox image runs Python under
+`--network=none`, the desktop main process and UI build exist, and — when reachable —
+the model answers one short turn and SearXNG returns hits. SearXNG is a metasearch front
+end, so it answers without the WAN but its results still come from upstream engines. A
+missing prerequisite reports `skip` with the reason; anything attempted and failed exits
+
+1. Set `SEARXNG_URL` (for example `http://127.0.0.1:4000`) to include the search check,
+   and `NEXUS_SANDBOX_IMAGE` to probe a different image.
 
 ## Python ingest
 

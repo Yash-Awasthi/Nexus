@@ -26,7 +26,7 @@ export function ownerIdFor(request: { nexusUserId?: string }): string {
  * Whether the caller sees rows with no owner: written before owner scoping or by a caller with
  * no identity, they are the desktop user's or the anonymous bucket's, never an account's.
  */
-export function seesOwnerless(request: { nexusUserId?: string }): boolean {
+function seesOwnerless(request: { nexusUserId?: string }): boolean {
   return process.env.NEXUS_DESKTOP === "1" || !request.nexusUserId;
 }
 

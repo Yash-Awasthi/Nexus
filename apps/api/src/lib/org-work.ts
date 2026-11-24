@@ -38,9 +38,9 @@ const conflict = (message: string) => new OrgError(409, "conflict", message);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export const GOAL_LEVELS = ["company", "team", "agent", "task"] as const;
+const GOAL_LEVELS = ["company", "team", "agent", "task"] as const;
 export type GoalLevel = (typeof GOAL_LEVELS)[number];
-export const GOAL_STATUSES = ["planned", "active", "achieved", "cancelled"] as const;
+const GOAL_STATUSES = ["planned", "active", "achieved", "cancelled"] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
 
 interface Goal {
@@ -72,7 +72,7 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const PRIORITIES = ["critical", "high", "medium", "low"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 const WORK_MODES = ["standard", "planning", "ask"] as const;
-export type WorkMode = (typeof WORK_MODES)[number];
+type WorkMode = (typeof WORK_MODES)[number];
 
 export interface Actor {
   type: ActorType;

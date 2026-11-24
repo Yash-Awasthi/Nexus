@@ -34,6 +34,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { getKG, getKGStore, searchGraph } from "../lib/knowledge-graph-store.ts";
 import { getMemoryStore } from "../lib/memory-store.ts";
+import { invalidateSymbolCache } from "../lib/symbols.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
 import { requireAdminRole } from "./admin-users.ts";
@@ -179,7 +180,9 @@ const _agentFs: AgentFileSystem = {
   async writeFile(p, content) {
     const abs = underRoot(p);
     await fsp.mkdir(path.dirname(abs), { recursive: true });
-    return fsp.writeFile(abs, content, "utf8");
+    const result = await fsp.writeFile(abs, content, "utf8");
+    invalidateSymbolCache();
+    return result;
   },
   async listDir(dir) {
     const entries = await fsp.readdir(underRoot(dir));

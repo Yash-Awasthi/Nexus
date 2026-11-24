@@ -92,7 +92,11 @@ export function nodeLocalApiPorts(dataDir: string, port: number): LocalApiPorts 
         // The child inherits nothing it was not given: a stray DATABASE_URL in
         // the developer's shell would otherwise point the desktop app at a
         // cloud database.
-        env: { PATH: process.env.PATH ?? "", ...env },
+        //
+        // `fork` spawns `process.execPath`, which is the Electron binary. Without this
+        // switch that binary starts a second GUI app, which needs a display and dies on a
+        // headless runner; with it, the same binary behaves as plain Node.
+        env: { PATH: process.env.PATH ?? "", ELECTRON_RUN_AS_NODE: "1", ...env },
         stdio: ["ignore", "inherit", "inherit", "ipc"],
       });
     },

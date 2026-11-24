@@ -198,6 +198,10 @@ function checkMcpBridgeHealth(): boolean {
   return allOk;
 }
 
-if (process.argv[1] === fileURLToPath(new URL(import.meta.url))) {
+// Only when this file is the entry point. Comparing full URLs breaks once a bundler
+// folds every module into the entry, where they all share one URL and this guard would
+// run the healthcheck (and exit) during an unrelated boot.
+const entry = process.argv[1] ? path.basename(process.argv[1]) : "";
+if (entry === "healthcheck.ts" || entry === "healthcheck.js") {
   process.exit(runHealthcheck() ? 0 : 1);
 }

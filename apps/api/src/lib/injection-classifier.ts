@@ -35,7 +35,7 @@ export function classifierFromClient(client: NlpLlmClient): InjectionClassifier 
   };
 }
 
-export async function injectionClassifier(): Promise<InjectionClassifier | null> {
+async function injectionClassifier(): Promise<InjectionClassifier | null> {
   const choice = process.env.NEXUS_INJECTION_CLASSIFIER?.trim();
   if (!choice || choice === "off") return null;
   const client = await namedModelClient(choice === "default" ? undefined : choice);

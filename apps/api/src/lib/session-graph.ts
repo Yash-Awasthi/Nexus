@@ -26,7 +26,7 @@ const GRAPH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAX_NODES = 200;
 const MAX_GRAPHS_PER_USER = 100;
 
-export type GraphNodeKind =
+type GraphNodeKind =
   | "user"
   | "phase"
   | "milestone"

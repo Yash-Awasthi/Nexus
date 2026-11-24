@@ -130,7 +130,6 @@ C:\GITHUB\open\
     ├── mission.txt                   <-- Acceptance mission
     ├── SRS_Agent_Board_v3.0.md       <-- Requirements Specification v3.0 (authoritative)
     ├── ARCHITECTURE.md               <-- Complete System Architecture (this file)
-    ├── PLAN.md                       <-- Remaining external validation
     └── claude_desktop_config.json    <-- Claude Desktop MCP entry
 ```
 

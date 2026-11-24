@@ -2,10 +2,10 @@
 
 # Nexus Operational Runbook
 
-**Version:** 1.0  
-**Last updated:** 2026-06-11  
+**Version:** 1.1  
+**Last updated:** 2026-11-23  
 **Owner:** Yash Awasthi  
-**Audience:** On-call engineers, DevOps, platform operators
+**Audience:** On-call engineers and operators
 
 ---
 
@@ -29,67 +29,64 @@
 ### Prerequisites
 
 - Docker 25+ and Docker Compose v2
-- Node 26 (`nvm use 26`)
+- Node 24+ (`.nvmrc` pins 26)
 - pnpm 12 (`npm i -g pnpm@12`)
-- Python 3.11 (`pyenv install 3.11`)
+- Python 3.11 only if you run `services/ingest`
 
 ### Start everything
 
 ```bash
-# 1. Clone and install
 git clone https://github.com/Yash-Awasthi/Nexus.git
 cd Nexus
-cp .env.example .env          # fill in GROQ_API_KEY, NEXUS_API_KEY, etc.
+cp .env.example .env          # set NEXUS_API_KEY and one LLM key
 
-# 2. Start infrastructure (Postgres + Redis + OTel collector)
-docker compose -f docker-compose.yml up -d postgres redis otel-collector
+pnpm install
+docker compose up -d postgres redis
+pnpm db:migrate
+pnpm dev                      # API :3000, UI :5173, worker
+```
 
-# 3. Apply DB migrations
-pnpm --filter @nexus/db drizzle:migrate
+Or the whole stack in Docker:
 
-# 4. Start all services (hot-reload)
-pnpm dev
-# or individually:
-pnpm --filter @nexus/api dev           # :3000
-pnpm --filter @nexus/worker dev        # background worker
-pnpm --filter @nexus/web dev           # :5173
-cd services/ingest && uvicorn nexus_ingest.api:app --reload --port 8000
+```bash
+docker compose up --build     # API :3000, built UI :4173
 ```
 
 ### Verify
 
 ```bash
 curl http://localhost:3000/health          # {"status":"ok"}
-curl http://localhost:3000/health/ready    # {"status":"ready","checks":{"db":"ok"}}
-curl http://localhost:8000/health          # {"status":"ok","scrapers":[...]}
-nexus health                               # ✓ API is ok
+curl http://localhost:3000/health/ready    # database and KV status
+pnpm --filter @nexus/cli exec nexus health # ✓ API is ok
 ```
 
 ---
 
 ## 2. Deployment targets
 
-### 2.1 Single VM (install script)
+### 2.1 Render (the supported hosted deployment)
+
+`render.yaml` describes one Docker web service running `infra/web/Dockerfile`,
+which serves the API and the built UI. The API runs the worker loop in-process
+when no queue is configured. Secrets are set in the Render dashboard, not in the
+blueprint; `render.yaml` marks them `sync: false`.
+
+`autoDeploy: true` follows `master`. The health check is `/health/ready`, which
+answers only after the database and KV are usable.
+
+### 2.2 Docker Compose
+
+`docker-compose.yml` is the full local stack. For a server, run the same file with
+real secrets in `.env`:
 
 ```bash
-curl -fsSL https://nexus.dev/install.sh | bash
-# Installs: Docker, composes all services, creates systemd units
-# Data: /var/lib/nexus/{postgres,redis,uploads}
+docker compose up -d --build
+docker compose ps
 ```
 
-### 2.2 Docker Compose (production)
-
-```bash
-cp docker-compose.yml docker-compose.prod.yml
-# Set NEXUS_API_KEY, DATABASE_URL, REDIS_URL, GROQ_API_KEY in .env
-docker compose -f docker-compose.prod.yml up -d
-```
-
-### 2.3 Kubernetes (Helm)
-
-Nexus deploys to Render as a single web service (`render.yaml`, image
-`infra/web/Dockerfile`). There is no Helm chart or Terraform tree any more; scale by raising the
-instance count and the plan in the Render dashboard, and let the platform roll the deploy.
+`migrate` runs to completion before `api` starts. There is no install script, no
+Helm chart and no Terraform tree; a second orchestration target is deliberately
+not maintained.
 
 ---
 
@@ -97,13 +94,16 @@ instance count and the plan in the Render dashboard, and let the platform roll t
 
 | Service          | Port                      | Repo path         | Healthcheck                |
 | ---------------- | ------------------------- | ----------------- | -------------------------- |
-| `nexus-api`      | 3000                      | `apps/api`        | `GET /health`              |
-| `nexus-worker`   | —                         | `apps/worker`     | Process alive + Redis ping |
-| `nexus-web`      | 5173 (dev) / 80 (prod)    | `apps/ui`         | Static serve               |
-| `nexus-ingest`   | 8000                      | `services/ingest` | `GET /health`              |
-| `postgres`       | 5432                      | `infra/docker`    | `pg_isready`               |
-| `redis`          | 6379                      | `infra/docker`    | `PING`                     |
-| `otel-collector` | 4317 (gRPC) / 4318 (HTTP) | `infra/otel`      | `/metrics`                 |
+| `api`            | 3000 (host) → 3001        | `apps/api`        | `GET /health/ready`        |
+| `worker`         | —                         | `apps/worker`     | Process alive + Redis ping |
+| `ui`             | 4173 (host) → 80          | `apps/ui`         | Static serve               |
+| `ingest`         | 8000                      | `services/ingest` | `GET /health`              |
+| `postgres`       | 127.0.0.1:5432            | compose           | `pg_isready`               |
+| `redis`          | 127.0.0.1:6379            | compose           | `PING`                     |
+| `otel-collector` | 4317 (gRPC) / 4318 (HTTP) | `infra/otel`      | Collector self-metrics     |
+| `jaeger`         | 16686                     | compose profile   | UI reachable               |
+
+`ui-dev`, `sandbox` and the observability services are opt-in profiles.
 
 ---
 
@@ -112,89 +112,92 @@ instance count and the plan in the Render dashboard, and let the platform roll t
 ### 4.1 Logs
 
 ```bash
-# Docker Compose
-docker compose logs -f nexus-api
-docker compose logs -f nexus-worker --since 1h
+docker compose logs -f api
+docker compose logs -f worker --since 1h
+docker compose logs -f ingest
 
-# Kubernetes
-kubectl logs -l app=nexus-api -n nexus-system -f
-kubectl logs -l app=nexus-worker -n nexus-system -f --previous  # crashed pod
-
-# Structured log fields (all services emit JSON)
-kubectl logs -l app=nexus-api | jq 'select(.level=="error")'
+# Errors only (all services emit JSON)
+docker compose logs api | jq 'select(.level=="error")'
 ```
+
+On Render, use the service's log stream; the same JSON fields apply.
 
 ### 4.2 Metrics
 
-- **Prometheus:** `http://localhost:9090` → scrapes `nexus-api:3000/metrics`, `nexus-ingest:8000/metrics`
-- **Grafana:** `http://localhost:3001` → dashboards: _Overview_, _Council_, _Ingest_, _Queue Depth_
-- **Key metrics to watch:**
-  - `nexus_api_request_duration_p99` — API latency
-  - `nexus_council_deliberation_duration_avg` — council latency
-  - `bullmq_queue_waiting{queue="nexus-high"}` — queue depth
-  - `nexus_worker_job_failure_total` — job failures
+- **Prometheus:** `http://localhost:9090` scrapes `api:3001/api/v1/metrics` and the
+  OTel collector. Local dev sets `METRICS_NO_AUTH=true`; production scrapes with a
+  bearer token.
+- **Grafana:** `http://localhost:3010`, pre-provisioned with the _Nexus overview_ and
+  _Provider health_ dashboards.
+- **Exported series:** `nexus_gateway_requests_total`, `nexus_gateway_latency_ms`,
+  `nexus_gateway_tokens_total`, `nexus_gateway_cost_usd_total`,
+  `nexus_memory_entries_total`, `nexus_drive_*`, `nexus_alert_events_total`,
+  `nexus_slo_availability`, `nexus_slo_error_rate`, `nexus_slo_p99_latency_ms`,
+  `nexus_slo_total_requests`.
+- Queue depth is not exported yet; read it from Redis (below) or the BullMQ dashboard.
 
 ### 4.3 Traces
 
-- **Tempo:** `http://localhost:3001/explore` → data source Tempo
-- Trace ID is in every API response header: `X-Nexus-Trace-Id`
-- Filter by `service.name=nexus-api` or `service.name=nexus-worker`
+- **Jaeger:** `http://localhost:16686` (observability profile).
+- The trace id is returned as `X-Nexus-Trace-Id`.
+- Filter by `service.name=nexus-api` or `service.name=nexus-worker`.
 
 ### 4.4 Queue management
 
 ```bash
-# View queue state
-nexus tasks list --status queued --limit 20
+# Queue lengths
+redis-cli llen bull:nexus-high:wait
+redis-cli llen bull:nexus-medium:wait
 
-# View dead-letter queue
-redis-cli -n 0 lrange bull:nexus-high:failed 0 -1
+# Failed jobs
+redis-cli lrange bull:nexus-high:failed 0 10
 
-# Retry a specific failed job (BullMQ)
-# Connect to worker process and call queue.retryJobs() or use Bull Board UI
-
-# Drain DLQ entirely (last resort)
-nexus dlq clear
+# Runtime tasks through the CLI
+pnpm --filter @nexus/cli exec nexus tasks list --status queued --limit 20
 ```
+
+There is no `nexus dlq clear` command. Retry from BullMQ or drain the failed set
+explicitly after inspecting it.
 
 ### 4.5 Database queries
 
 ```bash
-# Connect to Postgres
-psql $DATABASE_URL
+psql "$DATABASE_URL"
 
 # Pending approvals
 SELECT id, action, requestor, created_at FROM approval_requests WHERE status='pending';
 
 # Recent failed tasks
-SELECT id, type, error, completed_at FROM runtime_tasks WHERE status='failed' ORDER BY completed_at DESC LIMIT 20;
+SELECT id, type, error, completed_at FROM runtime_tasks
+WHERE status='failed' ORDER BY completed_at DESC LIMIT 20;
 
 # Audit log tail
-SELECT sequence, entity_type, action, actor, created_at FROM audit_log ORDER BY sequence DESC LIMIT 10;
+SELECT sequence, entity_type, action, actor, created_at
+FROM audit_log ORDER BY sequence DESC LIMIT 10;
 ```
 
 ### 4.6 Audit log verification
 
 ```bash
-nexus audit verify
-# ✓ Chain intact — 1247 entries checked
+pnpm --filter @nexus/cli exec nexus audit verify
 
-# If verification fails:
-curl -s $NEXUS_API_URL/api/v1/audit/log/verify | jq .
-# {"valid":false,"first_broken_sequence":842,"message":"Chain integrity violation detected"}
-# → Investigate DB access logs for sequence 842
+curl -s "$NEXUS_API_URL/api/v1/audit/log/verify" \
+  -H "Authorization: Bearer $NEXUS_API_KEY" | jq .
+# {"valid":false,"firstBrokenSequence":842,...}
+# → investigate database access at that sequence
 ```
 
 ---
 
 ## 5. Scaling guidelines
 
-| Component      | Scale trigger                | Action                                               |
-| -------------- | ---------------------------- | ---------------------------------------------------- |
-| `nexus-api`    | p99 latency > 500ms          | Add replicas; set `HPA minReplicas=2`                |
-| `nexus-worker` | Queue depth > 500 sustained  | Add worker replicas; increase `concurrency`          |
-| `nexus-ingest` | Scrape backlog > 30min       | Add ingest replicas; reduce `FINSCRAPE_MAX_ARTICLES` |
-| Postgres       | CPU > 70%, connections > 80% | Enable PgBouncer; scale to larger instance           |
-| Redis          | Memory > 80%                 | Increase `maxmemory`; enable cluster mode            |
+| Component | Scale trigger                | Action                                                 |
+| --------- | ---------------------------- | ------------------------------------------------------ |
+| `api`     | p99 latency > 500ms          | Raise the Render instance count or plan                |
+| `worker`  | Queue depth > 500 sustained  | Add worker replicas; raise BullMQ `concurrency`        |
+| `ingest`  | Scrape backlog > 30min       | Add ingest replicas; lower `FINSCRAPE_MAX_ARTICLES`    |
+| Postgres  | CPU > 70%, connections > 80% | Raise the Neon compute size; use the pooled connection |
+| Redis     | Memory > 80%                 | Raise `maxmemory`; move to a managed instance          |
 
 ---
 
@@ -203,90 +206,62 @@ curl -s $NEXUS_API_URL/api/v1/audit/log/verify | jq .
 ### P1 — API completely down
 
 ```
-1. Check: curl https://nexus-api-host/health
-2. If 502/504: load balancer can't reach the container — check container health
-   docker ps / kubectl get pods -n nexus-system
-3. If container is crash-looping:
-   docker logs nexus-api --tail 50
-   kubectl logs nexus-api-<pod> --previous
+1. Check: curl https://<host>/health/ready
+2. 502/504: the platform cannot reach the container — check the service status.
+   Render: dashboard events and logs.
+   Compose: docker compose ps
+3. Crash loop:
+   docker compose logs api --tail 50
 4. Common causes:
-   - DATABASE_URL unreachable → check Postgres / network
+   - DATABASE_URL unreachable → check Postgres / Neon
    - NEXUS_API_KEY not set → check env vars
-   - OOM → increase container memory limit
-5. Rollback if recent deploy:
-   helm rollback nexus N-1 -n nexus-system
-   # or docker-compose:
-   docker compose down nexus-api && docker compose up -d nexus-api --no-recreate
+   - OOM → raise the instance memory
+5. Roll back the deploy (Render: previous deploy; compose: rebuild the previous tag).
 ```
 
 ### P2 — Worker stuck / queue growing
 
 ```
-1. Check queue depth:
+1. Queue depth:
    redis-cli llen bull:nexus-high:wait
    redis-cli llen bull:nexus-medium:wait
-
-2. Check worker health:
-   docker ps | grep nexus-worker
-   kubectl get pods -l app=nexus-worker
-
-3. Check DLQ for patterns:
-   redis-cli lrange bull:nexus-high:failed 0 10
-
-4. If jobs are timing out: check GROQ_API_KEY validity, Groq service status
-
-5. Force drain and restart:
-   kubectl rollout restart deployment/nexus-worker -n nexus-system
+2. Worker health: docker compose ps worker
+3. Failed jobs: redis-cli lrange bull:nexus-high:failed 0 10
+4. If jobs time out: check the provider key and the provider's status page.
+5. Restart: docker compose restart worker
 ```
 
 ### P3 — Database connection exhaustion
 
 ```
-1. Check active connections:
-   psql $DATABASE_URL -c "SELECT count(*) FROM pg_stat_activity;"
-
-2. Kill long-running idle connections:
+1. Active connections:
+   psql "$DATABASE_URL" -c "SELECT count(*) FROM pg_stat_activity;"
+2. Idle sessions older than ten minutes:
    SELECT pg_terminate_backend(pid) FROM pg_stat_activity
    WHERE state = 'idle' AND query_start < now() - interval '10 minutes';
-
-3. Deploy PgBouncer if not already running:
-   docker compose -f infra/docker/docker-compose.pgbouncer.yml up -d
-
-4. Reduce pool sizes in nexus-api (DB_POOL_MAX env var, default 10)
+3. Use the pooled Neon connection string on the server.
+4. Lower the API pool size if the client is the source.
 ```
 
 ### P4 — Audit chain broken (T3 incident)
 
 ```
-1. Confirm via API:
-   curl $NEXUS_API_URL/api/v1/audit/log/verify | jq .
-   # Records first_broken_sequence
-
-2. Do NOT delete any audit_log rows. Preserve state for forensics.
-
-3. Pull DB access logs for the timestamp of sequence N-1 → N:
-   grep "audit_log" /var/log/postgres/postgresql.log | grep "UPDATE\|DELETE"
-
-4. Engage security response per SECURITY.md
-
-5. Export intact portion (sequences 1..N-1) to signed S3 object for evidence preservation
-
-6. Notify affected parties per data breach policy
+1. Confirm: GET /api/v1/audit/log/verify, or `nexus audit verify`.
+2. Do NOT delete audit_log rows. Preserve state for forensics.
+3. Pull database access logs for the timestamp of sequence N-1 → N.
+4. Engage security response per SECURITY.md.
+5. Export the intact portion (sequences 1..N-1) as evidence.
+6. Notify affected parties per the breach policy.
 ```
 
 ### P5 — LLM cost spike
 
 ```
-1. Check Groq dashboard for unusual usage
-
-2. Identify runaway deliberations:
+1. Check the provider dashboard for unusual usage.
+2. Identify expensive deliberations:
    SELECT id, created_at, cost_usd FROM verdicts ORDER BY cost_usd DESC LIMIT 10;
-
-3. Reduce default budget cap:
-   NEXUS_COUNCIL_DEFAULT_BUDGET_USD=0.05 (restart api + worker)
-
-4. Block council endpoint temporarily:
-   Add route-level circuit breaker in apps/api/src/routes/council.ts
+3. Lower the per-request budget with the `budgetUsd` field on the council call.
+4. Disable the offending provider key or model in Provider Keys.
 ```
 
 ---
@@ -295,123 +270,114 @@ curl -s $NEXUS_API_URL/api/v1/audit/log/verify | jq .
 
 ### 7.1 Postgres backup
 
-```bash
-# Automated: runs daily at 02:00 UTC via cron/k8s CronJob
-pg_dump $DATABASE_URL | gzip | \
-  aws s3 cp - s3://nexus-backups/postgres/$(date +%Y%m%d_%H%M%S).sql.gz
+The hosted deployment uses Neon, which keeps continuous backups and point-in-time
+restore. For a self-hosted Postgres:
 
-# Verify last backup (run this as part of monitoring)
-aws s3 ls s3://nexus-backups/postgres/ | tail -1
+```bash
+pg_dump "$DATABASE_URL" | gzip > nexus-$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
-### 7.2 PITR restore procedure
+### 7.2 Restore procedure
 
 ```bash
-# 1. Stop all services that write to Postgres
-docker compose stop nexus-api nexus-worker nexus-ingest
+# 1. Stop writers
+docker compose stop api worker ingest
 
-# 2. Restore from backup
-aws s3 cp s3://nexus-backups/postgres/20260611_020000.sql.gz - | \
-  gunzip | psql $DATABASE_URL
+# 2. Restore
+gunzip -c nexus-20261123_020000.sql.gz | psql "$DATABASE_URL"
 
-# 3. Verify audit chain after restore
-curl $NEXUS_API_URL/api/v1/audit/log/verify
+# 3. Verify the audit chain after restore
+curl -s "$NEXUS_API_URL/api/v1/audit/log/verify" \
+  -H "Authorization: Bearer $NEXUS_API_KEY" | jq .
 
-# 4. Restart services
-docker compose start nexus-api nexus-worker nexus-ingest
+# 4. Restart
+docker compose start api worker ingest
 ```
 
 ### 7.3 Redis backup
 
-Redis is ephemeral queue state. On failure:
-
-1. Restart Redis — BullMQ workers will continue from DB-resident state
-2. `SignalWorker` polls `ingested_events` and repopulates the queue automatically
+Redis holds queue state and the shared KV. BullMQ jobs also exist in Postgres-backed
+records, and `SignalWorker` repopulates from `ingested_events`, so a Redis restart is
+recoverable. The shared KV is the exception: without persistence, threads,
+notifications and the usage log lose their Redis copy. Use a managed Redis with
+persistence in production.
 
 ### 7.4 Recovery time objectives
 
-| Scenario             | RTO                       | RPO                         |
-| -------------------- | ------------------------- | --------------------------- |
-| API pod crash        | < 30s (container restart) | 0                           |
-| Worker pod crash     | < 30s                     | 0 (jobs persisted in Redis) |
-| Redis failure        | < 5min                    | < 5min (in-flight jobs)     |
-| Postgres failure     | < 1hr                     | < 24hr (daily backup)       |
-| Full datacenter loss | < 4hr                     | < 24hr                      |
+| Scenario         | RTO                      | RPO                         |
+| ---------------- | ------------------------ | --------------------------- |
+| API restart      | < 30s (platform restart) | 0                           |
+| Worker restart   | < 30s                    | 0 (jobs persisted in Redis) |
+| Redis failure    | < 5min                   | < 5min (in-flight jobs)     |
+| Postgres failure | Neon PITR                | Per Neon retention          |
 
 ---
 
 ## 8. Upgrade and rollback
 
-### 8.1 Rolling upgrade (Kubernetes)
+### 8.1 Render
+
+Push to `master`; `autoDeploy` rolls the service. If the new version is unhealthy,
+use **Rollback** on the previous deploy in the Render dashboard.
+
+### 8.2 Docker Compose
 
 ```bash
-# Pull new image tag
-helm upgrade nexus nexus/nexus \
-  --namespace nexus-system \
-  --set api.image.tag=v1.1.0 \
-  --set worker.image.tag=v1.1.0 \
-  --wait --timeout 5m
-
-# Monitor rollout
-kubectl rollout status deployment/nexus-api -n nexus-system
-
-# If unhealthy:
-helm rollback nexus -n nexus-system
+git pull
+docker compose up -d --build   # migrate runs before api
 ```
 
-### 8.2 DB schema migration
+### 8.3 DB schema migration
 
 ```bash
-# Always run migrations before upgrading services
-pnpm --filter @nexus/db drizzle:migrate
-
-# If migration fails, roll back the migration:
-pnpm --filter @nexus/db drizzle:migrate:rollback
-
-# NEVER upgrade services without a corresponding migration
+pnpm db:migrate
 ```
 
-### 8.3 Rollback checklist
+Migrations run before the API starts in compose and in the Render image. Do not
+upgrade services without the matching migration.
 
-- [ ] Helm rollback command executed
-- [ ] Health check passing on previous version
+### 8.4 Rollback checklist
+
+- [ ] Previous image or deploy restored
+- [ ] `/health/ready` passing
 - [ ] Queue depth normal
 - [ ] Audit chain intact
-- [ ] No DB schema mismatch errors in logs
+- [ ] No schema mismatch errors in logs
 
 ---
 
 ## 9. Configuration reference
 
-| Variable                           | Required | Default                  | Description                         |
-| ---------------------------------- | -------- | ------------------------ | ----------------------------------- |
-| `DATABASE_URL`                     | ✅       | —                        | Postgres connection string          |
-| `REDIS_URL`                        | ✅       | `redis://localhost:6379` | Redis connection                    |
-| `NEXUS_API_KEY`                    | ✅       | —                        | Bearer token for API auth           |
-| `NEXUS_AUDIT_KEY`                  | ✅       | —                        | HMAC key for audit chain            |
-| `GROQ_API_KEY`                     | ✅       | —                        | Groq LLM provider key               |
-| `NEXUS_INGEST_API_KEY`             | ✅       | —                        | Key for ingest service              |
-| `NEXUS_COUNCIL_URL`                | ❌       | `http://localhost:3000`  | Council service URL                 |
-| `NEXUS_INGEST_URL`                 | ❌       | `http://localhost:8000`  | Ingest service URL                  |
-| `LOG_LEVEL`                        | ❌       | `info`                   | `debug`, `info`, `warn`, `error`    |
-| `PORT`                             | ❌       | `3000`                   | API server port                     |
-| `SIGNAL_WORKER_INTERVAL_MS`        | ❌       | `5000`                   | Signal worker poll interval         |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`      | ❌       | —                        | OTel collector endpoint             |
-| `ALLOWED_SCRAPE_HOSTS`             | ❌       | allowlist                | Comma-separated scraper hostnames   |
-| `NEXUS_COUNCIL_DEFAULT_BUDGET_USD` | ❌       | `0.10`                   | Default per-deliberation LLM budget |
+| Variable                      | Required | Default                  | Description                                 |
+| ----------------------------- | -------- | ------------------------ | ------------------------------------------- |
+| `DATABASE_URL`                | ✅       | —                        | Postgres; unset falls back to PGlite in dev |
+| `REDIS_URL`                   | ❌       | `redis://localhost:6379` | Redis; unset uses in-process KV             |
+| `NEXUS_API_KEY`               | ✅       | —                        | Bearer token for API auth                   |
+| `NEXUS_AUDIT_KEY`             | ✅       | —                        | HMAC key for the audit chain                |
+| `NEXUS_SECRETS_KEY`           | ✅       | —                        | 64 hex chars; encrypts provider keys        |
+| `NEXUS_JWT_SECRET`            | ✅       | —                        | HS256 signing secret                        |
+| `GROQ_API_KEY`                | ❌       | —                        | One LLM provider is enough                  |
+| `NEXUS_INGEST_API_KEY`        | ❌       | —                        | Key for the ingest service                  |
+| `LOG_LEVEL`                   | ❌       | `info`                   | `debug`, `info`, `warn`, `error`            |
+| `PORT`                        | ❌       | `3000`                   | API server port                             |
+| `NEXUS_API_RATE_LIMIT`        | ❌       | `300`                    | Requests/minute per IP                      |
+| `NEXUS_SANDBOX_IMAGE`         | ❌       | —                        | Enables skill/mission/shell code            |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | ❌       | —                        | OTel collector endpoint                     |
+| `ALLOWED_SCRAPE_HOSTS`        | ❌       | allowlist                | Comma-separated scraper hostnames           |
 
 ---
 
 ## 10. SLOs and alerts
 
-See `docs/slos.md` for full SLO declarations. Summary:
+See `docs/slos.md` for the full declarations. Summary:
 
-| SLO                               | Target    | Alert threshold      |
-| --------------------------------- | --------- | -------------------- |
-| API availability                  | 99.5%     | < 99% over 5min      |
-| API p99 latency                   | < 500ms   | > 750ms over 5min    |
-| Council deliberation success rate | 99%       | < 97% over 15min     |
-| Queue job processing rate         | < 30s p99 | > 60s p99 over 10min |
-| Audit log chain integrity         | 100%      | Any breach           |
+| SLO                               | Target    | Alert threshold    |
+| --------------------------------- | --------- | ------------------ |
+| API availability                  | 99.5%     | < 99% over 5min    |
+| API p99 latency                   | < 500ms   | > 5s over 3min     |
+| Council deliberation success rate | 99%       | < 97% over 15min   |
+| Queue job processing rate         | < 30s p99 | Queue depth rising |
+| Audit log chain integrity         | 100%      | Any breach         |
 
-Alert destinations: PagerDuty (Critical), Slack `#nexus-alerts` (Warning).
+Grafana is the alert destination in the bundled stack. Point its contact points at
+your pager or chat service if you want notifications off the box.

@@ -15,6 +15,7 @@ pnpm-lock.yaml
 .docusaurus/
 REF/
 .claude/worktrees/
+.opencode/
 
 # Local reference clones (inspiration material — never repo source)
 inspiration/

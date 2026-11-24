@@ -1,0 +1,41 @@
+# k6 baseline, 2026-11-23
+
+Target: local API on PGlite (`DATABASE_URL=pglite://.nexus/db`), Node 26.8.1, Windows,
+`NODE_ENV=development`, `NEXUS_API_KEY` set. The compose stack was measured later the same day
+(see below) once Docker Desktop was running.
+
+## Compose stack: `docker compose up -d --build` from a clean clone
+
+Target: `http://localhost:3000`, Postgres 18 + pgvector, Redis, the API container. Same 75-VU
+profile, `NEXUS_API_RATE_LIMIT` at its default of 300/min.
+
+- Smoke: 25/25 checks, `http_req_failed` 0.00%, med 2.82ms, p95 12.45ms, max 24.43ms, 5 iterations
+- Load: 6564 iterations in 61.2s, 12,222 checks passed, `http_req_failed` 0.00%
+- `http_req_duration`: med 1.71ms, p95 11.44ms, max 68.95ms (p95<200 and p99<500 pass)
+- throttled: 92.46% (5792 of 6264) - the same per-key limiter, not a server limit
+
+## Smoke: `k6 run infra/k6/smoke-test.js`
+
+- checks: 25/25 passed, 0 failed
+- http_req_failed: 0.00%
+- http_req_duration: med 2.42ms, p95 8.98ms, max 14.19ms
+- 5 iterations, 305 req/s
+
+## Load: `k6 run infra/k6/load-test.js`
+
+- 6602 requests in 60.8s, 108.5 req/s attempted
+- http_req_failed: 0.00%
+- http_req_duration: med 1.05ms, p95 3.13ms, max 22.42ms (thresholds p95<200, p99<500 pass)
+- throttled: 95.23% (6002 of 6302) — `429`
+- ingest accepted: 4.96% (46 of 927), the rest throttled
+
+The limiter, not the server, is the ceiling: `/api/v1/*` admits 300 requests a minute per IP
+(`NEXUS_API_RATE_LIMIT`, `apps/api/src/server.ts:374`) and 600 per user, so a 75-VU profile can
+only ever get ~5 requests a second through. The accepted requests answer in single-digit
+milliseconds; there is no latency signal beyond that until the cap is raised.
+
+Before the run was fixed to expect 429, the same profile reported 88.95% `http_req_failed` and a
+6% success rate. That was the limiter, not an outage.
+
+To measure capacity rather than the limiter, raise `NEXUS_API_RATE_LIMIT` on the target first and
+record the value next to the numbers.

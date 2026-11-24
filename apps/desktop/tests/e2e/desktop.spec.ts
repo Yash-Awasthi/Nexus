@@ -18,8 +18,21 @@ async function launch(dataDir: string) {
   const env = { ...process.env, NEXUS_DESKTOP_DATA_DIR: dataDir } as Record<string, string>;
   delete env["NEXUS_DESKTOP_URL"];
   delete env["NEXUS_API_URL"];
-  const app = await electron.launch({ args: [MAIN], env, timeout: 120_000 });
+  // GitHub's runners have no usable SUID helper for Chromium's sandbox, so Electron exits
+  // before it creates a window. Local runs keep the sandbox.
+  const args = process.env["CI"] ? ["--no-sandbox", MAIN] : [MAIN];
+  const app = await electron.launch({ args, env, timeout: 120_000 });
+  // Playwright only reports that no window appeared, so the main process and the
+  // API child's own output has to reach the CI log or the cause is invisible.
+  app.process().stdout?.on("data", (chunk: Buffer) => process.stdout.write(chunk));
+  app.process().stderr?.on("data", (chunk: Buffer) => process.stderr.write(chunk));
   const page = await app.firstWindow({ timeout: 120_000 });
+  // A CI runner has no unlocked keyring, so `safeStorage` reports unavailable and the app
+  // refuses to seal a session. Electron's in-memory key is enough for a throwaway profile;
+  // a real install still uses the OS keychain.
+  if (process.env["CI"]) {
+    await app.evaluate(({ safeStorage }) => safeStorage.setUsePlainTextEncryption(true));
+  }
   return { app, page };
 }
 
@@ -123,21 +136,27 @@ test("a fresh install signs up, works, and keeps it all across a restart", async
     timeout: 60_000,
   });
 
-  // A Python kernel keeps its variables between runs.
-  await page.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "python" }).click();
-  await page.getByLabel("Keep variables between runs").check();
-  const editor = page.getByPlaceholder("// Write your code here…");
-  const run = page.getByRole("button", { name: /^(Run|Running…)$/ });
-  await editor.fill("n = 41");
-  await run.click();
-  await page.getByRole("button", { name: "Reset kernel" }).waitFor({ timeout: 120_000 });
-  await expect(run).toBeEnabled({ timeout: 120_000 });
-  await editor.fill("print(n + 1)");
-  await run.click();
-  await expect(page.locator("pre").filter({ hasText: /^\s*42\s*$/ })).toBeVisible({
-    timeout: 120_000,
-  });
+  // A Python kernel keeps its variables between runs. Kernels are Docker containers, so
+  // without a daemon the page says so and there is nothing to keep alive.
+  const sandbox = (await page.evaluate(() =>
+    fetch("/api/sandbox/status").then((r) => r.json()),
+  )) as { dockerAvailable?: boolean };
+  if (sandbox.dockerAvailable) {
+    await page.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: "python" }).click();
+    await page.getByLabel("Keep variables between runs").check();
+    const editor = page.getByPlaceholder("// Write your code here…");
+    const run = page.getByRole("button", { name: /^(Run|Running…)$/ });
+    await editor.fill("n = 41");
+    await run.click();
+    await page.getByRole("button", { name: "Reset kernel" }).waitFor({ timeout: 120_000 });
+    await expect(run).toBeEnabled({ timeout: 120_000 });
+    await editor.fill("print(n + 1)");
+    await run.click();
+    await expect(page.locator("pre").filter({ hasText: /^\s*42\s*$/ })).toBeVisible({
+      timeout: 120_000,
+    });
+  }
 
   // Closing the window leaves the app, and its companies, running in the tray.
   const origin = new URL(page.url()).origin;

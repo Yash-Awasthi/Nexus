@@ -7,7 +7,9 @@
  * against `ctx.workingDir` and rejected if it escapes that root, so an agent can
  * never read outside the workspace it was granted. No tool here mutates state or
  * makes an outbound call — they are pure reads, which is why their names live in
- * `AUTO_ALLOWED_TOOLS` and need no permission gate.
+ * `AUTO_ALLOWED_TOOLS` and need no permission gate. The read-only LSP tools
+ * (`lsp_definition`, `lsp_references`, `lsp_hover`, `lsp_document_symbols`,
+ * `lsp_diagnostics`) are auto-allowed for the same reason; see lsp-tools.ts.
  *
  * Zero runtime dependencies: the glob matcher and directory walker are inlined to
  * avoid pulling a glob library into the agent hot-path.

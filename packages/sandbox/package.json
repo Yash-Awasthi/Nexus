@@ -2,7 +2,7 @@
   "name": "@nexus/sandbox",
   "version": "0.0.0",
   "private": false,
-  "description": "Secure code execution sandbox — isolated subprocess runner for JS, TS, Python, Bash",
+  "description": "Secure code execution sandbox — isolated subprocess runner for JS, TS, Python, Bash, Go, Rust, Ruby",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./src/index.ts",

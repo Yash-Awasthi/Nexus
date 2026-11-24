@@ -17,12 +17,14 @@
  */
 
 export interface LocalApiPaths {
-  /** API entrypoint (`apps/api/src/index.ts`), run with Node's type stripping. */
+  /** API entrypoint: bundled JavaScript in a packaged app, TypeScript in a checkout. */
   entry: string;
   /** Built SPA directory (`apps/ui/build/client`). */
   spaDir: string;
   /** Writable directory for the embedded database and file-backed stores. */
   dataDir: string;
+  /** Bundled migrations folder; unset in a checkout, where the package resolves them. */
+  migrationsDir?: string;
 }
 
 export interface SpawnedProcess {
@@ -69,9 +71,13 @@ export function localApiEnv(
     DATABASE_URL: `pglite://${paths.dataDir}/postgres`,
     NEXUS_DATA_DIR: `${paths.dataDir}/stores`,
     NEXUS_SPA_DIR: paths.spaDir,
+    ...(paths.migrationsDir ? { NEXUS_MIGRATIONS_DIR: paths.migrationsDir } : {}),
     // No Redis on a laptop: the KV layer falls back to its in-process store,
     // and the durable surfaces sit on the embedded Postgres above.
     NEXUS_DESKTOP: "1",
+    // Language servers are operator-installed binaries on this machine's PATH;
+    // with none installed the LSP tools stay absent instead of failing.
+    NEXUS_LSP: "1",
   };
 }
 

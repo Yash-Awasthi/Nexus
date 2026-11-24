@@ -24,6 +24,7 @@
     "@nexus/contracts": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/llm": "workspace:*",
+    "@nexus/lsp": "workspace:*",
     "@nexus/governance": "workspace:*",
     "@nexus/memory": "workspace:*",
     "@nexus/shared": "workspace:*",

@@ -13,7 +13,7 @@ import {
   applyBrowserAction,
   BrowserUrlBlockedError,
   type BrowserActionPage,
-} from "../../src/lib/browser-agent.ts";
+} from "@nexus/browser-automation";
 
 /** Records what an action asked the page to do. */
 function fakePage(): BrowserActionPage & { calls: string[] } {

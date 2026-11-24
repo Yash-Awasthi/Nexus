@@ -100,13 +100,14 @@ pnpm dev
 
 - All tests live in `<package>/tests/` or colocated `*.test.ts` files.
 - Use **Vitest** for unit + integration tests. Use **Playwright** for e2e.
-- Coverage floor: **≥ 80%** on all published packages; **≥ 90%** on `runtime`, `governance`, `council`, `auth`.
-- CI blocks PRs that lower coverage below the floor.
+- Coverage thresholds are set once in `vitest.config.ts`: statements 85, lines 87,
+  functions 86, branches 73. `pnpm exec vp test run --coverage` enforces them.
+- CI blocks PRs that lower coverage below those numbers.
 - Every adapter must have a contract test using `@nexus/plugin-sdk/testing`.
 
 ```bash
 pnpm test --filter @nexus/agent-core        # single package
-pnpm test --coverage                     # with coverage report
+pnpm exec vp test run --coverage            # with coverage report
 ```
 
 Conventions for new work: build against mocks (`MockTransport`, an injectable `fetchFn` or
@@ -194,11 +195,10 @@ ADRs are immutable once merged. To supersede one, create a new ADR that explicit
 See [`docs/plugin-author-guide.md`](docs/plugin-author-guide.md) for the full guide. Quick version:
 
 ```bash
-# Scaffold a new adapter package
-mkdir -p packages/adapters/my-service/src
+# Scaffold a new adapter package under packages/adapters/<name>
+pnpm scaffold:adapter my-service
 # Implement defineAdapter() from @nexus/plugin-sdk
 # Add contract tests using @nexus/plugin-sdk/testing
-# Add to pnpm-workspace.yaml
 # Add a changeset
 ```
 

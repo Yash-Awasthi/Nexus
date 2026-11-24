@@ -31,6 +31,7 @@ export default [
   route("knowledge-graph", "routes/knowledge-graph.tsx"),
   route("search", "routes/search.tsx"),
   route("sandbox", "routes/sandbox.tsx"),
+  route("sandbox/connect", "routes/sandbox-connect.tsx"),
   route("terminals", "routes/terminals.tsx"),
   route("settings", "routes/settings.tsx"),
   route("profile", "routes/profile.tsx"),

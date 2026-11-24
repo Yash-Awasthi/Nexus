@@ -291,6 +291,11 @@ export const AUTO_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
   "conversation_search",
   "session_search",
   "codesearch",
+  "lsp_definition",
+  "lsp_references",
+  "lsp_hover",
+  "lsp_document_symbols",
+  "lsp_diagnostics",
 ]);
 
 /** Classify a tool by name into a permission tier (case-insensitive). */
@@ -299,7 +304,10 @@ export function classifyTool(name: string): ActionTier {
 }
 
 // Read-only filesystem tools (`read_file`, `list_files`, `glob`, `grep`), scoped
-// to `ctx.workingDir`. Their names are all in AUTO_ALLOWED_TOOLS above.
+// to `ctx.workingDir`, plus the read-only LSP tools (`lsp_definition`,
+// `lsp_references`, `lsp_hover`, `lsp_document_symbols`, `lsp_diagnostics`).
+// Their names are all in AUTO_ALLOWED_TOOLS above; `lsp_rename` and
+// `lsp_code_actions` are not, so they stay behind the approval gate.
 export {
   createFilesystemTools,
   applyEdit,
@@ -310,6 +318,19 @@ export {
 } from "./fs-tools.ts";
 export type { CommandExecutor, CommandResult } from "./fs-tools.ts";
 export { SANDBOX_PRELUDE } from "./sandbox-prelude.ts";
+// LSP tools — read-only names are auto-allowed; rename and code actions gate.
+export {
+  createLspRuntime,
+  createLspTools,
+  LSP_GATED_TOOLS,
+  LSP_READ_ONLY_TOOLS,
+} from "./lsp-tools.ts";
+export type {
+  CreateLspRuntimeOptions,
+  CreateLspToolsOptions,
+  LspLanguageStatus,
+  LspRuntime,
+} from "./lsp-tools.ts";
 // MCP tool bridge — dependency-injected, defaults to the requires_permission tier.
 export { createMcpTools } from "./mcp-tools.ts";
 export type { McpBridgeOptions, McpToolClient, McpToolInfo, McpToolResult } from "./mcp-tools.ts";

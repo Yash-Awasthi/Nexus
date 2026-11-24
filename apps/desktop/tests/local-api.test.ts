@@ -58,6 +58,14 @@ describe("localApiEnv", () => {
     const keys = { NEXUS_SECRETS_KEY: "a".repeat(64), NEXUS_JWT_SECRET: "b".repeat(64) };
     expect(localApiEnv(PATHS, "key-123", 41234, keys)).toMatchObject(keys);
   });
+
+  it("names the bundled migrations folder only when the build ships one", () => {
+    expect("NEXUS_MIGRATIONS_DIR" in env).toBe(false);
+    const bundled = { ...PATHS, migrationsDir: "/app/resources/api/migrations" };
+    expect(localApiEnv(bundled, "key-123", 41234).NEXUS_MIGRATIONS_DIR).toBe(
+      "/app/resources/api/migrations",
+    );
+  });
 });
 
 describe("startLocalApi", () => {

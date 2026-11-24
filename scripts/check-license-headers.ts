@@ -42,6 +42,7 @@ const IGNORE_DIRS = new Set([
   "Python", // vendored embedded CPython runtime (gitignored; not repo source)
   "coverage-html",
   "inspiration", // local reference clones (gitignored; never committed, not repo source)
+  ".nexus", // local runtime state: PGlite db, sandbox scratch, logs (gitignored)
 ]);
 
 const IGNORE_PATTERNS = [

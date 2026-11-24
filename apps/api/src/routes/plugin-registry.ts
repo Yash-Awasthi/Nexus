@@ -26,7 +26,7 @@ import type { FastifyInstance } from "fastify";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
-export interface RegistryRecord {
+interface RegistryRecord {
   manifest: PluginManifest;
   /** Publisher identity (nexusUserId when auth resolves one, else "anon"). */
   publisher: string;
@@ -39,10 +39,10 @@ export interface RegistryRecord {
  * module reads/seeds it (UI projection) and bumps download counters on
  * install; publish/unpublish stay in this file's wire contract.
  */
-export const pluginRegistryStore = new PersistentStore<RegistryRecord>("plugin_registry");
+const pluginRegistryStore = new PersistentStore<RegistryRecord>("plugin_registry");
 
 /** Composite key: id + version (a registry holds every published version). */
-export const registryKeyOf = (id: string, version: string): string => `${id}@${version}`;
+const registryKeyOf = (id: string, version: string): string => `${id}@${version}`;
 
 const store = pluginRegistryStore;
 const keyOf = registryKeyOf;

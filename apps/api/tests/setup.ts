@@ -35,6 +35,13 @@ if (!process.env.DATABASE_URL) {
 process.env.OLLAMA_BASE_URL ??= "http://127.0.0.1:9";
 process.env.NEXUS_EMBED_PROVIDER ??= "fixed";
 
+// requireAuth bypasses only while no key or JWT secret is configured. A machine or CI runner
+// that exports one would turn every route test into a 401, so start unconfigured; the auth
+// tests set these themselves.
+for (const key of ["NEXUS_API_KEY", "NEXUS_JWT_SECRET", "NEXUS_JWT_PUBLIC_KEY"]) {
+  delete process.env[key];
+}
+
 vi.mock("pg", () => {
   // Plain functions, NOT vi.fn(): suites call vi.restoreAllMocks() in
   // afterEach, which strips vi.fn() implementations — and the PersistentStore

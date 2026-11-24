@@ -25,7 +25,7 @@ interface SessionUser {
 }
 
 /** What the renderer is given: the user, and a token it can send. */
-export interface RendererSession {
+interface RendererSession {
   user: SessionUser;
   accessToken: string;
 }

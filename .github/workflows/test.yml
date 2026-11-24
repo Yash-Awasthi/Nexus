@@ -127,6 +127,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Playwright launches dist/main.js, not the TypeScript sources.
       - run: pnpm --filter @nexus/desktop build
+      # The desktop shell serves the built UI from the local API; without this the
+      # child process refuses to start and Playwright only sees a missing window.
+      - run: pnpm --filter @nexus/ui build
+      # Install scripts are blocked in pnpm-workspace.yaml, so the Electron binary is
+      # fetched on first use. Do that here, outside the launch timeout.
+      - run: pnpm --filter @nexus/desktop exec node -e "require('electron/install.js')"
+      # The sandbox page's kernel section runs only when Docker answers; the image it
+      # uses is pulled here so the test never waits on a download.
+      - run: docker pull python:3.12-slim
       - run: xvfb-run -a pnpm --filter @nexus/desktop exec playwright test
 
   migrations:

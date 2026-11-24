@@ -31,7 +31,7 @@ export interface ModerationDeps {
   noLlm: string;
 }
 
-export interface ModCategory {
+interface ModCategory {
   name: string;
   enabled: boolean;
   threshold: number;

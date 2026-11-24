@@ -41,6 +41,7 @@ import type { FastifyInstance } from "fastify";
 
 import { APPROVAL_TTL_MS, classifyAction } from "../lib/exec-approvals.ts";
 import { guardExec } from "../lib/exec-guard.ts";
+import { authorizeLspSpawn } from "../lib/lsp.ts";
 import { MissionGraphRecorder } from "../lib/mission-graph.ts";
 import { loadMissionMemory, type MissionMemory } from "../lib/mission-memory.ts";
 import {
@@ -62,6 +63,7 @@ import {
   type MissionOutputStyle,
   type SkillRecord,
 } from "../lib/skill-runner.ts";
+import { invalidateSymbolCache } from "../lib/symbols.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 import { getDefaultDriver } from "./api-bridge.ts";
@@ -211,6 +213,9 @@ async function startMission(
     breaker.recordError(record.id);
     console.log(`[breaker] mission ${record.id}: tool error on ${toolName}`);
   };
+  graph.onToolSuccess = (toolName) => {
+    if (toolName === "edit_file") invalidateSymbolCache();
+  };
   const toolSet = buildMissionToolset(llm, opts.shell === true);
   if (skills.length > 0) {
     // Skills execute end-to-end: the acting agent gets run_skill_code so the
@@ -261,6 +266,7 @@ async function startMission(
       : MISSION_ACTING_PROMPT;
   const actingPrompt = dispatchBlock ? `${dispatchBlock}\n\n${basePrompt}` : basePrompt;
 
+  const workingDir = await missionDir(uid, record.id);
   const runner = new MissionRunner({
     llm,
     toolSet,
@@ -276,7 +282,10 @@ async function startMission(
     stepsPerIteration: opts.stepsPerIteration ?? 5,
     store: kvMissionStore(uid),
     signal: controller.signal,
-    workingDir: await missionDir(uid, record.id),
+    workingDir,
+    // Language servers are operator-installed binaries gated by exec-policy;
+    // the runner disposes the pool when the mission ends.
+    lsp: { authorize: authorizeLspSpawn, workingDir },
     sessionId: record.id,
     id: record.id,
     skills: skills.map((s) => ({ id: s.id, name: s.name })),

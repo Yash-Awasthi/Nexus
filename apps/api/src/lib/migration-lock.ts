@@ -16,7 +16,7 @@ import pg from "pg";
 import { isEmbeddedUrl } from "./pg-pool.ts";
 
 /** Advisory-lock key for the migration step ("nexu"). */
-export const MIGRATION_LOCK_KEY = 0x6e657875;
+const MIGRATION_LOCK_KEY = 0x6e657875;
 
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_RETRY_MS = 1_000;

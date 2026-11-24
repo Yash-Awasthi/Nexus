@@ -71,7 +71,7 @@ done < <(find docs -maxdepth 1 -type f -printf '%p\n' | sort)
 [ "$missing" = "0" ] && echo "index covers $(find docs -maxdepth 1 -type f | wc -l | tr -d ' ') files in docs/"
 
 # 4. No code, script or root README still refers to a document's old root path.
-stale="$(grep -nE --exclude=check-docs.sh '(^|[^/[:alnum:]_.-])(ARCHITECTURE\.md|PLAN\.md|mission\.txt|SRS_Agent_Board_v[0-9.]+\.md|SRS Agent Board)' \
+stale="$(grep -nE --exclude=check-docs.sh '(^|[^/[:alnum:]_.-])(ARCHITECTURE\.md|mission\.txt|SRS_Agent_Board_v[0-9.]+\.md|SRS Agent Board)' \
   README.md scripts/*.sh $(find cmd pkg -name '*.go') 2>/dev/null || true)"
 if [ -n "$stale" ]; then
   echo "FAIL  stale root-path references:"

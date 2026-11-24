@@ -245,3 +245,43 @@ describe("surface defaults", () => {
     ).toBe("deny");
   });
 });
+
+describe("lsp surface", () => {
+  it("runs an operator-configured language server without asking", () => {
+    const result = decide(
+      { surface: "lsp", command: "pyright-langserver", args: ["--stdio"] },
+      ask,
+    );
+
+    expect(result.decision).toBe("allow");
+    expect(result.rule).toBe("builtin:surface-default:lsp");
+  });
+
+  it("is denied by readonly like every other surface", () => {
+    const result = decide({ surface: "lsp", command: "pyright-langserver" }, { mode: "readonly" });
+
+    expect(result.decision).toBe("deny");
+    expect(result.rule).toBe("mode:readonly");
+  });
+
+  it("is raised to ask by NEXUS_EXEC_ASK_SURFACES", () => {
+    const config = policyFromEnv({ NEXUS_EXEC_ASK_SURFACES: "lsp" });
+
+    expect(config.askSurfaces).toEqual(["lsp"]);
+    expect(decide({ surface: "lsp", command: "pyright-langserver" }, config).decision).toBe("ask");
+  });
+
+  it("lets a deny rule on the server binary win over the allow default", () => {
+    const result = decide(
+      { surface: "lsp", command: "/usr/local/bin/pyright-langserver" },
+      {
+        mode: "trusted",
+        deny: [{ id: "op:no-pyright", command: "pyright-langserver", reason: "Not on this host." }],
+        allow: [{ id: "op:any", command: "*", reason: "Trusted." }],
+      },
+    );
+
+    expect(result.decision).toBe("deny");
+    expect(result.rule).toBe("op:no-pyright");
+  });
+});

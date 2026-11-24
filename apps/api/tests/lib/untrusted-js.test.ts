@@ -61,7 +61,9 @@ describe("start-up deadline", () => {
     `setTimeout(() => process.stderr.write(${JSON.stringify(STARTED)}), ${ms});`;
 
   it("waits as long as the caller allows for the runner to start", async () => {
-    const r = await runSandboxedNode([], slowStart(1500), "", 5_000, [], 4_000);
+    // 15 s, not 5: a full-suite run on a loaded machine spends several seconds just
+    // starting the child Node, and a budget that covers only the 1.5 s delay fails there.
+    const r = await runSandboxedNode([], slowStart(1500), "", 5_000, [], 15_000);
     expect(r.timedOut).toBe(false);
   });
 

@@ -68,12 +68,12 @@ export function stateFromThisBrowser(request: FastifyRequest, state: string): bo
 }
 
 /** A page navigation asks for HTML; the desktop app's fetch and API clients do not. */
-export function isBrowserNavigation(request: FastifyRequest): boolean {
+function isBrowserNavigation(request: FastifyRequest): boolean {
   return (request.headers.accept ?? "").includes("text/html");
 }
 
 /** Where the sign-in page picks the session up from the cookie. */
-export function signedInUrl(appBase = "", next?: string): string {
+function signedInUrl(appBase = "", next?: string): string {
   const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : undefined;
   return `${appBase}/login?signed_in=1${safeNext ? `&next=${encodeURIComponent(safeNext)}` : ""}`;
 }

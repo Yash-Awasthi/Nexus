@@ -87,13 +87,13 @@ export type RunStatus =
   | "timed_out"
   | "skipped";
 
-export interface RunLogLine {
+interface RunLogLine {
   ts: string;
   stream: "system" | "stdout" | "stderr" | "agent";
   text: string;
 }
 
-export interface RunOutcome {
+interface RunOutcome {
   status: TaskStatus | "delegated" | null;
   summary: string;
   subtasks: string[];

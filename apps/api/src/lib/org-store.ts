@@ -75,7 +75,7 @@ export type AgentStatus =
   | "pending_approval"
   | "terminated";
 
-export const ADAPTER_TYPES = [
+const ADAPTER_TYPES = [
   "nexus",
   "claude_code",
   "codex",
@@ -144,7 +144,7 @@ const CONFIG_KEYS = [
   "secretNames",
 ] as const;
 
-export type AgentConfig = Pick<Agent, (typeof CONFIG_KEYS)[number]>;
+type AgentConfig = Pick<Agent, (typeof CONFIG_KEYS)[number]>;
 
 /** An agent's config as it was before one edit. */
 export interface AgentRevision {

@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   dependencies:
-    name: Production dependency advisories
+    name: Dependency advisories
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,6 +26,8 @@ jobs:
           node-version: "26"
       # Fails on a high or critical advisory in what ships; lower ones are reviewed by hand.
       - run: pnpm audit --prod --audit-level high
+      # Dev-only trees still execute on CI machines and developer laptops.
+      - run: pnpm audit --audit-level high
 
   gitleaks:
     name: Secret scanning (gitleaks)

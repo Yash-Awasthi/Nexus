@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /** Minimal event shape required by ApprovalWorkflow.rebuildState. */
-export interface IEventRecord {
+interface IEventRecord {
   event: string;
   payload: unknown;
 }

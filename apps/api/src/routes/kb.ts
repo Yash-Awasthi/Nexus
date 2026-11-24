@@ -171,30 +171,11 @@ export async function searchKb(
   }));
 }
 
-/** The caller's knowledge base with this name, created when missing. */
-export function ensureKb(userId: string | undefined, name: string, description = ""): Kb {
-  const found = listKbsFor(userId).find(
-    (kb) => kb.ownerId === (userId ?? null) && kb.name === name,
-  );
-  if (found) return found;
-  const kb: Kb = {
-    id: crypto.randomUUID(),
-    ownerId: userId ?? null,
-    name: name.slice(0, 200),
-    description: description.slice(0, 2000),
-    docCount: 0,
-    createdAt: now(),
-    documents: [],
-  };
-  _kbStore.set(kb.id, kb);
-  return kb;
-}
-
 /**
  * Chunk `text` into a knowledge base as one document. With `replace`, an
  * existing document of the same name is dropped first, so a re-sync updates.
  */
-export async function putKbText(
+async function putKbText(
   mem: MemoryManager,
   userId: string | undefined,
   kbId: string,
@@ -241,32 +222,6 @@ export async function putKbText(
   _kbStore.set(kb.id, kb);
   return doc;
 }
-
-/** Drop the documents whose names are not in `keep`; returns how many went. */
-export async function pruneKbDocs(
-  mem: MemoryManager,
-  userId: string | undefined,
-  kbId: string,
-  keep: Set<string>,
-): Promise<number> {
-  const kb = _kbStore.get(kbId);
-  if (!kb) return 0;
-  const gone = kb.documents.filter((d) => !keep.has(d.name));
-  for (const d of gone) {
-    const rows = await mem.list({
-      userId: userId ?? "local",
-      metadata: { category: "kb", kbId, docId: d.id },
-    });
-    await Promise.all(rows.map((r) => mem.forget(r.id)));
-  }
-  kb.documents = kb.documents.filter((d) => keep.has(d.name));
-  _kbStore.set(kb.id, kb);
-  return gone.length;
-}
-
-/** Text from HTML, for pages fetched rather than uploaded. */
-export const htmlToText = (html: string): Promise<string> =>
-  extractText("html", Buffer.from(html, "utf8"));
 
 /** Register the /kb surface. Called from apiBridgeRoutes. */
 export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promise<void> {

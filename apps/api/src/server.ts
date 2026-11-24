@@ -78,6 +78,7 @@ import { libertasRoutes } from "./routes/libertas.ts";
 import { llmOauthRoutes } from "./routes/llm-oauth.ts";
 import { llmRoutes } from "./routes/llm.ts";
 import { localPtyRoutes } from "./routes/local-pty.ts";
+import { lspRoutes } from "./routes/lsp.ts";
 import { mailIngestRoutes } from "./routes/mail-ingest.ts";
 import { mcpOpenApiRoutes } from "./routes/mcp-openapi.ts";
 import { mcpServersRoutes } from "./routes/mcp-servers.ts";
@@ -500,6 +501,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Enterprise — SAML 2.0 SSO (Okta, Azure AD, Google Workspace, etc.)
       await api.register(samlRoutes);
+
+      // Language servers — status and lifecycle (spawns gated by exec policy)
+      await api.register(lspRoutes);
 
       // System diagnostics — consolidated operability endpoint
       await api.register(diagnosticsRoutes);

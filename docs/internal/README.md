@@ -2,10 +2,9 @@
 
 # Internal engineering notes — security hardening and enrichment
 
-Working documents for the security hardening and feature enrichment program that started on
-2026-10-14. They are the source of truth for what was found, what was decided, what is being
-built and in which order. Public-facing docs (`docs/*.md`, `SECURITY.md`) describe the product;
-these describe the work.
+Working documents from the security hardening and feature enrichment program that started on
+2026-10-14. They record what was found, decided and built. `plan.md` is the only scheduled work;
+public-facing docs (`docs/*.md`, `SECURITY.md`) describe the product.
 
 ## Files
 

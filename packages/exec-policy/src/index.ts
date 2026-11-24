@@ -40,7 +40,7 @@ export type PermissionMode =
 export type Decision = "allow" | "ask" | "deny";
 
 /** The surfaces that can execute something. Named so a rule can target one. */
-export type ExecSurface = "pty" | "sandbox" | "repl" | "tool";
+export type ExecSurface = "pty" | "sandbox" | "repl" | "tool" | "lsp";
 
 /**
  * What an uncovered action does on each surface, and why they differ.
@@ -62,6 +62,13 @@ export type ExecSurface = "pty" | "sandbox" | "repl" | "tool";
  * authentication and the per-route guards; gating every one of them would
  * approve nothing new.
  *
+ * `lsp` starts a language server whose binary and arguments are operator
+ * configuration (`NEXUS_LSP_*_CMD`), not model input. A prompt there would ask
+ * a human to approve the operator's own setup on every call, so the default is
+ * `allow`. Readonly mode still denies every spawn, and a deny rule on the
+ * server binary still wins, which is where an operator writes the one they do
+ * not want started.
+ *
  * Deny rules and readonly mode apply to every surface regardless.
  */
 const SURFACE_DEFAULTS: Readonly<Record<ExecSurface, Decision>> = {
@@ -69,6 +76,7 @@ const SURFACE_DEFAULTS: Readonly<Record<ExecSurface, Decision>> = {
   sandbox: "allow",
   repl: "allow",
   tool: "allow",
+  lsp: "allow",
 };
 
 export interface ExecAction {
@@ -304,7 +312,7 @@ const MODES: readonly PermissionMode[] = ["readonly", "ask", "trusted"];
 export function policyFromEnv(env: NodeJS.ProcessEnv = process.env): PolicyConfig {
   const raw = env.NEXUS_EXEC_MODE?.trim().toLowerCase();
   const mode = MODES.find((m) => m === raw) ?? "ask";
-  const surfaces: readonly ExecSurface[] = ["pty", "sandbox", "repl", "tool"];
+  const surfaces: readonly ExecSurface[] = ["pty", "sandbox", "repl", "tool", "lsp"];
   return {
     mode,
     askSurfaces: (env.NEXUS_EXEC_ASK_SURFACES ?? "")

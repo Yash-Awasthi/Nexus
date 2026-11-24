@@ -17,7 +17,6 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@nexus/contracts": "workspace:*",
     "@toon-format/toon": "^2.3.1"
   },
   "optionalDependencies": {

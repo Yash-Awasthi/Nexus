@@ -3,8 +3,7 @@
 # Nexus — Architecture & Repository Layout
 
 How the apps, packages, and infrastructure fit together. For per-feature detail see
-[FEATURES.md](FEATURES.md); for the design history see the
-[ADRs](adr/).
+[FEATURES.md](FEATURES.md); for the design history see the [ADRs](adr/).
 
 ## System diagram
 
@@ -12,50 +11,50 @@ How the apps, packages, and infrastructure fit together. For per-feature detail 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Nexus monorepo                                 │
 │                                                                             │
-│  ┌──────────────┐   ┌───────────────────┐   ┌──────────────────────────┐   │
-│  │  services/   │   │    apps/api        │   │      apps/worker         │   │
-│  │   ingest     │──▶│  (Fastify)         │──▶│  BullMQ high/med/low     │   │
-│  │  (Python)    │   │  REST + SSE + MCP  │   │  signal + task queues    │   │
-│  └──────────────┘   └────────┬──────────┘   │  repeatable feed jobs    │   │
-│         │                    │               └──────────────────────────┘   │
+│  ┌──────────────┐   ┌───────────────────┐   ┌──────────────────────────┐    │
+│  │  services/   │   │    apps/api       │   │      apps/worker         │    │
+│  │   ingest     │──▶│  (Fastify)        │──▶│  BullMQ high/med/low     │    │
+│  │  (Python)    │   │  REST + SSE + MCP │   │  signal + task queues    │    │
+│  └──────────────┘   └────────┬──────────┘   │  repeatable feed jobs    │    │
+│         │                    │              └──────────────────────────┘    │
 │  adapters emit               │ REST/SSE                                     │
 │  ingested_events             ▼                                              │
-│         │           ┌──────────────┐   ┌──────────────────────────────┐    │
-│         │           │   apps/ui    │   │         apps/cli             │    │
-│         │           │ (React RR7)  │   │       (commander.js)         │    │
-│         │           └──────────────┘   └──────────────────────────────┘    │
+│         │           ┌──────────────┐   ┌──────────────────────────────┐     │
+│         │           │   apps/ui    │   │    apps/cli, apps/desktop    │     │
+│         │           │ (React RR8)  │   │  commander CLI · Electron    │     │
+│         │           └──────────────┘   └──────────────────────────────┘     │
 │         ▼                                                                   │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                         packages/ (110)                              │   │
+│  │                         packages/ (49)                               │   │
 │  │                                                                      │   │
-│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐   │   │
-│  │  │ agent-runtime  │  │   council    │  │      llm-drivers        │   │   │
-│  │  │ multi-step     │  │ multi-model  │  │  15 providers           │   │   │
-│  │  │ tool loop +    │  │ voting with  │  │  native SSE/NDJSON      │   │   │
-│  │  │ swarm layer    │  │ allSettled   │  │  streaming              │   │   │
-│  │  └────────────────┘  └──────────────┘  └────────────────────────┘   │   │
+│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐    │   │
+│  │  │   agent-core   │  │   council    │  │          llm           │    │   │
+│  │  │ multi-step     │  │ multi-model  │  │  49 provider drivers   │    │   │
+│  │  │ tool loop +    │  │ voting with  │  │  native SSE/NDJSON     │    │   │
+│  │  │ workflow layer │  │ allSettled   │  │  streaming             │    │   │
+│  │  └────────────────┘  └──────────────┘  └────────────────────────┘    │   │
 │  │                                                                      │   │
-│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐   │   │
-│  │  │   mcp-client   │  │  code-repl   │  │        runtime          │   │   │
-│  │  │ JSON-RPC 2.0   │  │  Docker REPL │  │  PlanningEngine         │   │   │
-│  │  │ HTTP transport │  │  Py/R/Julia  │  │  GovernanceEngine       │   │   │
-│  │  │                │  │  sandboxed   │  │  TaskExecutor           │   │   │
-│  │  └────────────────┘  └──────────────┘  └────────────────────────┘   │   │
+│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐    │   │
+│  │  │   mcp-client   │  │   sandbox    │  │        search          │    │   │
+│  │  │ JSON-RPC 2.0   │  │ Docker image │  │  hybrid BM25 + RRF     │    │   │
+│  │  │ HTTP transport │  │ fail-closed  │  │  GraphRAG, rerank      │    │   │
+│  │  └────────────────┘  └──────────────┘  └────────────────────────┘    │   │
 │  │                                                                      │   │
-│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐   │   │
-│  │  │    memory      │  │  telemetry   │  │      plugin-sdk         │   │   │
-│  │  │ pgvector +     │  │ OTel + HMAC  │  │  defineAdapter()        │   │   │
-│  │  │ MemoryGraph    │  │ audit log    │  │  + test harness         │   │   │
-│  │  └────────────────┘  └──────────────┘  └────────────────────────┘   │   │
+│  │  ┌────────────────┐  ┌──────────────┐  ┌────────────────────────┐    │   │
+│  │  │    memory      │  │  telemetry   │  │      plugin-sdk        │    │   │
+│  │  │ pgvector +     │  │ OTel + HMAC  │  │  defineAdapter()       │    │   │
+│  │  │ MemoryGraph    │  │ audit log    │  │  + test harness        │    │   │
+│  │  └────────────────┘  └──────────────┘  └────────────────────────┘    │   │
 │  │                                                                      │   │
-│  │  redteam · drift · stm · retrieval · knowledge-graph ·              │   │
-│  │  context-pruner · trigger-engine · stream-recovery · pipeline-      │   │
-│  │  signal · stealth-browser · gauntlet · doc-pipeline ·               │   │
-│  │  prediction-market · mcp-openapi                                    │   │
+│  │  governance · hooks · kv · llm-cache · llm-oauth · llm-tracer ·      │   │
+│  │  llm-translate · doc-pipeline · nlp-utils · pipeline-signal ·        │   │
+│  │  trigger-engine · stream-recovery · stealth-browser · researcher ·   │   │
+│  │  browser-automation · session-sync · pty · exec-policy ·             │   │
+│  │  escalation-breaker · tool-registry · mcp-openapi · ...              │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
-│  PostgreSQL (pgvector) · Redis (BullMQ) · Docker (REPL sandbox)            │
-│  Prometheus · Grafana · OpenTelemetry (OTLP) · Jaeger                      │
+│  PostgreSQL (pgvector) · Redis (BullMQ) · Docker (sandbox image)            │
+│  Prometheus · Grafana · OpenTelemetry (OTLP) · Jaeger                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,71 +63,66 @@ How the apps, packages, and infrastructure fit together. For per-feature detail 
 ```
 nexus/
 ├── apps/
-│   ├── api/            Fastify HTTP/SSE/WebSocket gateway (61 route modules)
+│   ├── api/            Fastify HTTP/SSE/WebSocket gateway (90 route modules)
 │   ├── cli/            Developer CLI (commander.js)
-│   ├── ui/             React Router v7 SPA dashboard (100+ routes)
+│   ├── desktop/        Electron shell
+│   ├── extension/      Browser extension around the search widget
+│   ├── sandbox-helper/ Loopback runner the browser page calls for local Docker
+│   ├── ui/             React Router 8 dashboard (43 routes)
 │   └── worker/         BullMQ workers — signal, task, and repeatable drive jobs
-├── packages/           90 scoped @nexus/* packages
-│   ├── agent-runtime/          Multi-step tool loop
+├── packages/           49 scoped @nexus/* packages
+│   ├── agent-core/             Multi-step tool loop, workflows, planning
 │   ├── council/                Multi-model voting (unanimous/majority/weighted)
-│   ├── llm-drivers/            40+ provider drivers, native SSE streaming
-│   ├── llm-router/             Dynamic routing by cost/latency/capability
+│   ├── llm/                    49 provider drivers, native SSE streaming
 │   ├── gateway/                IProvider, FallbackChain, classifyFailoverError()
-│   ├── best-of-n/              Best-of-N sampling + tournament selection
 │   ├── mcp-client/             JSON-RPC 2.0 MCP consumer
 │   ├── mcp-openapi/            OpenAPI → MCP tool auto-generation
-│   ├── code-repl/              DockerReplExecutor — sandboxed Python/R/Julia
-│   ├── runtime/                Orchestrator + PlanningEngine (11 blueprints), GovernanceEngine, TaskExecutor, circuit breaker, crash recovery, OTel tracing
+│   ├── sandbox/                Untrusted-code runner (Docker image, fail-closed)
+│   ├── search/                 Hybrid retrieval, GraphRAG, knowledge graph
 │   ├── memory/                 pgvector, MemoryGraph BFS, HNSW ANN
-│   ├── stm/                    Short-term memory: HedgeReducer, STMPipeline
-│   ├── knowledge-graph/        Entity graph, Leiden clustering, multi-hop BFS
-│   ├── retrieval/              RAG: chunk→embed→retrieve→rerank, hybrid search
-│   ├── context-pruner/         LlmCompactor + MicroCompactor (dual-trigger)
-│   ├── pipeline-signal/        ingest → classify → typed Signal rows
-│   ├── adaptive-scraper/       Proxy-aware scraper with robots.txt
-│   ├── stealth-browser/        PatchrightDriver + Redis Streams
 │   ├── doc-pipeline/           extract → classify → OCR → index
-│   ├── redteam/                Input perturbation engine
-│   ├── drift/                  EMA adaptive parameter tuning
-│   ├── gauntlet/               47-model race, 5 speed tiers, 0-100 scoring
+│   ├── researcher/             Research agent over search + documents
+│   ├── stealth-browser/        PatchrightDriver + Redis Streams
+│   ├── browser-automation/     Scripted browser sessions
 │   ├── rlhf-pipeline/          RLHF data pipeline
 │   ├── telemetry/              OTel, HMAC-chained audit log, Prometheus
 │   ├── auth/                   API key + JWT (HS256/RS256), login throttle,
 │   │                           session revocation, Fastify preHandler
 │   ├── db/                     Drizzle ORM — typed schemas + migrations
-│   ├── prediction-market/      Polymarket + Kalshi + Metaculus CLOB
+│   ├── contracts/              Generated OpenAPI types
 │   ├── plugin-sdk/             defineAdapter(), ISocialProvider, test harness
-│   └── adapter-{25}/           betterstack, calendar, cloudflare, confluence,
-│                               drive, github, gmail, groq, hubspot, jira,
-│                               linear, neon, notion, salesforce, slack, ...
+│   └── ...                     billing, bots, kv, pty, sdk, sse, and the rest
 ├── services/
-│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB, FinScrape bridge
+│   ├── board/          Go service
+│   └── ingest/         Python (FastAPI + Celery) — adapter runners → DB
 ├── infra/
 │   ├── docker/         docker-compose.dev/observability
 │   ├── grafana/        Pre-provisioned dashboards
+│   ├── k6/             Smoke and load test scripts
 │   ├── otel/           OTel Collector, Prometheus, datasource configs
-│   ├── helm/nexus/     Helm chart (6 templates, HPA, ingress)
-│   ├── terraform/      GKE / EKS provisioning modules
-│   └── k6/             Smoke and load test scripts
+│   ├── sandbox/        Untrusted-code image (Node, Python, Go, Rust, Ruby)
+│   ├── searxng/        Self-hosted metasearch configuration
+│   └── web/            Production web image used by render.yaml
 ├── docs/               This directory — guides, ADRs, runbook, SLOs, security
-├── docker-compose.yml  Local dev stack (postgres, redis, ingest, api)
+├── docker-compose.yml  Local dev stack (postgres, redis, api, optional tools)
 └── .env.example        Complete environment variable reference
 ```
 
 ## Toolchain
 
-- **Node** 22 (`.nvmrc` pins `22`; engines require `>=22.12.0`)
-- **pnpm** 12.x (`packageManager: pnpm@12.11.2`) — always pnpm, never npm/yarn
-- **Turbo** orchestrates all cross-package tasks (`dependsOn: ["^build"]`)
+- **Node** 26 (`.nvmrc` pins `26`; engines require `>=24`)
+- **pnpm** 12.x (`packageManager: pnpm@12.21.0`) — always pnpm, never npm/yarn
+- **TypeScript** 6.x
+- **Turbo** 2.x orchestrates all cross-package tasks (`dependsOn: ["^build"]`)
 - **Postgres** (pgvector) + **Redis** (BullMQ) via Docker Compose for runtime
 
 ## Key design decisions
 
-18 ADRs live in [`docs/adr/`](adr/). Notable:
+12 ADRs live in [`docs/adr/`](adr/). Notable:
 
-- ADR-001: pnpm workspaces over Nx/Turborepo
-- ADR-004: pgvector over a dedicated vector DB
-- ADR-007: `Promise.allSettled` for council fanout (no cascade failure)
-- ADR-011: HMAC-chained audit log for tamper evidence
-- ADR-015: Piston API for sandboxed multi-language code execution
-- ADR-018: BullMQ repeatable jobs for domain feed polling
+- ADR-0002: Postgres as the only state store
+- ADR-0004: pgvector over a dedicated vector DB
+- ADR-0007: `Promise.allSettled` for council fanout (no cascade failure)
+- ADR-0010: HMAC-chained audit log for tamper evidence
+- ADR-0015: Piston for multi-language execution outside the Docker sandbox
+- ADR-0018: BullMQ repeatable jobs for domain feed polling

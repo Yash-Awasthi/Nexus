@@ -36,7 +36,7 @@ export interface SyncOp {
 }
 
 /** One key that both sides changed, and how it was settled. */
-export interface SyncConflict {
+interface SyncConflict {
   key: string;
   winner: "local" | "remote";
   /** The value that did not win, kept so it can be recovered. */

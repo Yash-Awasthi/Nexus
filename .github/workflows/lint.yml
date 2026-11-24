@@ -37,3 +37,4 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:headers
+      - run: pnpm check:docs

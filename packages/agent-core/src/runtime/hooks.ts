@@ -72,7 +72,7 @@ export interface HookDecision {
   suppressOutput?: boolean;
 }
 
-export type AgentHookHandler<E extends AgentHookEvent> = (
+type AgentHookHandler<E extends AgentHookEvent> = (
   input: E extends "preToolUse"
     ? PreToolUseInput
     : E extends "postToolUse"

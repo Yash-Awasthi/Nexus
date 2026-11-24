@@ -76,9 +76,9 @@ export interface CompressFilter {
 // ── Lossless filters ──────────────────────────────────────────────────────────────
 
 // CSI / SGR ANSI escape sequences (colors, cursor moves). Pure terminal noise to an LLM.
-
-// eslint-disable-next-line no-control-regex -- the escape is what this matches
-const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+// Built from the character rather than a \x1b escape: no-control-regex rejects the escape.
+const ESC = String.fromCharCode(27);
+const ANSI_RE = new RegExp(`${ESC}\\[[0-9;?]*[ -/]*[@-~]`, "g");
 
 /** Strip ANSI escape codes (color/cursor sequences). Lossless. */
 export const stripAnsi: CompressFilter = {
@@ -240,8 +240,7 @@ export function compressPreset(input: string, preset: PresetName = "lossless"): 
 /** Structural traits a chunk of tool output can exhibit. A chunk may have several. */
 export type OutputTrait = "ansi" | "trailing-ws" | "blank-runs" | "repeat-runs";
 
-// eslint-disable-next-line no-control-regex -- the escape is what this matches
-const ANSI_DETECT = /\x1b\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
+const ANSI_DETECT = new RegExp(`${ESC}\\[[0-9;?]*[ -/]*[@-~]`); // non-global: safe for .test()
 const TRAILING_WS_DETECT = /[ \t]\r?(?:\n|$)/;
 const BLANK_RUNS_DETECT = /(\r?\n)[ \t]*(\r?\n)[ \t]*(\r?\n)/;
 

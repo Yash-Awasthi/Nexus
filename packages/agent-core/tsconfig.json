@@ -18,6 +18,9 @@
       "path": "../llm"
     },
     {
+      "path": "../lsp"
+    },
+    {
       "path": "../governance"
     },
     {

@@ -7,6 +7,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc --project tsconfig.json && rolldown src/preload.ts --file dist/preload.js --format cjs --platform node --external electron",
+    "build:api": "node ../../scripts/build-desktop-api.mjs",
     "start": "electron dist/main.js",
     "dev": "pnpm build && electron dist/main.js",
     "test": "vp test run",

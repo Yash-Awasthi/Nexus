@@ -6,6 +6,9 @@
 **/test-results
 **/.turbo
 apps/ui/build
+# The desktop app's staged API and UI (scripts/build-desktop-api.mjs); no image uses them.
+apps/desktop/resources
 .git
 data
+.nexus
 **/.env

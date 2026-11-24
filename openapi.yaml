@@ -2296,10 +2296,113 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/auth/passkeys:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/register/options:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/register:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - response
+              properties:
+                name:
+                  type: string
+                  maxLength: 64
+                response:
+                  type: object
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/login/options:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/auth/passkeys/login:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challengeId
+                - response
+              properties:
+                challengeId:
+                  type: string
+                  maxLength: 64
+                response:
+                  type: object
+                  required:
+                    - id
+                  properties:
+                    id:
+                      type: string
+      responses:
+        "200":
+          description: Default Response
   /api/v1/auth/register:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 320
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                name:
+                  type: string
+                  maxLength: 100
       responses:
         "200":
           description: Default Response
@@ -2307,6 +2410,26 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                code:
+                  type: string
+                  maxLength: 16
       responses:
         "200":
           description: Default Response
@@ -2314,6 +2437,16 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -2321,6 +2454,16 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -2334,6 +2477,23 @@ paths:
     patch:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+                  maxLength: 320
+                currentPassword:
+                  type: string
+                  maxLength: 128
       responses:
         "200":
           description: Default Response
@@ -2341,6 +2501,19 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 320
       responses:
         "200":
           description: Default Response
@@ -2348,6 +2521,23 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
       responses:
         "200":
           description: Default Response
@@ -2389,6 +2579,18 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
       responses:
         "200":
           description: Default Response
@@ -2405,7 +2607,38 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/workspaces{*}:
+  /api/v1/workspaces:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                slug:
+                  type: string
+                  minLength: 1
+                  maxLength: 48
+                  pattern: ^[a-z0-9-]+$
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/{id}:
     get:
       tags:
         - durable
@@ -2413,19 +2646,7 @@ paths:
         - schema:
             type: string
           in: path
-          name: "*"
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: "*"
+          name: id
           required: true
       responses:
         "200":
@@ -2433,11 +2654,27 @@ paths:
     patch:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                slug:
+                  type: string
+                  minLength: 1
+                  maxLength: 48
+                  pattern: ^[a-z0-9-]+$
       parameters:
         - schema:
             type: string
           in: path
-          name: "*"
+          name: id
           required: true
       responses:
         "200":
@@ -2449,7 +2686,145 @@ paths:
         - schema:
             type: string
           in: path
-          name: "*"
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/{id}/members:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/{id}/invitations:
+    post:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum:
+                    - admin
+                    - member
+                    - viewer
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/{id}/invitations/{invitationId}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+            format: uuid
+          in: path
+          name: invitationId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/invitations/{token}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: token
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/workspaces/{id}/members/{userId}:
+    patch:
+      tags:
+        - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum:
+                    - admin
+                    - member
+                    - viewer
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: userId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: userId
           required: true
       responses:
         "200":
@@ -2472,6 +2847,18 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -2479,6 +2866,18 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -2486,6 +2885,18 @@ paths:
     post:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
       responses:
         "200":
           description: Default Response
@@ -2629,7 +3040,28 @@ paths:
       responses:
         "200":
           description: Default Response
-  /api/v1/admin/users{*}:
+  /api/v1/admin/ownerless:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/ownerless/assign:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users/{id}:
     get:
       tags:
         - durable
@@ -2637,19 +3069,7 @@ paths:
         - schema:
             type: string
           in: path
-          name: "*"
-          required: true
-      responses:
-        "200":
-          description: Default Response
-    post:
-      tags:
-        - durable
-      parameters:
-        - schema:
-            type: string
-          in: path
-          name: "*"
+          name: id
           required: true
       responses:
         "200":
@@ -2657,11 +3077,36 @@ paths:
     patch:
       tags:
         - durable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  enum:
+                    - free
+                    - pro
+                    - enterprise
+                role:
+                  type: string
+                  enum:
+                    - owner
+                    - admin
+                    - member
+                    - viewer
+                emailVerified:
+                  type: boolean
+                name:
+                  type: string
+                  maxLength: 100
       parameters:
         - schema:
             type: string
           in: path
-          name: "*"
+          name: id
           required: true
       responses:
         "200":
@@ -2673,7 +3118,76 @@ paths:
         - schema:
             type: string
           in: path
-          name: "*"
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users/{id}/suspend:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users/{id}/restore:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users/{id}/sessions:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/admin/users/{id}/sessions/{sid}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: sid
           required: true
       responses:
         "200":
@@ -2730,6 +3244,39 @@ paths:
     post:
       tags:
         - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/lsp/status:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/lsp/servers/{language}/start:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: language
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/lsp/servers/{language}/restart:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: language
+          required: true
       responses:
         "200":
           description: Default Response
@@ -3375,6 +3922,19 @@ paths:
           description: Default Response
   /api/sandbox/execute:
     post:
+      tags:
+        - dedicated-volatile
+      responses:
+        "200":
+          description: Default Response
+  /api/sandbox/runs:
+    post:
+      tags:
+        - dedicated-volatile
+      responses:
+        "200":
+          description: Default Response
+    get:
       tags:
         - dedicated-volatile
       responses:

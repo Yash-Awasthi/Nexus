@@ -21,7 +21,7 @@ import { handleDriveBackupJob } from "@nexus/worker/drive-lifecycle";
 import { withKeyLock } from "./with-key-lock.ts";
 
 /** Unpack `dir`'s newest backup into it; false when the bucket holds none. */
-export async function restoreDrive(
+async function restoreDrive(
   dir: string,
   bucket: S3Bucket | null = null,
   prefix = s3ConfigFromEnv()?.prefix ?? "drives/",

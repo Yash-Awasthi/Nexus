@@ -43,9 +43,9 @@ running the desktop app (the owner is the operator there).
 | ID  | Asset                                              | Why it matters                                        |
 | --- | -------------------------------------------------- | ----------------------------------------------------- |
 | A1  | Server secrets (JWT key, API key, encryption keys) | Any one of them forges sessions or decrypts user data |
-| A2  | Users' provider keys and connector credentials     | Spend and data in third-party accounts                |
+| A2  | Users' provider keys                               | Spend and data in third-party accounts                |
 | A3  | Accounts and sessions                              | Everything a user owns                                |
-| A4  | User content (threads, memory, KB, drives, orgs)   | Confidentiality between accounts                      |
+| A4  | User content (threads, memory, KB, orgs)           | Confidentiality between accounts                      |
 | A5  | The host (API, worker, desktop machine)            | Code execution there reaches A1–A4                    |
 | A6  | Audit log chain                                    | Evidence of who did what                              |
 | A7  | Operator spend (server-side provider keys)         | Public endpoints spend it                             |
@@ -64,7 +64,6 @@ running the desktop app (the owner is the operator there).
 | Spend abuse on public completions | Per-client (IPv6 /64) and global ceilings keyed on `request.ip`                                                                                                                         |
 | Forged webhooks                   | Slack HMAC over raw bytes, Bot Framework JWT for Teams, secret token for Telegram; each refuses when unconfigured; replies only to the verified service URL                             |
 | Session thief moving the account  | Changing the sign-in email needs the current password; security notices are emailed, an email change to the old address                                                                 |
-| Forged signed links               | Drive and brief links HMAC-signed with server-derived keys, never a constant                                                                                                            |
 
 ### 4.2 User or model input → execution
 
@@ -72,7 +71,6 @@ running the desktop app (the owner is the operator there).
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | JavaScript sandbox, programmatic tool calling    | Child Node, permission model, empty env, no network, memory cap, deadline                                                                |
 | Python sandbox, code agent                       | Pyodide in a child Node, permission model reading only Pyodide, empty env, no network, 256 MB heap, 512 MB WASM, deadline, fresh per run |
-| Drive shell                                      | Docker (optionally gVisor/Kata), quota-sized tmpfs; host shell refused in production                                                     |
 | Host PTY, coding agent, skills, org CLI runtimes | Exec policy; on a shared server a host shell is admin-approved; PTY sessions owner-scoped; org CLIs get an allow-listed environment      |
 | Workflow transforms                              | Desktop only                                                                                                                             |
 
@@ -97,7 +95,7 @@ tries to execute still meets §4.2.
 | Threat                      | Control                                                                                                              |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Job injection through Redis | Redis is a trust boundary: loopback in development; the security check fails a remote `REDIS_URL` without a password |
-| Plaintext secrets at rest   | AES-256-GCM for provider keys, connector credentials, the secret store and TOTP secrets (`NEXUS_MFA_KEY`)            |
+| Plaintext secrets at rest   | AES-256-GCM for provider keys, the secret store and TOTP secrets (`NEXUS_MFA_KEY`)                                   |
 | Audit log tampering         | HMAC chain with `NEXUS_AUDIT_KEY`; the security check fails when it falls back to the published default              |
 | Database in clear text      | The security check warns on a remote `DATABASE_URL` without `sslmode`                                                |
 

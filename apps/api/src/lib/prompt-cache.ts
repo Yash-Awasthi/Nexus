@@ -20,7 +20,7 @@ import type { KVStore } from "@nexus/kv";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export interface CachedLlmMessage {
+interface CachedLlmMessage {
   role: "user" | "assistant";
   content: string;
 }

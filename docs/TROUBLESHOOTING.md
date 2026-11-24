@@ -21,10 +21,10 @@ Postgres must be up and reachable at `DATABASE_URL` first:
 service (default `postgresql://nexus:nexus_dev_password@localhost:5432/nexus`). A fresh
 database with a partially-applied migration can need a manual reset of the `nexus` DB.
 
-**API starts but every `/api/v1/*` call returns 401**
-Auth is disabled unless a secret is configured. Set `NEXUS_API_KEY` (for API-key auth)
-and/or `NEXUS_JWT_SECRET` (for user login tokens). Without either, the auth middleware treats
-the API as locked down.
+**API exits with `[startup] FATAL: NEXUS_API_KEY is not set`**
+`NEXUS_API_KEY` is required in every environment; the process refuses to start without
+it. Set it in `.env` (or the shell) and retry. In production a placeholder or short key
+is rejected too, and a missing `NEXUS_JWT_SECRET` / `NEXUS_AUDIT_KEY` is logged as a warning.
 
 ## BYOK / provider keys
 
@@ -39,14 +39,15 @@ fallback. Add the provider's key on the Provider Keys page (`/provider-keys`).
 ## Dev servers
 
 **UI loads but API calls 404 / fail in dev**
-The Vite dev server (`:5173`) proxies `/api/*` to the Fastify API on `:3001`. Make sure
-the API is running — `pnpm dev` starts all services, or `pnpm dev:api` / `pnpm dev:ui`
-start them individually.
+The React Router dev server (`:5173`) proxies `/api/*` to the API at
+`NEXUS_API_URL` (default `http://localhost:3000`). Make sure the API is running —
+`pnpm dev` starts all services, or `pnpm dev:api` / `pnpm dev:ui` start them
+individually.
 
 **Port already in use**
-Defaults: API `3001` (dev) / `3000` (docker), UI `5173` (dev) / `4173` (docker),
-worker is a background process. Stop the conflicting process or change the port in the
-relevant config.
+Defaults: API `3000` (dev and Docker host), UI `5173` (dev) / `4173` (Docker),
+worker is a background process. The API container listens on `3001` internally and
+publishes `3000`. Stop the conflicting process or change `PORT`.
 
 ## Build / typecheck
 

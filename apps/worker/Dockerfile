@@ -46,9 +46,14 @@ RUN groupadd -g 1001 nexus && useradd -u 1001 -g nexus -s /bin/sh -m nexus \
 COPY --from=prod --chown=nexus:nexus /app ./
 
 # Chromium for browser.task jobs, at the build patchright expects, with its system libraries.
+# The browser CDN occasionally drops the connection mid-download; retry before failing the image.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN node "$(find node_modules/.pnpm -path '*/node_modules/patchright/cli.js' | head -1)" \
-      install --with-deps chromium \
+RUN for attempt in 1 2 3; do \
+      node "$(find node_modules/.pnpm -path '*/node_modules/patchright/cli.js' | head -1)" \
+        install --with-deps chromium && break; \
+      if [ "$attempt" = 3 ]; then exit 1; fi; \
+      sleep 10; \
+    done \
  && rm -rf /var/lib/apt/lists/*
 
 USER nexus

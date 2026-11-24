@@ -89,6 +89,8 @@ const SUBROUTES = [
   "/connectors/onboarding",
   "/profile",
   "/setup",
+  // Linked from the sandbox page and its pairing dialog.
+  "/sandbox/connect",
   // The /knowledge tab shell renders these four; the standalone routes are deep links.
   "/knowledge-bases",
   "/knowledge-graph",

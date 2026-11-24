@@ -2,7 +2,7 @@
 /**
  * Code Sandbox — Phase 4.12 / 4.16
  *
- * Execute code directly in the sandbox (JS/Python/TypeScript/Bash) or
+ * Execute code directly in the sandbox (JS/Python/TypeScript/Bash/Go/Rust/Ruby) or
  * use the Code Agent to have the LLM write + iteratively fix code for you.
  *
  * API:
@@ -21,16 +21,28 @@ import {
   Clock,
   Code2,
   Bot,
+  Cable,
   ChevronRight,
   Copy,
   Check,
+  History,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router";
 
 import { Page, PageHeader } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -57,6 +69,17 @@ interface SandboxStatus {
   languages: string[];
 }
 
+/** A run kept by the API so the history survives a reload. */
+interface RunRecord {
+  executionId: string;
+  status: string;
+  output: string;
+  error?: string;
+  durationMs: number;
+  language?: string;
+  source?: "api" | "helper";
+}
+
 interface AgentSession {
   sessionId: string;
   task: string;
@@ -76,9 +99,13 @@ const readJson = async (r: Response): Promise<Body> => (await r.json().catch(() 
 // Languages with a lasting interpreter, which keeps variables from one run to the next.
 const KERNEL_LANGUAGES = ["python", "r", "julia"];
 
+/** The local helper a browser uses to run code on this machine (see /sandbox/connect). */
+const HELPER_URL = "http://127.0.0.1:4789";
+const HELPER_TOKEN_KEY = "nexus.sandbox-helper.token";
+
 // ─── Default snippets per language ───────────────────────────────────────────
 
-const SNIPPETS: Record<string, string> = {
+export const SNIPPETS: Record<string, string> = {
   javascript: `// JavaScript in Node.js sandbox
 const nums = [1, 2, 3, 4, 5];
 const doubled = nums.map(n => n * 2);
@@ -113,6 +140,35 @@ echo "Current date: $(date)"
 echo "Files in /tmp: $(ls /tmp 2>/dev/null | wc -l)"
 echo "Memory info:"
 free -h 2>/dev/null || echo "(free not available)"`,
+
+  go: `// Go sandbox
+package main
+
+import "fmt"
+
+func main() {
+	values := []int{1, 2, 3, 4, 5}
+	sum := 0
+	for _, v := range values {
+		sum += v
+	}
+	fmt.Println("Sum:", sum)
+}`,
+
+  rust: `// Rust sandbox
+fn main() {
+    let nums = [1, 2, 3, 4, 5];
+    println!("Sum: {}", nums.iter().sum::<i32>());
+}`,
+
+  ruby: `# Ruby sandbox
+def fibonacci(n)
+  a, b = 0, 1
+  n.times { a, b = b, a + b }
+  a
+end
+
+(0...10).each { |i| puts "fib(#{i}) = #{fibonacci(i)}" }`,
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -129,6 +185,15 @@ export default function Sandbox() {
   const [copied, setCopied] = useState(false);
   const [keepState, setKeepState] = useState(false);
   const [kernel, setKernel] = useState<{ id: string; language: string } | null>(null);
+  const [source, setSource] = useState<"api" | "helper" | null>(null);
+
+  // Local helper: a process on this machine the page talks to directly.
+  const [helper, setHelper] = useState<"checking" | "connected" | "offline">("checking");
+  const [pairOpen, setPairOpen] = useState(false);
+  const [pairCode, setPairCode] = useState("");
+  const [pairError, setPairError] = useState("");
+  const [pairing, setPairing] = useState(false);
+  const [history, setHistory] = useState<RunRecord[]>([]);
 
   // Code agent
   const [agentTask, setAgentTask] = useState("");
@@ -145,6 +210,80 @@ export default function Sandbox() {
       .then((d) => d && setSandboxStatus(d))
       .catch(() => {});
   }, []);
+
+  /** Probe the helper with a short budget: a page load must not wait on a stopped process. */
+  const probeHelper = useCallback(async () => {
+    try {
+      const r = await fetch(`${HELPER_URL}/health`, { signal: AbortSignal.timeout(500) });
+      setHelper(r.ok ? "connected" : "offline");
+    } catch {
+      setHelper("offline");
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const r = await fetch("/api/sandbox/runs");
+      if (!r.ok) return;
+      const d = (await r.json()) as { runs?: RunRecord[] };
+      setHistory(d.runs ?? []);
+    } catch {
+      /* history is a convenience, not a reason to fail the page */
+    }
+  }, []);
+
+  useEffect(() => {
+    void probeHelper();
+    void loadHistory();
+  }, [probeHelper, loadHistory]);
+
+  /** Store a locally-run result through the API, so it survives a reload. */
+  const rememberRun = useCallback(
+    async (exec: ExecResult) => {
+      try {
+        await fetch("/api/sandbox/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            language: exec.language,
+            stdout: exec.stdout,
+            stderr: exec.stderr,
+            exitCode: exec.exitCode,
+            durationMs: exec.durationMs,
+          }),
+        });
+      } finally {
+        void loadHistory();
+      }
+    },
+    [loadHistory],
+  );
+
+  const submitPair = useCallback(async () => {
+    setPairing(true);
+    setPairError("");
+    try {
+      const r = await fetch(`${HELPER_URL}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: pairCode.trim() }),
+        signal: AbortSignal.timeout(5_000),
+      });
+      const d = await readJson(r);
+      if (!r.ok) {
+        setPairError(d.message ?? "That code was not accepted.");
+        return;
+      }
+      localStorage.setItem(HELPER_TOKEN_KEY, String(d.token));
+      setPairOpen(false);
+      setPairCode("");
+      setHelper("connected");
+    } catch {
+      setPairError("The helper did not answer. Is it running?");
+    } finally {
+      setPairing(false);
+    }
+  }, [pairCode]);
 
   const dropKernel = useCallback((id: string) => {
     void fetch(`/api/code-agent/sessions/${id}`, { method: "DELETE" }).catch(() => {});
@@ -204,6 +343,40 @@ export default function Sandbox() {
           language,
           truncated: false,
         });
+        setSource("api");
+        void loadHistory();
+        return;
+      }
+      if (helper === "connected") {
+        const token = localStorage.getItem(HELPER_TOKEN_KEY) ?? "";
+        const r = await fetch(`${HELPER_URL}/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ language, code: code.trim(), timeoutMs: 30_000 }),
+          signal: AbortSignal.timeout(35_000),
+        });
+        if (r.status === 401) {
+          // The helper restarted, or its pairing expired: ask for the code again.
+          setHelper("offline");
+          setPairOpen(true);
+          setErr("The local sandbox needs to be paired again.");
+          return;
+        }
+        const d = await readJson(r);
+        if (!r.ok) {
+          setErr(d.message ?? "Execution failed");
+          return;
+        }
+        const exec: ExecResult = {
+          stdout: String(d.stdout ?? ""),
+          stderr: String(d.stderr ?? ""),
+          exitCode: typeof d.exitCode === "number" ? d.exitCode : 1,
+          durationMs: typeof d.durationMs === "number" ? d.durationMs : 0,
+          language,
+        };
+        setResult(exec);
+        setSource("helper");
+        await rememberRun(exec);
         return;
       }
       const r = await fetch("/api/sandbox/execute", {
@@ -231,12 +404,14 @@ export default function Sandbox() {
         language: raw.language ?? language,
         truncated: raw.truncated ?? false,
       });
+      setSource("api");
+      void loadHistory();
     } catch {
       setErr("Execution failed");
     } finally {
       setRunning(false);
     }
-  }, [code, language, keepState, kernel, dropKernel]);
+  }, [code, language, keepState, kernel, dropKernel, helper, rememberRun, loadHistory]);
 
   const runAgent = useCallback(async () => {
     if (!agentTask.trim()) return;
@@ -293,6 +468,26 @@ export default function Sandbox() {
                 {sandboxStatus.available ? "Sandbox ready" : "Sandbox unavailable"}
               </Badge>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => (helper === "connected" ? void probeHelper() : setPairOpen(true))}
+            >
+              <Cable
+                className={
+                  helper === "connected"
+                    ? "text-success"
+                    : helper === "checking"
+                      ? "text-muted-foreground animate-pulse"
+                      : "text-muted-foreground"
+                }
+              />
+              {helper === "connected"
+                ? "local sandbox: connected"
+                : helper === "checking"
+                  ? "local sandbox: checking…"
+                  : "Connect local sandbox"}
+            </Button>
             <div className="flex rounded-lg border p-0.5">
               <Button
                 size="sm"
@@ -322,134 +517,202 @@ export default function Sandbox() {
 
       {/* ── Execute Tab ── */}
       {tab === "execute" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: editor */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Only advertise languages the backend reports as runnable
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left: editor */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Only advertise languages the backend reports as runnable
                       (JS + Python always; the rest need a self-hosted Piston). */}
-                  {(sandboxStatus?.languages?.length
-                    ? sandboxStatus.languages
-                    : ["javascript", "python"]
-                  ).map((l) => (
-                    <SelectItem key={l} value={l} className="capitalize">
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={runCode} disabled={running || !code.trim()} className="flex-1">
-                {running ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Running…
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Run
-                  </>
-                )}
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={keepState}
-                  disabled={!KERNEL_LANGUAGES.includes(language)}
-                  onChange={(e) => setKeepState(e.target.checked)}
-                />
-                Keep variables between runs
-              </label>
-              {kernel && (
-                <Button size="sm" variant="ghost" onClick={() => dropKernel(kernel.id)}>
-                  Reset kernel
-                </Button>
-              )}
-            </div>
-            <Textarea
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              rows={22}
-              className="font-mono text-sm resize-none"
-              placeholder="// Write your code here…"
-              spellCheck={false}
-            />
-          </div>
-
-          {/* Right: output */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Output
-              </p>
-              {result && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {result.durationMs}ms
-                  </span>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={copyResult}>
-                    {copied ? (
-                      <Check className="w-3 h-3 text-success" />
-                    ) : (
-                      <Copy className="w-3 h-3" />
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {!result && !running ? (
-              <div className="rounded-lg border-2 border-dashed h-[460px] flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <Terminal className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Output will appear here</p>
-                </div>
-              </div>
-            ) : running ? (
-              <div className="rounded-lg border h-[460px] flex items-center justify-center text-muted-foreground bg-muted/20">
-                <div className="text-center">
-                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                  <p className="text-sm">Executing {language}…</p>
-                </div>
-              </div>
-            ) : result ? (
-              <div className="rounded-lg border h-[460px] overflow-auto bg-muted">
-                <div className="p-3 border-b border-border flex items-center gap-2">
-                  {result.exitCode === 0 ? (
-                    <CheckCircle className="w-4 h-4 text-success" />
+                    {(sandboxStatus?.languages?.length
+                      ? sandboxStatus.languages
+                      : ["javascript", "python"]
+                    ).map((l) => (
+                      <SelectItem key={l} value={l} className="capitalize">
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={runCode} disabled={running || !code.trim()} className="flex-1">
+                  {running ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Running…
+                    </>
                   ) : (
-                    <XCircle className="w-4 h-4 text-destructive" />
+                    <>
+                      <Play className="w-4 h-4 mr-2" />
+                      Run
+                    </>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    Exit {result.exitCode} · {result.durationMs}ms · {result.language}
-                  </span>
-                  {result.truncated && (
-                    <Badge variant="outline" className="text-xs text-warning border-warning/30">
-                      truncated
-                    </Badge>
-                  )}
-                </div>
-                {result.stdout && (
-                  <pre className="p-4 text-xs text-success font-mono whitespace-pre-wrap break-all">
-                    {result.stdout}
-                  </pre>
-                )}
-                {result.stderr && (
-                  <pre className="p-4 text-xs text-destructive font-mono whitespace-pre-wrap break-all border-t border-border">
-                    {result.stderr}
-                  </pre>
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <label className="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={keepState}
+                    disabled={!KERNEL_LANGUAGES.includes(language)}
+                    onChange={(e) => setKeepState(e.target.checked)}
+                  />
+                  Keep variables between runs
+                </label>
+                {kernel && (
+                  <Button size="sm" variant="ghost" onClick={() => dropKernel(kernel.id)}>
+                    Reset kernel
+                  </Button>
                 )}
               </div>
-            ) : null}
+              {helper === "offline" && (
+                <p className="text-xs text-muted-foreground">
+                  Local sandbox: not connected, so code runs on the server.{" "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4 hover:text-foreground"
+                    onClick={() => setPairOpen(true)}
+                  >
+                    Connect
+                  </button>{" "}
+                  or read the{" "}
+                  <Link
+                    to="/sandbox/connect"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    setup guide
+                  </Link>
+                  .
+                </p>
+              )}
+              <Textarea
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                rows={22}
+                className="font-mono text-sm resize-none"
+                placeholder="// Write your code here…"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Right: output */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                  Output
+                </p>
+                {result && (
+                  <div className="flex items-center gap-2">
+                    {source && (
+                      <Badge variant="outline" className="text-xs">
+                        {source === "helper" ? "local helper" : "server"}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {result.durationMs}ms
+                    </span>
+                    <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={copyResult}>
+                      {copied ? (
+                        <Check className="w-3 h-3 text-success" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {!result && !running ? (
+                <div className="rounded-lg border-2 border-dashed h-[460px] flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <Terminal className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">Output will appear here</p>
+                  </div>
+                </div>
+              ) : running ? (
+                <div className="rounded-lg border h-[460px] flex items-center justify-center text-muted-foreground bg-muted/20">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                    <p className="text-sm">Executing {language}…</p>
+                  </div>
+                </div>
+              ) : result ? (
+                <div className="rounded-lg border h-[460px] overflow-auto bg-muted">
+                  <div className="p-3 border-b border-border flex items-center gap-2">
+                    {result.exitCode === 0 ? (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-destructive" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      Exit {result.exitCode} · {result.durationMs}ms · {result.language}
+                    </span>
+                    {result.truncated && (
+                      <Badge variant="outline" className="text-xs text-warning border-warning/30">
+                        truncated
+                      </Badge>
+                    )}
+                  </div>
+                  {result.stdout && (
+                    <pre className="p-4 text-xs text-success font-mono whitespace-pre-wrap break-all">
+                      {result.stdout}
+                    </pre>
+                  )}
+                  {result.stderr && (
+                    <pre className="p-4 text-xs text-destructive font-mono whitespace-pre-wrap break-all border-t border-border">
+                      {result.stderr}
+                    </pre>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <History className="w-4 h-4" /> Recent runs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {history.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nothing has run yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {history.slice(0, 8).map((run) => (
+                    <li key={run.executionId}>
+                      <button
+                        type="button"
+                        className="w-full text-left rounded-lg border px-3 py-2 hover:bg-accent/50"
+                        onClick={() =>
+                          setResult({
+                            stdout: run.output,
+                            stderr: run.error ?? "",
+                            exitCode: run.status === "done" ? 0 : 1,
+                            durationMs: run.durationMs,
+                            language: run.language ?? language,
+                          })
+                        }
+                      >
+                        <span className="text-xs text-muted-foreground">
+                          {run.language ?? "code"} · {run.status} · {run.durationMs}ms ·{" "}
+                          {run.source === "helper" ? "local" : "server"}
+                        </span>
+                        <span className="block text-xs font-mono truncate">
+                          {(run.output || run.error || "(no output)").split("\n")[0]}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -609,6 +872,61 @@ export default function Sandbox() {
           </div>
         </div>
       )}
+      <Dialog open={pairOpen} onOpenChange={setPairOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect the local sandbox</DialogTitle>
+            <DialogDescription>
+              Start the helper on this machine and type the six-digit code it printed. It listens on{" "}
+              <code>{HELPER_URL}</code>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="pair-code" className="text-xs font-medium">
+              Pairing code
+            </label>
+            <Input
+              id="pair-code"
+              value={pairCode}
+              onChange={(e) => setPairCode(e.target.value)}
+              placeholder="123456"
+              inputMode="numeric"
+              maxLength={6}
+              autoComplete="off"
+            />
+            {pairError && <p className="text-xs text-destructive">{pairError}</p>}
+            <p className="text-xs text-muted-foreground">
+              Not running?{" "}
+              <Link
+                to="/sandbox/connect"
+                className="underline underline-offset-4 hover:text-foreground"
+                onClick={() => setPairOpen(false)}
+              >
+                Read the setup guide
+              </Link>
+              .
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPairOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void submitPair()}
+              disabled={pairing || pairCode.trim().length !== 6}
+            >
+              {pairing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Pairing…
+                </>
+              ) : (
+                "Pair"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }

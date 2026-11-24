@@ -26,10 +26,13 @@
 
 import {
   buildReviewPrompt,
+  createLspRuntime,
   parseReviewResult,
   RuntimeToolSet,
   ToolAgentRuntime,
+  type CreateLspRuntimeOptions,
   type LlmToolFn,
+  type LspRuntime,
   type RuntimeMessage,
   type RuntimeUsage,
 } from "../runtime/index.ts";
@@ -146,6 +149,11 @@ interface MissionRunnerOptions {
   llm: LlmToolFn;
   /** Toolset the acting agent (and spawned children) may use. */
   toolSet?: RuntimeToolSet;
+  /**
+   * LSP toolset. Enabled by default when `NEXUS_LSP=1` and a root resolves;
+   * pass options to supply the spawn `authorize` callback, or `false` to skip.
+   */
+  lsp?: CreateLspRuntimeOptions | false;
   /** System prompt for the acting agent (the "worker"). */
   actingSystemPrompt?: string;
   /** Workspace root passed to tools via ToolContext. */
@@ -196,6 +204,7 @@ interface MissionRunnerOptions {
 export class MissionRunner {
   private readonly llm: LlmToolFn;
   private readonly toolSet: RuntimeToolSet;
+  private readonly lspRuntime?: LspRuntime;
   private readonly missionId: string;
   private readonly workingDir?: string;
   private readonly sessionId?: string;
@@ -216,6 +225,8 @@ export class MissionRunner {
   constructor(opts: MissionRunnerOptions) {
     this.llm = opts.llm;
     this.toolSet = opts.toolSet ?? new RuntimeToolSet();
+    this.lspRuntime = opts.lsp === false ? undefined : createLspRuntime(opts.lsp ?? {});
+    for (const tool of this.lspRuntime?.tools ?? []) this.toolSet.add(tool);
     this.missionId = opts.id ?? this.generateId();
     this.workingDir = opts.workingDir;
     this.sessionId = opts.sessionId;
@@ -240,6 +251,14 @@ export class MissionRunner {
 
   /** Run a mission to completion (or abort / budget). Returns the final record. */
   async run(goal: string): Promise<MissionRecord> {
+    try {
+      return await this.runMission(goal);
+    } finally {
+      await this.lspRuntime?.dispose();
+    }
+  }
+
+  private async runMission(goal: string): Promise<MissionRecord> {
     const t0 = new Date().toISOString();
     const record: MissionRecord = {
       // The caller's id wins (route-created records); the runner never mints a

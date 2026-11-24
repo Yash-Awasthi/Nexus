@@ -13,10 +13,20 @@
  * somewhere else is worse than one that says it is offline.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, shell, Tray } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  safeStorage,
+  shell,
+  Tray,
+} from "electron";
 
 import { OsKeychainVault } from "./auth/keychain";
 import { createSessionFile, fetchJsonHttp } from "./auth/ports";
@@ -29,7 +39,7 @@ import {
   isTrustedSender,
   type RunMode,
 } from "./bridge";
-import { startLocalApi, type LocalApi } from "./local-api";
+import { startLocalApi, type LocalApi, type LocalApiPaths } from "./local-api";
 import { freePort, nodeLocalApiPorts } from "./local-api-node";
 import { syncOnce } from "./sync";
 import { fileSyncState, httpSyncTransport } from "./sync-node";
@@ -162,14 +172,28 @@ async function resolveHost(): Promise<{ url: string; mode: RunMode; local?: Loca
 
   const dataDir = app.getPath("userData");
   const local = await startLocalApi(
-    {
-      entry: join(__dirname, "..", "..", "api", "src", "index.ts"),
-      spaDir: join(__dirname, "..", "..", "ui", "build", "client"),
-      dataDir,
-    },
+    localApiPaths(dataDir),
     nodeLocalApiPorts(dataDir, await freePort()),
   );
   return { url: local.url, mode: "local-only", local };
+}
+
+/**
+ * The API entry and UI this build serves. A packaged app carries both under its
+ * resources (`scripts/build-desktop-api.mjs`); a checkout runs them in place.
+ */
+function localApiPaths(dataDir: string): LocalApiPaths {
+  const resources = app.isPackaged ? process.resourcesPath : join(__dirname, "..", "resources");
+  const entry = join(resources, "api", "index.js");
+  const spaDir = join(resources, "ui");
+  if (existsSync(entry) && existsSync(spaDir)) {
+    return { entry, spaDir, dataDir, migrationsDir: join(resources, "api", "migrations") };
+  }
+  return {
+    entry: join(__dirname, "..", "..", "api", "src", "index.ts"),
+    spaDir: join(__dirname, "..", "..", "ui", "build", "client"),
+    dataDir,
+  };
 }
 
 // A second launch shows the running app rather than starting a second API on the same data.
@@ -177,6 +201,16 @@ if (!SMOKE && !app.requestSingleInstanceLock()) app.quit();
 app.on("before-quit", () => {
   quitting = true;
 });
+
+/**
+ * A failed boot used to leave nothing but a tray icon and no window, which reads as a
+ * hung app. Say what went wrong, then exit.
+ */
+function bootFailed(err: unknown): void {
+  console.error(err);
+  dialog.showErrorBox("Nexus could not start", err instanceof Error ? err.message : String(err));
+  app.quit();
+}
 
 app.whenReady().then(async () => {
   const host = await resolveHost();
@@ -263,7 +297,7 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(host.url);
   });
-}, console.error);
+}, bootFailed);
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

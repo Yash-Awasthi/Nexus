@@ -226,7 +226,7 @@ go test -bench=. -benchmem ./pkg/grammar  # zero-alloc parser proof
 go vet ./...
 gofmt -l cmd pkg web
 bash scripts/check-docs.sh          # docs folder + link/reference integrity
-bash scripts/race-windows.sh ./...  # race detector via zig; see docs/PLAN.md
+bash scripts/race-windows.sh ./...  # race detector via zig
 ```
 
 Tests use temporary directories and `httptest`; nothing touches the network except the R2

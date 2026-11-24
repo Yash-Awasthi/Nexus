@@ -28,17 +28,22 @@ export async function withTurnSpan<T>(fn: () => Promise<T>): Promise<T> {
   });
 }
 
-/** Run `fn` inside a `tool.call` span carrying `tool.name` and `tool.tier`. */
+/**
+ * Run `fn` inside a `tool.call` span carrying `tool.name` and `tool.tier`, plus
+ * any extra `attrs`. Callers add attributes such as `lsp.language` without
+ * changing the two-argument call sites.
+ */
 export async function withToolSpan<T>(
   toolName: string,
   tier: string,
   fn: () => Promise<T>,
+  attrs?: Record<string, string | number | boolean>,
 ): Promise<T> {
   return trace
     .getTracer("nexus-agent")
     .startActiveSpan(
       TOOL_SPAN_NAME,
-      { attributes: { "tool.name": toolName, "tool.tier": tier } },
+      { attributes: { ...attrs, "tool.name": toolName, "tool.tier": tier } },
       async (span) => {
         try {
           return await fn();

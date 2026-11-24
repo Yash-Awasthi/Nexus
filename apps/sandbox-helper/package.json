@@ -1,0 +1,23 @@
+{
+  "name": "@nexus/sandbox-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Loopback helper that runs the sandbox image for the browser app",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.ts",
+    "build": "tsc --noEmit --project tsconfig.json",
+    "test": "vp test run",
+    "test:watch": "vp test"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@nexus/sandbox": "workspace:*"
+  }
+}

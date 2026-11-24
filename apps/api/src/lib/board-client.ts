@@ -115,17 +115,6 @@ export async function checkHealth(): Promise<BoardHealth> {
   return { ok: true, ...(typeof version === "string" ? { version } : {}) };
 }
 
-/** POST /api/join — register an agent on the board's default channel. */
-export async function joinAgent(name: string, caps?: string[]): Promise<boolean> {
-  // /api/join takes the channel as a query parameter; its body rejects one.
-  const query = new URLSearchParams({ channel: boardChannel() });
-  const result = await call(`/api/join?${query.toString()}`, {
-    method: "POST",
-    body: JSON.stringify({ name, caps: caps?.join(",") }),
-  });
-  return result.ok;
-}
-
 /** POST /api/tasks — create a task and return its generated id. */
 export async function createTask(params: {
   thread: string;
@@ -151,58 +140,6 @@ export async function createTask(params: {
   const task = taskFrom(result.body);
   if (!task?.id) return { ok: false, error: "board returned no task" };
   return { ok: true, id: task.id, task };
-}
-
-/** POST /api/claim — take a task under a lease. */
-export async function claimTask(params: {
-  thread: string;
-  taskId: string;
-  agent: string;
-  leaseSec?: number;
-}): Promise<{ ok: boolean; lease?: string; task?: BoardTask; error?: string }> {
-  const result = await call("/api/claim", {
-    method: "POST",
-    body: JSON.stringify({
-      channel: boardChannel(),
-      task_id: params.taskId,
-      agent: params.agent,
-      lease: params.leaseSec,
-    }),
-  });
-  if (!result.ok) return { ok: false, error: result.error };
-  const task = taskFrom(result.body);
-  return {
-    ok: true,
-    ...(task?.lease_until ? { lease: task.lease_until } : {}),
-    ...(task ? { task } : {}),
-  };
-}
-
-/** POST /api/renew — extend the caller's lease on a task. */
-export async function renewTask(params: { taskId: string; agent: string }): Promise<boolean> {
-  const result = await call("/api/renew", {
-    method: "POST",
-    body: JSON.stringify({ channel: boardChannel(), task_id: params.taskId, agent: params.agent }),
-  });
-  return result.ok;
-}
-
-/** POST /api/done — complete a task and release its locks. */
-export async function completeTask(params: {
-  taskId: string;
-  agent: string;
-  summary?: string;
-}): Promise<boolean> {
-  const result = await call("/api/done", {
-    method: "POST",
-    body: JSON.stringify({
-      channel: boardChannel(),
-      task_id: params.taskId,
-      agent: params.agent,
-      summary: params.summary,
-    }),
-  });
-  return result.ok;
 }
 
 /** GET /api/tasks — list tasks, optionally filtered. Offline yields an empty list. */

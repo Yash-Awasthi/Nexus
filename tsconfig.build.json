@@ -80,6 +80,9 @@
       "path": "packages/llm-translate"
     },
     {
+      "path": "packages/lsp"
+    },
+    {
       "path": "packages/mail-ingest"
     },
     {

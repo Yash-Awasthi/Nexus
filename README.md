@@ -15,9 +15,9 @@ Run, coordinate, and compare large language models from one place.
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">
   </a>
-  <img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Node-20+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node">
-  <img src="https://img.shields.io/badge/pnpm-9+-f69220?style=flat-square&logo=pnpm&logoColor=white" alt="pnpm">
+  <img src="https://img.shields.io/badge/TypeScript-6.0-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Node-24+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node">
+  <img src="https://img.shields.io/badge/pnpm-12+-f69220?style=flat-square&logo=pnpm&logoColor=white" alt="pnpm">
 </p>
 
 <p>
@@ -49,10 +49,10 @@ and keeps memory across sessions — behind a Fastify API, a React dashboard, an
 background workers. It is bring-your-own-key: you provide your LLM provider keys and
 they stay within your deployment.
 
-It is a TypeScript monorepo (pnpm + Turbo): a handful of apps (`api`, `ui`, `worker`,
-`cli`, ingest) and a set of focused `@nexus/*` packages for the runtime, council,
-memory, retrieval, drivers, and the rest. This page is a starting point — the
-[docs](docs/) and the source go further.
+It is a TypeScript monorepo (pnpm + Turbo): apps for the API, dashboard, worker,
+CLI, desktop shell and browser extension, plus 50 focused `@nexus/*` packages for
+the runtime, council, memory, retrieval, drivers, and the rest. This page is a
+starting point — the [docs](docs/) and the source go further.
 
 Auth is hardened by default: HS256 or RS256 JWTs (`NEXUS_JWT_ALG`), exponential-backoff
 login throttling, per-session / per-user token revocation, and self-service GDPR
@@ -135,7 +135,7 @@ observability.
 - **Structured dispatch contract** — every mission worker runs against OBJECTIVE / OUTPUT / TOOLS / BOUNDARIES, folded into the system prompt so the agent acts autonomously within concrete constraints.
 - **Escalation-breaker guardrails** — a steer → constrain → stop ladder fed by loop, error-storm, token-velocity, and cost-cap detection; one level per tick, automatic recovery, `hardStop` opt-in, all tunable via `MISSION_BREAKER_*` env vars.
 - **Agent-CLI terminal plane** (local installs) — spawn real PTY sessions for Codex, Claude Code, VS Code, OpenCode, and other installed CLIs; stream output over SSE, type into and resize sessions, kill on demand. Hard-gated to loopback so a hosted deployment never exposes process spawning.
-- **Sandboxed code execution** — `--network none`, read-only filesystem, memory cap.
+- **Sandboxed code execution** — the page's JavaScript and Python run locally under Node's permission model; skill, mission and model-written shell code runs only in a Docker image with `--network none`, a read-only rootfs, a memory cap and a non-root user, and fails closed when the image is absent.
 
 ### Memory & knowledge
 
@@ -147,7 +147,7 @@ observability.
 - **Fastify API + React dashboard + BullMQ workers** in one pnpm/Turbo monorepo, with a versioned `/api/v1` surface and OpenAPI spec.
 - **Hardened auth** — HS256/RS256 JWTs (alg-pinned), exponential-backoff login throttling, per-session token revocation, and self-service GDPR erasure.
 - **Auditable & observable** — HMAC-SHA256-chained audit log, OpenTelemetry traces, health endpoints, Prometheus-ready metrics.
-- **Deploy anywhere** — Docker Compose for the full stack, Helm charts for Kubernetes, or single-service deploys (Render/Fly/Vercel recipes included).
+- **Deploy anywhere Node runs** — Docker Compose for the full stack, or the `render.yaml` blueprint for a single web service. The API and UI also run as plain Node processes.
 - **Tested** — hermetic unit suites, e2e assertions against the real HTTP surface, and CI (lint + typecheck + tests) on every push.
 
 ## Deployment modes
@@ -191,9 +191,9 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 
 ## Quality bar
 
-- **623 tests** in the agent-runtime package alone (80%+ line coverage); hundreds more across API, council, memory, and drivers — unit suites are hermetic (no live services).
-- **115 e2e assertions** in two suites exercised against the real HTTP surface, plus live proofs for auth (token rotation, lockout, revocation, erasure), rate limiting (atomic under 320 concurrent requests), and durability (restart-survival of every user-facing store).
-- CI runs lint, typecheck, and tests on every push; audit log is HMAC-SHA256 chained.
+- **6,086 unit tests** across 509 files (`pnpm test` on this tree, 16 skipped), including 1,017 in `@nexus/agent-core` and 1,286 in `@nexus/api`. Suites are hermetic: no live services.
+- **47 UI e2e tests** at phone width against the real HTTP surface (11 skipped on this machine), plus a desktop spec that signs up, chats, runs a skill and survives a restart. Separate suites cover auth (token rotation, lockout, revocation, erasure), rate limiting (a 100-request stampede counted exactly), and restart-survival of the user-facing stores.
+- CI runs lint, typecheck, and tests on every push; the audit log is HMAC-SHA256 chained.
 
 ---
 

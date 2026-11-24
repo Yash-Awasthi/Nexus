@@ -5,6 +5,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+apps/desktop/resources/
 .next/
 out/
 
@@ -28,9 +29,14 @@ apps/api/data/stores/
 
 # Runtime data the API writes when NEXUS_DATA_DIR is unset (never source)
 apps/api/data/
+# Same, for a test run that leaves its embedded database under the package.
+apps/api/.nexus/
 
 # Embedded PGlite database (DATABASE_URL=pglite://.nexus/db)
-.nexus/
+# Ignore the contents, not the directory: git cannot re-include a file under an
+# excluded directory, and the k6 baseline is evidence worth tracking.
+.nexus/*
+!.nexus/k6-baseline.txt
 
 # Local runtime state under data/ (auth tokens, run ids — dev state, not source)
 data/.*
@@ -94,3 +100,6 @@ inspiration/
 
 # Generated agent skill bundles
 .agents/
+
+# Subagent session IDs and exported transcripts, local only
+.opencode/subagents/*.txt

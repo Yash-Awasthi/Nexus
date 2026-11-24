@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { tmpdir } from "node:os";
-import { basename } from "node:path";
 import { EventEmitter } from "events";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import type { IExecutionContext } from "@nexus/plugin-sdk";
@@ -10,7 +8,6 @@ import {
   prepareExecution,
   buildSafeEnv,
   buildDockerArgs,
-  HOST_TMP_MOUNT,
   createDockerRunner,
   resolveUntrustedRunner,
   defaultRunner,
@@ -19,6 +16,7 @@ import {
   MAX_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
   SAFE_ENV_KEYS,
+  SANDBOX_LANGUAGES,
   SECCOMP_PROFILE_PATH,
   SCRATCH_DIR,
   WORKSPACE_MOUNT,
@@ -27,13 +25,6 @@ import {
   type RunnerResult,
   type DockerSandboxConfig,
 } from "../src/index.ts";
-
-// ── Mock fs/promises so no real temp files are touched ───────────────────────
-
-vi.mock("fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  unlink: vi.fn().mockResolvedValue(undefined),
-}));
 
 // ── Mock child_process for defaultRunner tests ────────────────────────────────
 
@@ -84,7 +75,7 @@ describe("prepareExecution", () => {
     expect(prep.cmd).toBe("node");
     expect(prep.args).toContain("-e");
     expect(prep.args).toContain("console.log(1)");
-    expect(prep.tempFilePath).toBeUndefined();
+    expect(prep.useStdin).toBe(false);
   });
 
   it("routes python to python3 via stdin (Windows alias-safe)", () => {
@@ -105,24 +96,66 @@ describe("prepareExecution", () => {
     expect(prep.args).toContain("echo hello");
   });
 
-  it("routes typescript to tsx with a temp file path", () => {
+  it("routes typescript to tsx through a shell that writes stdin to the scratch", () => {
     const prep = prepareExecution("typescript", "const x: number = 1;");
-    expect(prep.cmd).toBe("tsx");
-    expect(prep.tempFilePath).toBeDefined();
-    expect(prep.tempFilePath).toMatch(/nexus-sandbox-.+\.ts$/);
-    // tsx receives the file path as an arg
-    expect(prep.args).toContain(prep.tempFilePath!);
+    expect(prep.cmd).toBe("sh");
+    expect(prep.useStdin).toBe(true);
+    expect(prep.args.join(" ")).toContain("tsx");
+    // The code travels on stdin, so no path has to exist on the daemon's side.
+    expect(prep.args).not.toContain("const x: number = 1;");
   });
 
-  it("typescript temp file paths are unique per call", () => {
-    const p1 = prepareExecution("typescript", "x");
-    const p2 = prepareExecution("typescript", "x");
-    expect(p1.tempFilePath).not.toBe(p2.tempFilePath);
+  it("typescript does not depend on a host path the daemon must see", () => {
+    const prep = prepareExecution("typescript", "x");
+    expect(prep.args.join(" ")).not.toMatch(/nexus-host-tmp|\/tmp\//);
   });
 
   it("javascript uses no-addons flag for security", () => {
     const prep = prepareExecution("javascript", "x");
     expect(prep.args).toContain("--no-addons");
+  });
+
+  it("routes go through sh to a scratch file, then go run", () => {
+    const prep = prepareExecution("go", "package main");
+    expect(prep.cmd).toBe("sh");
+    expect(prep.useStdin).toBe(true);
+    expect(prep.args.join(" ")).toContain("nexus-sandbox.go");
+    expect(prep.args.join(" ")).toContain("go run");
+    expect(prep.args).not.toContain("package main");
+  });
+
+  it("routes rust through sh to a scratch file, then rustc", () => {
+    const prep = prepareExecution("rust", "fn main() {}");
+    expect(prep.cmd).toBe("sh");
+    expect(prep.useStdin).toBe(true);
+    expect(prep.args.join(" ")).toContain("nexus-sandbox.rs");
+    expect(prep.args.join(" ")).toContain("rustc");
+    expect(prep.args).not.toContain("fn main() {}");
+  });
+
+  it("routes ruby through sh to a scratch file, then ruby", () => {
+    const prep = prepareExecution("ruby", "puts 1");
+    expect(prep.cmd).toBe("sh");
+    expect(prep.useStdin).toBe(true);
+    expect(prep.args.join(" ")).toContain("nexus-sandbox.rb");
+    expect(prep.args.join(" ")).toContain("ruby");
+    expect(prep.args).not.toContain("puts 1");
+  });
+
+  it("covers all seven image languages", () => {
+    for (const language of SANDBOX_LANGUAGES) {
+      const prep = prepareExecution(language, "x");
+      expect(prep.cmd).toBeTruthy();
+    }
+    expect([...SANDBOX_LANGUAGES]).toEqual([
+      "javascript",
+      "typescript",
+      "python",
+      "bash",
+      "go",
+      "rust",
+      "ruby",
+    ]);
   });
 });
 
@@ -283,39 +316,38 @@ describe("executeCode — language routing", () => {
     expect(cmd).toBe("bash");
   });
 
-  it("calls runner with tsx for typescript", async () => {
+  it("calls runner with sh for typescript", async () => {
     const runner = makeRunner({});
     await executeCode(task({ language: "typescript", code: "const x: number = 1" }), runner);
     const cmd = (runner as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(cmd).toBe("tsx");
+    expect(cmd).toBe("sh");
   });
 
-  it("typescript: writes temp file before running and deletes after", async () => {
-    const { writeFile, unlink } = await import("fs/promises");
-    vi.clearAllMocks();
+  it("calls runner with sh for go, rust and ruby and sends the code on stdin", async () => {
+    for (const language of ["go", "rust", "ruby"] as const) {
+      const runner = makeRunner({});
+      await executeCode(task({ language, code: "print 1" }), runner);
+      const call = (runner as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call?.[0]).toBe("sh");
+      const opts = call?.[2] as { stdin?: string };
+      expect(opts.stdin).toBe("print 1");
+    }
+  });
 
+  it("typescript: sends the code on stdin, not through a temp file", async () => {
     const runner = makeRunner({});
     await executeCode(task({ language: "typescript", code: "const x = 1" }), runner);
-
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    expect(unlink).toHaveBeenCalledTimes(1);
-
-    // Unlink path matches writeFile path
-    const writePath = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
-    const unlinkPath = (unlink as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
-    expect(writePath).toBe(unlinkPath);
+    const opts = (runner as ReturnType<typeof vi.fn>).mock.calls[0]?.[2] as { stdin?: string };
+    expect(opts.stdin).toBe("const x = 1");
   });
 
-  it("typescript: temp file is cleaned up even when runner throws", async () => {
-    const { unlink } = await import("fs/promises");
-    vi.clearAllMocks();
-
-    await executeCode(
+  it("typescript: still runs when the runner throws", async () => {
+    const result = await executeCode(
       task({ language: "typescript", code: "const x = 1" }),
       makeErrorRunner("tsx crashed"),
     );
-
-    expect(unlink).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("tsx crashed");
   });
 });
 
@@ -603,11 +635,9 @@ describe("buildDockerArgs", () => {
     expect(args).toContain("-i");
   });
 
-  it("mounts tmpdir as read-only volume", () => {
+  it("adds no bind mount of the host temp dir", () => {
     const args = buildDockerArgs();
-    const vIdx = args.indexOf("-v");
-    expect(vIdx).toBeGreaterThan(-1);
-    expect(args[vIdx + 1]).toMatch(/:ro$/);
+    expect(args).not.toContain("-v");
   });
 
   // ── §9.4 hardening: seccomp + read-only rootfs + non-root user ──────────────
@@ -629,7 +659,7 @@ describe("buildDockerArgs", () => {
 
   it("provides a writable scratch tmpfs and points TMPDIR at it when read-only", () => {
     const args = buildDockerArgs({ scratchMb: 32 });
-    expect(args).toContain(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=32m`);
+    expect(args).toContain(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,exec,size=32m,mode=1777`);
     expect(args).toContain(`--env=TMPDIR=${SCRATCH_DIR}`);
   });
 
@@ -758,29 +788,24 @@ describe("buildDockerArgs workspace mount", () => {
   });
 });
 
-describe("host temp mount", () => {
-  it("mounts the temp dir at one fixed container path on every platform", () => {
+describe("no host temp mount", () => {
+  it("does not bind-mount the host temp dir into the container", () => {
     const args = buildDockerArgs({});
-    expect(args[args.indexOf("-i") - 1]).toBe(`${tmpdir()}:${HOST_TMP_MOUNT}:ro`);
+    expect(args.join(" ")).not.toContain("nexus-host-tmp");
   });
 
-  it("names a temp file by its container path when the code runs in a container", () => {
-    const prep = prepareExecution("typescript", "const x = 1;", true);
-    expect(prep.tempFilePath!.startsWith(tmpdir())).toBe(true);
-    expect(prep.args).toEqual([`${HOST_TMP_MOUNT}/${basename(prep.tempFilePath!)}`]);
-  });
-
-  it("runs a docker runner's TypeScript on the container path", async () => {
-    const seen: string[][] = [];
-    const inner: Runner = async (_cmd, args) => {
-      seen.push(args);
+  it("runs a docker runner's TypeScript with the code on stdin", async () => {
+    const seen: { args: string[]; stdin?: string }[] = [];
+    const inner: Runner = async (_cmd, args, opts) => {
+      seen.push({ args, stdin: opts.stdin });
       return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
     };
     await executeCode(
       { taskType: "sandbox.execute", code: "1", language: "typescript" },
       Object.assign(inner, { inContainer: true }),
     );
-    expect(seen[0]![0]!.startsWith(`${HOST_TMP_MOUNT}/`)).toBe(true);
+    expect(seen[0]!.args.join(" ")).toContain("tsx");
+    expect(seen[0]!.stdin).toBe("1");
   });
 });
 

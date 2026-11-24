@@ -15,6 +15,7 @@
 
 import crypto from "node:crypto";
 
+import { SANDBOX_LANGUAGES } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
 import { guardExec } from "../lib/exec-guard.ts";
@@ -32,6 +33,11 @@ const _sandboxResults = new Map<
     output: string;
     error?: string;
     durationMs: number;
+    language?: string;
+    source?: "api" | "helper";
+    createdAt: number;
+    /** Insertion order; ms timestamps tie when two runs land in the same tick. */
+    seq: number;
   }
 >();
 
@@ -41,6 +47,7 @@ const _sandboxResults = new Map<
  * insertion order), so /sandbox/status/:id returns not_found for evicted ids.
  */
 const MAX_SANDBOX_RESULTS = 100;
+let _sandboxSequence = 0;
 function recordResult(
   ownerId: string,
   result: {
@@ -49,9 +56,17 @@ function recordResult(
     output: string;
     error?: string;
     durationMs: number;
+    language?: string;
+    source?: "api" | "helper";
   },
 ): void {
-  _sandboxResults.set(result.executionId, { ...result, ownerId });
+  _sandboxResults.set(result.executionId, {
+    ...result,
+    ownerId,
+    source: result.source ?? "api",
+    createdAt: Date.now(),
+    seq: ++_sandboxSequence,
+  });
   if (_sandboxResults.size > MAX_SANDBOX_RESULTS) {
     const oldest = _sandboxResults.keys().next().value;
     if (oldest !== undefined) _sandboxResults.delete(oldest);
@@ -77,6 +92,9 @@ const PISTON_LANG_MAP: Record<string, { language: string; version: string; filen
   go: { language: "go", version: "1.21.0", filename: "main.go" },
   rust: { language: "rust", version: "1.68.2", filename: "main.rs" },
 };
+
+/** Languages only Piston can run here; the rest come from @nexus/sandbox. */
+const PISTON_ONLY_LANGUAGES = ["r"] as const;
 
 export async function runViaPiston(
   code: string,
@@ -135,21 +153,21 @@ export async function sandboxRoutes(
     // emkc.org went whitelist-only Feb 2026 — only an explicit non-emkc
     // PISTON_URL counts as a working Piston instance.
     const usingCustomPiston = PISTON_AVAILABLE;
-    // Only advertise languages that actually run on this box: JS (vm) and
-    // Python (Pyodide) always; everything else needs a working Piston.
-    const nonJsLangs = usingCustomPiston
-      ? ["typescript", "python", "bash", "r", "ruby", "go", "rust"]
-      : ["python"];
+    // Local languages are the sandbox image's: the page runs them through the
+    // local helper. Piston adds what the image lacks (r) and can also take the rest.
+    const languages = usingCustomPiston
+      ? [...SANDBOX_LANGUAGES, ...PISTON_ONLY_LANGUAGES]
+      : [...SANDBOX_LANGUAGES];
     return reply.send({
       available: true,
       dockerAvailable: dockerAvail,
       pistonAvailable: usingCustomPiston,
       pythonRuntime: "pyodide-local",
-      languages: ["javascript", ...nonJsLangs],
+      languages,
       pistonUrl: process.env.PISTON_URL ?? null,
       note: usingCustomPiston
         ? undefined
-        : "JS + Python run locally (Pyodide). Set PISTON_URL to a self-hosted Piston for Go/Rust/Ruby/R/bash.",
+        : "JS and Python run in the API; Go, Rust, Ruby, TypeScript and Bash run through the local sandbox helper. Set PISTON_URL to a self-hosted Piston for r.",
     });
   });
 
@@ -250,6 +268,51 @@ export async function sandboxRoutes(
       return reply.code(201).send(result);
     },
   );
+
+  /**
+   * POST /sandbox/runs — record a run this browser executed through the local
+   * sandbox helper. The helper runs on the viewer's machine, so the server only
+   * sees what the page reports; that is why these rows are marked `helper`.
+   */
+  app.post<{
+    Body: {
+      language?: unknown;
+      stdout?: unknown;
+      stderr?: unknown;
+      exitCode?: unknown;
+      durationMs?: unknown;
+    };
+  }>("/sandbox/runs", async (request, reply) => {
+    const { language, stdout, stderr, exitCode, durationMs } = request.body ?? {};
+    if (typeof language !== "string" || typeof stdout !== "string") {
+      return reply
+        .code(400)
+        .send({ error: "invalid_run", message: "Send the language and the output." });
+    }
+    const exit = typeof exitCode === "number" ? exitCode : 0;
+    const result = {
+      executionId: crypto.randomUUID(),
+      status: exit === 0 ? "done" : "error",
+      output: stdout.slice(0, 64 * 1024),
+      error: typeof stderr === "string" && stderr !== "" ? stderr.slice(0, 64 * 1024) : undefined,
+      durationMs: typeof durationMs === "number" ? durationMs : 0,
+      language,
+      source: "helper" as const,
+    };
+    recordResult(ownerIdFor(request), result);
+    return reply.code(201).send(result);
+  });
+
+  /** GET /sandbox/runs — this caller's recent runs, newest first. */
+  app.get("/sandbox/runs", async (request, reply) => {
+    const owner = ownerIdFor(request);
+    const runs = [..._sandboxResults.values()]
+      .filter((entry) => entry.ownerId === owner)
+      .sort((a, b) => b.seq - a.seq)
+      .slice(0, 20)
+      .map(({ ownerId: _owner, seq: _seq, ...rest }) => rest);
+    return reply.send({ runs });
+  });
 
   app.get<{ Params: { id: string } }>("/sandbox/status/:id", async (request, reply) => {
     const found = _sandboxResults.get(request.params.id);

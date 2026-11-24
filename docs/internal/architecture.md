@@ -14,7 +14,7 @@ does not repeat it.
 | `apps/api`        | Fastify 5 API; also serves the built UI when `NEXUS_SPA_DIR` | Internet (cloud), loopback (desktop) |
 | `apps/worker`     | BullMQ consumers (agent runs, browser tasks, feeds)          | Redis only                           |
 | `apps/ui`         | React Router 8 SPA (React 19)                                | Browser                              |
-| `apps/desktop`    | Electron 44 shell; boots the API as a child on loopback      | Local user                           |
+| `apps/desktop`    | Electron 45 shell; boots the API as a child on loopback      | Local user                           |
 | `apps/cli`        | `nexus` CLI                                                  | Local user, talks to the API         |
 | `apps/extension`  | Browser extension stub                                       | —                                    |
 | `services/ingest` | Python FastAPI + Celery scrapers                             | Internal network, port 8000          |
@@ -38,8 +38,7 @@ the single most important fact for reviewing a route:
 
 Public `/api/v1` routes as of the baseline: auth register/login/refresh/logout/reset/verify,
 OAuth/OIDC/SAML entry and callbacks, SCIM discovery, `/libertas*`, `/bots/*`, `/org/hooks/:hookId`
-(HMAC-verified), `/mcp/info`, `/oauth/providers`, `/llm-oauth/providers`, `/drive/file` (signed
-link). Re-run the route census in [security-findings.md](security-findings.md) after adding
+(HMAC-verified), `/mcp/info`, `/oauth/providers`, `/llm-oauth/providers`. Re-run the route census in [security-findings.md](security-findings.md) after adding
 routes.
 
 ## Identity resolution
@@ -82,19 +81,18 @@ All executing surfaces go through `lib/exec-guard.ts` → `@nexus/exec-policy`
 `repl` and `tool` run, on the reasoning that the runtime is the control. That reasoning holds
 only where the runtime really isolates:
 
-| Surface / path                         | Runtime                                                                                                                                                                           | Isolation                                                      |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `/api/sandbox/execute` JavaScript      | `lib/untrusted-js.ts`: child Node, `--permission`, empty env, sockets and DNS stubbed, 64 MB, deadline                                                                            | Good                                                           |
-| `/api/sandbox/execute` Python          | `lib/untrusted-python.ts`: Pyodide in a fresh child Node per run, `--permission` reading only the Pyodide package, empty env, network prelude, 256 MB heap, 512 MB WASM, deadline | Good (was in-process until NX-SEC-001)                         |
-| Code agent build/run (Python)          | same `runViaPyodide` → `lib/untrusted-python.ts`                                                                                                                                  | Good                                                           |
-| `/api/sandbox/execute` other languages | Piston at `PISTON_URL` (self-hosted)                                                                                                                                              | Piston's container                                             |
-| Programmatic tool calling              | `@nexus/agent-core` `ptc-sandbox.ts`: child Node, permission model                                                                                                                | Good                                                           |
-| Drive shell `/api/v1/drive/exec`       | Docker (`runOnDrive`), tmpfs sized to quota, gVisor/Kata optional; host shell only with `ALLOW_UNSANDBOXED_EXEC=true` and never in production                                     | Good                                                           |
-| Python/R/Julia kernels                 | `@nexus/code-repl` Docker REPL                                                                                                                                                    | Container                                                      |
-| Host PTY `/api/local/pty`              | `@nexus/pty`, loopback-only (`NEXUS_LOCAL_PTY_FORCE` outside production only), inherits server env                                                                                | By design a host shell; sessions not owner-scoped (NX-SEC-018) |
-| Skills                                 | `lib/skill-runner.ts` → `@nexus/sandbox` child process; gated as `pty`                                                                                                            | Approval / admin on shared servers                             |
-| Org CLI runtimes                       | `lib/org-cli-adapters.ts`; exec policy once per agent and command; no inherited env                                                                                               | Policy                                                         |
-| Workflow `transform` expressions       | `new Function` in the API process                                                                                                                                                 | Desktop only; refused on shared servers                        |
+| Surface / path                         | Runtime                                                                                                                                                                           | Isolation                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `/api/sandbox/execute` JavaScript      | `lib/untrusted-js.ts`: child Node, `--permission`, empty env, sockets and DNS stubbed, 64 MB, deadline                                                                            | Good                                                       |
+| `/api/sandbox/execute` Python          | `lib/untrusted-python.ts`: Pyodide in a fresh child Node per run, `--permission` reading only the Pyodide package, empty env, network prelude, 256 MB heap, 512 MB WASM, deadline | Good (was in-process until NX-SEC-001)                     |
+| Code agent build/run (Python)          | same `runViaPyodide` → `lib/untrusted-python.ts`                                                                                                                                  | Good                                                       |
+| `/api/sandbox/execute` other languages | Piston at `PISTON_URL` (self-hosted)                                                                                                                                              | Piston's container                                         |
+| Programmatic tool calling              | `@nexus/agent-core` `ptc-sandbox.ts`: child Node, permission model                                                                                                                | Good                                                       |
+| Python/R/Julia kernels                 | `@nexus/code-repl` Docker REPL                                                                                                                                                    | Container                                                  |
+| Host PTY `/api/local/pty`              | `@nexus/pty`, loopback-only (`NEXUS_LOCAL_PTY_FORCE` outside production only), inherits server env                                                                                | By design a host shell; sessions owner-scoped (NX-SEC-018) |
+| Skills                                 | `lib/skill-runner.ts` → `@nexus/sandbox` child process; gated as `pty`                                                                                                            | Approval / admin on shared servers                         |
+| Org CLI runtimes                       | `lib/org-cli-adapters.ts`; exec policy once per agent and command; no inherited env                                                                                               | Policy                                                     |
+| Workflow `transform` expressions       | `new Function` in the API process                                                                                                                                                 | Desktop only; refused on shared servers                    |
 
 ## Where requests leave the server
 
@@ -104,7 +102,7 @@ only where the runtime really isolates:
 - `apps/api/src/lib/public-url.ts`: `unsafeUrlReason` (string check), `callerFetch` (pinned off
   the desktop), `fetchPublic` (pinned, re-checks every redirect hop, at most 5).
 - Stealth browser routes every page request through `pinnedFetch`.
-- MCP servers, connectors, OIDC discovery, org HTTP runtime, KB crawl, scraping: pinned.
+- MCP servers, OIDC discovery, org HTTP runtime, KB crawl, scraping: pinned.
 - Raw `fetch` to fixed vendor URLs (Google, GitHub, Slack, Groq, Tavily, Semantic Scholar,
   Upstash, Sentry): fine. Raw `fetch` to a URL a user influences: the model catalogue probe in
   `api-bridge.ts` (NX-SEC-015) and the Teams reply URL (NX-SEC-005).
@@ -126,7 +124,6 @@ prevented; the exec gate and approvals are the backstop for anything an agent tr
 | `NEXUS_MFA_KEY` / `OAUTH_ENCRYPTION_KEY`         | env; TOTP secret encryption (plaintext fallback)       |
 | Provider keys (operator)                         | env (`GROQ_API_KEY` …)                                 |
 | Provider keys (users)                            | Postgres, AES-256-GCM (`lib/provider-keys.ts`)         |
-| Connector credentials                            | Postgres, encrypted                                    |
 | OAuth client secrets, bot tokens                 | env                                                    |
 
 Every one of these is readable by any code that runs inside the API process, which is why

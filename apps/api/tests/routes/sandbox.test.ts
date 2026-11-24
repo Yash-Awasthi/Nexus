@@ -11,6 +11,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 import type { FastifyInstance } from "fastify";
 
+import { SANDBOX_LANGUAGES } from "@nexus/sandbox";
+
 import { buildServer } from "../../src/server.ts";
 
 // lib/untrusted-js gives its child Node 30 s to boot on a busy machine; a run needs more than that.
@@ -43,7 +45,7 @@ interface ExecResult {
 }
 
 describe("GET /api/sandbox/status", () => {
-  it("advertises the local runtimes (js + python) and availability", async () => {
+  it("advertises the image languages and availability", async () => {
     const res = await app.inject({ method: "GET", url: "/api/sandbox/status" });
     expect(res.statusCode).toBe(200);
     const body = res.json<{
@@ -56,8 +58,8 @@ describe("GET /api/sandbox/status", () => {
     }>();
     expect(body.available).toBe(true);
     expect(body.pythonRuntime).toBe("pyodide-local");
-    // Without a custom PISTON_URL, only JS (vm) + Python (Pyodide) run here.
-    expect(body.languages).toEqual(["javascript", "python"]);
+    // Without a custom PISTON_URL, only the image languages are offered.
+    expect(body.languages).toEqual([...SANDBOX_LANGUAGES]);
     expect(body.pistonAvailable).toBe(false);
     expect(body.pistonUrl).toBeNull();
     expect(typeof body.dockerAvailable).toBe("boolean");
@@ -148,6 +150,90 @@ describe("POST /api/sandbox/execute (other languages — piston guard)", () => {
     expect(body.language).toBe("bash");
     // A duration, not a timestamp.
     expect(body.durationMs).toBeLessThan(60_000);
+  });
+
+  it("fails closed for go, rust and ruby without a custom PISTON_URL", async () => {
+    for (const language of ["go", "rust", "ruby"]) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/sandbox/execute",
+        payload: { code: "print 1", language },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<ExecResult>();
+      expect(body.status).toBe("error");
+      expect(body.error).toContain("PISTON_URL");
+      expect(body.language).toBe(language);
+    }
+  });
+});
+
+describe("sandbox run history", () => {
+  it("records a run the browser executed locally", async () => {
+    const run = await app.inject({
+      method: "POST",
+      url: "/api/sandbox/runs",
+      payload: {
+        language: "python",
+        stdout: "42\n",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 120,
+      },
+    });
+    expect(run.statusCode).toBe(201);
+    const recorded = run.json<ExecResult & { source?: string }>();
+    expect(recorded.status).toBe("done");
+    expect(recorded.source).toBe("helper");
+
+    const read = await app.inject({
+      method: "GET",
+      url: `/api/sandbox/status/${recorded.executionId}`,
+    });
+    expect(read.json<ExecResult>().output).toBe("42\n");
+  });
+
+  it("marks a non-zero exit as an error and keeps the stderr", async () => {
+    const run = await app.inject({
+      method: "POST",
+      url: "/api/sandbox/runs",
+      payload: {
+        language: "bash",
+        stdout: "",
+        stderr: "command not found",
+        exitCode: 127,
+        durationMs: 5,
+      },
+    });
+    expect(run.json<ExecResult>()).toMatchObject({ status: "error", error: "command not found" });
+  });
+
+  it("refuses a run without a language or output", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sandbox/runs",
+      payload: { stdout: "orphan" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("lists the caller's recent runs, newest first", async () => {
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/sandbox/runs",
+      payload: { language: "javascript", stdout: "first", exitCode: 0, durationMs: 1 },
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/api/sandbox/runs",
+      payload: { language: "javascript", stdout: "second", exitCode: 0, durationMs: 1 },
+    });
+    const ids = [first.json<ExecResult>().executionId, second.json<ExecResult>().executionId];
+
+    const listed = await app.inject({ method: "GET", url: "/api/sandbox/runs" });
+    const runs = listed.json<{ runs: Array<{ executionId: string }> }>().runs;
+    expect(runs[0]?.executionId).toBe(ids[1]);
+    expect(runs.map((r) => r.executionId)).toContain(ids[0]);
   });
 });
 

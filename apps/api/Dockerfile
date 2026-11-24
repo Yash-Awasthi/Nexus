@@ -47,9 +47,14 @@ RUN pnpm install --frozen-lockfile --prod --filter "@nexus/api..." \
 FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runner
 WORKDIR /app
 
+# The dev compose stack mounts the host socket so the API can start sandbox
+# containers; that needs the client here. Deployments leave it off.
+ARG WITH_DOCKER_CLI=false
+
 # Non-root user for security
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus \
-  && mkdir -p /data/drives && chown nexus:nexus /data/drives
+  && mkdir -p /data/drives && chown nexus:nexus /data/drives \
+  && if [ "$WITH_DOCKER_CLI" = "true" ]; then apk add --no-cache docker-cli; fi
 
 COPY --from=prod --chown=nexus:nexus /app ./
 

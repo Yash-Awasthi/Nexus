@@ -23,6 +23,10 @@ import { execScript, type PgLike } from "./pg-pool.ts";
 
 /** Where `@nexus/db` keeps its `.sql` files, resolved through the package. */
 function migrationsDir(): string {
+  // A bundled build has no @nexus/db package to resolve; it ships the folder and
+  // names it here.
+  const bundled = process.env.NEXUS_MIGRATIONS_DIR;
+  if (bundled) return bundled;
   const pkg = createRequire(import.meta.url).resolve("@nexus/db/package.json");
   return join(dirname(pkg), "migrations");
 }

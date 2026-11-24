@@ -4,6 +4,10 @@
  * test is that the shipped `.sql` files apply to PGlite and leave the tables
  * sign-in needs, which only executing them can show.
  */
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, it, expect, afterAll } from "vite-plus/test";
 
 import { migrateEmbedded } from "../../src/lib/migrate-embedded.ts";
@@ -72,5 +76,24 @@ describe("migrateEmbedded", () => {
     const { applied } = await migrateEmbedded(server as never);
     expect(applied.length).toBeGreaterThan(0);
     expect(sent.some((sql) => /CREATE TABLE (IF NOT EXISTS )?"?users"? \(/i.test(sql))).toBe(true);
+  });
+
+  it("reads the folder named by NEXUS_MIGRATIONS_DIR, which a bundled build ships", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nexus-migrations-"));
+    mkdirSync(join(dir, "0001_bundled"));
+    writeFileSync(
+      join(dir, "0001_bundled", "migration.sql"),
+      "CREATE TABLE bundled_probe (id int);",
+    );
+    const previous = process.env.NEXUS_MIGRATIONS_DIR;
+    process.env.NEXUS_MIGRATIONS_DIR = dir;
+    try {
+      const { applied } = await migrateEmbedded(getPgPool("pglite://:memory:bundled")!);
+      expect(applied).toEqual(["0001_bundled"]);
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_MIGRATIONS_DIR;
+      else process.env.NEXUS_MIGRATIONS_DIR = previous;
+      await closePgPools();
+    }
   });
 });

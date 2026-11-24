@@ -13,7 +13,7 @@ import {
 } from "@nexus/search/retrieval";
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
 
-export interface CitedSource {
+interface CitedSource {
   n: number;
   title: string;
   url?: string;

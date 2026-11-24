@@ -4,6 +4,9 @@ import { expect, it } from "vite-plus/test";
 
 import { defaultOutputProcessors } from "./token-saver.ts";
 
+// Shared CI runners are several times slower; quadratic work still blows past this.
+const BUDGET_MS = process.env["CI"] ? 600 : 100;
+
 const COMMANDS = [
   "pytest",
   "npm test",
@@ -53,7 +56,7 @@ it.each(defaultOutputProcessors.map((p) => [p.name, p] as const))(
         const t = performance.now();
         processor.process(command, input(shape));
         const ms = performance.now() - t;
-        if (ms > 100) slow.push(`${command} #${i} ${Math.round(ms)}ms`);
+        if (ms > BUDGET_MS) slow.push(`${command} #${i} ${Math.round(ms)}ms`);
       }
     }
     expect(slow).toEqual([]);
