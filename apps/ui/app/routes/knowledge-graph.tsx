@@ -10,9 +10,9 @@
  *   POST /api/kb/graph { text }         — extract entities and relationships from text
  */
 import { Loader2, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
-import { KnowledgeGraphView } from "~/components/knowledge-graph-view";
+import { CoachMark } from "~/components/coach-mark";
 import { Page, PageHeader } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -27,6 +27,16 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { apiFetch } from "~/lib/api";
+
+/**
+ * The 3D view is a separate chunk on purpose: `graph-3d` imports three.js, and the
+ * rest of this page — communities, search results, the extraction box — is text.
+ * Loading the page must not download a renderer for a panel the reader may never
+ * scroll to.
+ */
+const KnowledgeGraphView = lazy(() =>
+  import("~/components/knowledge-graph-view").then((m) => ({ default: m.KnowledgeGraphView })),
+);
 
 interface Entity {
   id: string;
@@ -120,7 +130,7 @@ export default function KnowledgeGraphPage() {
         title="Knowledge graph"
         description="Entities and relationships extracted from what you add, grouped into communities of closely linked things."
       />
-
+      <CoachMark page="/knowledge-graph" />
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -136,14 +146,23 @@ export default function KnowledgeGraphPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <KnowledgeGraphView
-            reloadKey={reloadKey}
-            onSearch={(name) => {
-              setQuery(name);
-              setType("LOCAL_GRAPH");
-              void search(name, "LOCAL_GRAPH");
-            }}
-          />
+          <Suspense
+            fallback={
+              <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Loading the 3D view…
+              </p>
+            }
+          >
+            <KnowledgeGraphView
+              reloadKey={reloadKey}
+              onSearch={(name) => {
+                setQuery(name);
+                setType("LOCAL_GRAPH");
+                void search(name, "LOCAL_GRAPH");
+              }}
+            />
+          </Suspense>
         </CardContent>
       </Card>
 

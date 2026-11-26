@@ -107,11 +107,18 @@ const PUBLIC = [
   "/status",
 ];
 
-/** Paths the sidebar links to, read out of the navGroups literal in root.tsx. */
+/**
+ * Paths the sidebar links to, read out of the shared nav registry.
+ *
+ * The registry lives in `lib/nav.ts` because two surfaces read it — the sidebar and the
+ * command palette. This test reads it from wherever it is, so a page that gains a link in one
+ * surface and not the other still fails here.
+ */
 function sidebarPaths(): string[] {
-  const root = read("root.tsx");
-  const nav = root.slice(root.indexOf("const navGroups"), root.indexOf("export function Layout"));
-  return [...nav.matchAll(/\{ to: "([^"]+)"/g)].map((m) => m[1] as string);
+  const nav = read("lib/nav.ts");
+  // Entries are single-line when short and wrap when they carry keywords, so match the
+  // `to:` field rather than an object shape.
+  return [...nav.matchAll(/\bto: "([^"]+)",/g)].map((m) => m[1] as string);
 }
 
 /** Every path registered in routes.ts, including the index. */

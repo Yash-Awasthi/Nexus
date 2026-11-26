@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { isSafeCommandName, parseNpmCmdShim, PtyManager, resolveCommand } from "./index";
+import type { PtySession } from "./index";
 
 describe("isSafeCommandName", () => {
   it("accepts plain command names", () => {
@@ -154,15 +155,29 @@ describe("PtyManager — remove + retention bound", () => {
         cwd: process.cwd(),
       });
     }
-    await new Promise<void>((resolve) => {
-      mgr.onExit("e24", () => resolve());
-      setTimeout(resolve, 30_000);
-    });
-    await new Promise((r) => setTimeout(r, 500)); // let remaining exits settle
-    const exited = mgr.list().filter((s) => s.exited);
-    expect(exited.length).toBeLessThanOrEqual(20);
+
+    // Wait for the cap to hold rather than for a fixed number of milliseconds:
+    // on a loaded machine 500ms is sometimes not enough for 25 processes to
+    // report their exit, and the old version then failed on a slow runner rather
+    // than on a broken eviction. The condition is the assertion itself, retried
+    // until the deadline, so a pass means the cap was enforced and a failure
+    // names the sessions that were still there.
+    const deadline = Date.now() + 55_000;
+    const settle = async (): Promise<PtySession[]> => {
+      const sessions = mgr.list();
+      if (sessions.length <= 20 && !sessions.some((s) => s.id === "e0")) return sessions;
+      if (Date.now() > deadline) {
+        const seen = sessions.map((s) => `${s.id}:${s.exited ? "exited" : "live"}`).join(", ");
+        throw new Error(`retention cap not enforced within 55s; sessions: ${seen}`);
+      }
+      await new Promise((r) => setTimeout(r, 25));
+      return settle();
+    };
+    const retained = await settle();
+
+    expect(retained.length).toBeLessThanOrEqual(20);
     // The OLDEST ids must be the ones evicted.
-    expect(mgr.list().some((s) => s.id === "e0")).toBe(false);
-    expect(mgr.list().some((s) => s.id === "e24")).toBe(true);
-  }, 60_000);
+    expect(retained.some((s) => s.id === "e0")).toBe(false);
+    expect(retained.some((s) => s.id === "e24")).toBe(true);
+  }, 70_000);
 });

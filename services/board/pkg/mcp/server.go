@@ -100,8 +100,23 @@ type rpcResponse struct {
 }
 
 // Serve reads JSON-RPC messages from in and writes responses to out until in
-// is exhausted or ctx is cancelled.
+// is exhausted or ctx is cancelled. Writes are allowed without an approval step; a caller that
+// wants the approval handshake uses ServeWith.
 func Serve(ctx context.Context, in io.Reader, out io.Writer, c *Client) error {
+	return ServeWith(ctx, in, out, c, Options{})
+}
+
+// Options is how a bridge decides what a write costs.
+type Options struct {
+	// Approval, when set, turns every write into a two-step exchange: the first call returns a
+	// token and the action it would take, and only a repeat with that token is performed.
+	Approval *Approval
+	// ReadOnly refuses every write outright, before the approval step.
+	ReadOnly bool
+}
+
+// ServeWith is Serve with the write policy applied.
+func ServeWith(ctx context.Context, in io.Reader, out io.Writer, c *Client, opts Options) error {
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 64*1024), 4<<20)
 	enc := json.NewEncoder(out)
@@ -128,7 +143,7 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, c *Client) error {
 			continue
 		}
 
-		resp := handle(ctx, c, req)
+		resp := handle(ctx, c, req, opts)
 		if err := enc.Encode(resp); err != nil {
 			return err
 		}
@@ -136,7 +151,7 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, c *Client) error {
 	return scanner.Err()
 }
 
-func handle(ctx context.Context, c *Client, req rpcRequest) rpcResponse {
+func handle(ctx context.Context, c *Client, req rpcRequest, opts Options) rpcResponse {
 	var result any
 	var rerr *rpcError
 
@@ -160,7 +175,7 @@ func handle(ctx context.Context, c *Client, req rpcRequest) rpcResponse {
 			rerr = &rpcError{Code: -32602, Message: "invalid params: " + err.Error()}
 			break
 		}
-		text, err := callTool(ctx, c, params.Name, params.Arguments)
+		text, err := callTool(ctx, c, params.Name, params.Arguments, opts)
 		if err != nil {
 			result = map[string]any{
 				"content": []map[string]string{{"type": "text", "text": "error: " + err.Error()}},
@@ -184,6 +199,15 @@ func toolDefinitions() []map[string]any {
 		if required == nil {
 			required = []string{}
 		}
+		write := IsWrite(name)
+		if write {
+			// Every write takes the same approval argument, and says so in its schema rather
+			// than only in prose: a client that validates arguments sees the field exists.
+			props["confirm"] = map[string]any{
+				"type":        "string",
+				"description": "The approval token the first call returned. Omit it to be shown what the write would do.",
+			}
+		}
 		return map[string]any{
 			"name":        name,
 			"description": description,
@@ -191,6 +215,13 @@ func toolDefinitions() []map[string]any {
 				"type":       "object",
 				"properties": props,
 				"required":   required,
+			},
+			// The hint a client uses to decide whether to ask before calling. A read tool
+			// that claims to be read-only is a promise; a write tool that did not would be a
+			// surprise.
+			"annotations": map[string]any{
+				"readOnlyHint":    !write,
+				"destructiveHint": write,
 			},
 		}
 	}
@@ -258,12 +289,15 @@ func toolDefinitions() []map[string]any {
 	}
 }
 
-func callTool(ctx context.Context, c *Client, name string, raw json.RawMessage) (string, error) {
+func callTool(ctx context.Context, c *Client, name string, raw json.RawMessage, opts Options) (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("no broker configured")
 	}
 	if len(raw) == 0 {
 		raw = json.RawMessage("{}")
+	}
+	if gate, refused, err := gateWrite(name, raw, opts); refused || err != nil {
+		return gate, err
 	}
 	switch name {
 	case "board_post":

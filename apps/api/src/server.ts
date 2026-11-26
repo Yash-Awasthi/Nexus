@@ -19,6 +19,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
 import swagger from "@fastify/swagger";
+import { isDockerAvailable } from "@nexus/code-repl";
 import { getTracer, enableTracing } from "@nexus/llm-tracer";
 import { startTracing, stopTracing } from "@nexus/telemetry";
 import {
@@ -48,6 +49,7 @@ import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate
 import { flushTraces, recordTrace, type LlmStep } from "./lib/request-traces.ts";
 import { sentryReporter } from "./lib/sentry-reporter.ts";
 import { parseTrustProxy } from "./lib/trust-proxy.ts";
+import { loadWebhooks, startDispatcher, stopDispatcher } from "./lib/webhooks.ts";
 import { requireAuthWithTier, resolveIdentity } from "./middleware/auth.ts";
 import { adminTracesRoutes } from "./routes/admin-traces.ts";
 import { adminUsersRoutes } from "./routes/admin-users.ts";
@@ -61,6 +63,7 @@ import { boardRoutes } from "./routes/board.ts";
 import { botsRoutes } from "./routes/bots.ts";
 import { channelRoutes } from "./routes/channels.ts";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.ts";
+import { comparisonRoutes } from "./routes/comparisons.ts";
 import { councilRoutes } from "./routes/council.ts";
 import { cspReportRoutes } from "./routes/csp-report.ts";
 import { diagnosticsRoutes } from "./routes/diagnostics.ts";
@@ -72,6 +75,7 @@ import { featureFlagsRoutes } from "./routes/feature-flags.ts";
 import { gatewayRoutes } from "./routes/gateway.ts";
 import { governanceRoutes } from "./routes/governance.ts";
 import { healthRoutes } from "./routes/health.ts";
+import { statusRoutes } from "./routes/status.ts";
 import { hooksRoutes } from "./routes/hooks.ts";
 import { ingestRoutes } from "./routes/ingest.ts";
 import { libertasRoutes } from "./routes/libertas.ts";
@@ -92,6 +96,7 @@ import { notificationsRoutes } from "./routes/notifications.ts";
 import { oauthRoutes } from "./routes/oauth.ts";
 import { oidcRoutes } from "./routes/oidc.ts";
 import { openaiBatchRoutes } from "./routes/openai-batch.ts";
+import { openaiResponsesRoutes } from "./routes/openai-responses.ts";
 import { openaiRoutes } from "./routes/openai.ts";
 import { orgHookRoutes, orgRoutes } from "./routes/org.ts";
 import { pluginRegistryRoutes } from "./routes/plugin-registry.ts";
@@ -108,6 +113,8 @@ import { sessionSyncRoutes } from "./routes/session-sync.ts";
 import { sseRoutes } from "./routes/sse.ts";
 import { threadsRoutes } from "./routes/threads.ts";
 import { userDataRoutes } from "./routes/user-data.ts";
+import { webhookRoutes } from "./routes/webhooks.ts";
+import { globalSearchRoutes } from "./routes/global-search.ts";
 import { workspacesRoutes } from "./routes/workspaces.ts";
 
 // Resolve pino-pretty to an absolute path so pino's transport worker can load it
@@ -397,7 +404,14 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Drives back up to DRIVE_BACKUP_S3_* so a restart or redeploy does not lose them.
   const stopDriveBackups = startDriveBackups(app.log);
 
+  // ── Webhook delivery
+  // Pending deliveries are re-read on boot, so a restart resumes the retry schedule
+  // instead of dropping whatever was mid-backoff when the process went down.
+  await loadWebhooks().catch(() => undefined);
+  startDispatcher();
+
   app.addHook("onClose", async () => {
+    stopDispatcher();
     // Runs that outlast the wait are failed by the boot sweep on the next start.
     stopAuditExport();
     // One last backup, bounded so a slow bucket cannot hold up shutdown.
@@ -411,6 +425,13 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
   await app.register(healthRoutes);
+
+  // ── Status (no prefix — /status) ───────────────────────────────
+  // The five dependencies named, each with what was measured, for a status page rather than a
+  // load balancer. It reads the boot-time Docker answer instead of starting its own client.
+  await app.register(async (statusApp) => {
+    await statusRoutes(statusApp, { dockerReady: isDockerAvailable(), sandboxReady: () => true });
+  });
 
   // ── BullMQ dashboard (/admin/queues, opt-in) ──────────────────────────────
   await app.register(queueDashboardRoutes);
@@ -508,6 +529,17 @@ export async function buildServer(): Promise<FastifyInstance> {
       // System diagnostics — consolidated operability endpoint
       await api.register(diagnosticsRoutes);
 
+      // Webhook subscriptions for the long jobs (missions, research, workflows, council
+      // discussions) — the durable half of "it finished", for a caller with a server of
+      // their own that does not want to poll.
+      await api.register(webhookRoutes);
+
+      // Saved A/B comparisons of two council runs.
+      await api.register(comparisonRoutes);
+
+      // One search box across sessions, discussions, knowledge bases, workflows, the graph.
+      await api.register(globalSearchRoutes);
+
       // Org routine webhooks: unauthenticated, verified by per-routine HMAC.
       await api.register(orgHookRoutes);
 
@@ -545,11 +577,26 @@ export async function buildServer(): Promise<FastifyInstance> {
   // ── OpenAI-compatible API (/v1/*): an OpenAI client's base URL points here ──
   await app.register(
     async (v1) => {
+      // An empty body with `content-type: application/json` is not an error here:
+      // DELETE and POST from ordinary HTTP clients send the header and no bytes, and
+      // Fastify's default parser answers that with a 400 before any route sees it.
+      // Routes read `request.body ?? {}`, so an empty body becomes `{}`. Scoped to
+      // /v1 so the Slack route keeps its own raw-body parser in ../bots.
+      v1.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+        const raw = typeof body === "string" ? body.trim() : body;
+        if (raw === "" || raw === undefined) return done(null, {});
+        try {
+          done(null, JSON.parse(raw as string));
+        } catch {
+          done(new Error("Body is not valid JSON"), undefined);
+        }
+      });
       v1.addHook("preHandler", requireAuthWithTier);
       v1.addHook("preHandler", apiScopeRL);
       v1.addHook("preHandler", enterUserContext);
       v1.addHook("onResponse", traceLlmRequest);
       await v1.register(openaiRoutes);
+      await v1.register(openaiResponsesRoutes);
       await v1.register(openaiBatchRoutes);
     },
     { prefix: "/v1" },

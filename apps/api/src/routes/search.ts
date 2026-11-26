@@ -14,6 +14,7 @@ import type { FastifyInstance } from "fastify";
 import { citedNumbers, numberSources, sourcesPrompt } from "../lib/citations.ts";
 import { screenForPrompt } from "../lib/injection-classifier.ts";
 import { getKGStore, searchGraph } from "../lib/knowledge-graph-store.ts";
+import { normalisePage, pageBlock, pageSummary } from "../lib/page-context.ts";
 
 import { listKbsFor, searchKb } from "./kb.ts";
 
@@ -48,6 +49,8 @@ export async function searchRoutes(app: FastifyInstance, deps: SearchDeps): Prom
       graph?: boolean;
       answer?: boolean;
       limit?: number;
+      /** The tab the caller was looking at, attached by the extension. */
+      page?: { title?: string; url?: string; selection?: string };
     };
   }>("/search", async (request, reply) => {
     const query = request.body?.query?.trim() ?? "";
@@ -156,14 +159,23 @@ export async function searchRoutes(app: FastifyInstance, deps: SearchDeps): Prom
 
     let answer: string | undefined;
     let answerError: string | undefined;
-    if (request.body?.answer && set.chunks.length) {
+    // The page the caller was looking at. It goes in with the question rather than into the
+    // ranking: it is context for this turn, not a source the answer may cite.
+    const page = normalisePage(request.body?.page);
+    if (request.body?.answer && (set.chunks.length || page)) {
       const screened = await screenForPrompt(set.chunks.map((c) => c.text));
       set.chunks.forEach((c, i) => (c.text = screened[i]!));
+      // A page is the same untrusted kind of text as an excerpt, so it is screened the same way
+      // before it can reach a prompt.
+      const [screenedPage] = page ? await screenForPrompt([pageBlock(page)]) : [""];
       try {
         answer = await deps.llm(
           [
             { role: "system", content: ANSWER_PROMPT },
-            { role: "user", content: `${sourcesPrompt(set)}\n\nQuestion: ${query}` },
+            {
+              role: "user",
+              content: `${sourcesPrompt(set)}\n\n${screenedPage}\n\nQuestion: ${query}`,
+            },
           ],
           700,
         );
@@ -191,6 +203,7 @@ export async function searchRoutes(app: FastifyInstance, deps: SearchDeps): Prom
       sources: set.sources,
       ...(answer !== undefined ? { answer, cited } : {}),
       ...(answerError ? { answerError } : {}),
+      ...(page ? { page: pageSummary(page) } : {}),
       notes,
     });
   });

@@ -1,0 +1,16 @@
+{
+  "branch": "master",
+  "checkedAt": "2026-11-24",
+  "strict": false,
+  "contexts": [
+    "Unit tests (Node 24)",
+    "Unit tests (Node 26)",
+    "ESLint + Prettier",
+    "Build (26 / ubuntu-latest)",
+    "Build api",
+    "Browser E2E (offline, isolated)",
+    "App package suites",
+    "Python tests (nexus-ingest)",
+    "Production dependency advisories"
+  ]
+}

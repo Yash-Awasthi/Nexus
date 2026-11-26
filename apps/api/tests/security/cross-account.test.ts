@@ -160,6 +160,12 @@ const FIXTURES: Record<string, Fixture> = {
     refusals: [409],
   },
   "/api/v1/workspaces": { body: () => ({ name: `Alice ${crypto.randomUUID().slice(0, 8)}` }) },
+  // A webhook endpoint: the URL must pass the SSRF guard, so it is a public host, not a local
+  // one. Owning it is what is under test here, not delivering to it.
+  "/api/v1/webhooks": {
+    body: { url: "https://example.com/hooks/alice", events: ["workflow.completed"] },
+    refusals: [403],
+  },
 };
 
 /** Collections not checked here, each with the reason. */
@@ -171,6 +177,8 @@ const SKIP: Record<string, string> = {
   "/api/v1/agent/run": "only an admin starts a run on a shared server",
   "/api/v1/billing/keys": "admin only: one instance-wide pool of keys",
   "/api/local/pty": "desktop only: refuses every request on a server",
+  "/api/v1/comparisons":
+    "created from two finished council runs, not from a body; ownership is asserted in tests/routes/comparisons.test.ts",
 };
 
 const ITEM = /\/:[A-Za-z]+$/;

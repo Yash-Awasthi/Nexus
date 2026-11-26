@@ -100,6 +100,26 @@ export interface StreamDelta {
   usage?: LlmUsage;
   /** On the final (done) delta: tool calls accumulated during the stream. */
   toolCalls?: LlmToolCall[];
+  /**
+   * Tool calls as they are being written, one fragment at a time.
+   *
+   * `toolCalls` above only arrives on the last delta, so a client that wants to show
+   * "calling search(`foo`)" while the arguments are still arriving has nothing to show
+   * until the turn is over. These fragments are the same bytes the provider sends; the
+   * OpenAI-compatible surface forwards them as `delta.tool_calls` parts and the
+   * Responses surface as `response.function_call_arguments.delta`.
+   */
+  toolCallDeltas?: ToolCallDelta[];
+}
+
+/** One fragment of one tool call, keyed by the provider's call index. */
+export interface ToolCallDelta {
+  index?: number;
+  id?: string;
+  /** Set on the fragment that names the function; usually only the first. */
+  name?: string;
+  /** The arguments fragment, exactly as received — not parsed, because it is not whole yet. */
+  argumentsDelta?: string;
 }
 
 /** Stream handler type alias. */
@@ -658,7 +678,17 @@ export class AnthropicDriver extends BaseDriver {
         const delta = event["delta"] as Record<string, unknown> | undefined;
         if (delta?.["type"] === "input_json_delta") {
           const block = toolBlocks.get(idx);
-          if (block) block.json += (delta["partial_json"] as string) ?? "";
+          const partial = (delta["partial_json"] as string) ?? "";
+          if (block) block.json += partial;
+          // Same fragment the provider sent, so a caller can draw the call being written.
+          if (partial)
+            await handler({
+              delta: "",
+              done: false,
+              toolCallDeltas: [
+                { index: idx, ...(block?.id ? { id: block.id } : {}), argumentsDelta: partial },
+              ],
+            });
         } else {
           const text = (delta?.["text"] as string) ?? "";
           if (text) {
@@ -835,6 +865,18 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
           if (tc.function?.arguments) acc.args += tc.function.arguments;
           toolAcc.set(idx, acc);
         }
+        // Forward the fragments as they arrive: a caller drawing the call being written
+        // cannot wait for the accumulated list, which only lands at the end.
+        await handler({
+          delta: "",
+          done: false,
+          toolCallDeltas: tcDeltas.map((tc) => ({
+            index: tc.index ?? 0,
+            ...(tc.id ? { id: tc.id } : {}),
+            ...(tc.function?.name ? { name: tc.function.name } : {}),
+            ...(tc.function?.arguments ? { argumentsDelta: tc.function.arguments } : {}),
+          })),
+        });
       }
 
       const fr = choice0?.finish_reason;
@@ -1714,6 +1756,27 @@ export class QwenDriver extends OpenAICompatibleDriver {
     super(config, transport);
     this.baseUrl = config.baseUrl || "https://dashscope.aliyuncs.com/compatible-mode/v1";
     this.model = config.model ?? "qwen-max";
+  }
+}
+
+/**
+ * GitHub Models (`models.github.ai`) — the worked example in
+ * `docs/providers/adding-a-provider.md`.
+ *
+ * It is here because it is the cheapest way for somebody with a GitHub account to run this
+ * stack at all: a personal access token reaches a curated set of hosted models under
+ * `openai/…`, `meta/…`, `mistral/…` names, no card required. The API is the plain
+ * `/chat/completions` schema, so the whole provider is the two lines below — which is the
+ * point the guide makes.
+ */
+export class GithubModelsDriver extends OpenAICompatibleDriver {
+  readonly provider = "github_models";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl || "https://models.github.ai/inference";
+    this.model = config.model ?? "openai/gpt-4.1-mini";
   }
 }
 
@@ -2610,6 +2673,7 @@ export type ProviderName =
   | "nebius"
   | "venice"
   | "qwen"
+  | "github_models"
   | "ai360"
   | "vercel_ai_gateway"
   | "doubao"

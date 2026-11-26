@@ -3,21 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "description": "Nexus desktop shell: Electron main process, preload host bridge",
+  "author": "Nexus contributors",
   "license": "Apache-2.0",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc --project tsconfig.json && rolldown src/preload.ts --file dist/preload.js --format cjs --platform node --external electron",
     "build:api": "node ../../scripts/build-desktop-api.mjs",
+    "dist": "pnpm build && pnpm build:api && pnpm update:config && electron-builder --config electron-builder.yml",
+    "dist:win": "pnpm dist --win",
+    "dist:mac": "pnpm dist --mac",
     "start": "electron dist/main.js",
     "dev": "pnpm build && electron dist/main.js",
     "test": "vp test run",
-    "clean": "rm -rf dist coverage",
+    "clean": "rm -rf dist coverage dist-installers",
     "smoke": "node scripts/smoke.cjs",
-    "test:e2e": "playwright test"
+    "measure:launch": "node scripts/measure-launch.mjs",
+    "test:e2e": "playwright test",
+    "update:config": "node scripts/write-update-config.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "electron": "45.4.1",
+    "electron-builder": "26.18.0",
     "rolldown": "^1.2.13",
     "vite-plus": "catalog:"
   }

@@ -1,0 +1,19 @@
+{
+  "$comment": "Dependencies scripts/license-audit.mjs cannot accept on its own. A strong copyleft licence needs an entry plus an ADR that exists; a package that declares no licence needs an entry, and an ADR when the entry cannot name one either.",
+  "entries": [
+    {
+      "package": "@giscus/react",
+      "version": "3.1.0",
+      "license": "MIT",
+      "reason": "The published tarball carries no licence field and no LICENCE file, so nothing installed states a grant. Upstream is MIT: github.com/giscus/giscus-component returns spdx_id MIT from the GitHub licence API. Reachable only through @lobehub/ui.",
+      "evidence": "https://api.github.com/repos/giscus/giscus-component/license -> MIT (checked 2026-11-24)"
+    },
+    {
+      "package": "@splinetool/runtime",
+      "version": "0.9.526",
+      "license": "none",
+      "reason": "No licence field, no LICENCE file, no licence on the npm registry, and the repository the package points at returns 404. There is no grant, so nothing from it may be bundled or shipped. ADR 0019 records why @lobehub/ui keeps it in the tree and what keeps it out of the build.",
+      "adr": "docs/adr/0019-transitive-dependency-without-a-licence.md"
+    }
+  ]
+}

@@ -207,6 +207,10 @@ export default function AnalyticsCharts() {
               <div className="h-[200px] flex items-center justify-center">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
               </div>
+            ) : chartData7.every((point) => point.count === 0) ? (
+              <p className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                No requests in the last 7 days.
+              </p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={chartData7} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
@@ -290,6 +294,10 @@ export default function AnalyticsCharts() {
             <div className="h-[240px] flex items-center justify-center">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
+          ) : chartData30.every((point) => point.requests === 0 && point.cost === 0) ? (
+            <p className="h-[240px] flex items-center justify-center text-sm text-muted-foreground">
+              No requests or spend in the last 30 days.
+            </p>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={240}>
@@ -360,6 +368,10 @@ export default function AnalyticsCharts() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
+          ) : modelsData.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No model calls recorded yet.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

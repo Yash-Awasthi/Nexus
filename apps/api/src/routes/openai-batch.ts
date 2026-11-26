@@ -28,6 +28,7 @@ import { issueAccessToken } from "../lib/issue-access-token.ts";
 import { patScopesAllow } from "../lib/pat-scopes.ts";
 import { verifyPat } from "../lib/pat-store.ts";
 import { PersistentStore, dataDir } from "../lib/persistent-store.ts";
+import { openaiError } from "../lib/reply-errors.ts";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_LINES = 1000;
@@ -128,7 +129,7 @@ const idOf = (prefix: string) => `${prefix}${randomUUID().replace(/-/g, "")}`;
 const userOf = (request: FastifyRequest) => request.nexusUserId ?? "local";
 
 const fail = (reply: FastifyReply, status: number, message: string) =>
-  reply.code(status).send({ error: { message, type: "invalid_request_error", code: null } });
+  openaiError(reply, status, "invalid_request_error", message, { code: null });
 
 const fileView = ({ userId: _u, ...f }: FileRow) => ({ ...f, object: "file", status: "processed" });
 const batchView = ({ userId: _u, role: _r, runner: _n, heartbeatAt: _h, ...b }: BatchRow) => b;

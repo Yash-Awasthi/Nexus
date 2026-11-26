@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
 	"open-board/pkg/mcp"
 )
@@ -24,7 +25,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	if err := mcp.Serve(ctx, os.Stdin, os.Stdout, mcp.NewClient(server, channel)); err != nil {
+	// A write from this bridge is a model acting on a shared board. Two steps by default: the
+	// first call reports what it would change, and the call only lands when it comes back with
+	// the token. OPEN_BOARD_MCP_READ_ONLY=1 refuses writes outright, for a server that should
+	// only ever observe.
+	opts := mcp.Options{
+		Approval: mcp.NewApproval(5 * time.Minute),
+		ReadOnly: os.Getenv("OPEN_BOARD_MCP_READ_ONLY") == "1",
+	}
+
+	if err := mcp.ServeWith(ctx, os.Stdin, os.Stdout, mcp.NewClient(server, channel), opts); err != nil {
 		fmt.Fprintln(os.Stderr, "mcp-bridge:", err)
 		os.Exit(1)
 	}

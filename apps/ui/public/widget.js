@@ -9,6 +9,10 @@
  * anyone who opens the page can read it), kbs, web, graph, heading, api (the
  * Nexus origin, defaults to where this script came from) and mode="inline"
  * (an open panel instead of the floating button).
+ *
+ * A host page (the browser extension, for one) can attach the tab a question is
+ * about with `widget.setPage({ title, url, selection })`; the transcript shows
+ * the attachment beside the question that used it.
  */
 (() => {
   const scriptOrigin = document.currentScript
@@ -40,6 +44,9 @@ header button { background: none; border: 0; color: var(--muted); font-size: 20p
 .log { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .q { align-self: flex-end; background: var(--nexus-accent); color: #fff; padding: 6px 10px;
   border-radius: 10px; max-width: 85%; overflow-wrap: anywhere; }
+.ctx { align-self: flex-end; max-width: 85%; font-size: 12px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; overflow-wrap: anywhere; }
+.ctx b { color: var(--fg); font-weight: 600; }
 .a { white-space: pre-wrap; overflow-wrap: anywhere; }
 .a.err { color: #b91c1c; }
 .src { font-size: 12px; color: var(--muted); margin: 4px 0 0; padding-left: 18px; }
@@ -54,8 +61,7 @@ form button:disabled { opacity: 0.6; cursor: default; }
 
   class NexusWidget extends HTMLElement {
     connectedCallback() {
-      if (this.shadowRoot) return;
-      const root = this.attachShadow({ mode: "open" });
+      if (this.shadowRoot) return;      const root = this.attachShadow({ mode: "open" });
       const inline = this.getAttribute("mode") === "inline";
       root.innerHTML = `<style>${STYLE}</style>
 <button class="launch" part="launcher" aria-label="Open questions" aria-expanded="false">?</button>
@@ -93,6 +99,28 @@ form button:disabled { opacity: 0.6; cursor: default; }
       });
     }
 
+    /**
+     * Attach the page a question is about, or clear it.
+     *
+     * Set from the extension after the person attaches a tab. Until then there is no page, and a
+     * question is answered from the knowledge bases alone — the same as before this attribute
+     * existed.
+     */
+    setPage(page) {
+      const url = page && /^https?:\/\//i.test(String(page.url || "")) ? String(page.url) : "";
+      this._page = url
+        ? {
+            title: String(page.title || "").slice(0, 300),
+            url,
+            selection: String(page.selection || "").slice(0, 4000),
+          }
+        : null;
+    }
+
+    clearPage() {
+      this._page = null;
+    }
+
     async ask(query, log, button) {
       const add = (cls, text) => {
         const el = document.createElement("div");
@@ -103,6 +131,21 @@ form button:disabled { opacity: 0.6; cursor: default; }
         return el;
       };
       add("q", query);
+      // The transcript shows what was sent. A page that is attached and not shown is context the
+      // user cannot see, which is the one thing an attachment must never be.
+      const page = this._page;
+      if (page) {
+        const chip = add("ctx", "");
+        const title = document.createElement("b");
+        title.textContent = page.title || page.url;
+        chip.append(title);
+        chip.append(
+          document.createTextNode(
+            page.selection ? ` — ${page.selection.trim().split(/\s+/).length} words selected` : " — page attached",
+          ),
+        );
+        chip.title = page.url;
+      }
       const answer = add("a", "…");
       button.disabled = true;
       try {
@@ -123,6 +166,7 @@ form button:disabled { opacity: 0.6; cursor: default; }
             ...(kbs.length ? { kbs } : {}),
             web: this.hasAttribute("web"),
             graph: this.hasAttribute("graph"),
+            ...(page ? { page } : {}),
           }),
         });
         const data = await res.json().catch(() => ({}));

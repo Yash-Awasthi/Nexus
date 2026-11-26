@@ -12,8 +12,9 @@
  *   nexus approvals [--status pending]
  *   nexus approvals approve <approvalId> --by <actor>
  *   nexus approvals reject <approvalId> --by <actor> [--reason <text>]
- *   nexus council deliberate --title <title> [--desc <text>] [--budget 0.10]
+ *   nexus council deliberate --title <title> [--desc <text>] [--budget 0.10] [--json] [--out f]
  *   nexus council verdict <verdictId>
+ *   nexus run <workflowId> [--watch] [--file <path>] [--json] [--out <path>]
  *   nexus ingest event --source <src> --type <type> --payload <json>
  *   nexus models seed [--file <path>]
  *   nexus audit [--limit 50]
@@ -22,20 +23,73 @@
  */
 
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { styleText } from "node:util";
 
 import { Command } from "commander";
 
 import { api, fail } from "./lib/client.ts";
+import { collectDoctor, formatDoctor } from "./lib/doctor.ts";
+import { buildBundle, writeBundle } from "./lib/diagnostic-bundle.ts";
 import { runLocalAgent } from "./lib/local-agent.ts";
 import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.ts";
 import { registerOrgCommands } from "./lib/org.ts";
+import { registerRunCommand } from "./lib/run.ts";
 import { registerSecurityCommands } from "./lib/security.ts";
 import { streamSse } from "./lib/sse-stream.ts";
 
 const program = new Command();
 
 program.name("nexus").description("Nexus autonomous orchestration platform CLI").version("0.1.0");
+
+// ── doctor ────────────────────────────────────────────────────────────────────
+
+program
+  .command("doctor")
+  .description("Check the local toolchain and print one line per prerequisite")
+  .option("--json", "print the checks as JSON")
+  .option(
+    "--bundle [dir]",
+    "write a redacted diagnostic bundle for a bug report (default: the current directory)",
+  )
+  .action(async (options: { json?: boolean; bundle?: string | boolean }) => {
+    const rows = await collectDoctor();
+    if (options.bundle !== undefined && options.bundle !== false) {
+      // The bundle is for someone else to read, so the API documents are optional: a bug report
+      // about "nothing starts" is exactly the case where `/status` cannot be fetched.
+      const ask = async (fn: () => Promise<unknown>) => {
+        try {
+          return await fn();
+        } catch (err) {
+          return { unreachable: err instanceof Error ? err.message : String(err) };
+        }
+      };
+      const status = await ask(() => api.unversioned<unknown>("GET", "/status"));
+      const health = await ask(() => api.health());
+      const bundle = buildBundle({
+        version: program.version() ?? "0.0.0",
+        startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+        node: process.versions.node,
+        platform: process.platform,
+        arch: process.arch,
+        doctor: rows,
+        status,
+        health,
+      });
+      const dir = typeof options.bundle === "string" ? options.bundle : ".";
+      const written = writeBundle(dir, bundle);
+      console.log(styleText("green", "✓"), `wrote ${written.jsonPath}`);
+      console.log(
+        "  read it, then attach it to your report; see SUPPORT.md for where that goes",
+      );
+      if (bundle.redacted.length) console.log(`  redacted: ${bundle.redacted.join(", ")}`);
+      return;
+    }
+    if (options.json) console.log(JSON.stringify(rows, null, 2));
+    else console.log(formatDoctor(rows));
+    if (rows.some((row) => row.status === "fail")) process.exitCode = 1;
+  });
 
 // ── health ────────────────────────────────────────────────────────────────────
 
@@ -353,8 +407,12 @@ council
   .option("--budget <usd>", "LLM cost budget in USD", "0.10")
   .option("--signal-id <id>", "Link to an existing signal ID")
   .option("--mode <mode>", "majority | unanimous | weighted", "majority")
+  .option("--json", "Print the verdict as JSON, for CI and scripting")
+  .option("--out <path>", "Write the JSON verdict to a file")
   .action(async (opts) => {
-    console.log(styleText("cyan", "⚙ Deliberating..."), styleText("bold", opts.title));
+    if (opts.json !== true) {
+      console.log(styleText("cyan", "⚙ Deliberating..."), styleText("bold", opts.title));
+    }
     const data = await api.post("/council/deliberate", {
       proposal: { title: opts.title, description: opts.desc },
       budgetUsd: parseFloat(opts.budget),
@@ -367,6 +425,17 @@ council
       verdictId?: string | null;
       result?: { outcome: string; consensus: number; summary: string };
     };
+    // --out writes whatever came back, including a failure: a CI job that keeps the artefact
+    // of a failed deliberation is one that can say why it failed later.
+    if (typeof opts.out === "string") {
+      fs.writeFileSync(path.resolve(opts.out), `${JSON.stringify(data, null, 2)}\n`);
+    }
+    if (opts.json === true) {
+      console.log(JSON.stringify(data, null, 2));
+      // The exit code is the contract for a script: a refusal is not a success.
+      if (!res.ok || res.result?.outcome === "rejected") process.exitCode = 1;
+      return;
+    }
     if (res.ok && res.result) {
       const outcome = res.result.outcome;
       const color = outcome === "approved" ? "green" : outcome === "rejected" ? "red" : "yellow";
@@ -374,6 +443,7 @@ council
       console.log(`  Consensus: ${(res.result.consensus * 100).toFixed(0)}%`);
       console.log(`  Summary:   ${res.result.summary}`);
       if (res.verdictId) console.log(`  Verdict:   ${res.verdictId}`);
+      if (typeof opts.out === "string") console.log(`  Written:   ${opts.out}`);
     } else {
       console.log(JSON.stringify(data, null, 2));
     }
@@ -586,68 +656,54 @@ memory
 
 const research = program.command("research").description("Research agent commands");
 
+interface ResearchRun {
+  runId: string;
+  query: string;
+  synthesis: string;
+  durationMs: number;
+  citations: string[];
+  richCitations: { citationKey: string; title: string; url: string }[];
+}
+
 research
   .command("submit <query>")
-  .description("Research a question and print the report")
-  .option("--no-wait", "Create the job without running it here")
-  .action(async (query: string, opts: { wait: boolean }) => {
+  .description("Research a question and print the synthesis and its sources")
+  .option("--max <n>", "results per source (default 10, max 50)")
+  .action(async (query: string, opts: { max?: string }) => {
     try {
-      const job = await api.unversioned<{ id: string }>("POST", "/api/research", { query });
-      console.log(styleText("green", "✓"), `Job: ${styleText("bold", job.id)}`);
-      if (!opts.wait) return;
-      // The run happens while its stream is open, as it does for the web page.
-      for await (const frame of streamSse(
-        api.url(`/api/research/${job.id}/stream`),
-        api.authHeaders(),
-      )) {
-        let data: { type?: string; label?: string; content?: string; message?: string } = {};
-        try {
-          data = JSON.parse(frame.data) as typeof data;
-        } catch {
-          continue;
-        }
-        if (data.type === "phase_start" && data.label)
-          console.log(styleText("gray", `  ${data.label}`));
-        if (data.type === "report")
-          console.log(`
-${data.content ?? ""}`);
-        if (data.type === "error") throw new Error(data.message ?? "Research failed");
-        if (data.type === "done") break;
-      }
+      const run = await api.post<ResearchRun>(
+        "/researcher/research",
+        opts.max ? { query, maxResults: Number(opts.max) } : { query },
+      );
+      console.log(`
+${run.synthesis}
+`);
+      for (const source of run.richCitations)
+        console.log(
+          ` ${styleText("cyan", source.citationKey)} ${source.title} ${styleText("gray", source.url)}`,
+        );
+      console.log(
+        styleText(
+          "gray",
+          `${run.richCitations.length} source(s) in ${run.durationMs} ms · run ${run.runId} · ` +
+            `nexus research citations ${run.runId}`,
+        ),
+      );
     } catch (err) {
       fail(err);
     }
   });
 
 research
-  .command("list")
-  .description("List recent research jobs")
-  .option("--limit <n>", "Max jobs", "10")
-  .action(async (opts: { limit: string }) => {
+  .command("citations <runId>")
+  .description("Print the sources recorded for a research run")
+  .action(async (runId: string) => {
     try {
-      const { jobs = [] } = await api.unversioned<{
-        jobs?: { id: string; status: string; query: string }[];
-      }>("GET", "/api/research");
-      const shown = jobs.slice(0, Number(opts.limit) || 10);
-      console.log(
-        styleText(
-          "bold",
-          `
-${shown.length} research jobs
-`,
-        ),
+      const run = await api.get<{ query: string; total: number; markdownRef: string }>(
+        `/researcher/${runId}/citations`,
       );
-      for (const j of shown) {
-        const icon =
-          j.status === "done"
-            ? styleText("green", "✓")
-            : j.status === "error"
-              ? styleText("red", "✗")
-              : styleText("yellow", "◌");
-        console.log(
-          ` ${icon} ${styleText("gray", j.id.slice(0, 12))}  ${j.query.slice(0, 60)}${j.query.length > 60 ? "…" : ""}`,
-        );
-      }
+      console.log(styleText("bold", `${run.total} source(s) for: ${run.query}`));
+      console.log(run.markdownRef);
     } catch (err) {
       fail(err);
     }
@@ -774,6 +830,7 @@ models
 
 registerOrgCommands(program);
 registerSecurityCommands(program);
+registerRunCommand(program);
 
 // ── Run ───────────────────────────────────────────────────────────────────────
 

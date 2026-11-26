@@ -1,3 +1,5 @@
+<!-- verified: c6e5d6c 2026-11-24 -->
+
 # Nexus Local Bridge
 
 A token-gated HTTP bridge that lets **cloud agents reach your local machine** —

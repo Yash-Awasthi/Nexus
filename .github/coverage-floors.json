@@ -1,0 +1,74 @@
+{
+  "packages/llm": {
+    "statements": 83.1,
+    "branches": 68.5,
+    "functions": 88,
+    "lines": 85.9
+  },
+  "packages/agent-core": {
+    "statements": 88.5,
+    "branches": 79.3,
+    "functions": 88.8,
+    "lines": 89.5
+  },
+  "packages/council": {
+    "statements": 95.7,
+    "branches": 82.4,
+    "functions": 98.2,
+    "lines": 97.9
+  },
+  "packages/search": {
+    "statements": 84.5,
+    "branches": 74.5,
+    "functions": 87.6,
+    "lines": 86.5
+  },
+  "packages/governance": {
+    "statements": 93.3,
+    "branches": 80.3,
+    "functions": 96.2,
+    "lines": 93
+  },
+  "packages/lsp": {
+    "statements": 78.7,
+    "branches": 66.5,
+    "functions": 91.3,
+    "lines": 84.4
+  },
+  "packages/mcp-client": {
+    "statements": 90.2,
+    "branches": 79.6,
+    "functions": 86.7,
+    "lines": 92.3
+  },
+  "packages/plugin-sdk": {
+    "statements": 91.3,
+    "branches": 80.7,
+    "functions": 95.2,
+    "lines": 92.6
+  },
+  "packages/billing": {
+    "statements": 98.4,
+    "branches": 91.2,
+    "functions": 100,
+    "lines": 98.3
+  },
+  "packages/llm-oauth": {
+    "statements": 90.5,
+    "branches": 79.2,
+    "functions": 95,
+    "lines": 93.6
+  },
+  "packages/browser-automation": {
+    "statements": 88.3,
+    "branches": 70.8,
+    "functions": 70.6,
+    "lines": 91.7
+  },
+  "packages/db": {
+    "statements": 45.6,
+    "branches": 31.6,
+    "functions": 15.3,
+    "lines": 46
+  }
+}

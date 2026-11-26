@@ -9,8 +9,48 @@
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { existsSync } from "node:fs";
+import { delimiter, extname, join } from "node:path";
 
 import { FrameDecoder, encodeFrame } from "./framing.ts";
+
+/**
+ * How to launch a language server. POSIX uses `spawn` directly; Windows needs
+ * `cmd.exe` for the `.cmd` shims npm installs, because CreateProcess will not
+ * run a batch file. The API's availability probe finds those shims, so the
+ * spawn path must agree with it instead of reporting a server that cannot start.
+ */
+export function resolveSpawn(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): { command: string; args: string[]; windowsVerbatimArguments?: boolean } {
+  if (process.platform !== "win32") return { command, args: [...args] };
+  const pathExt = (env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+  const withExt = (base: string): string | undefined => {
+    if (extname(base)) return existsSync(base) ? base : undefined;
+    for (const ext of pathExt) if (existsSync(`${base}${ext}`)) return `${base}${ext}`;
+    return undefined;
+  };
+  let found: string | undefined;
+  if (/[\\/]/.test(command)) {
+    found = withExt(command);
+  } else {
+    for (const dir of (env.PATH ?? env.Path ?? "").split(delimiter).filter(Boolean)) {
+      found = withExt(join(dir, command));
+      if (found) break;
+    }
+  }
+  if (!found) return { command, args: [...args] };
+  if (!/\.(cmd|bat)$/i.test(found)) return { command: found, args: [...args] };
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const line = [quote(found), ...args.map(quote)].join(" ");
+  return {
+    command: env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", `"${line}"`],
+    windowsVerbatimArguments: true,
+  };
+}
 
 export type LspTransportErrorCode =
   | "SPAWN_FAILED"
@@ -91,15 +131,17 @@ export class LspTransport {
     return this.pending.size;
   }
 
-  /** Start the child. Idempotent. Spawning never goes through a shell. */
+  /** Start the child. Idempotent. Windows `.cmd` shims go through `cmd.exe`. */
   start(): void {
     if (this.child) return;
     this.closed = false;
-    const child = spawn(this.options.command, [...(this.options.args ?? [])], {
+    const resolved = resolveSpawn(this.options.command, this.options.args ?? [], this.options.env);
+    const child = spawn(resolved.command, resolved.args, {
       cwd: this.options.cwd,
       env: this.options.env,
       shell: false,
       windowsHide: true,
+      ...(resolved.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.child = child;

@@ -10,7 +10,8 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, delimiter, isAbsolute, join } from "node:path";
 
 import { decide, policyFromEnv, type ExecAction } from "@nexus/exec-policy";
 import {
@@ -245,6 +246,35 @@ function managerStatus(manager: LspManager): LspManagerStatus {
   return manager.status();
 }
 
+/**
+ * Whether the configured command resolves the way a shell would: an absolute or
+ * path-containing command must exist (with PATHEXT on Windows), and a bare name
+ * must be found on PATH. Same rule as the agent-core toolset uses, copied here
+ * so the API does not depend on agent-core for a filesystem probe.
+ */
+function commandAvailable(command: string, env: NodeJS.ProcessEnv): boolean {
+  if (!command) return false;
+  const extensions =
+    process.platform === "win32"
+      ? (env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
+      : [""];
+  if (command.includes("/") || command.includes("\\") || isAbsolute(command)) {
+    if (existsSync(command)) return true;
+    return extensions.some((extension) => existsSync(`${command}${extension}`));
+  }
+  const search = env.PATH ?? env.Path ?? "";
+  return search
+    .split(delimiter)
+    .filter(Boolean)
+    .some((dir) => extensions.some((extension) => existsSync(join(dir, `${command}${extension}`))));
+}
+
+/** Names the variable to set; only the binary's basename, never the full path. */
+function unavailableReason(language: LspLanguage, command: string): string {
+  const binary = command ? basename(command) : "language server";
+  return `${language}: set ${COMMAND_ENV[language]} to a ${binary} binary`;
+}
+
 /** Availability per language, naming the env variable that is missing. */
 function languageStatus(enabled: boolean, rootReason: string | undefined): ApiLspLanguageStatus[] {
   const config = parseLspConfig(process.env);
@@ -253,12 +283,9 @@ function languageStatus(enabled: boolean, rootReason: string | undefined): ApiLs
       return { language, available: false, reason: "LSP is disabled; set NEXUS_LSP=1" };
     }
     if (rootReason) return { language, available: false, reason: rootReason };
-    if (config.commands[language].command.length === 0) {
-      return {
-        language,
-        available: false,
-        reason: `${language}: set ${COMMAND_ENV[language]} to a language server binary`,
-      };
+    const command = config.commands[language].command;
+    if (!commandAvailable(command, process.env)) {
+      return { language, available: false, reason: unavailableReason(language, command) };
     }
     return { language, available: true };
   });

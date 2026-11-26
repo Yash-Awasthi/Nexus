@@ -110,6 +110,34 @@ pnpm test --filter @nexus/agent-core        # single package
 pnpm exec vp test run --coverage            # with coverage report
 ```
 
+### Running one test, and debugging it
+
+The whole suite takes minutes; one file takes seconds. Vitest in this repo is `vite-plus/test`
+(`vp`), and the binary lives at the repo root, so from an app directory the path is two levels up:
+
+```bash
+cd apps/api && ../../node_modules/.bin/vp test run tests/routes/webhooks.test.ts
+cd apps/ui  && ../../node_modules/.bin/vp test run tests/command-palette.test.ts
+cd apps/cli && ../../node_modules/.bin/vp test run tests/lib/watch-run.test.ts
+cd services/board && go test ./pkg/mcp/ -run TestApproval -v
+node --test scripts/actions-pinned.test.mjs      # the repo-level Node scripts
+```
+
+Add `-t "part of the test name"` to run one case, and `--watch` to rerun on save. A test that
+imports `src/lib/*` must sit at the matching depth: `apps/cli/tests/lib/x.test.ts` resolves
+`../../src`, while `apps/cli/tests/x.test.ts` resolves `../src` and will fail to find the module.
+
+When a test fails for a reason you cannot read from the assertion, debug rather than guess:
+
+```bash
+node --inspect-brk ../../node_modules/.bin/vp test run tests/routes/webhooks.test.ts
+LOG_LEVEL=debug pnpm dev:api     # one line per request: route, status, timing (never the body)
+```
+
+`LOG_LEVEL=debug` is the API's own pino level; it does not print request bodies or keys. For a
+route that fails only in a real browser, `pnpm test:e2e` with `--headed` and `PWDEBUG=1` opens
+Playwright's inspector instead of a video of the failure.
+
 Conventions for new work: build against mocks (`MockTransport`, an injectable `fetchFn` or
 `TokenHttp`) so no test needs a live account; new env vars go in `.env.example`; every new file
 carries the SPDX `Apache-2.0` header (`pnpm check:headers`); migrations are a
@@ -117,6 +145,45 @@ carries the SPDX `Apache-2.0` header (`pnpm check:headers`); migrations are a
 every existing one (folders run in name order); UI routes register in `apps/ui/app/routes.ts`, compose `app/components/page.tsx`, and follow
 `provider-keys.tsx` for CRUD pages or `costs.tsx` for dashboards. Route changes regenerate
 `openapi.yaml` (`pnpm openapi:generate`) and the contract types (`pnpm types:generate`).
+
+---
+
+## Rules before you push
+
+Four rules decide whether a PR is reviewable at all. They are short because they are meant to
+be checked, not quoted.
+
+**1. The pre-push gate must pass.** Run the same commands CI runs, from the repo root. A PR that
+fails any of these is not reviewed, because nobody can tell a real failure from its noise:
+
+```bash
+pnpm typecheck && pnpm lint && pnpm test && pnpm check:headers && pnpm openapi:check
+```
+
+Two more are worth running when your change touches what they cover:
+
+```bash
+pnpm check:offline      # the local model path still works (see rule 2)
+pnpm bundle:budget      # the UI route you touched is still inside its size budget
+```
+
+**2. A local run never requires a paid API.** The no-paid-API promise is a product invariant, not
+a convenience: a missing model key degrades a feature and never blocks the app. So a new feature
+must have a working path with no paid key — a local model, a deterministic fallback, or an
+explicit "this needs a key" state that the UI shows without breaking. `pnpm check:offline` guards
+it; a test that only passes with a real key is a broken test.
+
+**3. The surface policy holds.** Removed surfaces are not re-added. God Mode, Gauntlet, Drift,
+Simulation, Voice, Image Gen, prediction markets, marketplace, prompts, drive, deep research, red
+team, A/B arena, app builder, and the wiki/alert/brief satellites were pruned deliberately; a PR
+that brings one back is closed with a link to this section. Widening happens **inside** a
+surviving surface. If you believe a removed surface should return, that is an ADR arguing against
+the pruning, not a diff.
+
+**4. One subtask, one PR.** Each `plan.md` subtask is one reviewable change: one route, one
+component, one command. A PR that also renames a package, reformats a directory and fixes three
+unrelated warnings cannot be reviewed and will be asked to split. If the work is large, split it
+by subtask id (`m4.2.3: command palette`) so the reviewer can read one thing at a time.
 
 ---
 

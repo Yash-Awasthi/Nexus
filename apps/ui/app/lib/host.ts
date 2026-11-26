@@ -28,6 +28,9 @@
  *   runMode        — the host can say where the API it serves actually runs.
  *   sync           — the host can sync with a cloud deployment and report what
  *                    moved.
+ *   offlineQueue   — the host can keep prompts typed while the API was unreachable,
+ *                    in a file that outlives the window.
+ *   workspace      — the host can ask the OS for a project folder and tell its API.
  */
 type HostCapability =
   | "localAccount"
@@ -38,7 +41,9 @@ type HostCapability =
   | "councilSync"
   | "providerSignIn"
   | "runMode"
-  | "sync";
+  | "sync"
+  | "offlineQueue"
+  | "workspace";
 
 interface HostBridge {
   /** Identifies the host in diagnostics. Never branch on it. */

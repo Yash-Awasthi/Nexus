@@ -279,3 +279,81 @@
     animation: none !important;
   }
 }
+
+/* ── Print ──────────────────────────────────────────────────────────────────
+   Pressing Print should produce the document, not a screenshot of the app. The
+   rules below remove the chrome (sidebar, action bars, the coach mark), force
+   dark-on-white whatever the theme, keep headings with their content, and show
+   link targets so a printed verdict still says where a citation came from. */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Navigation, actions and anything explicitly marked decorative. */
+  nav,
+  aside,
+  [data-print="hide"],
+  [role="navigation"],
+  [role="dialog"],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* The page itself: no max-width games, no shadow card on paper. */
+  main,
+  [data-print="page"] {
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .card,
+  [data-slot="card"] {
+    border: 1px solid #d4d4d8 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+
+  /* A heading alone at the bottom of a page is a page break we did not ask for. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  p,
+  li,
+  pre,
+  blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* A verdict is cited by URL; printing it without the URL makes the citation useless. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 10px;
+    color: #555;
+    word-break: break-all;
+  }
+
+  @page {
+    margin: 18mm 16mm;
+  }
+}

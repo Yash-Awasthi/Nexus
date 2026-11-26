@@ -51,12 +51,23 @@ it.each(defaultOutputProcessors.map((p) => [p.name, p] as const))(
   "%s stays fast on long hostile lines",
   (_name, processor) => {
     const slow: string[] = [];
+    // Timings on a shared runner are one-sided noisy: another job's CPU steals a
+    // slice and a single call reads as a spike. Take the fastest of three passes
+    // (after a warm-up, so the first call's JIT cost is not measured as work), and
+    // the number reflects the processor rather than the machine's mood. Quadratic
+    // work is slow in every pass, so nothing is hidden by this.
+    for (const command of COMMANDS) {
+      for (const shape of SHAPES) processor.process(command, input(shape));
+    }
     for (const command of COMMANDS) {
       for (const [i, shape] of SHAPES.entries()) {
-        const t = performance.now();
-        processor.process(command, input(shape));
-        const ms = performance.now() - t;
-        if (ms > BUDGET_MS) slow.push(`${command} #${i} ${Math.round(ms)}ms`);
+        let best = Number.POSITIVE_INFINITY;
+        for (let pass = 0; pass < 3; pass++) {
+          const t = performance.now();
+          processor.process(command, input(shape));
+          best = Math.min(best, performance.now() - t);
+        }
+        if (best > BUDGET_MS) slow.push(`${command} #${i} ${Math.round(best)}ms`);
       }
     }
     expect(slow).toEqual([]);

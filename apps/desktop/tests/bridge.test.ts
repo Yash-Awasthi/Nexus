@@ -46,6 +46,12 @@ function impl(): HostImplementation & {
     syncLedger: () => [],
     setGlass: vi.fn<HostImplementation["setGlass"]>(),
     saveCouncilMembers: vi.fn<HostImplementation["saveCouncilMembers"]>(),
+    queuePrompt: vi.fn(async () => 1),
+    offlineState: () => ({ online: false, queued: 1 }),
+    flushOfflineQueue: vi.fn(async () => undefined),
+    getWorkspace: () => "/home/yash/project",
+    chooseWorkspace: vi.fn(async () => "/home/yash/project"),
+    clearWorkspace: vi.fn(),
     auth: {
       signIn: vi.fn().mockResolvedValue(SESSION),
       signInWithPassword: vi.fn().mockResolvedValue(SESSION),
@@ -67,7 +73,29 @@ describe("capability list", () => {
       "councilSync",
       "runMode",
       "sync",
+      "offlineQueue",
+      "workspace",
     ]);
+  });
+
+  it("refuses a queue or workspace call when the host does not provide one", async () => {
+    // A shell that has no queue must say so by name, not answer `undefined` and look queued.
+    const bare = impl();
+    delete bare.queuePrompt;
+    delete bare.getWorkspace;
+    const handler = createInvokeHandler(bare);
+    await expect(handler("queuePrompt", [{ text: "hi" }])).rejects.toThrow(/queuePrompt/);
+    await expect(handler("getWorkspace", [])).rejects.toThrow(/getWorkspace/);
+  });
+
+  it("passes a queued prompt through with its conversation, and never a bare string", async () => {
+    const deps = impl();
+    const handler = createInvokeHandler(deps);
+    await handler("queuePrompt", [{ text: "hello", sessionId: "s1" }]);
+    await handler("queuePrompt", [{ text: "hello" }]);
+    expect(deps.queuePrompt).toHaveBeenNthCalledWith(1, { text: "hello", sessionId: "s1" });
+    expect(deps.queuePrompt).toHaveBeenNthCalledWith(2, { text: "hello", sessionId: null });
+    expect(await handler("getOfflineState", [])).toEqual({ online: false, queued: 1 });
   });
 
   it("claims nothing the web path already serves over HTTP", () => {

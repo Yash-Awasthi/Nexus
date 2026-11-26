@@ -34,6 +34,13 @@ paths:
       responses:
         "200":
           description: Default Response
+  /status:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/ingest/events:
     post:
       tags:
@@ -328,6 +335,39 @@ paths:
                 maxWallMs:
                   type: number
                   minimum: 1000
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/discussion:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/discussion/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/discussion/{id}/export:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
       responses:
         "200":
           description: Default Response
@@ -3287,6 +3327,120 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/webhooks:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/webhooks/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/webhooks/{id}/test:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/webhooks/{id}/deliveries/{deliveryId}/retry:
+    post:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: deliveryId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/comparisons:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/comparisons/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/search:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/v1/org/hooks/{hookId}:
     post:
       tags:
@@ -5035,6 +5189,26 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/threads/{id}/export:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/threads/import:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
   /api/diff/apply:
     post:
       tags:
@@ -6171,6 +6345,38 @@ paths:
     post:
       tags:
         - durable
+      responses:
+        "200":
+          description: Default Response
+  /v1/responses:
+    post:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /v1/responses/{id}:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
       responses:
         "200":
           description: Default Response

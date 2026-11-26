@@ -31,6 +31,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 
 import { Page, PageHeader } from "~/components/page";
+import { CoachMark } from "~/components/coach-mark";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -61,12 +62,36 @@ interface ExecResult {
   durationMs: number;
   language: string;
   truncated?: boolean;
+  /** What the run cost, when the server measured it. */
+  resources?: { cpuMs: number; peakRssBytes: number; wallMs: number; method: string };
 }
 
 interface SandboxStatus {
   available: boolean;
   dockerAvailable?: boolean;
   languages: string[];
+  /** The same list with the version and the path each language runs through. */
+  runtimes?: {
+    language: string;
+    version: string | null;
+    via: string;
+    serverRuns: boolean;
+    pin: string;
+  }[];
+}
+
+/** Bytes → the unit a person reads ("48 MB"), rounding to two significant figures. */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded} ${units[unit]}`;
 }
 
 /** A run kept by the API so the history survives a reload. */
@@ -182,6 +207,14 @@ export default function Sandbox() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ExecResult | null>(null);
   const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
+
+  /**
+   * The version a language actually runs, from `GET /sandbox/status`. Shown beside the name
+   * because "python" is not an answer to "which python", and a script that depends on 3.12
+   * behaves differently on 3.10.
+   */
+  const runtimeVersion = (language: string): string | null =>
+    sandboxStatus?.runtimes?.find((runtime) => runtime.language === language)?.version ?? null;
   const [copied, setCopied] = useState(false);
   const [keepState, setKeepState] = useState(false);
   const [kernel, setKernel] = useState<{ id: string; language: string } | null>(null);
@@ -508,6 +541,8 @@ export default function Sandbox() {
         }
       />
 
+      <CoachMark page="/sandbox" />
+
       {err && (
         <p className="text-destructive text-sm flex items-center gap-2">
           <XCircle className="w-4 h-4" />
@@ -533,8 +568,14 @@ export default function Sandbox() {
                       ? sandboxStatus.languages
                       : ["javascript", "python"]
                     ).map((l) => (
-                      <SelectItem key={l} value={l} className="capitalize">
+                      <SelectItem key={l}
+                        value={l} className="capitalize" title={sandboxStatus?.runtimes?.find((r) => r.language === l)?.pin}>
                         {l}
+                        {runtimeVersion(l) ? (
+                          <span className="ml-1.5 text-[10px] text-muted-foreground">
+                            {runtimeVersion(l)}
+                          </span>
+                        ) : null}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -652,6 +693,14 @@ export default function Sandbox() {
                     <span className="text-xs text-muted-foreground">
                       Exit {result.exitCode} · {result.durationMs}ms · {result.language}
                     </span>
+                    {result.resources && (
+                      <span
+                        className="text-xs text-muted-foreground font-mono"
+                        title={`CPU ${result.resources.cpuMs} ms, peak memory sampled (${result.resources.method})`}
+                      >
+                        cpu {result.resources.cpuMs}ms · peak {formatBytes(result.resources.peakRssBytes)}
+                      </span>
+                    )}
                     {result.truncated && (
                       <Badge variant="outline" className="text-xs text-warning border-warning/30">
                         truncated

@@ -11,6 +11,7 @@
  *   notif:item:{userId}:{id}       → serialized Notification
  */
 
+import { RETENTION } from "@nexus/contracts";
 import { globalBus } from "@nexus/sse";
 
 import { getSharedKV } from "./shared-kv.ts";
@@ -25,7 +26,8 @@ export interface AppNotification {
   createdAt: string;
 }
 
-const NOTIF_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+/** The expiry is a policy, not a local literal: see RETENTION.notifications. */
+const NOTIF_TTL_MS = RETENTION.notifications.ttlMs!;
 
 const listKey = (userId: string) => `notif:list:${userId}`;
 const itemKey = (userId: string, id: string) => `notif:item:${userId}:${id}`;

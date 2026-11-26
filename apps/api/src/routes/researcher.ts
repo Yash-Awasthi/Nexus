@@ -38,6 +38,7 @@ import type { FastifyInstance } from "fastify";
 import { evictOldestEntry } from "../lib/lru-utils.ts";
 import { ownerIdFor } from "../lib/owner.ts";
 import { execScript, getPgPool, type PgLike } from "../lib/pg-pool.ts";
+import { publish } from "../lib/webhooks.ts";
 import { requireAuth } from "../middleware/auth.ts";
 
 // ── Search backend factory ────────────────────────────────────────────────────
@@ -413,6 +414,19 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
     };
 
     await persistRun(record);
+    // The run is over and its id is now addressable; a caller that started it from a
+    // background job learns that here instead of polling GET /researcher/runs.
+    publish(
+      "research.completed",
+      {
+        runId,
+        query,
+        results: orderedResults.length,
+        citations: index.list().length,
+        durationMs: _agentDurationMs,
+      },
+      record.ownerId,
+    );
 
     return reply.code(201).send({
       runId,

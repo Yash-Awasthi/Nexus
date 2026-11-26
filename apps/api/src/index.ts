@@ -20,6 +20,7 @@ import { failInterruptedRuns } from "./lib/agent-queue.ts";
 import { closePgPools, getPgPool, isEmbeddedUrl } from "./lib/pg-pool.ts";
 import { checkPosture } from "./lib/security-posture.ts";
 import { sharedKvBackend } from "./lib/shared-kv.ts";
+import { collectSecretProblems } from "./lib/startup-env.ts";
 
 // ── .env loader (zero-dependency) ───────────────────────────────────────────
 // Parses a standard KEY=VALUE .env file at the monorepo root so `pnpm dev:api`
@@ -106,49 +107,18 @@ process.on("unhandledRejection", (reason) => {
 
 // ── Startup validation ────────────────────────────────────────────────────────
 
-/** Known dev/sample placeholder values that must never reach production. */
-const INSECURE_DEFAULTS = new Set([
-  "dev",
-  "change-me",
-  "changeme",
-  "your-nexus-api-key",
-  "your-api-key",
-  "secret",
-  "test",
-  "nexus-dev-key",
-]);
-
 /**
- * Validate required secrets at startup. NEXUS_API_KEY is always required. In
- * production we additionally reject insecure placeholder / too-short keys and
- * warn when recommended secrets (NEXUS_JWT_SECRET, NEXUS_AUDIT_KEY) are missing, so a
- * misconfigured deploy fails fast instead of silently running insecurely.
+ * Validate required secrets at startup. All problems are collected into one
+ * message: a deploy missing three variables should not reveal them one restart
+ * at a time. Development keeps its permissive defaults.
  */
 function validateSecrets(): void {
-  const apiKey = process.env.NEXUS_API_KEY;
-  if (!apiKey) {
-    console.error("[startup] FATAL: NEXUS_API_KEY is not set.");
-    process.exit(1);
-  }
-
-  const isProd = process.env.NODE_ENV === "production";
-  if (isProd) {
-    if (INSECURE_DEFAULTS.has(apiKey.toLowerCase()) || apiKey.length < 16) {
-      console.error(
-        "[startup] FATAL: NEXUS_API_KEY is a placeholder or too short (<16 chars) for production.",
-      );
-      process.exit(1);
-    }
-    for (const name of ["NEXUS_JWT_SECRET", "NEXUS_AUDIT_KEY"]) {
-      const val = process.env[name];
-      if (!val) {
-        console.warn(`[startup] ⚠ ${name} is not set — strongly recommended in production.`);
-      } else if (INSECURE_DEFAULTS.has(val.toLowerCase()) || val.length < 16) {
-        console.error(`[startup] FATAL: ${name} is a placeholder or too short for production.`);
-        process.exit(1);
-      }
-    }
-  }
+  const { errors, warnings } = collectSecretProblems(process.env);
+  for (const warning of warnings) console.warn(`[startup] ⚠ ${warning}`);
+  if (errors.length === 0) return;
+  console.error(`[startup] FATAL: ${errors.length} environment problem(s):`);
+  for (const error of errors) console.error(`[startup]   - ${error}`);
+  process.exit(1);
 }
 
 // ── Graceful shutdown ───────────────────────────────────────────────────────

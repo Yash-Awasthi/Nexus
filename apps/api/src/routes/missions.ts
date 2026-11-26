@@ -64,6 +64,7 @@ import {
   type SkillRecord,
 } from "../lib/skill-runner.ts";
 import { invalidateSymbolCache } from "../lib/symbols.ts";
+import { publish } from "../lib/webhooks.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 import { getDefaultDriver } from "./api-bridge.ts";
@@ -344,6 +345,23 @@ async function startMission(
     .finally(() => {
       _aborters.delete(abortKey(uid, record.id));
       breaker.forget(record.id);
+      // A mission is the longest job this server runs and the one a caller is least able to
+      // wait for, so its terminal state is the one that most needs to arrive by itself.
+      void getMission(uid, record.id)
+        .then((finished) => {
+          if (!finished) return;
+          publish(
+            "mission.completed",
+            {
+              missionId: finished.id,
+              goal: finished.goal,
+              status: finished.status,
+              ...(finished.error ? { error: finished.error } : {}),
+            },
+            uid,
+          );
+        })
+        .catch(() => undefined);
       // Surface the final breaker state on the record so any consumer can see
       // the run was steered/constrained without parsing the phase list.
       if (breakerLevel !== undefined) {

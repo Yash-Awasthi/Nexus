@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The CLI end to end against a stand-in API: the paths it calls, what it prints, how it exits. */
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
@@ -89,40 +93,77 @@ describe("nexus CLI", () => {
     expect(run.out).toContain("m-new");
   }, 60_000);
 
-  it("lists research jobs from the research endpoint", async () => {
+  it("prints the sources recorded for a research run", async () => {
     seen.length = 0;
-    answer = () => [200, { jobs: [{ id: "job-1", status: "done", query: "tides" }] }];
-    const run = await nexus("research", "list");
-    expect(seen).toEqual(["GET /api/research"]);
-    expect(run.out).toContain("tides");
+    answer = () => [200, { query: "tides", total: 2, markdownRef: "citations/run-1.md" }];
+    const run = await nexus("research", "citations", "run-1");
+    expect(seen).toEqual(["GET /api/v1/researcher/run-1/citations"]);
+    expect(run.out).toContain("2 source(s) for: tides");
+    expect(run.out).toContain("citations/run-1.md");
+    expect(run.code).toBe(0);
   }, 60_000);
 
-  it("runs a research job through its stream and prints the report", async () => {
+  it("submits a research query and prints the synthesis with its sources", async () => {
     seen.length = 0;
-    answer = (method, url) =>
-      method === "POST"
-        ? [201, { id: "job-2", status: "running" }]
-        : url.endsWith("/stream")
-          ? [200, "unused"]
-          : [404, {}];
-    server.removeAllListeners("request");
-    server.on("request", (req, res) => {
-      seen.push(`${req.method} ${req.url}`);
-      if (req.url?.endsWith("/stream")) {
-        res.writeHead(200, { "content-type": "text/event-stream" });
-        res.write(`data: ${JSON.stringify({ type: "phase_start", label: "Planning" })}\n\n`);
-        res.write(
-          `data: ${JSON.stringify({ type: "report", content: "Tides follow the moon." })}\n\n`,
-        );
-        res.end(`data: ${JSON.stringify({ type: "done" })}\n\n`);
-        return;
-      }
-      const [status, body] = answer(req.method ?? "GET", req.url ?? "");
-      res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
-    });
-    const run = await nexus("research", "submit", "why tides");
-    expect(seen).toEqual(["POST /api/research", "GET /api/research/job-2/stream"]);
+    answer = () => [
+      201,
+      {
+        runId: "run-2",
+        query: "why tides",
+        synthesis: "Tides follow the moon.",
+        durationMs: 1200,
+        citations: [],
+        richCitations: [{ citationKey: "1", title: "Tides", url: "https://example.test/tides" }],
+      },
+    ];
+    const run = await nexus("research", "submit", "why tides", "--max", "3");
+    // One round trip: m1.4.2 replaced the dead submit-plus-stream pair with the
+    // route that answers with the report, and the CLI prints it from that answer.
+    expect(seen).toEqual(["POST /api/v1/researcher/research"]);
+    expect(bodies.at(-1)).toEqual({ query: "why tides", maxResults: 3 });
     expect(run.out).toContain("Tides follow the moon.");
+    expect(run.out).toContain("https://example.test/tides");
+    expect(run.out).toContain("nexus research citations run-2");
     expect(run.code).toBe(0);
+  }, 60_000);
+
+  it("runs a workflow and prints one line per step, then the result", async () => {
+    seen.length = 0;
+    answer = () => [
+      200,
+      {
+        status: "success",
+        result: { answer: "three decisions" },
+        events: [{ type: "step:finished", stepId: "decide", timestamp: "t" }],
+      },
+    ];
+    const run = await nexus("run", "wf_1", "--json");
+    expect(seen).toEqual(["POST /api/v1/workflows/wf_1/run"]);
+    expect(run.out).toContain('"status": "success"');
+    expect(run.code).toBe(0);
+  }, 60_000);
+
+  it("writes the workflow result to a file and exits 1 when the run failed", async () => {
+    const out = path.join(os.tmpdir(), `nexus-run-${randomUUID()}.json`);
+    answer = () => [200, { status: "error", message: "model refused" }];
+    const run = await nexus("run", "wf_2", "--json", "--out", out);
+    expect(run.code).toBe(1);
+    const written = JSON.parse(fs.readFileSync(out, "utf8")) as { status: string };
+    expect(written.status).toBe("error");
+    fs.unlinkSync(out);
+  }, 60_000);
+
+  it("prints a council verdict as JSON and exits 1 on a rejection", async () => {
+    answer = () => [
+      200,
+      {
+        ok: true,
+        verdictId: "v-1",
+        result: { outcome: "rejected", consensus: 0.2, summary: "no" },
+      },
+    ];
+    const run = await nexus("council", "deliberate", "--title", "Ship?", "--json");
+    expect(run.out).toContain('"outcome": "rejected"');
+    expect(run.code).toBe(1);
   }, 60_000);
 });

@@ -1,36 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import {
-  Activity,
-  BarChart3,
-  Building2,
-  ChevronsUpDown,
-  Database,
-  DollarSign,
-  Flag,
-  FolderKanban,
-  GitFork,
-  Hexagon,
-  Key,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  MessageSquare,
-  MessagesSquare,
-  Moon,
-  Network,
-  Plus,
-  ScrollText,
-  Server,
-  Settings,
-  ShieldAlert,
-  SquareTerminal,
-  Sun,
-  Terminal,
-  Boxes,
-  UserCircle,
-  Users as UsersIcon,
-  Wrench,
-} from "lucide-react";
+
 import { useEffect } from "react";
 import {
   isRouteErrorResponse,
@@ -46,6 +15,7 @@ import {
 
 import type { Route } from "./+types/root";
 
+import { CommandPalette } from "~/components/command-palette";
 import { NotificationBell } from "~/components/NotificationBell";
 import { NexusMark } from "~/components/brand";
 import { Button } from "~/components/ui/button";
@@ -72,12 +42,14 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { MobileNav } from "~/components/mobile-nav";
 import { AuthProvider, bootstrapSession, useAuth } from "~/context/AuthContext";
 import { NotificationsProvider } from "~/context/NotificationsContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
 import { hostCan } from "~/lib/host";
 import { installAuthFetch } from "~/lib/install-auth-fetch";
 import { useLocalPlane } from "~/lib/local-plane";
+import { navGroups, type NavEntry } from "~/lib/nav";
 import "./app.css";
 
 // Attach the session's token to same-origin /api/* calls made via raw fetch
@@ -110,85 +82,15 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
 ];
 
-interface NavEntry {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  end?: boolean;
-  /** Shown only when the server can run it. */
-  requires?: "terminal";
-}
-
-// The council leads; everything else supports it. Admin shows to admins only.
-const navGroups: { label: string; admin?: boolean; items: NavEntry[] }[] = [
-  {
-    label: "Deliberate",
-    items: [
-      { to: "/dashboard", icon: LayoutDashboard, label: "Home", end: true },
-      { to: "/chat", icon: MessageSquare, label: "Council" },
-      { to: "/discussion", icon: MessagesSquare, label: "Discussion" },
-      { to: "/archetypes", icon: Hexagon, label: "Archetypes" },
-    ],
-  },
-  {
-    label: "Company",
-    items: [
-      { to: "/org", icon: Building2, label: "Companies" },
-      { to: "/projects", icon: FolderKanban, label: "Projects" },
-      { to: "/workspaces", icon: UsersIcon, label: "Workspaces" },
-    ],
-  },
-  {
-    label: "Automate",
-    items: [
-      { to: "/workflows", icon: GitFork, label: "Workflows" },
-      { to: "/skills", icon: Wrench, label: "Skills" },
-    ],
-  },
-  {
-    label: "Knowledge",
-    items: [{ to: "/knowledge", icon: Database, label: "Knowledge" }],
-  },
-  {
-    label: "Tools",
-    items: [
-      { to: "/sandbox", icon: Terminal, label: "Sandbox" },
-      { to: "/terminals", icon: SquareTerminal, label: "Terminals", requires: "terminal" },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { to: "/settings", icon: Settings, label: "Preferences" },
-      { to: "/provider-keys", icon: KeyRound, label: "Models & keys" },
-      { to: "/costs", icon: DollarSign, label: "Usage & cost" },
-      { to: "/mcp-servers", icon: Boxes, label: "MCP servers" },
-      { to: "/api-tokens", icon: Key, label: "API tokens" },
-    ],
-  },
-  {
-    label: "Admin",
-    admin: true,
-    items: [
-      { to: "/admin/users", icon: UsersIcon, label: "Users" },
-      { to: "/admin/analytics", icon: BarChart3, label: "Analytics" },
-      { to: "/admin/traces", icon: Activity, label: "Traces" },
-      { to: "/gateway", icon: Network, label: "Gateway" },
-      { to: "/admin/audit", icon: ScrollText, label: "Audit log" },
-      { to: "/moderation", icon: ShieldAlert, label: "Content filter" },
-      { to: "/admin/feedback", icon: MessageSquare, label: "Feedback" },
-      { to: "/admin/feature-flags", icon: Flag, label: "Feature flags" },
-      { to: "/admin/system", icon: Server, label: "System" },
-    ],
-  },
-];
-
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
         {/* Phase 3.15 — PWA manifest */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#1c1d22" />
@@ -400,10 +302,16 @@ export default function App() {
         <NotificationsProvider>
           <TooltipProvider>
             <SidebarProvider>
+              <CommandPalette />
               <AppSidebar />
               {/* Pages fill the area under the phone header with h-full, never h-screen. */}
               <main className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
+                <div
+                  className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden"
+                  // The status bar sits over the top of a standalone window; the inset keeps the
+                  // trigger out from under it on a notched phone.
+                  style={{ paddingTop: "env(safe-area-inset-top)" }}
+                >
                   <SidebarTrigger />
                   <NexusMark className="size-6" />
                   <span className="text-sm font-semibold tracking-tight">Nexus</span>
@@ -411,6 +319,7 @@ export default function App() {
                 <div className="min-h-0 flex-1 overflow-auto">
                   <Outlet />
                 </div>
+                <MobileNav />
               </main>
             </SidebarProvider>
           </TooltipProvider>

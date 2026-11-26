@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { ProviderIcon, ModelIcon } from "@lobehub/icons";
 import {
   ReactFlow,
   Background,
@@ -37,6 +36,8 @@ import { useState, useCallback, useEffect } from "react";
 
 import { selectClass } from "~/components/org/AgentDialog";
 import { EmptyState, Page, PageHeader } from "~/components/page";
+import { ModelGlyph, ProviderGlyph } from "~/components/provider-glyph";
+import { PrintButton } from "~/components/print-button";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -58,6 +59,7 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { canManage, orgApi, type Agent, type Company } from "~/lib/org";
+import { workflowRunDoc } from "~/lib/printable";
 
 import "@xyflow/react/dist/style.css";
 
@@ -467,7 +469,7 @@ function PropertiesPanel({
             <Select value={selectedModel} onValueChange={(m) => onUpdateModel(selectedNode.id, m)}>
               <SelectTrigger className="h-7 text-xs">
                 <div className="flex items-center gap-1.5 truncate">
-                  <ModelIcon model={selectedModel} size={14} />
+                  <ModelGlyph model={selectedModel} size={14} />
                   <SelectValue placeholder="Select model" />
                 </div>
               </SelectTrigger>
@@ -475,7 +477,7 @@ function PropertiesPanel({
                 {models.map((m) => (
                   <SelectItem key={m.id} value={m.id} className="text-xs">
                     <span className="flex items-center gap-2">
-                      <ProviderIcon provider={m.provider} size={14} type="mono" />
+                      <ProviderGlyph provider={m.provider} size={14} />
                       <span className="truncate">{m.id}</span>
                       {m.available === false && (
                         <span className="text-[10px] text-muted-foreground">(no key)</span>
@@ -559,6 +561,10 @@ function WorkflowEditor({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runOutput, setRunOutput] = useState<string | null>(null);
+  /** The last run as data, for the printable document; `runOutput` is the same run as prose. */
+  const [runDetail, setRunDetail] = useState<{ result: string; trace: string; status: string } | null>(
+    null,
+  );
   const [outputExpanded, setOutputExpanded] = useState(true);
   const [models, setModels] = useState<GatewayModel[]>(FALLBACK_MODELS);
   const [schedule, setSchedule] = useState(workflow.schedule ?? "");
@@ -745,6 +751,7 @@ function WorkflowEditor({
       setRunOutput(
         `Workflow completed successfully.\n\nFinal result:\n${finalResult}\n\nStep trace:\n${trace || "(no steps executed)"}`,
       );
+      setRunDetail({ result: finalResult, trace, status: "success" });
 
       const now = new Date();
       const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
@@ -756,7 +763,9 @@ function WorkflowEditor({
         steps,
       });
     } catch (err) {
-      setRunOutput(`Workflow failed: ${err instanceof Error ? err.message : String(err)}`);
+      const failure = err instanceof Error ? err.message : String(err);
+      setRunOutput(`Workflow failed: ${failure}`);
+      setRunDetail({ result: `The run failed: ${failure}`, trace: "", status: "error" });
       onUpdateWorkflow({
         ...workflow,
         lastRun: "Just now",
@@ -855,17 +864,36 @@ function WorkflowEditor({
       {/* AI Run Output Panel */}
       {runOutput && (
         <div className="border-t border-border bg-background shrink-0">
-          <button
-            onClick={() => setOutputExpanded((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <span>AI Run Output</span>
-            {outputExpanded ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronUp className="size-3.5" />
+          {/* A div, not a button: the print control lives in here and a button inside a button
+              is invalid HTML that also swallows its own clicks. */}
+          <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium text-muted-foreground">
+            <button
+              onClick={() => setOutputExpanded((v) => !v)}
+              className="flex flex-1 items-center justify-between gap-2 text-left hover:text-foreground transition-colors"
+              aria-expanded={outputExpanded}
+            >
+              <span>AI Run Output</span>
+              {outputExpanded ? (
+                <ChevronDown className="size-3.5" />
+              ) : (
+                <ChevronUp className="size-3.5" />
+              )}
+            </button>
+            {runDetail && (
+              <PrintButton
+                doc={workflowRunDoc({
+                  workflowName: workflow.name,
+                  status: runDetail.status,
+                  result: runDetail.result,
+                  trace: runDetail.trace,
+                  steps: (workflow.steps ?? []).map((step: Record<string, unknown>) => ({
+                    name: String(step["name"] ?? step["id"] ?? "step"),
+                    kind: String(step["kind"] ?? "step"),
+                  })),
+                })}
+              />
             )}
-          </button>
+          </div>
           {outputExpanded && (
             <div className="px-4 pb-3 max-h-48 overflow-y-auto">
               <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed bg-muted/50 rounded-md p-3 border border-border">
@@ -1078,7 +1106,7 @@ export default function WorkflowsPage() {
           </Button>
         }
       />
-
+      <CoachMark page="/workflows" />
       {workflows.length === 0 && (
         <EmptyState
           icon={GitFork}

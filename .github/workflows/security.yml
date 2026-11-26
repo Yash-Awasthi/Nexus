@@ -7,6 +7,7 @@ on:
   pull_request:
   schedule:
     - cron: "0 6 * * 1" # Weekly Monday 06:00 UTC
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -16,27 +17,44 @@ permissions:
 
 jobs:
   dependencies:
-    name: Dependency advisories
+    # The required-status-check context on master is this exact string. Renaming
+    # the job silently blocks every pull request, because a required check that
+    # never reports cannot pass; scripts/required-checks.mjs fails when the two
+    # drift apart.
+    name: Production dependency advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "26"
-      # Fails on a high or critical advisory in what ships; lower ones are reviewed by hand.
-      - run: pnpm audit --prod --audit-level high
-      # Dev-only trees still execute on CI machines and developer laptops.
-      - run: pnpm audit --audit-level high
+      # Fails on a high or critical advisory in what ships; lower ones are reviewed by
+      # hand, and an allowlisted one carries a reason and an expiry date.
+      - run: node scripts/audit-gate.mjs --prod
+
+  dev-dependencies:
+    # Dev-only trees still execute on CI machines and developer laptops, but this
+    # one is a signal, not a merge gate: a dev advisory must not block a release
+    # fix that has nothing to do with it.
+    name: Dev dependency advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+      - run: node scripts/audit-gate.mjs
 
   gitleaks:
     name: Secret scanning (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Override the auto-computed push range (before^..after). After a
@@ -53,9 +71,9 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Lockfiles, manifests and IaC. Fixed findings are the ones a bump can clear.
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -66,7 +84,22 @@ jobs:
           exit-code: "1"
           format: sarif
           output: trivy-results.sarif
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
+
+  desktop-toolchain:
+    # Electron and electron-builder are pinned exactly, so nothing here moves on its own —
+    # which is also why nothing here notices a new major. This job asks the registry once a
+    # week and fails when the pin is a major behind, so the decision to test a bump arrives
+    # as a red check rather than as a surprise during a release.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Desktop toolchain freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+      - run: node scripts/electron-current.mjs --online

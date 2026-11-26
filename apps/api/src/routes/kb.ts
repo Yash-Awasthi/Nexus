@@ -142,8 +142,52 @@ interface GraphJob {
   error?: string;
   startedAt: string;
 }
-/** The latest graph build of each knowledge base; a restart forgets them, the graph itself stays. */
-const graphJobs = new Map<string, GraphJob>();
+/** The latest graph build of each knowledge base; persisted, so a restart reports the truth. */
+interface StoredGraphJob extends GraphJob {
+  /** The caller who started it, so an erasure of that account reaches the row. */
+  ownerId?: string;
+}
+const graphJobs = new PersistentStore<StoredGraphJob>("kb_graph_jobs");
+/** A finished build older than this is not worth keeping; the graph itself is the record. */
+const GRAPH_JOB_TTL_MS = 7 * 24 * 3600_000;
+let _graphJobsLoaded: Promise<void> | null = null;
+
+/**
+ * Read the jobs back once, and tell the truth about the ones that were running:
+ * extraction lives in the process that started it, so a restart cannot resume a
+ * build, and a job stuck at "running" would poll forever.
+ */
+function loadGraphJobs(): Promise<void> {
+  _graphJobsLoaded ??= graphJobs.load().then(() => {
+    const cutoff = Date.now() - GRAPH_JOB_TTL_MS;
+    for (const [id, job] of [...graphJobs.entries()]) {
+      const started = Date.parse(job.startedAt);
+      if (Number.isFinite(started) && started < cutoff) {
+        graphJobs.delete(id);
+        continue;
+      }
+      if (job.state === "running")
+        graphJobs.set(id, {
+          ...job,
+          state: "error",
+          error: "The server restarted before this build finished; start it again.",
+        });
+    }
+  });
+  return _graphJobsLoaded;
+}
+
+/** The stored job for a base, as a restart would read it. */
+export async function _graphJobForTests(id: string): Promise<StoredGraphJob | undefined> {
+  await loadGraphJobs();
+  return graphJobs.get(id);
+}
+
+/** Write a job row as an earlier process would have left it. */
+export async function _seedGraphJobForTests(id: string, job: StoredGraphJob): Promise<void> {
+  await graphJobs.save(id, job);
+  _graphJobsLoaded = null;
+}
 
 /** The knowledge bases a caller can see. */
 export function listKbsFor(userId: string | undefined): Kb[] {
@@ -226,6 +270,7 @@ async function putKbText(
 /** Register the /kb surface. Called from apiBridgeRoutes. */
 export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promise<void> {
   await _kbStore.load();
+  await loadGraphJobs();
   // Rows written before documents were tracked have no list.
   for (const kb of _kbStore.values()) {
     if (!Array.isArray(kb.documents)) _kbStore.set(kb.id, { ...kb, documents: [] });
@@ -359,7 +404,8 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
       failed: 0,
       startedAt: now(),
     };
-    graphJobs.set(kb.id, job);
+    await loadGraphJobs();
+    await graphJobs.save(kb.id, { ...job, ownerId: request.nexusUserId });
     const userId = request.nexusUserId;
     extractGraphFromChunks(deps.getKG(true), chunks, {
       source: kb.id,
@@ -384,6 +430,8 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
         job.error = err instanceof Error ? err.message : String(err);
       })
       .finally(() => {
+        // The finished job is what a restart reads back; progress in between stays in memory.
+        void graphJobs.save(kb.id, { ...job, ownerId: userId });
         void createNotification(userId, {
           type: "knowledge",
           title:
@@ -406,6 +454,7 @@ export async function kbRoutes(app: FastifyInstance, deps: KbRoutesDeps): Promis
     if (!mine(request, request.params.id)) {
       return reply.code(404).send({ error: "knowledge base not found" });
     }
+    await loadGraphJobs();
     return reply.send(graphJobs.get(request.params.id) ?? { state: "idle" });
   });
 

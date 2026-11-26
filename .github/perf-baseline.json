@@ -1,0 +1,22 @@
+{
+  "buildCold": {
+    "ms": 12356,
+    "host": "win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb",
+    "at": "2026-11-24T15:34:06.929Z"
+  },
+  "buildWarm": {
+    "ms": 627,
+    "host": "win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb",
+    "at": "2026-11-24T15:34:07.557Z"
+  },
+  "uiDev": {
+    "ms": 8900,
+    "host": "win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb",
+    "at": "2026-11-24T15:33:28.978Z"
+  },
+  "apiBoot": {
+    "ms": 5837,
+    "host": "win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb",
+    "at": "2026-11-24T15:33:34.829Z"
+  }
+}

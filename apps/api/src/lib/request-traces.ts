@@ -14,6 +14,8 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { RETENTION } from "@nexus/contracts";
+
 import { priceOf } from "./cost-log.ts";
 import { PersistentStore, dataDir } from "./persistent-store.ts";
 import { getPgPool } from "./pg-pool.ts";
@@ -42,7 +44,8 @@ interface RequestTrace {
   createdAt: string;
 }
 
-const MAX_TRACES = 1000;
+/** The cap is a policy, not a local literal: see RETENTION.traces. */
+const MAX_TRACES = RETENTION.traces.maxEntries!;
 const traces: RequestTrace[] = [];
 
 const rows = new PersistentStore<RequestTrace>("request_traces");

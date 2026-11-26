@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { CoachMark } from "~/components/coach-mark";
 import { Page, PageHeader } from "~/components/page";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -92,6 +93,23 @@ const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 /** Sum the per-day costUsd rows from `since` (inclusive) to today. */
 function sumSince(byDay: DayRow[], since: string): number {
   return byDay.filter((r) => r.date >= since).reduce((s, r) => s + r.costUsd, 0);
+}
+
+/**
+ * The cost log answered, and it has nothing in it.
+ *
+ * This used to fall through to the KPI grid, which printed $0.00 month-to-date,
+ * week-to-date and year-to-date plus a 0 request count — indistinguishable from
+ * an account that really spent nothing, and from a query that silently missed.
+ * An empty log is its own state.
+ */
+function nothingRecorded(dashboard: Dashboard): boolean {
+  return (
+    dashboard.requests === 0 &&
+    dashboard.totalUsd === 0 &&
+    dashboard.totalTokens === 0 &&
+    Object.keys(dashboard.byDay).length === 0
+  );
 }
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -178,7 +196,7 @@ export default function Costs() {
     : 0;
   const wtd = dashboard ? sumSince(dayRows, dayKey(new Date(Date.now() - 6 * 86_400_000))) : 0;
 
-  const hasLimit = limits && limits.limits.monthly_usd !== null;
+  const hasLimit = limits?.limits?.monthly_usd != null;
   const monthPrefix = new Date().toISOString().slice(0, 7);
   const spentMonth =
     limits?.spent.monthly_usd ??
@@ -196,7 +214,7 @@ export default function Costs() {
           </Button>
         }
       />
-
+      <CoachMark page="/costs" />
       {loading && !dashboard ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -210,6 +228,19 @@ export default function Costs() {
             <RefreshCw className="w-4 h-4 mr-2" /> Retry
           </Button>
         </div>
+      ) : nothingRecorded(dashboard) ? (
+        <Card data-testid="costs-empty">
+          <CardContent className="py-12 text-center space-y-2">
+            <p className="text-sm font-medium">No model spend recorded yet</p>
+            <p className="mx-auto max-w-md text-xs text-muted-foreground">
+              The cost log has no calls in this period, so there is no month-, week- or year-to-date
+              total to show. The first priced call appears here.
+            </p>
+            <Button variant="outline" size="sm" onClick={loadAll}>
+              <RefreshCw className="w-4 h-4 mr-2" /> Check again
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <>
           {/* KPI cards */}

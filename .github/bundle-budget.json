@@ -1,0 +1,140 @@
+{
+  "defaultGzipKb": 200,
+  "forbidden": {
+    "three.module": {
+      "why": "three.js is 540 kB of renderer; it belongs behind a dynamic import so a page that shows a graph does not make /chat download it",
+      "allowedIn": []
+    }
+  },
+  "perRoute": {
+    "workflows.tsx": {
+      "gzipKb": 187
+    },
+    "terminals.tsx": {
+      "gzipKb": 152
+    },
+    "chat.tsx": {
+      "gzipKb": 138
+    },
+    "knowledge.tsx": {
+      "gzipKb": 134
+    },
+    "skills.tsx": {
+      "gzipKb": 127
+    },
+    "projects.tsx": {
+      "gzipKb": 125
+    },
+    "org.tsx": {
+      "gzipKb": 118
+    },
+    "sandbox.tsx": {
+      "gzipKb": 116
+    },
+    "admin-users.tsx": {
+      "gzipKb": 111
+    },
+    "mcp-servers.tsx": {
+      "gzipKb": 110
+    },
+    "provider-keys.tsx": {
+      "gzipKb": 108
+    },
+    "knowledge-graph.tsx": {
+      "gzipKb": 104
+    },
+    "profile.tsx": {
+      "gzipKb": 100
+    },
+    "landing.tsx": {
+      "gzipKb": 99
+    },
+    "knowledge-bases.tsx": {
+      "gzipKb": 95
+    },
+    "archetypes.tsx": {
+      "gzipKb": 85
+    },
+    "api-tokens.tsx": {
+      "gzipKb": 84
+    },
+    "admin-traces.tsx": {
+      "gzipKb": 82
+    },
+    "home.tsx": {
+      "gzipKb": 80
+    },
+    "moderation.tsx": {
+      "gzipKb": 78
+    },
+    "costs.tsx": {
+      "gzipKb": 77
+    },
+    "login.tsx": {
+      "gzipKb": 74
+    },
+    "register.tsx": {
+      "gzipKb": 72
+    },
+    "settings.tsx": {
+      "gzipKb": 72
+    },
+    "search.tsx": {
+      "gzipKb": 72
+    },
+    "setup.tsx": {
+      "gzipKb": 71
+    },
+    "discussion.tsx": {
+      "gzipKb": 71
+    },
+    "admin-feature-flags.tsx": {
+      "gzipKb": 70
+    },
+    "reset-password.tsx": {
+      "gzipKb": 70
+    },
+    "forgot-password.tsx": {
+      "gzipKb": 70
+    },
+    "verify-email.tsx": {
+      "gzipKb": 67
+    },
+    "memory.tsx": {
+      "gzipKb": 65
+    },
+    "admin-system.tsx": {
+      "gzipKb": 64
+    },
+    "live.tsx": {
+      "gzipKb": 64
+    },
+    "admin-feedback.tsx": {
+      "gzipKb": 63
+    },
+    "admin-audit.tsx": {
+      "gzipKb": 63
+    },
+    "workspaces.tsx": {
+      "gzipKb": 63
+    },
+    "gateway.tsx": {
+      "gzipKb": 62
+    },
+    "marketing-layout.tsx": {
+      "gzipKb": 62
+    },
+    "sandbox-connect.tsx": {
+      "gzipKb": 61
+    },
+    "admin-analytics.tsx": {
+      "gzipKb": 61
+    },
+    "status.tsx": {
+      "gzipKb": 60
+    },
+    "invitations.tsx": {
+      "gzipKb": 50
+    }
+  }
+}

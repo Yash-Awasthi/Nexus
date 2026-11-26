@@ -25,6 +25,12 @@ export interface LocalApiPaths {
   dataDir: string;
   /** Bundled migrations folder; unset in a checkout, where the package resolves them. */
   migrationsDir?: string;
+  /**
+   * The folder the language servers and the sandbox treat as the project, from the app's
+   * workspace picker. Passed as `NEXUS_WORKSPACE_DIR`, so choosing a folder in the UI is the
+   * same thing as setting the variable — and the API keeps one source for it.
+   */
+  workspaceDir?: string;
 }
 
 export interface SpawnedProcess {
@@ -78,6 +84,7 @@ export function localApiEnv(
     // Language servers are operator-installed binaries on this machine's PATH;
     // with none installed the LSP tools stay absent instead of failing.
     NEXUS_LSP: "1",
+    ...(paths.workspaceDir ? { NEXUS_WORKSPACE_DIR: paths.workspaceDir } : {}),
   };
 }
 

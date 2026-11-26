@@ -11,11 +11,13 @@
 #   make build          Build all packages
 #   make test           Run all tests
 #   make lint           ESLint + Prettier check
+#   make verify         Every gate CI runs that this machine can run (see scripts/verify.mjs)
+#   make verify-fast    Everything but typecheck and the full suite (~2 min)
 #   make logs           Tail all container logs
 
 .PHONY: help setup dev-infra dev-infra-down dev-up dev-down dev-logs \
         migrate migrate-neon db-studio seed build test lint clean \
-        ingest-scan
+        verify verify-fast ingest-scan
 
 # ── Default target ────────────────────────────────────────────────────────────
 
@@ -108,6 +110,12 @@ test: ## Run all test suites via turbo
 
 lint: ## Run ESLint + Prettier check across all packages
 	pnpm lint && pnpm format:check
+
+verify: ## Run every gate CI runs that this machine can run (local green ⇒ CI green)
+	@node scripts/verify.mjs
+
+verify-fast: ## The same gates minus typecheck and the full test suite
+	@node scripts/verify.mjs --fast
 
 typecheck: ## Run TypeScript type-check across all packages
 	pnpm typecheck

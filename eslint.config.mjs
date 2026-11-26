@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// oxlint (.oxlintrc.json) runs every other rule; ESLint keeps only import ordering.
+// `vp lint --type-aware` is the type-aware pass and owns every rule except one. ESLint is
+// here for import ordering only, which needs no type information — keeping it to a single
+// rule is what stops a second rule engine growing in parallel with the first.
 import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
 

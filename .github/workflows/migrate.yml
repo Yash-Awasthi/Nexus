@@ -19,6 +19,14 @@ on:
       - "packages/db/migrations/**"
       - "packages/db/drizzle.config.ts"
 
+  pull_request:
+    paths:
+      - "packages/db/src/schema/**"
+      - "packages/db/migrations/**"
+      - "packages/db/drizzle.config.ts"
+      - "scripts/db-forward-only-drill.sh"
+      - "scripts/migrations-forward-only.mjs"
+
   workflow_dispatch:
     inputs:
       environment:
@@ -71,9 +79,9 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
@@ -91,3 +99,51 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         # drizzle-kit exits non-zero on a failed migration, so no extra probe is needed.
         run: pnpm db:migrate
+
+  # The schema and the data both have to survive a deploy, and "the migration ran"
+  # proves neither. This applies the previous release's migrations to a real Postgres,
+  # writes rows the way the old code wrote them, then applies this release's
+  # migrations on top -- failing if a column the old code reads is gone or a seeded
+  # row did not make it. No production secret is involved.
+  forward-only:
+    name: Forward-only migration drill
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: forward_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/forward_only
+
+    steps:
+      # Full history: the drill needs the previous release tag, not a shallow clone.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      # A migration that drops or truncates something needs an entry in
+      # .github/migration-exceptions.json naming an existing ADR.
+      - name: Migrations only go forward
+        run: node scripts/migrations-forward-only.mjs
+
+      - name: Resolve the previous release tag
+        id: prev
+        run: echo "ref=$(git tag --sort=-v:refname --list 'v*' | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply the previous release, then this one, over its data
+        env:
+          PREV_REF: ${{ steps.prev.outputs.ref }}
+        run: bash scripts/db-forward-only-drill.sh

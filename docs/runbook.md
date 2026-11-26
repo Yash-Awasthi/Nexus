@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- verified: c6e5d6c 2026-11-24 -->
 
 # Nexus Operational Runbook
 
@@ -21,6 +22,7 @@
 8. [Upgrade and rollback](#8-upgrade-and-rollback)
 9. [Configuration reference](#9-configuration-reference)
 10. [SLOs and alerts](#10-slos-and-alerts)
+11. [Rotating a credential (drill)](#11-rotating-a-credential-drill)
 
 ---
 
@@ -311,6 +313,50 @@ persistence in production.
 | Redis failure    | < 5min                   | < 5min (in-flight jobs)     |
 | Postgres failure | Neon PITR                | Per Neon retention          |
 
+### 7.5 The drill: restore a dump into a clean instance and prove it is the same system
+
+A dump nobody has restored is a file, not a backup. `scripts/db-backup-drill.sh` runs
+the whole loop and reports the timings §7.4 needs to stay honest:
+
+```bash
+DATABASE_URL="$DATABASE_URL" \
+SCRATCH_DATABASE_URL="postgres://user:pass@host/nexus_restore" \
+  scripts/db-backup-drill.sh
+```
+
+`SCRATCH_DATABASE_URL` must be a **different, throwaway** database: the script drops
+and recreates it before restoring, so point it at something whose loss costs nothing.
+It refuses to run when the two URLs are equal — restoring over the source is how a
+drill becomes an incident.
+
+What it checks, in order:
+
+1. `pg_dump --no-owner --no-privileges` into a gzipped file, timed.
+2. `DROP DATABASE` then `CREATE DATABASE` the scratch database, so the restore proves
+   the dump is self-sufficient instead of leaning on whatever was already there.
+3. `psql -v ON_ERROR_STOP=1` on the gunzip'd dump — a restore that needs more than the
+   dump to succeed is a restore that will fail when it is needed.
+4. Every `public` base table's row count compared between the source and the restored
+   copy; a single mismatch fails the drill with the table named.
+5. The restored `audit_log` — the chain is what makes the log evidence, so a restore
+   that keeps the rows but breaks the HMAC chain is a restore of a different system.
+   Verify it against the copy:
+   `DATABASE_URL="$SCRATCH_DATABASE_URL" pnpm --filter @nexus/cli exec nexus audit verify`,
+   or `GET /api/v1/audit/log/verify` from an API pointed at the copy.
+6. With `RUN_SUITE=1`, the API suite runs against the restored copy (the wrapper sets
+   `PG_URL` and `DATABASE_URL` to scratch) — the half that takes minutes rather than
+   seconds.
+
+The retention values in §4 of `docs/OPS.md` are a floor on what a restore can contain:
+a restored copy of a database whose oldest thread is 30 days old has no threads older
+than 30 days, and that is expected rather than a failed restore.
+
+Drill record — an `_unrun_` row means it has not been done:
+
+| Date    | Restore wall time | Total wall time | Dump size | Rows restored | Who | Anything that went wrong |
+| ------- | ----------------- | --------------- | --------- | ------------- | --- | ------------------------ |
+| _unrun_ | —                 | —               | —         | —             | —   | —                        |
+
 ---
 
 ## 8. Upgrade and rollback
@@ -378,6 +424,131 @@ See `docs/slos.md` for the full declarations. Summary:
 | Council deliberation success rate | 99%       | < 97% over 15min   |
 | Queue job processing rate         | < 30s p99 | Queue depth rising |
 | Audit log chain integrity         | 100%      | Any breach         |
+| Dependency status                 | 99.9% ok  | Any `down` over 2m |
 
 Grafana is the alert destination in the bundled stack. Point its contact points at
 your pager or chat service if you want notifications off the box.
+
+### 10.1 Every alert, and what to do first
+
+Each alert names its playbook, so the first action is never "investigate". "Paged?" is
+who hears about it when nobody is looking at a dashboard.
+
+| Alert                       | Meaning                                                   | First action                                                                 | Playbook | Paged? |
+| --------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- | -------- | ------ |
+| `NexusStatusDown`           | `GET /status` said `down`: a critical dependency is out    | `curl $NEXUS_URL/status` — the failing row names the dependency and the probe | P1       | yes    |
+| `NexusStatusDegraded`       | A non-critical row failed: Redis, sandbox or Docker       | Read the row: Redis → queue drain is at risk; Docker → image languages only  | P2       | no     |
+| `NexusAPIAvailabilityPage`  | Real requests are failing, `/health` may still be green   | Roll back the last deploy before diagnosing                              | P1       | yes    |
+| `NexusAPILatencyPage`       | p99 over 5s for 3 minutes                                 | Check `/status`: a slow dependency, not a slow route                     | P1       | yes    |
+| Queue depth rising          | The worker is not draining (or providers are slow)        | `llen bull:nexus-high:wait`, then `docker compose ps worker`              | P2       | yes    |
+| Audit chain breach          | `audit/log/verify` is false                               | Stop writes; preserve rows; treat as T3                                  | P4       | yes    |
+| Cost spike                  | Spend above the day's expectation                         | Find the dearest verdicts, then lower `budgetUsd`                         | P5       | no     |
+| Dead webhook delivery       | A receiver refused five deliveries; the hook is `dead`    | Inspect `/webhooks/:id`, fix the receiver, `POST .../deliveries/:id/retry` | —        | no     |
+| Update feed 5xx             | `/updates/latest.json` is unreachable for autoupdate      | Check the CDN; clients answer "feed unreachable" and keep running         | P1       | no     |
+
+A `degraded` status is a task, not a page: the product still answers. A `down` status is a
+page, because it cannot.
+
+### 10.2 Who is told, and how to reach the owner
+
+- **Paging:** the P1 rows above go to the on-call rotation in the bundled Grafana contact
+  point. Escalation after 15 minutes of no acknowledgement is to the owner below.
+- **Owner:** Yash Awasthi (maintainer). Security incidents additionally follow `SECURITY.md`.
+- **Support path for users:** `SUPPORT.md` — a bug report goes to the issue tracker, a
+  vulnerability goes to the private advisory channel and never to the tracker. A user who is
+  reading this runbook because something broke should be sent to the status page
+  (`GET /status`) first, then to `SUPPORT.md` if the report is theirs to file.
+- **What is never published:** no runbook step, status row or public page names a provider,
+  a key, a host or a dependency version. If a step needs one, it takes it from the environment.
+
+---
+
+## 11. Rotating a credential (drill)
+
+A credential you cannot rotate on demand is a credential you will keep after it
+leaks. This is the procedure, and it doubles as the drill: run it on a quiet
+system, start a stopwatch at the first step, and write the wall time in the table
+at the end. Two halves — one key Nexus stores **for** a user, one secret Nexus
+**holds** for an OAuth client. Doing both is the point: they fail differently.
+
+### 11.1 Provider key (BYOK) — stored, encrypted, per user
+
+The old key must stop resolving and the new one must work, without the old value
+being readable anywhere. Three minutes is the target.
+
+1. Note the current prefix (never the value):
+
+   ```bash
+   curl -s -H "authorization: Bearer $NEXUS_TOKEN" \
+     "$NEXUS_URL/api/user/provider-keys" | jq '.keys[] | {provider, keyPrefix, label}'
+   ```
+
+2. Make the old key invalid at the provider console first — revoke it there. A
+   rotation that leaves the old key alive at the provider is a copy, not a
+   rotation.
+
+3. Store the replacement. Posting the same `provider` again is the rotation: the
+   previous row is soft-deleted, the audit log records `provider_key.rotate`, and
+   the cached driver for that user is dropped.
+
+   ```bash
+   curl -s -X POST -H "authorization: Bearer $NEXUS_TOKEN" \
+     -H 'content-type: application/json' \
+     -d '{"provider":"groq","apiKey":"gsk_…new…","label":"rotated 2026-11-24"}' \
+     "$NEXUS_URL/api/user/provider-keys" | jq '{provider, keyPrefix}'
+   ```
+
+4. Check all four, in order:
+
+   - [ ] `GET /api/user/provider-keys` shows one row for that provider, with the new `keyPrefix`
+   - [ ] No response body anywhere contains the raw key (they are prefix-only by contract)
+   - [ ] The audit log has the rotation event:
+         `curl -s -H "authorization: Bearer $NEXUS_TOKEN" "$NEXUS_URL/api/admin/audit-logs" | jq '.logs[] | select(.action=="provider_key.rotate")'`
+   - [ ] `pnpm --filter @nexus/cli exec nexus audit verify` still reports a valid chain
+   - [ ] A real request through that provider succeeds (the key is resolved server-side,
+         so a list check alone proves storage, not use)
+
+5. Rollback: store the previous key again. The old row is still there, soft-deleted,
+   for exactly this reason.
+
+### 11.2 OAuth client secret — env only, never stored
+
+The client secret is not in the database: `packages/llm-oauth/src/providers.ts`
+declares it as `requiredEnv` for each provider. Rotating it is a console change, an
+env change, and a restart — and the stored refresh tokens must survive all three.
+
+1. Rotate the secret in the provider console (Google Cloud, Azure AD, GitHub App).
+2. Update the value where the deployment reads env: Render environment, or `.env`
+   for compose, as `GOOGLE_OAUTH_CLIENT_SECRET` / `AZURE_OAUTH_CLIENT_SECRET` /
+   `GITHUB_OAUTH_CLIENT_SECRET`.
+3. Redeploy or restart the API (`docker compose up -d api`, or the Render deploy).
+   The old secret keeps working in the console only as long as the provider allows
+   overlap — close that window once step 4 passes.
+4. Check, in order:
+
+   - [ ] `/health/ready` is passing and the API logged no `requiredEnv` warnings
+   - [ ] A fresh sign-in round trip completes (authorize → callback → token exchange)
+   - [ ] A token stored **before** the rotation still refreshes: the vault that seals it
+         (`NEXUS_OAUTH_VAULT_KEY`) was not touched, so it must still open
+   - [ ] The provider console shows the old secret revoked
+
+5. Rollback: restore the previous secret in the console and the deployment env, then
+   restart. Nothing else in the system depends on the value.
+
+### 11.3 Do not rotate these in the same drill
+
+`NEXUS_SECRETS_KEY` seals every stored provider key, and `NEXUS_OAUTH_VAULT_KEY`
+seals every stored OAuth token. Changing either one makes every existing ciphertext
+unreadable — the rows survive, the plaintext does not. Rotating an **at-rest** key is
+a different procedure (re-encrypt under the new key while the old one is still
+configured) and is deliberately out of scope here; mixing it into a credential drill
+is how a rotation becomes an outage.
+
+### 11.4 Drill record
+
+Fill this in after a real run; an empty row means the drill has not been done.
+
+| Date    | Half                | Wall time | Who | Anything that went wrong |
+| ------- | ------------------- | --------- | --- | ------------------------ |
+| _unrun_ | provider key (BYOK) | —         | —   | —                        |
+| _unrun_ | OAuth client secret | —         | —   | —                        |

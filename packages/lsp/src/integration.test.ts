@@ -6,7 +6,7 @@
  */
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 
@@ -43,10 +43,21 @@ function resolveServer(envName: string, binary: string, args: string[]): LspComm
   return found ? { command: found, args } : undefined;
 }
 
+/** npm installs `.cmd` shims on Windows, which `spawn` without a shell rejects. */
+function throughNode(command: LspCommand | undefined): LspCommand | undefined {
+  if (!command || !isWindows || !/\.(cmd|bat)$/i.test(command.command)) return command;
+  const script = join(dirname(command.command), "node_modules", "pyright", "langserver.index.js");
+  return existsSync(script)
+    ? { command: process.execPath, args: [script, ...command.args] }
+    : command;
+}
+
 const tsServer = resolveServer("NEXUS_LSP_TYPESCRIPT_CMD", "typescript-language-server", [
   "--stdio",
 ]);
-const pyServer = resolveServer("NEXUS_LSP_PYTHON_CMD", "pyright-langserver", ["--stdio"]);
+const pyServer = throughNode(
+  resolveServer("NEXUS_LSP_PYTHON_CMD", "pyright-langserver", ["--stdio"]),
+);
 
 let dir: string;
 let managers: LspManager[] = [];
@@ -149,9 +160,10 @@ describe("real pyright-langserver", () => {
   const run = pyServer ? it : it.skip;
 
   run(
-    "answers definition and diagnostics",
+    "answers definition, references, hover, document symbols and diagnostics",
     async () => {
-      write("lib.py", "def add(a: int, b: int) -> int:\n    return a + b\n");
+      write("pyrightconfig.json", '{"include":["."],"typeCheckingMode":"basic"}');
+      const lib = write("lib.py", "def add(a: int, b: int) -> int:\n    return a + b\n");
       const user = write(
         "use.py",
         "from lib import add\n\ntotal: int = add(1, 2)\nbad: str = add(1, 2)\n",
@@ -162,8 +174,28 @@ describe("real pyright-langserver", () => {
       expect(definition.ok).toBe(true);
       if (definition.ok) expect(definition.locations[0]?.path.endsWith("lib.py")).toBe(true);
 
+      const references = await manager.references({ path: user, line: 3, column: 16 });
+      expect(references.ok).toBe(true);
+      if (references.ok) {
+        expect(references.locations.length).toBeGreaterThan(0);
+        expect(references.locations.some((l) => l.path.endsWith("lib.py"))).toBe(true);
+      }
+
+      const hover = await manager.hover({ path: user, line: 3, column: 16 });
+      expect(hover.ok).toBe(true);
+      if (hover.ok) expect(hover.contents.toLowerCase()).toContain("add");
+
+      const symbols = await manager.documentSymbols({ path: lib });
+      expect(symbols.ok).toBe(true);
+      if (symbols.ok) expect(symbols.symbols.map((s) => s.name)).toContain("add");
+
       const diagnostics = await manager.diagnostics({ path: user });
       expect(diagnostics.ok).toBe(true);
+      if (diagnostics.ok) {
+        expect(diagnostics.diagnostics.some((d) => d.message.includes("not assignable"))).toBe(
+          true,
+        );
+      }
     },
     60_000,
   );

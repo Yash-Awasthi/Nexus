@@ -52,7 +52,9 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov", "html", "json"],
+      // json-summary is what scripts/coverage-floors.mjs reads: per-file counts,
+      // which it sums per package. The others are for humans and codecov.
+      reporter: ["text", "lcov", "html", "json", "json-summary"],
       // Scope coverage to package source only.
       // apps/api route tests and apps/worker e2e tests require a live Fastify
       // server + Postgres + Redis and run in the dedicated e2e CI job — measuring

@@ -34,6 +34,10 @@ export const CAPABILITY_METHODS = {
   councilSync: ["setCouncilMembers"],
   runMode: ["getRunMode"],
   sync: ["syncNow", "getSyncLedger"],
+  /** Prompts queued while the API was unreachable; the host owns the file and the flush. */
+  offlineQueue: ["queuePrompt", "getOfflineState", "flushOfflineQueue"],
+  /** The folder the language servers and sandbox treat as the project. */
+  workspace: ["getWorkspace", "chooseWorkspace", "clearWorkspace"],
 } as const;
 
 type DesktopCapability = keyof typeof CAPABILITY_METHODS;
@@ -80,6 +84,18 @@ export interface HostImplementation {
   saveCouncilMembers(members: unknown): void | Promise<void>;
   /** Account session and provider links, both behind app-owned browser windows. */
   auth: DesktopAuth;
+  /** Queue a prompt typed while the API was unreachable; returns the queue length. */
+  queuePrompt?(input: { text: string; sessionId?: string | null }): Promise<number>;
+  /** The queue and the connection state, for the renderer's own indicator. */
+  offlineState?(): { online: boolean; queued: number };
+  /** Try to send everything queued now. */
+  flushOfflineQueue?(): Promise<void>;
+  /** The chosen workspace folder, or null. */
+  getWorkspace?(): string | null;
+  /** Open the folder picker; resolves to the chosen folder, or null when cancelled. */
+  chooseWorkspace?(): Promise<string | null>;
+  /** Forget the chosen workspace. */
+  clearWorkspace?(): void;
 }
 
 type InvokeHandler = (method: string, args: readonly unknown[]) => Promise<unknown>;
@@ -112,6 +128,36 @@ export function createInvokeHandler(impl: HostImplementation): InvokeHandler {
     getRunMode: async () => impl.runMode(),
     syncNow: async (args) => impl.syncNow(String(args[0] ?? "default")),
     getSyncLedger: async () => impl.syncLedger(),
+    queuePrompt: async (args) => {
+      if (!impl.queuePrompt) throw new UnsupportedMethodError("queuePrompt");
+      const raw = (args[0] ?? {}) as { text?: unknown; sessionId?: unknown };
+      return impl.queuePrompt({
+        text: String(raw.text ?? ""),
+        sessionId: typeof raw.sessionId === "string" ? raw.sessionId : null,
+      });
+    },
+    getOfflineState: async () => {
+      if (!impl.offlineState) throw new UnsupportedMethodError("getOfflineState");
+      return impl.offlineState();
+    },
+    flushOfflineQueue: async () => {
+      if (!impl.flushOfflineQueue) throw new UnsupportedMethodError("flushOfflineQueue");
+      await impl.flushOfflineQueue();
+      return { ok: true };
+    },
+    getWorkspace: async () => {
+      if (!impl.getWorkspace) throw new UnsupportedMethodError("getWorkspace");
+      return impl.getWorkspace();
+    },
+    chooseWorkspace: async () => {
+      if (!impl.chooseWorkspace) throw new UnsupportedMethodError("chooseWorkspace");
+      return impl.chooseWorkspace();
+    },
+    clearWorkspace: async () => {
+      if (!impl.clearWorkspace) throw new UnsupportedMethodError("clearWorkspace");
+      impl.clearWorkspace();
+      return { ok: true };
+    },
   };
 
   return async (method, args) => {

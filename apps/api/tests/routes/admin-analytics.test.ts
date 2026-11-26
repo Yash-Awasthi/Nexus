@@ -93,3 +93,44 @@ it("reports the organization's spend and seats to an admin only", async () => {
   });
   expect(member.statusCode).toBe(403);
 });
+
+it("reports unknown latency as null when the traffic log cannot answer", async () => {
+  // A `0` p50 would claim every request finished in zero milliseconds; the log
+  // being unreachable means the number is unknown, and the page renders a dash.
+  const Fastify = (await import("fastify")).default;
+  const { analyticsRoutes } = await import("../../src/routes/analytics.ts");
+  const bare = Fastify();
+  await bare.register(
+    async (scoped) =>
+      analyticsRoutes(scoped, {
+        costLog: [],
+        gatewayLog: {
+          stats: async () => {
+            throw new Error("no KV mounted");
+          },
+        },
+      }),
+    { prefix: "/api" },
+  );
+  await bare.ready();
+
+  const res = await bare.inject({
+    url: "/api/analytics/overview",
+    headers: { authorization: `Bearer ${tokenFor(ADMIN)}` },
+  });
+  await bare.close();
+
+  expect(res.statusCode).toBe(200);
+  const body = res.json<{
+    latencyP50ms: number | null;
+    latencyP99ms: number | null;
+    errorRate: number | null;
+    source: string;
+    requests: number;
+  }>();
+  expect(body.source).toBe("cost-log");
+  expect(body.latencyP50ms).toBeNull();
+  expect(body.latencyP99ms).toBeNull();
+  expect(body.errorRate).toBeNull();
+  expect(body.requests).toBe(0);
+});

@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-# npm publish — manual only. Requires NPM_TOKEN secret.
+# npm publish — preview only, manual. Requires NPM_TOKEN secret.
+#
+# This is the PREVIEW path: it publishes under the `next` dist-tag, so `npm i`
+# still installs the stable version. Stable releases come from release.yml, which
+# publishes `latest` from a `v*` tag on master and nowhere else.
 #
 # What this publishes:
 #   @nexus/cli      — nexus CLI (apps/cli)
@@ -39,11 +43,11 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
@@ -52,14 +56,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Turbo caches task output in .turbo/cache; without restoring it a manual
+      # publish rebuilds the whole graph.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node26-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node26-
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Build all packages
         run: pnpm build
 
       - name: Run tests
         run: pnpm test --filter="./packages/*"
 
-      - name: Publish changed packages (Changesets)
-        run: pnpm changeset publish --no-git-tag
+      - name: Publish changed packages as a preview (next tag)
+        # `--tag next`, never `latest`: a manual run must not move what `npm i`
+        # installs. release.yml owns `latest`, and only from a tag on master.
+        run: pnpm changeset publish --no-git-tag --tag next
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
@@ -72,6 +88,12 @@ jobs:
           git push --follow-tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publishes this job's wall time; fails on a 25% regression once
+      # .github/job-times.json carries a baseline for it.
+      - name: Job wall time
+        if: always()
+        run: node scripts/job-times.mjs --job npm-publish --started "$STARTED"
 
   notify:
     name: Post-publish notification

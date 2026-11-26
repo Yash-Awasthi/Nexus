@@ -52,6 +52,11 @@ vi.mock("../../src/lib/provider-keys.ts", async (importOriginal) => ({
   },
 }));
 
+// Records go to nexus_kv when a database answers and to data/stores otherwise; the
+// restart case below re-imports the module, which only proves anything against a
+// store this process can actually write.
+delete process.env.DATABASE_URL;
+
 const { buildServer } = await import("../../src/server.ts");
 
 let app: FastifyInstance;
@@ -180,5 +185,85 @@ describe("POST /api/v1/discussion/stream", () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.payload).error).toBe("unknown_supervisor_model");
+  });
+});
+
+describe("a discussion outlives its stream", () => {
+  it("hands out an id first, then serves the same ledger and its export", async () => {
+    reset();
+    script["alpha-model"] = ["Invalidate on write."];
+    script["beta-model"] = ["Invalidate on read."];
+    script["recorder-model"] = ["Positions: invalidate on write.\n\nSTATUS: SETTLED"];
+
+    const { frames } = await discuss({ maxContributions: 20 });
+    const id = String(frames[0]?.data.discussionId ?? "");
+    expect(frames[0]?.event).toBe("id");
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+
+    const record = await app.inject({ method: "GET", url: `/api/v1/discussion/${id}` });
+    expect(record.statusCode).toBe(200);
+    const body = record.json<{
+      id: string;
+      topic: string;
+      entries: { line: number; author: string }[];
+      settled: boolean;
+      markdown: string;
+    }>();
+    expect(body.id).toBe(id);
+    expect(body.entries.length).toBe(frames.filter((f) => f.event === "entry").length);
+    expect(body.settled).toBe(true);
+    expect(body.markdown).toContain("Invalidate on write.");
+
+    const exported = await app.inject({ method: "GET", url: `/api/v1/discussion/${id}/export` });
+    expect(exported.statusCode).toBe(200);
+    expect(exported.headers["content-type"]).toContain("text/markdown");
+    expect(String(exported.headers["content-disposition"])).toContain("attachment;");
+    expect(exported.body).toBe(body.markdown);
+
+    const listed = await app.inject({ method: "GET", url: "/api/v1/discussion" });
+    expect(listed.json<{ discussions: { id: string }[] }>().discussions.map((d) => d.id)).toContain(
+      id,
+    );
+  });
+
+  it("keeps the ledger across a restart and shows it to nobody else", async () => {
+    reset();
+    script["recorder-model"] = ["Positions: one.\n\nSTATUS: SETTLED"];
+    const { frames } = await discuss({ maxContributions: 4 });
+    const id = String(frames[0]?.data.discussionId ?? "");
+
+    // A restart is a fresh module registry reading the same store.
+    vi.resetModules();
+    const fresh = await import("../../src/routes/discussion.ts");
+    const record = await fresh._discussionForTests(id);
+    expect(record?.entries.length).toBeGreaterThan(0);
+    expect(record?.topic).toContain("cache");
+
+    // A record another account owns is not this caller's to read, list or export.
+    const strangerId = "11111111-2222-3333-4444-555555555555";
+    await fresh._seedDiscussionForTests({
+      id: strangerId,
+      ownerId: "someone-else",
+      topic: "Not yours",
+      participants: [],
+      entries: [],
+      digest: "",
+      settled: false,
+      reason: "running",
+      contributions: 0,
+      totalTokens: 0,
+      startedAt: new Date().toISOString(),
+    });
+    for (const url of [
+      `/api/v1/discussion/${strangerId}`,
+      `/api/v1/discussion/${strangerId}/export`,
+    ]) {
+      const denied = await app.inject({ method: "GET", url });
+      expect(denied.statusCode, url).toBe(404);
+    }
+    const listedOther = await app.inject({ method: "GET", url: "/api/v1/discussion" });
+    expect(
+      listedOther.json<{ discussions: { id: string }[] }>().discussions.map((d) => d.id),
+    ).not.toContain(strangerId);
   });
 });

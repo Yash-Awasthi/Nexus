@@ -73,6 +73,7 @@ import { getMemoryStore } from "../lib/memory-store.ts";
 import { createOAuthTokenStore } from "../lib/oauth-token-store.ts";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.ts";
 import { listUserDrivers, listUserModels } from "../lib/provider-keys.ts";
+import { gatewayError } from "../lib/reply-errors.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.ts";
 
@@ -509,10 +510,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       // invisible to every user's scoped memory queries anyway).
       const ingestUserId = request.nexusUserId;
       if (typeof request.body?.model !== "string" || !Array.isArray(request.body.messages)) {
-        return reply.code(400).send({
-          type: "error",
-          error: { type: "invalid_request_error", message: "model and messages are required" },
-        });
+        return gatewayError(reply, 400, "invalid_request_error", "model and messages are required");
       }
       const overrideProvider = request.headers["x-nexus-provider"];
       const registry = buildDriverRegistry();
@@ -550,13 +548,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       if (hasAccounts) {
         const picked = accountPool.pick(providerName);
         if (!picked) {
-          return reply.code(503).send({
-            type: "error",
-            error: {
-              type: "provider_unavailable",
-              message: `All accounts for provider "${providerName}" are unhealthy (cooldown or circuit breaker open).`,
-            },
-          });
+          return gatewayError(
+            reply,
+            503,
+            "provider_unavailable",
+            `All accounts for provider "${providerName}" are unhealthy (cooldown or circuit breaker open).`,
+          );
         }
         account = picked;
         if (picked.id.startsWith("oauth:") && request.nexusUserId) {
@@ -577,13 +574,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (!driver) {
-        return reply.code(400).send({
-          type: "error",
-          error: {
-            type: "provider_unavailable",
-            message: `Provider "${providerName}" is not configured. Set the corresponding API key env var.`,
-          },
-        });
+        return gatewayError(
+          reply,
+          400,
+          "provider_unavailable",
+          `Provider "${providerName}" is not configured. Set the corresponding API key env var.`,
+        );
       }
 
       // Prune message history to fit the context window before dispatching.
@@ -609,15 +605,13 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         try {
           const totalUsd = spentBy(request.nexusUserId);
           if (totalUsd >= request.body.max_spend_usd) {
-            return reply.code(402).send({
-              type: "error",
-              error: {
-                type: "spend_cap_exceeded",
-                message: `Gateway cumulative spend ($${totalUsd.toFixed(6)}) exceeds max_spend_usd ($${request.body.max_spend_usd}).`,
-                total_usd: totalUsd,
-                max_spend_usd: request.body.max_spend_usd,
-              },
-            });
+            return gatewayError(
+              reply,
+              402,
+              "spend_cap_exceeded",
+              `Gateway cumulative spend (${totalUsd.toFixed(6)}) exceeds max_spend_usd (${request.body.max_spend_usd}).`,
+              { total_usd: totalUsd, max_spend_usd: request.body.max_spend_usd },
+            );
           }
         } catch {
           /* non-fatal — proceed if cost store unavailable */
@@ -634,15 +628,16 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         });
         const verdict = await _quota.check(billingKey, estUsd);
         if (!verdict.allowed) {
-          return reply.code(429).send({
-            type: "error",
-            error: {
-              type: "monthly_cost_cap_exceeded",
-              message: "Monthly BYOK spend cap reached for this key.",
+          return gatewayError(
+            reply,
+            429,
+            "monthly_cost_cap_exceeded",
+            "Monthly BYOK spend cap reached for this key.",
+            {
               monthly_cost_usd: verdict.monthlyCostUsd,
               monthly_cost_cap_usd: verdict.monthlyCostCapUsd,
             },
-          });
+          );
         }
       }
 
@@ -951,13 +946,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
             willRetry: false,
           })
           .catch(() => {});
-        return reply.code(statusCode).send({
-          type: "error",
-          error: {
-            type: e.code ?? "server_error",
-            message: e.message ?? "Upstream provider error",
-          },
-        });
+        return gatewayError(
+          reply,
+          statusCode,
+          e.code ?? "server_error",
+          e.message ?? "Upstream provider error",
+        );
       }
     },
   );

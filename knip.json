@@ -36,6 +36,6 @@
     }
   },
   "ignoreDependencies": ["pino-pretty", "pyodide"],
-  "ignoreBinaries": ["syft", "go", "where"],
+  "ignoreBinaries": ["syft", "go", "gofmt", "where"],
   "ignoreExportsUsedInFile": true
 }

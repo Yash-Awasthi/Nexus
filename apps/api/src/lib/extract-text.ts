@@ -41,7 +41,8 @@ export async function extractText(type: string, bytes: Buffer): Promise<string> 
   if (type === "html") {
     return stripScriptAndStyle(raw)
       .replace(/<[^<>]*>/g, " ")
-      .replace(/\s+/g, " ");
+      .replace(/\s+/g, " ")
+      .trim();
   }
   return raw;
 }

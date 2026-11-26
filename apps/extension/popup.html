@@ -36,6 +36,48 @@
         cursor: pointer;
         padding: 4px 14px 8px;
       }
+      .attach {
+        margin: 0 14px 8px;
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #f9fafb;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .chip {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin: 0 14px 8px;
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #eff6ff;
+        font-size: 12px;
+      }
+      .chip strong {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chip span {
+        color: #6b7280;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chip button {
+        margin-left: auto;
+        border: 0;
+        background: none;
+        color: #6b7280;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+      }
     </style>
   </head>
   <body>
@@ -48,7 +90,14 @@
       <button type="submit">Save</button>
     </form>
     <div id="ask"></div>
+    <button class="attach" id="attach" hidden>Attach this page</button>
+    <div class="chip" id="chip" hidden>
+      <strong id="chip-label"></strong>
+      <span id="chip-url"></span>
+      <button id="remove" aria-label="Remove the attached page">×</button>
+    </div>
     <button class="reset" id="reset" hidden>Change server or token</button>
+    <script src="context.js"></script>
     <script src="widget.js"></script>
     <script src="popup.js"></script>
   </body>

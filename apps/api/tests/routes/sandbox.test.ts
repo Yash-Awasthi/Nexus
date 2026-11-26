@@ -9,7 +9,7 @@
  * Pyodide (network/WASM) is intentionally not exercised here.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
-import type { FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 
 import { SANDBOX_LANGUAGES } from "@nexus/sandbox";
 
@@ -54,7 +54,9 @@ describe("GET /api/sandbox/status", () => {
       pistonAvailable: boolean;
       pythonRuntime: string;
       languages: string[];
+      runtimes: { language: string; via: string; serverRuns: boolean }[];
       pistonUrl: string | null;
+      note: string;
     }>();
     expect(body.available).toBe(true);
     expect(body.pythonRuntime).toBe("pyodide-local");
@@ -63,6 +65,86 @@ describe("GET /api/sandbox/status", () => {
     expect(body.pistonAvailable).toBe(false);
     expect(body.pistonUrl).toBeNull();
     expect(typeof body.dockerAvailable).toBe("boolean");
+  });
+
+  it("says which path runs each language instead of implying the server runs them all", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/sandbox/status" });
+    const body = res.json<{
+      languages: string[];
+      runtimes: { language: string; via: string; serverRuns: boolean; version: string | null; pin: string }[];
+      note: string;
+    }>();
+    // One entry per advertised language, in the same order, and none invented.
+    expect(body.runtimes.map((runtime) => runtime.language)).toEqual(body.languages);
+    const byLanguage = new Map(body.runtimes.map((runtime) => [runtime.language, runtime]));
+
+    // The API itself runs only these two: a vm child for JS, Pyodide for Python. The version
+    // names the interpreter that does it, not a number someone typed into a doc.
+    expect(byLanguage.get("javascript")).toMatchObject({
+      language: "javascript",
+      via: "vm",
+      serverRuns: true,
+      version: process.version.replace(/^v/, ""),
+    });
+    expect(byLanguage.get("python")).toMatchObject({
+      language: "python",
+      via: "pyodide",
+      serverRuns: true,
+    });
+
+    // The image languages run through the helper on the viewer's machine, which
+    // this server cannot see; it must not claim to run them.
+    for (const language of ["typescript", "bash", "go", "rust", "ruby"]) {
+      expect(byLanguage.get(language)).toMatchObject({
+        language,
+        serverRuns: false,
+      });
+      // And it names what a caller can pin: the version in the image, not "latest".
+      expect(byLanguage.get(language)!.pin).toMatch(/in the sandbox image$/);
+    }
+
+    // r is Piston-only. With no PISTON_URL it is not advertised at all, and the
+    // note has to say how to get it rather than pretend it works.
+    expect(body.languages).not.toContain("r");
+    expect(byLanguage.has("r")).toBe(false);
+    expect(body.note).toContain("PISTON_URL");
+  });
+});
+
+describe("GET /api/sandbox/status with a self-hosted Piston", () => {
+  it("adds r only when PISTON_URL points at a non-emkc instance", async () => {
+    // The route reads PISTON_URL once at module load, so reload it with the
+    // variable set instead of mutating the server built in beforeAll.
+    process.env.PISTON_URL = "http://piston.internal:2000";
+    vi.resetModules();
+    try {
+      const { sandboxRoutes } = await import("../../src/routes/sandbox.ts");
+      const pistonApp = Fastify();
+      await sandboxRoutes(pistonApp, { dockerReady: Promise.resolve(true) });
+      await pistonApp.ready();
+      const res = await pistonApp.inject({ method: "GET", url: "/sandbox/status" });
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{
+        pistonAvailable: boolean;
+        languages: string[];
+        runtimes: { language: string; via: string; serverRuns: boolean }[];
+        pistonUrl: string | null;
+      }>();
+      expect(body.pistonAvailable).toBe(true);
+      expect(body.pistonUrl).toBe("http://piston.internal:2000");
+      // The image list still comes from @nexus/sandbox; r is the Piston-only add.
+      expect(body.languages).toEqual([...SANDBOX_LANGUAGES, "r"]);
+      expect(body.runtimes.map((runtime) => runtime.language)).toEqual(body.languages);
+      expect(body.runtimes.find((runtime) => runtime.language === "r")).toMatchObject({
+        language: "r",
+        via: "piston",
+        serverRuns: true,
+      });
+      await pistonApp.close();
+    } finally {
+      delete process.env.PISTON_URL;
+      vi.resetModules();
+    }
   });
 });
 

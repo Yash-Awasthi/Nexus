@@ -53,6 +53,7 @@ const PROVIDERS = [
   ["openrouter", "OpenRouter", "chat"],
   ["xai", "xAI", "chat"],
   ["together", "Together AI", "chat"],
+  ["github_models", "GitHub Models", "chat"],
   ["perplexity", "Perplexity", "chat"],
   ["cohere", "Cohere", "chat"],
   ["bedrock", "AWS Bedrock", "chat"],

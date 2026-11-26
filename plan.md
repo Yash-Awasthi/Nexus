@@ -1,770 +1,887 @@
-# Nexus: master plan
+# plan.md — Nexus
 
-One file, one order, from here to a project whose docs and code agree. Every item is small enough
-to finish in one sitting and carries the check that proves it. Tick an item only in the commit that
-produces its evidence, and put the evidence on the line. If a claim is not in the tree, it does not
-go in this file or in any other doc.
+Consolidated engineering plan for the Nexus monorepo. Replaces `plan.md`
+(phases 0–9, the LSP build-out, dependency/secret hygiene, docs/code agreement,
+release, board validations) and the plan-like sections of `docs/STATUS.md` and
+`docs/FEATURES.md`. Finished work from the old plan is not repeated here.
 
-**Legend**
+Generated 2026-11-24. Evidence base: root and app `package.json` files,
+`pnpm-workspace.yaml` catalog, `docs/{ARCHITECTURE,DEPLOYMENT,OPS,STATUS,TESTING,TROUBLESHOOTING,slos,runbook,cli-reference,plugin-author-guide}.md`,
+the 14 workflows, `infra/sandbox/Dockerfile`, `services/board/go.mod`,
+`services/ingest`, the 50 `packages/*` and 7 `apps/*` trees, and the 31
+unchecked items carried over from the previous `plan.md`.
 
-- `[x]` done and verified; the line names the proof.
-- `[ ]` open.
-- **(you)** needs a human: an account, a secret, a certificate, an install, or an approval.
-- **(gate)** blocks the next phase; run it, do not reason about it.
+**Order:** corrective → preventive → perfective → widening → depth →
+enterprise.
 
-**Baseline, 2026-11-23, `0698367`** (`master` level with `origin/master`)
+**Hierarchy:** Phase → Major (M#.#) → Minor (m#.#.#) → Subtask (`- [ ]`). One
 
-Seven workflows ran on that commit and all are green: Lint, Test, Build & Typecheck, Docker Build &
-Push, Security, Release, DB Migrate. The `pre-migration` tag still restores the old tree with
-`git reset --hard pre-migration`; it is not a fast-forward base. This file is the only scheduled
-plan; superseded records live in git history.
+**Done tasks stay.** A finished subtask becomes `- [x]` in place with one evidence line under it (`verified-here: <command> → <result>`). Nothing is ever removed from this list.
+subtask = one PR = one command that proves it = one revert.
 
-**Definition of done for the whole plan**
+**Tag (exactly one):** `[C]` corrective · `[P]` preventive · `[F]` perfective ·
+`[W]` widening · `[D]` depth · `[E]` enterprise.
 
-1. Offline acceptance passes with no WAN, no cloud database and no cloud model.
-2. Online acceptance passes on the deployed host: sign-in, chat, skill, billing row, audit export,
-   a second user who cannot read the first user's data, and a revoked session that is refused.
-3. Desktop installs from a signed installer, runs its own API, and updates with a rollback.
-4. Every language in `NEXUS_SANDBOX_IMAGE` is selectable in the app, or is removed from the image.
-5. LSP tools answer definition, references, hover, document symbols and diagnostics in at least
-   TypeScript and Python, behind workspace containment and the exec policy.
-6. `pnpm check:docs` proves every `process.env` read is documented and every documented variable is
-   read; the docs-claims audit has no unchecked row.
-7. `pnpm audit --prod --audit-level high` exits 0 and the Dependabot queue is empty or every open
-   alert carries a written dismissal.
-8. All seven workflows are green on the release commit.
+**Internal split.** Parts are labels, not extra structure: **A** platform/API,
+**B** UI, **C** desktop/extension, **D** sandbox/CLI/services, **E** docs/ops.
 
-**Deployment values**
-
-- Host: `nexus-iosc.onrender.com`. Render service `srv-davasjdg1s2s739ptc8g` (`nexus-iosc`).
-- GitHub OAuth app: homepage `https://nexus-iosc.onrender.com`, callback
-  `https://nexus-iosc.onrender.com/api/v1/oauth/github/callback`, client ID
-  `Ov23lirM3z6UH32R8zhf`. The secret belongs in Render only.
-- Render: `OAUTH_REDIRECT_BASE=https://nexus-iosc.onrender.com` (no trailing slash),
-  `ALLOWED_ORIGINS=https://nexus-iosc.onrender.com`.
-- Neon `nexus` (`mute-scene-02756044`, us-east-1, PG 17, pgvector 0.8.0). The pooled URL is on
-  Render; `DB Migrate` reads the `production` environment secret `DATABASE_URL`, which should be
-  the direct URL, because PgBouncer transaction mode breaks DDL and advisory locks.
-- Secrets live in dashboards and gitignored local files: GitHub client secret, `DATABASE_URL`,
-  `NEXUS_SECRETS_KEY`, `NEXUS_AUDIT_KEY`, `RESEND_API_KEY`. Never in the repo.
+**Method anchors:** `engineering-craft` (reproduce, then fix; behaviour is the
+contract), `backend-api` §3 contract/§7 data/§9 failure/§10 security,
+`devops-cloud` §8 pre-ship gate/§9 SLO/§10 runbook, `security-operations` §5
+supply chain, `frontend-ui` §9 state/§10 performance, `mobile-apps` §4/§5,
+`data-ml` §8 evaluation, `design-ux` §1 audit/§5 craft, `writing-docs` §1.
 
 ---
 
-## Phase 0: gates that stay green
+## 0. Verified ground truth
 
-Run this before every commit that claims a phase is done. It is the whole quality bar in one line.
+| Fact              | Measured                                                                                                                                                              | Claimed                               | Source                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------- |
+| Runtime           | Node 26.8.1 local, `engines.node >=24`                                                                                                                                | —                                     | `node -v`, root `package.json`                              |
+| Package manager   | pnpm 12.21.0, catalog workspace                                                                                                                                       | —                                     | `package.json`, `pnpm-workspace.yaml`                       |
+| TypeScript        | `@typescript/typescript6 ^6.0.2` (native), `@typescript/native`                                                                                                       | —                                     | catalog                                                     |
+| API framework     | Fastify `^5.12.8`                                                                                                                                                     | —                                     | catalog                                                     |
+| ORM               | Drizzle `1.0.0-rc.6` (release candidate)                                                                                                                              | —                                     | catalog                                                     |
+| UI                | React 19.3.1, React Router 8.5.2, three 0.186.1, Vite via `vite-plus`                                                                                                 | —                                     | `apps/ui/package.json`                                      |
+| Desktop           | Electron 45.4.1, electron-builder ^26.18.0, `electron-updater` flow                                                                                                   | "M4 installable and updatable"        | `apps/desktop/package.json`                                 |
+| Workspace size    | 50 packages, 7 apps, 2 Go services                                                                                                                                    | —                                     | `ls`                                                        |
+| Tracked files     | 1,888 (`git ls-files` now; 1,877 when this plan was first written)                                                                                                    | —                                     | `git ls-files \| wc -l`                                     |
+| Test volume       | `pnpm test`: 6,252 tests in 530 files, 6,236 passed, 0 failed, 16 skipped (root 4,812/278, api 1,310/235, ui 58/12, desktop 72/5; e2e 47 passed / 11 skipped)         | same                                  | `node scripts/baseline.mjs --json` — measured 2026-11-24    |
+| API surface       | every operation in `openapi.yaml` carries a durability class (counts in `docs/STATUS.md`, gated)                                                                      | same                                  | `node scripts/baseline.mjs --check` (parses `openapi.yaml`) |
+| CI                | 14 workflows: build, codeql, conventional-commits, dependabot-automerge, docker, ingest-finscrape, k6, keep-warm, lint, migrate, npm-publish, release, security, test | "all 14 green" gate                   | `.github/workflows`                                         |
+| Secrets/SCA in CI | `pnpm audit` (prod + full), gitleaks-action v3, trivy → SARIF, CodeQL                                                                                                 | —                                     | `security.yml`                                              |
+| Sandbox image     | `node:26-bookworm-slim` pinned by digest; Go 1.27.4 and Rust 1.100.0 from official releases pinned by SHA-256; `ruby`/`python3` still from Debian                     | "Go 1.19.8, rustc 1.63.0, Ruby 3.1.2" | `infra/sandbox/Dockerfile`                                  |
+| Board service     | Go module `open-board`, `go 1.27.0`, `modernc.org/sqlite v1.62.0`                                                                                                     | —                                     | `services/board/go.mod`                                     |
+| Local model path  | Ollama `qwen2.5:7b` + `nomic-embed-text`, no paid key required                                                                                                        | "works with no paid APIs"             | `STATUS.md`                                                 |
+| Lint entrypoint   | `vp lint --type-aware` with a hand-written path list, then `eslint` on a second hand-written list                                                                     | —                                     | root `package.json`                                         |
+| Test campaign     | `test:campaign` was a hand-written list of 53 test paths; deleted in M1.2 — every path is already in the suite runs                                                   | —                                     | root `package.json`                                         |
 
-- [x] **(gate)** `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm
-      format:check && pnpm check:headers && pnpm types:check && pnpm --filter @nexus/api
-      openapi:check && pnpm prune:knip` exits 0.
-      Measured 2026-11-23 on this tree: every step exit 0; headers 1,484 files; format 1,517 files;
-      gate run on `1c307db`.
-- [x] **(gate)** `pnpm test` passes on the change.
-      Measured 2026-11-23: `turbo run test` 55 of 55 tasks passed, 0 cached; `@nexus/api` 1,298
-      passed, 4 skipped (230 files); `@nexus/agent-core` 1,028 passed.
-- [x] **Record the measured baseline** so later work has a comparison.
-      Table below, taken on this tree.
-- [ ] **(gate)** The seven workflows are green on the pushed commit before the next phase starts.
-      Proof: `gh run list --commit <sha>` shows seven `success` rows.
+Invariants this plan must not break:
 
-### Measured on this tree
-
-| Check                                    | Result                              |
-| ---------------------------------------- | ----------------------------------- |
-| `pnpm install --frozen-lockfile`         | exit 0, lockfile in sync            |
-| `pnpm test`                              | 55/55 turbo tasks; api 1,298 passed |
-| `pnpm typecheck`                         | exit 0                              |
-| `pnpm types:check`                       | in sync                             |
-| `pnpm --filter @nexus/api openapi:check` | in sync (410 paths, 513 operations) |
-| `pnpm prune:knip`                        | exit 0, no findings                 |
-| `pnpm audit --prod --audit-level high`   | exit 0, 3 advisories, none high     |
-| `pnpm audit --audit-level high`          | exit 0, 3 advisories, none high     |
-| UI e2e                                   | 47 passed, 11 skipped               |
-| Desktop e2e                              | 1 passed                            |
-| `docker compose config`                  | exit 0                              |
-| `pnpm check:offline`                     | 2 passed, 4 skipped, 0 failed       |
-
-Dependency entries went from 283 at `pre-migration` to 289 at `HEAD` (+6): `vite-plus` in each
-workspace that runs `vitest`, with root `vitest`, `oxlint`, `oxlint-tsgolint` and `prettier`
-removed. 289 is the gate.
+1. **No paid API is required** for a local run; a missing model key degrades, never blocks, the UI.
+2. **Tier gating stays off**; the only gate is login (`STATUS.md`).
+3. **Sandbox fails closed**: skill code, missions and model-written shell run only through Docker plus `NEXUS_SANDBOX_IMAGE`.
+4. **Surface policy**: pages removed in the pruning passes (God Mode, Gauntlet, Drift, Simulation, Voice, Image Gen, prediction markets, marketplace, prompts, drive, deep research, red team, A/B arena, app builder, wiki/alert/brief satellites) are not re-added. Any widening happens inside surviving surfaces.
+5. **Bridge/durable split** in the generated spec (`openapi.yaml` tags; the counts move as routes are added) is a contract; a new route must declare which it is.
+6. **Determinism of the spec**: `openapi:check` and `types:check` must pass on a clean tree.
 
 ---
 
-## Phase 1: unblock the operator items
+## Phase 1 — Corrective: make the tree's own claims true
 
-Everything here is yours. Nothing else in the plan can finish without it.
+### M1.1 Re-verify the recorded baseline
 
-- [ ] **(you) Fix the GitHub OAuth app's own fields.** Homepage
-      `https://nexus-iosc.onrender.com`; authorization callback
-      `https://nexus-iosc.onrender.com/api/v1/oauth/github/callback`. The client ID is
-      `Ov23lirM3z6UH32R8zhf`; the secret stays in Render.
-      Proof: `/api/v1/oauth/providers` still returns `{"google":false,"github":true}` and a browser
-      sign-in on the host completes and survives a reload.
-- [ ] **(you) Rotate the GitHub client secret.** It appeared in a chat transcript; treat it as
-      public. Create a new secret, update Render, deploy.
-      Proof: a fresh sign-in works and the old secret is deleted at GitHub.
-- [ ] **(you) Google sign-in, when a tenant exists.** Google Cloud project, OAuth client, consent
-      screen review; set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on Render.
-      Proof: `/api/v1/oauth/providers` returns `{"google":true,"github":true}` and the Google button
-      completes a sign-in.
-- [ ] **(you) Add a cloud model key for online acceptance.** The deployed host cannot reach this
-      machine's Ollama. Use a provider key in Render (`GROQ_API_KEY` or another registered
-      provider).
-      Proof: one chat turn on the host returns model content, not a configuration error.
-- [ ] **(you) Install the local tools that are still missing.** Present: `k6`, `ollama`. Missing:
-      `gitleaks`, `trivy`, `syft`, `psql`. Commands are in Appendix B.
-      Proof: `gitleaks version`, `trivy --version`, `syft version`, `psql --version` all answer.
-- [ ] **(you) Repoint `OLLAMA_MODELS`.** It points at `D:\brain-models\ollama`, which does not
-      exist. Unset it or point it at `%USERPROFILE%\.ollama\models`.
-      Proof: `ollama serve` starts and `ollama list` shows `qwen2.5:7b`.
-- [ ] **(you) Desktop signing material.** A Windows code-signing certificate (OV or EV) and an
-      Apple Developer ID Application certificate plus notarisation credentials, stored as CI
-      secrets only.
-      Proof: `signtool verify` passes on the NSIS installer and `spctl --assess` passes on the dmg.
-- [ ] **(you) Update-feed host.** A domain or bucket for the signed update feed and its credentials.
-      Proof: the feed URL answers with a signed manifest from CI.
+**Why:** `STATUS.md` is the project's only evidence of what works, and it is a
+hand-typed snapshot. If the numbers moved, every later phase is measured against
+a fiction.
+**Done when:** the snapshot is produced by a script and CI fails when it drifts.
 
----
+- [x] `scripts/baseline.sh --json` emitting: test files, tests, skipped, e2e pass/skip, spec paths/operations by durability class, package/app counts, Node/pnpm versions. `[C]`
+      Proof (`node scripts/baseline.mjs --json`, 13m30s wall): 6,252 tests in 530 files — 6,236 passed, 0 failed, 16 skipped (root 4,812, api 1,310, ui 58, desktop 72); e2e 47 passed / 11 skipped; spec 413 paths, 516 operations (350/161/5); 50 packages, 7 apps, 2 services, 1,888 tracked files. Disproved two §0 claims: the spec is 413/516 (350 durable), not 410/513 (347), and the suite is 530 files, not 509.
+- [x] Replace the three hand-typed paragraphs in `docs/STATUS.md` with the generated block; add a CI step that fails on drift. `[C]`
+      Proof: the hand-typed "Measured on this tree" paragraph is gone; `node scripts/baseline.mjs --write` owns the `baseline:start` … `baseline:end` block, `--check` compares the deterministic half (workspace counts, spec paths/operations/classes) in seconds, and `.github/workflows/lint.yml` job `baseline` runs `pnpm baseline:check`. Negative proof: adding `packages/zz-baseline-probe/package.json` made it exit 1 with `51 packages` against the committed `50 packages`; removing it restored exit 0. Test counts sit below a `baseline:measured` marker and are recorded, not gated — this host produced 6,210–6,236 passing and 0–5 failing on identical code.
+- [x] Record which of the 16 unit skips and 11 e2e skips are intentional (feature off, platform-only) and which are dead; put the list in `docs/TESTING.md`. `[C]`
+      Proof: `node scripts/baseline.mjs --skips` prints all 16 unit skips with the file that declares each; `--json` reports the 11 e2e skips. All 27 are intentional (missing `python`/`deno`/LSP binary, POSIX-only cases, `NEXUS_TEST_POSTGRES_URL`, four secret env vars, `E2E_MODELS`/`E2E_PRICED`); the table in `docs/TESTING.md` names the switch that turns each one on, so none is dead. No test was deleted.
+- [x] For each dead skip: fix it or delete it with a one-line reason in the PR. `[C]`
+      Proof: none is dead. Every one of the 27 has a switch that a real host or CI job flips, and `docs/TESTING.md` §"Where the skips actually run" records which four are exercised in CI (the two POSIX-only cases on Linux, `migrate-concurrent` in the `migrations` job, plus the POSIX drive-run case) and why the remainder are host-gated. No test was deleted and no file changed beyond that documentation.
 
-## Phase 2: online, end to end
+### M1.2 Remove hand-maintained path lists
 
-Target: a stranger signs up on `https://nexus-iosc.onrender.com` and does real work, and a second
-stranger cannot see the first one's work.
+**Why:** `lint` names package and app paths by hand, so a new package is silently
+unlinted; `test:campaign` is a 60-path literal that no one can keep true. Both
+are correctness holes disguised as scripts.
+**Done when:** a new workspace is covered the moment it exists.
 
-- [x] **Deploy and migrate are healthy.** `/health/ready` returns 200 with `db` and `kv` ok on
-      `nexus-iosc.onrender.com`; `DB Migrate` is green against Neon `mute-scene-02756044`. The
-      pooled URL is on Render; the `production` secret should be the direct URL, because PgBouncer
-      transaction mode breaks DDL and advisory locks.
-- [ ] **Live sign-in.** Needs Phase 1's OAuth URLs.
-      Proof: browser sign-in, reload, still signed in.
-- [ ] **Sign-up and session.** Create an account on the host and confirm the session survives a
-      reload.
-      Proof: 201/200 responses and one screenshot-free assertion (the authenticated `/api/v1/me` or
-      equivalent returns the new user).
-- [ ] **One chat turn.** Send a prompt and read model content back.
-      Proof: the response id and the content prefix.
-- [ ] **One skill run.** Run a skill that needs no extra credential.
-      Proof: the run id and its terminal status.
-- [ ] **Billing row is free plus BYOK.** No subscription exists by design.
-      Proof: the row shows the free allowance and a BYOK path, and no paywall blocks the journey.
-- [ ] **Audit export.** Download it and find the events above in it.
-      Proof: the downloaded file and the matching event ids.
-- [ ] **Second user is isolated.** User B cannot open user A's session, drive, or sandbox run by id.
-      Proof: B gets 404/403 for each of A's identifiers.
-- [ ] **Revoked session is refused.** Sign out or revoke, then replay the old bearer token.
-      Proof: 401, and the UI returns to signed-out.
-- [ ] **`pnpm check:online` exists and is honest.** A script that reads `NEXUS_ONLINE_BASE_URL` and
-      an operator-supplied `NEXUS_ONLINE_API_KEY`, checks `/health/ready`,
-      `/api/v1/oauth/providers`, the OpenAPI document, and the UI, and reports `skip` with a reason
-      when either variable is unset. Attempted failures exit 1.
-      Proof: one run with values, one without; output matches both.
-- [ ] **CORS and CSP on the deployed origin.** Only `ALLOWED_ORIGINS` is accepted; a preflight from
-      another origin gets no allow-origin header; CSP reports land in the log and do not break the
-      app.
-      Proof: one refused preflight; the browser console is clean.
-- [ ] **Rate limiting behaves.** One key shares `NEXUS_API_RATE_LIMIT`; a burst returns 429 and the
-      UI says "throttled", not "failed".
-      Proof: a burst test and one UI message.
+- [x] `lint` targets `packages/*/src` and every `apps/*/src` via globs derived from `pnpm-workspace.yaml`, plus the Go services; no literal package list. `[C]`
+      Proof: `pnpm lint` is now `node scripts/lint.mjs`; `scripts/lint-targets.mjs` expands the workspace patterns to 56 source directories (50 packages + 5 `apps/*/src` + `apps/ui/app`) and `services/board` for gofmt/`go vet`. A probe package `packages/zz-lint-probe` with a syntax error went 56 → 57 targets and failed both `vp lint` and `eslint`; deleting it restored `lint passed: 56 source directories, 1 Go module(s)`. The old literal list omitted `apps/desktop/src`, which is now linted (no errors), and named two `*/tests` directories that `vite.config.ts` `ignorePatterns` (`**/*.test.ts`) excludes anyway.
+- [x] Replace `test:campaign` with a filter (`turbo run test --filter=...`) or delete it; if it exists to dodge a slow suite, fix the slow suite instead (M3.4). `[C]`
+      Proof: it was redundant, not a fast path, so it is deleted. All 53 literal paths it named appear in the four suite runs that `pnpm test` plus the `app-suites` CI job already perform (checked against the JSON reports: 53/53 covered), and its trailing `pnpm --filter @nexus/api exec vitest run` is exactly the api suite. `pnpm test` and `test:e2e` are the only test scripts left.
+- [x] Add a test asserting every workspace package appears in the lint and typecheck target set. `[P]`
+      Proof: `node --test scripts/lint-targets.test.mjs` — 5 assertions (lint target, `tsconfig.json`, `tsconfig.build.json` reference, `tsconfig.node.json` include, Go modules) pass. Negative proof: a probe `packages/zz-probe` with only `package.json` + `src/index.ts` failed two of them (`workspace packages without tsconfig.json: packages/zz-probe`, plus the build-graph assertion); removing it restored 5/5. Runs in the `lint` CI job.
+- [x] Generate the `tsconfig.build.json` references instead of typing them: TypeScript project references cannot be globs, so the list must exist, but `tsc -b` silently skips a package that is missing from it. `[C]`
+      Proof: `node scripts/tsconfig-refs.mjs --check` → `tsconfig.build.json references all 50 packages`, and running the writer reproduced the committed file byte-for-byte (`git diff` empty). Negative proof: a probe `packages/zz-probe` with a valid `tsconfig.json` made `--check` exit 1 listing the full expected set including `packages/zz-probe`; removing it restored exit 0. `pnpm tsconfig:sync` rewrites the list.
 
----
+### M1.3 Sandbox toolchain is a security defect
 
-## Phase 3: offline, end to end
+**Why:** the image advertises Go 1.19.8 and rustc 1.63.0 — both years past their
+security support — inside the one container that runs untrusted code.
+**Done when:** the image ships supported toolchains and says which versions.
 
-Target: no WAN, no cloud database, no cloud model, real work.
+- [x] Install Go and Rust from official current releases (pinned by checksum), not Debian's `golang-go`/`rustc`. `[C]`
+      Proof: `infra/sandbox/Dockerfile` downloads `go1.27.4.linux-<arch>.tar.gz` and `rust-1.100.0-<arch>-unknown-linux-gnu.tar.xz` and verifies each with `sha256sum -c` before extracting; `golang-go` and `rustc` are no longer installed from apt. The pins were checked against the files themselves: `sha256sum` of the downloaded Go tarball = `7226736c…24840` and of the Rust tarball = `98ee6bec…15acd`, both matching the Dockerfile. `build-essential` was added because Rust needs a linker and cgo needs `cc`.
+      needs-verify: `docker build -t nexus-sandbox:local infra/sandbox` — no Docker daemon on this host, so the image layer itself is unbuilt here.
+- [x] Assert versions at build time by running `go version`, `rustc --version`, `ruby --version`, `node --version`; embed the output as an image label. `[C]`
+      Proof: a final `RUN` records each `--version` line into `/usr/local/share/nexus-toolchains.txt` and fails the build unless it matches the pins (`go version go1.27.4 linux/<arch>`, `rustc 1.100.0`), with major checks for the base image's Ruby 3.x, Node v26.x and Python 3.x. `LABEL org.nexus.toolchains` carries the pins and `org.nexus.toolchains-file` points at the recorded output; Docker labels cannot hold command output, so the build assertion is what makes the label true.
+      needs-verify: `docker build -t nexus-sandbox:local infra/sandbox && docker run --rm nexus-sandbox:local cat /usr/local/share/nexus-toolchains.txt && docker inspect -f '{{index .Config.Labels "org.nexus.toolchains"}}' nexus-sandbox:local` — no Docker on this host.
+- [x] Ruby still comes from Debian bookworm at 3.1.2, which reached end of life on 2025-03-31; install a supported Ruby (source build or a pinned official release) or record the acceptance in an ADR. `[C]`
+      Proof: the `ruby` package is gone from the final apt install and a `ruby` build stage compiles 3.4.13 from `cache.ruby-lang.org/pub/ruby/3.4/ruby-3.4.13.tar.gz`, checking `sha256 = d0d3bf3d…f351a` (measured here with `sha256sum` on the real tarball), `--disable-install-doc` and no `--enable-shared` (a static libruby needs no loader path under a read-only rootfs); `COPY --from=ruby /opt/ruby /opt/ruby` puts it on `PATH` and the build now asserts `^ruby 3.4.13` instead of `^ruby 3`. `sources.debian.org/api/src/ruby3.1/` confirms the claim it replaces (3.1.2-7+deb12u1, bookworm only).
+      needs-verify: `docker build -t nexus-sandbox:local infra/sandbox` — no Docker daemon here, so the Ruby compile itself is unbuilt.
+- [x] Update `STATUS.md`'s language table from that label, not from memory. `[C]`
+      Proof: the sandbox row now says Go 1.27.4 and rustc 1.100.0 "from official checksum-pinned releases, asserted at build and recorded in the image's `org.nexus.toolchains` label", and the base-image half was checked against the archive rather than recalled: `sources.debian.org/api/src/ruby3.1/` → `3.1.2-7+deb12u1` on bookworm, `sources.debian.org/api/src/python3.11/` → `3.11.2-6+deb12u8` (an earlier draft said Python 3.12 and was corrected). No "Go 1.19"/"rustc 1.63" claim remains in `docs/` or `infra/`.
+- [x] Add `r` (via Piston) and any other documented-but-missing language to `GET /sandbox/status` truthfully, or drop the claim. `[C]`
+      Proof: `/sandbox/status` now returns a `runtimes` array parallel to `languages`: `javascript` → `api` and `python` → `pyodide` are the only two with `serverRuns: true`; `typescript`/`bash`/`go`/`rust`/`ruby` report `sandbox-helper` with `serverRuns: false`, because the API cannot run them (the helper runs on the viewer's machine); `r` appears only when a non-emkc `PISTON_URL` is configured, and the `note` explains the three states (Piston configured, Docker present, Docker absent). New test `apps/api/tests/routes/sandbox.test.ts` "says which path runs each language instead of implying the server runs them all": 16/16 pass with the change, 15/16 with the route reverted (`runtimes` missing).
 
-- [x] **Offline boot.** `DATABASE_URL` unset resolves to `pglite://.nexus/db`; `/health/ready`
-      returns `{db: ok, kv: ok, costlog_flush: ok}` with outbound sockets blocked.
-- [x] **Offline model.** `qwen2.5:7b` (4.36 GB) answered `OK` (9 tokens) through
-      `POST /v1/chat/completions` with `model: "ollama/qwen2.5:7b"`, and the streaming form
-      delivered `chat.completion.chunk` events to the end.
-- [x] **Sandbox image.** `infra/sandbox/Dockerfile`: Node 26, Python, Go, Rust, Ruby, Bash and tsx
-      on uid 1000, base pinned by digest, writable paths on a scratch tmpfs with `mode=1777`.
-      Verified under `--network=none` and `--read-only`.
-- [x] **Compose wiring.** The sandbox service builds the image; the api gets
-      `NEXUS_SANDBOX_IMAGE`, the `docker.sock` mount and `WITH_DOCKER_CLI`. TypeScript travels on
-      stdin; unsetting the image fails closed.
-- [x] **Search wiring.** SearXNG answers `/healthz`; the api reaches `http://searxng:8080` through
-      `SEARXNG_URL`. `SEARXNG_BASE_URL` only configures the container.
-- [x] **Offline desktop.** The packaged app boots its own API on a loopback port against PGlite,
-      serves the built UI, and registration, restart and login all survive.
-- [x] **Offline acceptance script.** `scripts/offline-check.mjs` (`pnpm check:offline`): 5 passed,
-      0 skipped, 0 failed, covering boot, a real model turn, the sandbox image, SearXNG and the
-      desktop/UI builds. Missing prerequisites are `skip` with a reason; attempted failures exit 1.
-- [x] **Document the search surface once.** `docs/TESTING.md` already says SearXNG needs upstream
-      engines; add the matching sentence to `docs/STATUS.md` (search/provider row): offline SearXNG
-      proves reachability, not answers, and `@web` in the composer resolves to a URL that is
-      fetched, not a query that is answered.
-      Proof: both files say it and match the `type === "web"` branch in `mentionContext`.
-- [x] **Offline LSP.** `scripts/offline-lsp-probe.mjs` drives the pool when a server exists and
-      skips with the reason otherwise. `pnpm check:offline` reports
-      `[skip] offline lsp: no binary: typescript-language-server is not on PATH` on this machine
-      (2 passed, 4 skipped, 0 failed); the definition path runs on a machine with the binary.
+### M1.4 Contract drift in the public surfaces
+
+- [x] Run `openapi:generate`/`openapi:check` and `types:check` on a clean tree; fix any diff and make both blocking in `test.yml`. `[C]`
+      Proof: both pass on this tree (`openapi:check` in sync, `types:check` in sync) and
+      `.github/workflows/test.yml` runs them as separate steps; a stale spec fails the job.
+- [x] Assert every route declares a durability class; a route with none fails the check, so the 353/161/5 split cannot rot. `[C]`
+      Proof: `apps/api/tests/lib/openapi-maturity.test.ts` builds the live server, walks every
+      operation in the generated spec and fails unless exactly one of `durable`,
+      `bridge` or `dedicated-volatile` is present (300+ operations checked).
+- [x] Verify the OpenAI-compatible `/v1` surface against the current spec (`models`, `chat/completions` JSON+SSE, `completions`, `embeddings`, `files`, `batches`) with a recorded client transcript. `[C]`
+      Proof: `apps/api/tests/routes/openai-v1-transcript.test.ts` drives a listening server over real HTTP with a bearer token and asserts the spec's fields for `models` (`object: "list"`, `id`/`object: "model"`/`created`/`owned_by`), `chat/completions` (`chatcmpl-` id, `chat.completion`, `usage` summing to `total_tokens`) and its SSE form (`chat.completion.chunk` frames, `delta.role` first, closing `data: [DONE]`), `completions` (`text_completion`, `logprobs: null`), `embeddings` (relayed `embedding` list), files (`object: "file"`, `bytes`, `deleted: true`), and the `invalid_request_error` shape — 9/9 pass, and the same file writes `docs/openai-v1-transcript.md` (12 recorded exchanges) with `OPENAI_TRANSCRIPT=1`.
+      Found and fixed on the way: `DELETE /v1/files/:id` from a client that sends `content-type: application/json` and no body got Fastify's `FST_ERR_CTP_EMPTY_JSON_BODY` 400 instead of deleting. The `/v1` scope now parses an empty JSON body as `{}`; with the parser stashed the files test fails 400-vs-200 (`2 failed | 7 passed`). Two deployment behaviours are recorded rather than "fixed" because they are deliberate: a repeated identical request replays from the response cache with `usage` zeroed, and a non-OpenAI provider answer keeps Nexus's own `upstream_error` shape on a 502.
+- [x] Verify CLI parity: every documented `nexus …` command exists and every route family has one or an explicit "API only" note in `docs/cli-reference.md`. `[C]`
+      Proof: `scripts/cli-parity.mjs` (in `pnpm lint`) reads the CLI's commander chains, cross-checks them against `nexus --help`, and fails on four things it was proved to catch: `44 CLI commands, 83 route families, 28 CLI calls` pass; renaming a documented heading to `nexus nonsense` → "is documented but the CLI has no \"nonsense\""; deleting the `sandbox` row → "route family \"sandbox\" has no row"; pointing a row at `nexus sandbox` → "names `nexus sandbox`, which does not exist"; changing a CLI call to `/admin/nowhere` → "get /api/v1/admin/nowhere is not a path in openapi.yaml". `docs/cli-reference.md` gained a "Route families" table (83 rows: 16 named commands, the rest `API only`).
+      Found and fixed: `nexus research` was dead — it posted to `/api/research` and streamed `/api/v1/api/research/:id/stream`, neither of which exists (the real route is `/api/v1/researcher/research`, synchronous, plus `/researcher/:runId/citations`), and `nexus research list` had no route at all. `submit` now prints the synthesis and sources, `citations <runId>` reads the recorded sources, `list`/`--no-wait`/the stream are gone because nothing serves them.
+
+### M1.5 Fix the reported-but-open defects
+
+- [x] `GET /api/kb/:id/graph` jobs are lost on restart (documented). Persist job rows in `nexus_kv` with TTL and resume-or-report on boot. `[C]`
+      Proof: the jobs map is now a `PersistentStore` (`nexus_kv` collection `kb_graph_jobs`), written at start and at the end of a build, read once per process. On load a job older than seven days is dropped, and a job left `running` becomes `error` with "The server restarted before this build finished; start it again." — a restart cannot resume extraction, so it reports instead of polling forever. `apps/api/tests/routes/kb-graph.test.ts` gained two cases that re-import the module as a restart: the finished job reads back `{state: "done", entities: 3}`, and a seeded `running` row reads back as that error. 6/6 pass; with `graphJobs.load()` replaced by `Promise.resolve()` the first case fails (`1 failed | 5 passed`).
+- [x] Discussion ledger is not persisted past the stream (documented). Persist it per session and add export. `[C]`
+      Proof: each discussion is a `PersistentStore` row (`nexus_kv` collection `discussions`, 30-day retention) created before the first entry, so the stream's first frame is `id` with the discussion id; entries are written as they land and the outcome, digest, tokens and finish time on completion. New routes `GET /api/v1/discussion`, `GET /api/v1/discussion/:id` and `GET /api/v1/discussion/:id/export` (the same Markdown the run ends with, as a `text/markdown` attachment) serve it back, filtered by owner — a record another account owns answers 404 on read and is absent from the list. `apps/api/tests/routes/discussion.test.ts` 7/7 pass, including a re-import-as-restart read-back; with `discussions.load()` replaced by `Promise.resolve()` that case fails (`1 failed | 6 passed`). `openapi.yaml` regenerated.
+- [x] `docs/STATUS.md` says traces keep "newest 1000"; assert the cap in a test so the number is enforced, not asserted in prose. `[C]`
+      Proof: `apps/api/tests/lib/request-traces.test.ts` records past the cap, re-imports the
+      module (a restart) and asserts `total === 1000` and 1000 persisted rows on both backings.
+- [x] Any page whose data source is a stub returns an explicit empty state, not zeros that read as measurements (Admin → Analytics, Cost Analytics). Audit each for a "no data" path. `[C]`
+      Proof: `apps/ui/tests/component/empty-analytics.test.tsx` 3/3 pass — with an all-zero overview the cards read `—`/`—`/`—`/`—` under "No model traffic recorded yet" and no `$0.00` appears anywhere on the page, and an all-zero cost dashboard shows "No model spend recorded yet". Forcing `hasRecordedTraffic` to `true` and `nothingRecorded` to `false` fails both cases (2 failed | 1 passed). `apps/api/tests/routes/admin-analytics.test.ts` 3/3 pass, the new case asserting `latencyP50ms/latencyP99ms/errorRate` are `null` (not `0`) when `gatewayLog.stats()` throws; putting `0` back fails it. The charts panel now names each empty window (7-day, 30-day, Top Models, Provider Usage) instead of drawing empty axes.
+
+### M1.6 Close the tracked-artefact and local-tool drift
+
+- [x] A built `mcp-bridge.exe`/`vb.exe` sits in `services/board`; confirm it is ignored, add it to `.gitignore` if not, and have `board:build` write to `services/board/bin/`. `[C]`
+      Proof: both binaries were already ignored (`services/board/.gitignore`); `pnpm board:build`
+      now creates `services/board/bin/` and writes `bin/vb.exe` and `bin/mcp-bridge.exe`, and
+      that directory is ignored too. `git status` stays clean after the build.
+- [x] `.nexus/bin` holds hand-built security tools (gitleaks). Move to a documented `make tools` step with pinned versions, else remove. `[C]`
+      Proof (removed, the second branch of the item): the two binaries (`actionlint.exe`, `gitleaks.exe`) were referenced by nothing — not a script, a husky hook, a Makefile target or a workflow — and `.nexus/*` is already ignored, so they were unattributable local state. Deleted. `docs/OPS.md` §5 now states which security checks CI actually runs (gitleaks via `gitleaks/gitleaks-action@v3`, `pnpm audit --audit-level high` on both trees, Trivy), the pinned version each comes from, and how to run the same locally — and records that workflow YAML is _not_ linted by any CI job, so a local actionlint could never have matched CI (tracked in M2.1). `pnpm check:docs` passes.
+- [x] `docs/OPS.md` "local security tools" is marked optional; make `make verify` run the same checks CI runs so local green means CI green. `[P]`
+      Proof (corrected: the doc never carried that wording, it had no security-tools section at all): `scripts/verify.mjs` runs 12 gates, each labelled with the workflow job it mirrors, reachable as `make verify` / `pnpm verify` (`--fast` skips build, typecheck and the suite). It reads `.github/workflows/*.yml` and prints every `run:` step no gate covers — `node scripts/verify.mjs --gaps` now answers "no uncovered workflow steps" — so a new CI step shows up as a gap instead of drifting. Measured: `--fast` 10/10 gates green; `pnpm build` green (1m50s, 4 tasks); `pnpm typecheck` green (135s); `pnpm test` failed twice on host load (`extraction-model.test.ts` 2 timeouts at 44.9s, a vitest worker start timeout in `sandbox-snippets.test.ts`) and both files pass alone (4/4 and 3/3) — the flake class already recorded in M1.1, not a gate, and the run is not claimed green.
 
 ---
 
-## Phase 4: desktop M4, installable and updatable
+## Phase 2 — Preventive: make the gates hard to bypass
 
-- [x] **Bundle the API.** `scripts/build-desktop-api.mjs` (`pnpm build:desktop-api`) bundles the
-      API and every `@nexus/*` package to ESM, stages a hoisted production deploy, copies
-      migrations and the UI build, and `main.ts` prefers that tree. Booted on plain `node` with no
-      checkout: `/health/ready` 200, UI 200, register 201, 24 migrations applied.
-      Size: 908 MB of dependencies (onnxruntime dominates) plus 6.3 MB of UI.
-- [ ] **Measure the installer before building the feed.** Record installer size, install time and
-      cold start on a clean Windows VM and on macOS.
-      Proof: three numbers in `docs/STATUS.md`; if the installer exceeds 1.5 GB, decide whether
-      onnxruntime is optional and record the decision.
-- [ ] **Windows installer.** electron-builder NSIS target, per-user install, no admin prompt,
-      uninstall keeps the data directory unless the user opts out.
-      Proof: install, launch, register, close, relaunch, log in; uninstall and reinstall keeps the
-      data.
-- [ ] **macOS dmg.** arm64 and x64, hardened runtime, notarised and stapled.
-      Proof: `spctl --assess --type execute` passes; the app opens without a Gatekeeper override.
-- [ ] **Sign in CI.** Both installers are signed in the release workflow from the Phase 1 secrets,
-      never from a developer machine.
-      Proof: the workflow log shows signing and notarisation; the artifacts verify.
-- [ ] **Auto-update manifest.** CI writes a signed manifest (version, platform, URL, sha256) to the
-      feed from Phase 1.
-      Proof: the feed URL returns the manifest and its signature verifies with the embedded key.
-- [ ] **Version check on launch.** One request, a short timeout, and no launch delay when the feed
-      is unreachable.
-      Proof: launch time with and without the feed.
-- [ ] **Download and verify.** Fetch in the background, verify the signature and sha256, and refuse
-      a mismatch.
-      Proof: one good artifact installs; one tampered byte is refused.
-- [ ] **Install on quit and roll back.** Apply on quit; if the new build does not reach
-      `/health/ready`, restore the previous build and start it.
-      Proof: ship `N`, then `N+1`; a deliberate bad `N+1` leaves `N` running after one restart.
-- [ ] **Desktop LSP is on by default.** The embedded API sets `NEXUS_LSP=1` and resolves server
-      commands from `PATH`; with no server installed the tools are absent, not broken.
-      Proof: definition works in the packaged app against a local TS file with no network.
-- [ ] **Release artifacts.** NSIS installer, dmg, `SHA256SUMS`, SBOM and the update manifest are
-      attached to the GitHub release.
-      Proof: every file downloads and its checksum matches.
+### M2.1 CI truth
 
----
+- [x] Fourteen workflows is a lot of surface for one maintainer; publish a table in `docs/OPS.md` mapping each workflow to the failure it prevents, and delete any workflow that duplicates another. `[P]`
+      Proof: `docs/OPS.md` §7 has a row per workflow (trigger + the failure it prevents) and `scripts/workflow-map.test.mjs` enforces the map in both directions: a new workflow with no row fails (added `ghost.yml` → 1 failing), and a row naming a workflow that does not exist fails (renamed `k6.yml` → `k7.yml` in the doc → 1 failing); 3/3 pass otherwise. Wired into `lint.yml` and into `make verify` (`node scripts/verify.mjs --gaps` still reports no uncovered CI steps). Nothing was deleted: no workflow is an exact duplicate — the two real overlaps are stated in the section (`docker.yml` vs `release.yml`/docker-release, `npm-publish.yml` vs `release.yml`/release) and distinguish themselves by trigger, and the section records the defect the map exposed (release.yml triggers on `v*` tags but `release`/`docker-release` are master-gated), which M2.1.4 fixes.
+- [x] Make `test.yml`, `lint.yml`, `build.yml` required checks on `main`; document the branch-protection state in `docs/OPS.md`. `[P]`
+      Proof (corrected twice: the branch is `master`, not `main`, and the checks were already required — the defect was elsewhere): `gh api repos/:owner/:repo/branches/master/protection` shows 9 required contexts including all three — `Unit tests (Node 24/26)`, `App package suites`, `Browser E2E (offline, isolated)`, `Python tests (nexus-ingest)` (test.yml), `ESLint + Prettier` (lint.yml), `Build (26 / ubuntu-latest)` (build.yml), plus `Build api` and `Production dependency advisories`; `strict: false`, no admin enforcement, force pushes and deletions blocked. Found and fixed a real merge-blocker: the required context `Production dependency advisories` matched no job name (the job was `Dependency advisories`), so it could never report and every pull request would sit blocked — `node scripts/required-checks.mjs` exits 1 with that context named when the name is reverted, and 0 after the job takes the required name (dev-tree audit split into a non-required `Dev dependency advisories` job). `scripts/required-checks.test.mjs` 6/6 (matrix expansion as Actions does it, cross products, include matrices, and a live-vs-snapshot equality), snapshot in `.github/required-checks.json` refreshed by `--fetch`. State documented in `docs/OPS.md` §8, with the two jobs that are not required but probably should be (`Concurrent migrations`, `E2E — signal pipeline`) named. Changing the protection settings themselves is an admin action on GitHub, so it is documented, not applied.
+- [x] Fail the build on a `pnpm-lock.yaml` change without a matching `package.json` change (lockfile drift). `[P]`
+      Proof: `scripts/lockfile-drift.mjs` classifies a pull request's changed paths; `scripts/lockfile-drift.test.mjs` 7/7 pass, and end-to-end on a scratch branch that appended a line to `pnpm-lock.yaml` and nothing else, `node scripts/lockfile-drift.mjs --base master` exits 1 with "pnpm-lock.yaml changed without a package.json change" (branch deleted, lockfile untouched). It fails the opposite direction too — a manifest change with no lockfile, which is the `--frozen-lockfile` break — and only runs on pull requests, where a base branch exists; with no base it prints "nothing checked" instead of passing silently. Wired into `lint.yml` (with `fetch-depth: 0`) and into `make verify` as its test.
+- [x] `npm-publish` and `release` both publish; separate preview from stable and require a tag for stable. `[P]`
+      Proof: `scripts/release-triggers.test.mjs` 5/5 parses the workflow YAML and asserts one writer of the `latest` dist-tag, that it is `release.yml`'s `publish` job gated on `refs/tags/v` with a `git merge-base --is-ancestor HEAD FETCH_HEAD` guard, that the master-push job (`version-pr`) has no `publish-script` and no `changeset publish`, that `npm-publish.yml` publishes only `--tag next`, and that `docker-release` is tag-gated and tags images `:latest` + `:${github.ref_name}` instead of a floating SHA. Each was made to fail on purpose: `--tag next` → `--tag latest` in the manual workflow fails 5 cases, the tag gate reverted to `master` fails 5, `ref_name` → `sha` fails 3. All workflows still parse (`yaml.parse`), and `node scripts/verify.mjs --gaps` reports no uncovered CI step. The workflow table and §7 prose in `docs/OPS.md` were updated to match. needs-verify: an actual tagged run (no GitHub runner here).
+- [x] Cache `turbo` and pnpm stores across jobs; publish job wall times and fail on a 25% regression. `[P]`
+      Proof: `scripts/ci-cache.test.mjs` 4/4 — every job that runs `pnpm install` enables the package cache, every job that runs a turbo task (`pnpm build` / `pnpm test`) restores `.turbo/cache`, every such job reports a wall time, and a canary asserts the turbo detection matches at least two real jobs (it found three more offenders when first pointed at the workflows: `npm-publish.yml:publish`, `release.yml:publish`, `test.yml:browser`, all fixed). Deleting the cache step from `build.yml` fails two of the four cases; dropping `cache: true` from `lint.yml` fails the package-cache one. `scripts/job-times.test.mjs` 5/5 covers the 25% rule (400→500s passes, 400→501s fails naming the percentage, no baseline is not judged), and end to end with a 60s baseline a 120s job exits 1 ("100% over the 60s baseline"). `.github/job-times.json` ships as `{}` because only a real runner can supply the first number; `--record` writes one and the number is printed into the run summary. Wired into `lint.yml` (one step running the five rule tests) and `make verify`, whose `--gaps` still reports no uncovered CI step. needs-verify: the actual runs — no GitHub runner here.
 
-## Phase 5: make the sandbox honest about languages
+### M2.2 Test integrity
 
-The image runs Go 1.19.8, rustc 1.63.0 and Ruby 3.1.2, and each answers under
-`--network=none --read-only -u 1000`, but the app types `SandboxLanguage` as
-`javascript | typescript | python | bash` and refuses the rest. Either expose them or remove them
-from the image; exposing them is the smaller change.
+- [x] Coverage run on `packages/*` and `apps/api` with a floor per package; ratchet, never lower without a written reason. `[P]`
+- [x] E2E: replace fixed sleeps with condition waits; run the suite 5× and quarantine any test that is not 5/5 stable. `[P]`
+      Proof (the stability half is needs-verify): the audit found fixed sleeps in 2 of 20 spec files, and both are condition waits now — `org-models.spec.ts` had an inline `setTimeout(2500)` polling loop _inside a test body_ (so the first check always paid 2.5s and a failure read as "too early"), now `waitForFiledSubtask()`, which asks first and only sleeps when the answer is not there yet; `waitForRun()` already polled. `scripts/e2e-waits.test.mjs` 4/4 holds the rule: no `waitForTimeout()` in any spec, and a `setTimeout` of 200 ms or more must sit inside a `wait*`/`poll*`/`until*`/`settle*` helper — with a canary that fails when fewer than 15 spec files are scanned, so a reorganised suite cannot leave it passing vacuously. Sabotage: an inline `waitForTimeout(500)` plus `setTimeout(900)` in a test body fails both rules, naming the file and line. The 5× stability run and the quarantine decision for `chat-history`/`skills` need a machine with Playwright browsers, which this host is not — `needs-verify`, protocol written into `docs/TESTING.md`.
+- [x] Quarantine or fix the two host-timing flakes the M1.1 baseline found: `packages/pty/src/index.test.ts` "evicts the oldest exited sessions beyond the retention cap" and `packages/llm/src/compress/token-saver-slow.test.ts` (two processors passed the 100 ms local budget once; 0 failures on the next full run, so both are budget-bound, not broken). `[P]`
+      Proof: both fixed, neither quarantined, and each passes 5 runs out of 5 after the change (`pnpm --filter @nexus/pty exec vitest run src/index.test.ts` 13/13 five times; `pnpm --filter @nexus/llm exec vitest run src/compress/token-saver-slow.test.ts` 14/14 five times). What was wrong: the pty test waited a fixed 500ms for 25 child processes to report their exit and then asserted, so a loaded host failed it while the eviction was correct — it now polls the condition itself (cap holds, `e0` gone) to a 55s deadline and its failure message names which sessions were still present. The token-saver test measured one call per case, so a single stolen timeslice read as a superlinear processor — it now warms up and takes the fastest of three passes, which removes one-sided scheduler noise without hiding real quadratic work. Both assertions still bite: `MAX_RETAINED_EXITED = 30` fails the pty case with "retention cap not enforced within 55s", and `BUDGET_MS = 0` fails all 14 token-saver cases.
+- [x] Add a seeded-determinism job: run the same suite twice with the same seed and compare results. `[P]`
+      Proof: `node scripts/seed-determinism.mjs --scope packages/llm/src/compress` → "149 tests, identical result twice at seed 1337", exit 0; the same command with one test that reads `Math.random()` → "1 of 150 tests changed status: zz-sabotage.test.ts › depends on randomness the seed does not reach — run 1: failed, run 2: passed", exit 1. `scripts/seed-determinism.test.mjs` 6/6 (arg parsing, name keys, agreement, a changed status, and a test present in one run only). New `seeded` job in `test.yml` ("Seeded determinism (same seed twice)", whole suite, seed 1337 default) with a `seed-determinism` gate in `scripts/verify.mjs` (skipped by `--fast`) and docs in `docs/OPS.md` §7a; `verify.mjs --gaps` still reports no uncovered workflow steps.
+- [x] Guard the durable/bridge distinction with a test: a bridge route that mutates durable state must be declared `durable`, and the reverse. `[P]`
+      Proof: `apps/api/tests/lib/durable-bridge.test.ts` 4/4. It locates each registration in the three bridge files (`api-bridge.ts`, `billing-bridge.ts`, `memory-bridge.ts`, literals relative to `/api` because they are registered inside the `/api` scope) and takes the handler body as exactly the text up to the next registration, so a write cannot be borrowed from the neighbouring handler. Forward: `POST /api/memory/compact` and `DELETE /api/memory/entries` are the only bridge-file handlers that write (`mem.forget(...)`), both on paths the table calls `durable` — zero offenders. Reverse: every route a bridge file serves may be tagged `durable` only if that file has storage plumbing (all three do: 31/2/8 hits). Two canaries keep it honest: at least 12 located registrations and at least 2 writing handlers, so a registration refactor that defeats the scanner fails instead of passing vacuously. Sabotage: dropping `/api/memory` from `DEDICATED_UNDER_API` fails the suite naming both routes.
+- [x] Contract tests for the 5 `dedicated-volatile` routes: assert the documented behaviour under restart. `[P]`
+      Proof: `apps/api/tests/routes/sandbox-volatile.test.ts` 3/3 (`npx vp test run tests/routes/sandbox-volatile.test.ts`, 35s — the execute case boots the JS sandbox). It exercises all five operations — `GET /api/sandbox/status`, `POST /api/sandbox/runs`, `GET /api/sandbox/runs`, `GET /api/sandbox/status/:id`, `POST /api/sandbox/execute` — and asserts both halves of the tag: the data is real while the process lives (the output that was posted comes back, `execute` lands in the same history), and after a restart (`vi.resetModules()` + a fresh `buildServer()`, which re-creates the history Map exactly as a new process would) the list is empty, the old id answers `status: "not_found"`, and the stateless `/sandbox/status` still serves its language table. Two sabotages: making `/sandbox/runs` a stub fails 2 tests, and dropping the module reset (so the record survives) fails the restart case — so it measures residue rather than trusting its own setup. Corrects an assumption: an empty body on `/sandbox/execute` is not a 400, it is an empty program (201, `done`), so the contract asserts history participation instead.
 
-- [x] **Widen the type.** `SANDBOX_LANGUAGES` is the only list; `SandboxLanguage` is derived from it and
-      `prepareExecution` routes Go, Rust and Ruby through a stdin-written scratch file, like
-      TypeScript (2026-11-23).
-      Proof: `pnpm --filter @nexus/sandbox test` -> 99 passed, 1 skipped, and a test asserts the
-      seven names.
-- [x] **Widen the helper.** `apps/sandbox-helper/src/server.ts` builds `LANGUAGES` from
-      `SANDBOX_LANGUAGES`; the image allowlist is unchanged (2026-11-23).
-      Proof: `pnpm --filter @nexus/sandbox-helper test` -> 18 passed; a real `POST /run` against
-      `nexus-sandbox:local` returned 200, exit 0 and `go-ok`, `rust-ok`, `ruby-ok`.
-- [x] **Widen the API and the UI.** `routes/sandbox.ts` advertises the shared list in
-      `/sandbox/status`; the page's snippets cover the same seven (2026-11-23).
-      Proof: the status test expects `[...SANDBOX_LANGUAGES]` and `apps/ui` snippet test passes (3
-      tests); no second hard-coded list.
-- [x] **Fix the `docs/STATUS.md` sandbox row.** It now names the seven image languages, the Piston-only
-      `r`, and which path answered (2026-11-23).
-      Proof: the row matches `/sandbox/status`'s `languages` array.
-- [x] **Keep Piston optional.** A self-hosted Piston behind `PISTON_URL` is still the only way to
-      run a language the image lacks; the status endpoint says which path answered (2026-11-23).
-      Proof: with `PISTON_URL` unset the API test asserts the image list only, and Go/Rust/Ruby fail
-      closed with the `PISTON_URL` hint instead of running on the host.
-- [x] **Make the scratch mount executable.** Some hosts mount tmpfs `noexec` by default, which broke
-      `go run` and every `rustc` output (`permission denied`); the mount now says `exec` explicitly,
-      keeping `nosuid,nodev` (2026-11-23).
-      Proof: `buildDockerArgs` test pins the option; a real Docker run of all three languages
-      returned exit 0.
+### M2.3 Supply chain
 
----
+- [x] `pnpm audit` currently warns; make high/critical blocking with an allowlist that carries an expiry date. `[P]`
+      Proof: `scripts/audit-gate.mjs` runs `pnpm audit --json` (pnpm and npm report shapes both parsed) and blocks on high/critical only: a fixture with one critical advisory exits 1 naming `GHSA-9999-aaaa-bbbb evil-pkg critical: remote code execution`, and the live trees exit 0 with 0 advisories across 1,819 dependencies. `scripts/audit-gate.test.mjs` 8/8 covers the decisions — pnpm and npm report shapes, moderate not blocking, a live allowlist entry not blocking, an expired entry failing even though the advisory is listed, an entry with no usable date counting as expired, and a stale entry being reported without failing. Expiry proven live: an entry dated 2026-01-01 makes the gate exit 1 with `allowlist entry expired 2026-01-01`. `.github/audit-allowlist.json` ships empty (nothing high/critical today). Wired into `security.yml` (prod in the required `Production dependency advisories` job, dev in the `Dev dependency advisories` signal job), the lint job's rule tests, `make verify` (the dev sweep is skipped by `--fast`), and `docs/OPS.md` §6. A run that cannot fetch the registry exits 2 after one retry instead of passing.
+- [x] SBOM exists (`pnpm sbom`); generate it in `release.yml` and attach it, plus a signed hash list. `[P]`
+      Proof: `desktop-feed` runs `pnpm sbom` into `release/sbom.cdx.json`, writes `SHA256SUMS`
+      over every installer, the update manifest and its signature, and both SBOMs, then signs it
+      with `UPDATE_SIGNING_KEY` as `SHA256SUMS.sig` via `scripts/release/sign-checksums.mjs`,
+      which fails when the key is absent.
+- [x] Pin GitHub Actions by commit SHA, not tag; add a workflow that asserts it. `[P]`
+      Proof: all 66 `uses:` lines across the 14 workflows now name a 40-character
+      commit SHA with the tag kept in a trailing comment (26 distinct refs). Every
+      SHA was resolved back to the tag it claims with
+      `git ls-remote --tags https://github.com/owner/repo refs/tags/<tag> refs/tags/<tag>^{}`
+      — 26/26 match, so no pin was invented. `scripts/actions-pinned.test.mjs`
+      (lint job's rule run and `make verify`) asserts it: reverting one step to
+      `actions/cache@v5` fails naming `.github/workflows/build.yml:32`, and dropping
+      only the tag comment fails naming `.github/workflows/build.yml:25` — a SHA with
+      no tag is reproducible but unreadable. Local actions (`./…`) and
+      `docker://…` refs are exempt. `.github/dependabot.yml` already watches the
+      `github-actions` ecosystem, so Dependabot rewrites SHA and comment together;
+      `docs/OPS.md` §6 says how to move a pin by hand.
+- [x] Licence audit across 50 packages and the Go services; write `NOTICE` and fail on a new copyleft dependency without an ADR. `[P]`
+      Proof: `scripts/license-audit.mjs` classifies every licence in the installed tree —
+      1018 production packages, 908 more reachable only through dev edges, 25 Go modules
+      (read from each module's own `LICENSE` in the module cache) — and prints 1014
+      permissive / 2 weak-copyleft / 2 unclassified in prod, 24 permissive / 1
+      weak-copyleft in Go. Sabotage: patching `isbot` to `GPL-3.0-or-later` fails with
+      `prod isbot@5.2.1 is GPL-3.0-or-later — no entry in .github/license-exceptions.json`,
+      the same patch on `knip` fails for the dev tree, deleting the `@splinetool/runtime`
+      entry fails with `declares no usable licence`, and pointing that entry at a missing
+      ADR fails with `names no existing ADR`. `scripts/license-audit.test.mjs` 9/9 covers
+      expression reading (`MIT OR GPL-3.0-or-later` → permissive, `Apache-2.0 AND
+      LGPL-3.0-or-later` → weak), licence-file sniffing, an unmeasured module being a note
+      rather than a pass, and a stale exception being reported. `NOTICE`'s
+      `Third-party components` block is generated and compared on every run (7 entries),
+      with platform binaries attributed once as `<platform>` so a laptop and a Linux runner
+      agree. Two decisions are recorded rather than assumed: `@giscus/react` (no licence in
+      the tarball, MIT upstream) and `@splinetool/runtime` (no grant anywhere, kept installed
+      by an unused peer and out of the build — [ADR 0019](docs/adr/0019-transitive-dependency-without-a-licence.md)).
+      Wired into `lint.yml`, `make verify` and `docs/OPS.md` §6.
+- [~] Rotation drill: rotate one provider key and one OAuth secret end to end, timed, with the steps added to `docs/runbook.md`. `[P]`
+  Written and guarded, not yet run. `docs/runbook.md` §11 is the procedure: the BYOK
+  half rotates through `POST /api/user/provider-keys` (soft-delete + `provider_key.rotate`
+  audit event), the OAuth half rotates an env-only client secret and asserts the stored
+  tokens still open because `NEXUS_OAUTH_VAULT_KEY` was not touched. §11.3 says why the
+  two at-rest keys are a different drill (rotating them makes every ciphertext
+  unreadable), and §11.4 is the timing table.
+  `scripts/rotation-drill.test.mjs` (lint job, `make verify`) keeps the procedure honest
+  against the code: 8/8, and sabotage proves it — renaming one curl path fails with
+  `/api/user/provider-keyz is in the drill but no route registers /user/provider-keyz`,
+  dropping `NEXUS_OAUTH_VAULT_KEY` fails with `must be named: touching it breaks every
+      stored value`. It also caught two real gaps, now fixed: `NEXUS_SECRETS_KEY` and
+  `GITHUB_OAUTH_CLIENT_SECRET` were read but undocumented in `.env.example`.
+  **Still open:** the timed run itself. `§11.4` reads `_unrun_` — no provider console or
+  deployed environment was available here, and a drill nobody performed must not be
+  recorded as performed.
 
-## Phase 6: LSP-backed code intelligence
+### M2.4 Data safety
 
-Agents currently read and grep. They cannot ask where a symbol is defined, who references it, or
-what the type checker thinks. This phase adds a client, not a language server: the server is an
-operator-installed binary, and Nexus speaks LSP to it over stdio.
+- [~] Postgres backup + restore drill: dump, restore into a clean instance, run the test suite against it, record the wall time. `[P]`
+  Written and guarded, not yet run — no Postgres or Docker on this machine, so the wall
+  time is still owed. `scripts/db-backup-drill.sh` is the drill: `pg_dump --no-owner
+      --no-privileges` into a gzipped file (timed), `DROP`/`CREATE` the scratch database so
+  the restore proves the dump is self-sufficient, `psql -v ON_ERROR_STOP=1` on the
+  gunzip'd dump, then every `public` base table's row count compared against the source
+  and a named failure on any mismatch, the restored `audit_log` pointed at
+  `nexus audit verify` / `GET /api/v1/audit/log/verify` because a chain that stops
+  verifying is a restore of a different system, and with `RUN_SUITE=1` the API suite
+  against the copy. It refuses to run when `DATABASE_URL` and `SCRATCH_DATABASE_URL` are
+  equal — restoring over the source is how a drill becomes an incident.
+  `docs/runbook.md` §7.5 is the procedure and the record table (restore time, total
+  time, dump size, rows) which reads `_unrun_` until someone runs it.
+  `scripts/backup-drill.test.mjs` 5/5 reads §7.5 as data: the script exists, every
+  variable it needs (`DATABASE_URL`, `SCRATCH_DATABASE_URL`, `RUN_SUITE`, `PG_URL`) is
+  named in the procedure, the identical-URL guard is still in the script, the scratch
+  `DROP` cannot target the source, the promised checks are the checks the script runs,
+  and the audit-chain check points at a route (`apps/api/src/routes/audit.ts`) and a CLI
+  (`@nexus/cli`) that exist. Sabotage: deleting the guard fails with "the identical-URL
+  guard is gone", and replacing the `_unrun_` row with a measurement fails with "the
+  record must show the drill has not been run yet".
+- [x] Forward-only migration check: `migrate.yml` runs against the previous release schema; a destructive migration fails the check. `[P]`
+      Proof: three layers. `scripts/migrations-forward-only.mjs` reads all 24 shipped
+      migrations, strips comments first, and fails on `DROP TABLE/COLUMN/TYPE`, `TRUNCATE`,
+      `DELETE FROM` or `RENAME` unless `.github/migration-exceptions.json` names it with a
+      reason and an ADR that exists — it reports `24 migration(s), 0 removal(s), 0
+      unpermitted`, and an `ALTER COLUMN … TYPE` is a warning rather than a failure because
+      it may run and may lose precision. `scripts/migrations-forward-only.test.mjs` 6/6
+      covers a commented-out `DELETE FROM` being prose (three real migrations do that), a
+      drop being refused, an exception without an ADR or with a missing ADR not counting,
+      a stale exception being reported, and the shipped tree being clean against a 20-file
+      canary. `apps/api/tests/lib/migrate-forward-only.test.ts` runs the drill on real
+      Postgres (embedded): every migration but the newest, then rows in the shape the older
+      code wrote (memory owner in `metadata.userId` only, and in `user_id` only), then the
+      newest migration — 0022 backfills both halves and the test asserts both rows end up
+      carrying both spellings plus an additive-only column snapshot. Sabotage: neutering the
+      backfill's `WHERE` fails with the row still `user_id: null`; appending `ALTER TABLE
+      memory_entries DROP COLUMN expires_at` fails with `memory_entries.expires_at was
+      removed by 20240610061320_0022_memory_owner_both`. `migrate.yml` gains a `forward-only`
+      job (pull requests, throwaway `postgres:16`, `fetch-depth: 0`, previous release via
+      `git archive`, `scripts/db-forward-only-drill.sh`) that fails on a removed column or a
+      seeded row that did not survive; wired into `lint.yml`, `make verify` and `docs/OPS.md`
+      §4. That CI job has not run — the local drill above is the proof that it can.
+- [x] Retention policy enforced in code (traces 1000, notifications 30-day TTL, audit log indefinite) with a test per policy. `[P]`
+      Proof: `RETENTION` in `packages/contracts/src/shared/retention.ts` is the single
+      statement, and both stores now read it — `request-traces.ts` takes `MAX_TRACES` from
+      `RETENTION.traces.maxEntries`, `notifications-store.ts` takes `NOTIF_TTL_MS` from
+      `RETENTION.notifications.ttlMs`; no literal survives in either file.
+      `apps/api/tests/lib/retention.test.ts` 8/8: the traces cap is 1000 with no clock, the
+      30-day expiry is stamped on `notif:item:*` **and** on the `notif:list:*` index that
+      points at it (sabotage: dropping the ttl on the item write fails with `expected
+      undefined to be 2592000000`), `audit_log` is absent from `USER_SCOPED_TABLES` so an
+      erasure cannot erase the record of itself, and the append-only triggers
+      (`audit_log_no_delete`, `audit_log_no_update`) are still in the bootstrap migration.
+      `scripts/retention-policy.test.mjs` 6/6 (a rule, with a 500-file canary so an empty
+      read cannot pass) fails on a second copy of any number and on any
+      `delete(auditLog)`/`DELETE FROM audit_log` — a sabotage file holding all four fails four
+      of its tests. Four older stores keep their own 30-day literal (diff history, missions,
+      session graphs, drive idle) and are listed by name in the rule, so the leak cannot grow
+      without a decision. `docs/OPS.md` §4 carries the table.
+- [x] Redis is a cache and a queue in places; document which keys are safe to lose and assert the app boots with an empty Redis. `[P]`
+      Proof: `docs/OPS.md` §3 gains "What is safe to lose if Redis is flushed" — eight key
+      families, each row saying safe / retried / lost, from `cache:*` (rebuilt, costs tokens
+      twice) and `ratelimit:*` (counters restart) through `oauth:*` states (a sign-in in
+      flight fails closed) to user content (`thread:*`, `notif:*`, `research:*`, `mission:*`,
+      `diffhist:*`) and `bull:nexus-{high,medium,low,dlq}` (jobs vanish, the durable task rows
+      remain for the reconciler). `apps/api/tests/lib/empty-redis.test.ts` 3/3 starts a real
+      RESP server on a socket whose keyspace is empty, points `REDIS_URL` at it, and asserts
+      the app picks `RedisKVStore` (sabotage: drop `REDIS_URL` → `expected 'PgKVStore' to be
+      'RedisKVStore'`), that every read answers empty instead of throwing, and that the first
+      `/api/notifications`, `/api/threads`, `/api/missions` requests return 200/401 with the
+      health probe's `kv` leg `ok`. The fake is a working keyspace, so the cold path runs
+      through ioredis and `RedisKVStore` rather than stubs — sabotage the fake so a cold
+      `thread:list` read fails and the same test reports `/api/missions answered 500`.
 
-**Shape**
+### M2.5 Environment contract
 
-- `packages/lsp`, no runtime dependency beyond Node: framing, transport, client, pool, documents.
-  The agent tools live in `packages/agent-core/src/runtime/lsp-tools.ts`; spawn authorization is a
-  callback the API supplies, so the package never imports the API or the policy.
-- One server process per `(workspace root, language)`, pooled, idle-evicted, memory-capped.
-- Read-only tools are `auto_allowed`; rename and code actions are `requires_permission`.
-- Workspace root comes from the tool context, then `NEXUS_LSP_ROOTS`, then `NEXUS_EXEC_ROOTS`,
-  then `NEXUS_WORKSPACE_DIR`. A path outside it is refused, symlinks included.
-- Each call is a `tool.call` span, so latency and failures land in traces.
-- Off by default on a shared host. The desktop's embedded API turns it on.
-
-### 6.1 Package scaffold
-
-- [x] **Create `packages/lsp`.** `package.json` (`@nexus/lsp`, private, `type: module`, exports
-      `./src/index.ts`), a `tsconfig.json` extending the base, `src/` and colocated `*.test.ts`
-      (2026-11-23).
-      Proof: `pnpm typecheck` and `pnpm prune:knip` exit 0; the package is not yet an API
-      dependency because no API route imports it.
-- [x] **Write the file map down** at the top of `src/index.ts`: `framing.ts` (Content-Length),
-      `transport.ts` (spawn and JSON-RPC), `client.ts` (handshake and requests), `manager.ts`
-      (pool), `languages.ts` (extensions, commands, env), `documents.ts` (sync); plus `config.ts`,
-      `containment.ts` and `testing/fake-server.mjs` (2026-11-23). The tools are not here; they live
-      in agent-core.
-      Proof: each file exists and exports what the map says.
-
-### 6.2 Transport and framing
-
-- [x] **Encode and decode `Content-Length` frames.** Case-insensitive header, `\r\n\r\n` separator,
-      partial reads across chunks, a header cap (8 KB), a body cap (8 MB), and a close on a bad
-      frame instead of a hang (2026-11-23).
-      Proof: `framing.test.ts` feeds byte-at-a-time, two frames in one chunk, a missing length, a
-      header over the cap and a body over the cap.
-- [x] **Speak JSON-RPC with ids.** Monotonic request ids, response routing, notifications dropped
-      or forwarded by name, a request timeout that rejects once and clears the pending entry, and
-      no unhandled rejection when the process dies mid-request (2026-11-23).
-      Proof: `transport.test.ts` covers out-of-order responses, a timeout and a kill mid-request.
-- [x] **Model it on the existing stdio client.** `transport.ts` names
-      `packages/mcp-client/src/stdio.ts` and states why LSP differs (mandated `Content-Length`
-      framing) (2026-11-23).
-      Proof: the header comment exists.
-
-### 6.3 Process lifecycle
-
-- [x] **Spawn without a shell.** `spawn(command, argv, { shell: false, cwd, env })` in
-      `transport.ts`; the command and argv come only from `NEXUS_LSP_*_CMD`, split by
-      `splitCommand` with double quotes honoured (2026-11-23).
-      Proof: `config.test.ts` keeps a quoted path with spaces as one argv and does not interpret
-      `;` or `&&`; `transport.test.ts` passes both forms through to the process as single argv
-      entries.
-- [x] **Handshake.** `initialize` carries `processId`, `rootUri`, capabilities and full document
-      sync, then `initialized`; server capabilities and `serverInfo` are stored, and a miss of
-      `NEXUS_LSP_START_TIMEOUT_MS` kills the child (2026-11-23).
-      Proof: `client.test.ts` asserts the two messages, the stored capabilities and the timeout.
-- [x] **Shut down cleanly.** `shutdown`, then `exit`, then `killTree` after 2 s; on Windows the tree
-      kill is `taskkill /pid <pid> /T /F` (2026-11-23).
-      Proof: `client.test.ts` sees a server that ignores `shutdown` gone after the grace period.
-- [x] **Minimal environment.** The child gets only `PATH`, `HOME`, `LANG`, `LC_ALL`, `TMPDIR`, `TZ`
-      via `minimalChildEnv` (2026-11-23).
-      Proof: `client.test.ts` asserts `NEXUS_API_KEY` is absent from the child env.
-- [x] **Honour `NEXUS_LSP_LOG` for captured stderr.** `client.ts` forwards the ring tail to
-      `process.stderr` only when the parsed level is `info` or `debug`; `off` keeps it in the ring
-      only. `packages/lsp/src/client.test.ts` asserts no `[lsp]` line at `off` (while the ring still
-      holds the text) and a forwarded line at `info`.
-
-### 6.4 Pool and resource caps
-
-- [x] **Key the pool by `(root, language)`.** One server per pair, LRU at `NEXUS_LSP_MAX_SERVERS`
-      (default 2); a third stops the oldest idle one (2026-11-23).
-      Proof: `manager.test.ts` counts starts and sees the third language after one stop.
-- [x] **Idle eviction and shutdown.** A server stops after `NEXUS_LSP_IDLE_MS` (default 300000)
-      with no request; `dispose()` stops every entry and calls `onClose` (2026-11-23).
-      Proof: a clock-injected idle test and a `dispose` test that asserts zero servers and one
-      callback.
-- [x] **Memory watchdog.** RSS is sampled every 15 s; above `NEXUS_LSP_MAX_MEMORY_MB` (default 1024) the server stops, is marked unhealthy for 60 s, and the next call starts a fresh one
-      (2026-11-23).
-      Proof: a test with a fabricated RSS reading.
-- [x] **Crash policy.** A server that exits unexpectedly restarts once; a second crash inside 60 s
-      marks it broken and the call returns a reason instead of spawning forever (2026-11-23).
-      Proof: a fake server that exits on the second `initialize`.
-
-### 6.5 Workspace containment
-
-- [x] **Resolve the root once.** First `ctx.workingDir`; then the first entry of `NEXUS_LSP_ROOTS`;
-      then `NEXUS_EXEC_ROOTS`; then `NEXUS_WORKSPACE_DIR`. No root means the tools are absent
-      (2026-11-23).
-      Proof: `containment.test.ts` covers each fallback and "none".
-- [x] **Refuse escapes.** Canonicalises with `realpath`, rejects a path outside the root, a symlink
-      that resolves outside, a non-file, and a file above `NEXUS_LSP_MAX_FILE_BYTES` (default
-      1,000,000) (2026-11-23).
-      Proof: `containment.test.ts` covers `..`, an absolute path, a symlink to another root, a
-      directory and an oversized file.
-- [x] **Map extensions to languages.** `.ts/.tsx/.js/.jsx/.mjs/.cjs` to TypeScript, `.py/.pyi` to
-      Python, `.go` to Go, `.rs` to Rust; anything else is "no server", never a guess (2026-11-23).
-      Proof: a table-driven `languages.test.ts` plus the unknown-extension cases.
-
-### 6.6 Document sync
-
-- [x] **Open, change, close.** `didOpen` sends full text and version 1; `didChange` sends full text at
-      `version + 1` (never incremental deltas); `didClose` on eviction; open documents are capped at
-      `NEXUS_LSP_MAX_DOCUMENTS` (default 50), evicting the least recently used (2026-11-23).
-      Proof: `documents.test.ts` records versions 1, 2, 3, the close and the LRU eviction.
-- [x] **Wait for diagnostics correctly.** After `didOpen`/`didChange`, waits up to
-      `NEXUS_LSP_DIAGNOSTICS_WAIT_MS` (default 3000) for `publishDiagnostics` for that URI and
-      version; on timeout returns the last known set with `stale: true` (2026-11-23).
-      Proof: early, late and missing publishes in `documents.test.ts`.
-- [x] **Cache per document.** The last diagnostics and symbol list are keyed by URI + version, so a
-      repeat read is cheap and a version bump invalidates the entry (2026-11-23).
-      Proof: two symbol reads produce one server request; the manager test asserts it.
-
-### 6.7 Read-only tools
-
-- [x] **Define five tools** in `packages/agent-core/src/runtime/lsp-tools.ts`, built on the
-      `@nexus/lsp` client and the existing `RuntimeTool` shape:
-      `lsp_definition`, `lsp_references`, `lsp_hover`, `lsp_document_symbols`, `lsp_diagnostics`.
-      Input is `{ path, line, column }` with 1-based line and column at the boundary, converted to
-      0-based LSP positions; output is normalised arrays with `path`, `line`, `column` and a
-      one-line `preview`.
-      Proof: schema snapshot test and one fake-server call per tool.
-- [x] **Cap every result.** At most 200 locations, 20 references per symbol, hover text at 8 KB,
-      diagnostics at 200; truncation is reported as `truncated: true`, not silently dropped.
-      Proof: tests at the boundary and one over it.
-- [x] **Auto-allow them.** Add the five names to `AUTO_ALLOWED_TOOLS` in
-      `packages/agent-core/src/runtime/index.ts` and to the filesystem tools' doc comment that
-      lists read-only tools.
-      Proof: `classifyTool` returns `auto_allowed` for each.
-
-### 6.8 Gated tools
-
-- [x] **`lsp_rename` returns an edit, never applies one.** It takes the new name, returns the
-      `WorkspaceEdit` mapped to readable `{path, range, newText}`, and the model applies it through
-      `edit_file`; no file is written by the LSP client.
-      Proof: test asserts zero writes and a well-formed edit.
-- [x] **`lsp_code_actions` lists, never applies.** It accepts a range and returns titles, kinds and
-      a `command` payload that is not executed.
-      Proof: fake server returns one action; no edit reaches the filesystem.
-- [x] **Both are `requires_permission` by default.** They are absent from `AUTO_ALLOWED_TOOLS`, so
-      `classifyTool` returns `requires_permission`; the existing approval flow applies unchanged.
-      Proof: classification test and one 202 in an API test.
-
-### 6.9 Exec policy integration
-
-- [x] **Add the `lsp` surface.** `ExecSurface` includes `"lsp"` with the default `allow`, and the
-      reason is written down: the binary and argv are operator configuration, not model input;
-      `readonly` still denies everything; deny rules still apply (2026-11-23).
-      Proof: `packages/exec-policy` tests cover `readonly`, `NEXUS_EXEC_ASK_SURFACES=lsp` and a
-      deny rule on the server binary.
-- [x] **Gate every spawn through an injected callback.** The manager takes
-      `authorize(action: {command, args, cwd}) => Promise<"allow" | "ask" | "deny">`; the API
-      supplies one that calls `decide()` and, on `ask`, creates the record in
-      `apps/api/src/lib/exec-approvals.ts` and returns the approval id. On `deny` the tool error
-      names the rule; on `ask` the caller gets 202 with the id.
-      Proof: an API test that approves once, runs once, and cannot replay the approval.
-- [x] **Constrain `cwd`.** When `NEXUS_EXEC_ROOTS` is non-empty, a root outside it is refused even
-      if `NEXUS_LSP_ROOTS` names it (2026-11-23).
-      Proof: `containment.test.ts` and `manager.test.ts` refuse before authorizing a spawn.
-
-### 6.10 Telemetry
-
-- [x] **Extend `withToolSpan` with optional attributes.** The two-argument call sites are unchanged;
-      `withToolSpan(name, tier, fn, attrs?)` merges `attrs` under `tool.name` and `tool.tier`
-      (2026-11-23).
-      Proof: `packages/telemetry` tests pass (107) and `tool-spans.test.ts` asserts the extra
-      attributes.
-- [x] **Wrap every LSP tool call.** Use the same wrapper as `read_file` and `write_file`, so one
-      turn with a definition and a diagnostics call yields three nested spans under `agent.turn`.
-      Proof: `tool-spans.test.ts` extension.
-
-### 6.11 Runtime wiring
-
-- [x] **Build the toolset once.** A `createLspTools({ root, manager })` helper in agent-core;
-      `missions.ts` includes it when `NEXUS_LSP=1` and a root resolves, and the chat runtime
-      includes it in the same condition. Otherwise the tools are absent, not failing.
-      Proof: mission toolset test with the flag on and off.
-- [x] **Fail with instructions, not silence.** A missing binary makes that language unavailable:
-      `"python: set NEXUS_LSP_PYTHON_CMD to a pyright-langserver binary"`. The other languages keep
-      working.
-      Proof: test with `NEXUS_LSP_PYTHON_CMD` pointing at a missing path.
-
-### 6.12 API surface
-
-- [x] **`GET /api/v1/lsp/status`.** Returns `{enabled, root, servers: [{language, state, pid,
-      rssMb, requests}], languages: [{language, available, reason}]}` and never a command line or
-      an absolute path outside the root.
-      Proof: API test and OpenAPI entry.
-- [x] **`POST /api/v1/lsp/servers/:language/restart`.** Admin only; stops and clears one entry.
-      Proof: 200 for an admin, 403 for another user.
-- [ ] **Back `@symbol` with `workspace/symbol`.** `GET /context/symbols?q=` asks every available
-      server for `workspace/symbol` when LSP is enabled, merges the results, maps them to
-      `{name, type, file, line, source: "lsp"}`, caps at 50, and falls back to the existing regex
-      walk with `source: "regex"` when no server answers. Cache for 30 s, invalidate on a
-      successful write.
-      Proof: one response of each kind, same shape, and the UI renders both.
-- [ ] **Regenerate the spec and types.** `pnpm openapi:generate`, `pnpm types:generate`, and commit
-      the generated files with the routes.
-      Proof: `pnpm openapi:check` and `pnpm types:check` exit 0.
-
-### 6.13 UI
-
-- [x] **Show the source in the `@symbol` picker.** `ContextPicker` keeps its result shape and adds
-      a small `lsp` badge; no new endpoint and no second picker.
-      Proof: a component test with one LSP result and one regex result.
-- [x] **Show availability where the user looks.** The chat composer hides the symbol kind when
-      `/api/v1/lsp/status` says no server is available, and the tooltip names the missing server
-      variable.
-      Proof: one test for available and one for unavailable.
-
-### 6.14 Environment
-
-- [x] **Add the `NEXUS_LSP_*` block to `.env.example`** exactly as Appendix A.1, with the defaults
-      and the security note. Do this in the same change as the code that reads them.
-      Proof: `pnpm check:docs` (Phase 8) passes.
-
-### 6.15 Tests
-
-- [x] **Fake server fixture.** `src/testing/fake-server.mjs` answers `initialize`, `definition`,
-      `references`, `hover`, `documentSymbol`, `workspace/symbol`, `rename`, `codeAction` and
-      `shutdown`, with scripted delays and a forced crash (2026-11-23).
-      Proof: the package suite passes on this machine, which has no language server installed.
-- [x] **Real-server integration, skipped without the binary.** One test per language that runs
-      when the command is on `PATH`, otherwise reports `skip` with the reason. TypeScript first,
-      then Python.
-      Proof: locally `typescript-language-server` returns a definition for a fixture; CI without it
-      reports two skips.
-- [x] **Containment tests are hostile.** `..`, absolute paths, a symlink out of the root, a
-      metacharacter filename, a 10 MB file and another user's root (2026-11-23).
-      Proof: each is a `containment.test.ts` case; a metacharacter name is one path and never
-      reaches a shell, and the other five are refusals.
-- [x] **No server leak.** After the suite, no child process is left; assert with a process count
-      before and after.
-      Proof: test helper, not a manual check.
-
-### 6.16 Packaging
-
-- [ ] **Desktop bundle includes `@nexus/lsp`.** It is a workspace package, so the existing rolldown
-      bundler picks it up; verify by booting the staged tree and calling `GET /api/v1/lsp/status`.
-      Proof: status returns `enabled: true` in the packaged app with `NEXUS_LSP=1`.
-- [x] **Hosted stays off.** Neither `docker-compose.yml` nor `render.yaml` sets `NEXUS_LSP`, so the
-      parsed default (`0`) applies; `packages/lsp` reads the flag and the status route reports
-      `enabled: false`. The desktop app is the only place that sets `NEXUS_LSP=1`
-      (`apps/desktop/src/local-api.ts`), and a hosted deployment needs an operator to add a server
-      binary and the flag.
-- [ ] **Desktop resolves commands from `PATH`.** Packaged app plus a system
-      `typescript-language-server` works; with none, the UI says which variable to set.
-      Proof: one manual run each way, recorded in `docs/STATUS.md`.
-
-### 6.17 Documentation
-
-- [x] **The proposal lives in this phase.** The old `docs/proposals/lsp.md` was folded into the
-      sections above and deleted, so there is no second LSP plan to drift (2026-11-23).
-      Proof: `docs/proposals/` no longer exists and this phase carries the decisions.
-- [x] **`docs/STATUS.md` gets one row** naming what works, what is off by default, and what happens
-      without a server.
-      Proof: the row matches `/api/v1/lsp/status` on a default install.
-- [x] **`docs/FEATURES.md` gets the entry only when the tools ship.** No entry before Phase 6's exit
-      criteria are ticked.
-      Proof: the entry names the five read-only tools and the two gated ones.
-
-### 6.18 Exit criteria
-
-- [x] TypeScript: definition, references, hover, document symbols and diagnostics answer on a
-      fixture file. Fake-server tests cover all five; `integration.test.ts` runs them against
-      `typescript-language-server` whenever the binary exists (skipped here, no server installed).
-- [ ] Python: the same five answer when `pyright-langserver` is installed.
-- [x] A rename returns an edit and writes nothing until `edit_file` is called. Manager test and the
-      real-server rename test read the file back unchanged.
-- [x] A code action is listed and never executed. Fake-server test returns one action, zero writes.
-- [x] A path outside the root is refused, symlink included. Containment tests cover `..`, absolute,
-      symlink out, directory, oversized file and another root.
-- [x] `NEXUS_EXEC_MODE=readonly` refuses to spawn; `NEXUS_EXEC_ASK_SURFACES=lsp` asks once and the
-      approval cannot be replayed. `exec-policy` tests plus the API approval test (202 then 403 on
-      replay).
-- [ ] One trace shows `agent.turn` with `tool.call` children carrying `lsp.language`.
-- [x] A server that crashes twice is reported broken and does not loop. Manager crash-policy test.
-- [x] `pnpm check:offline` includes an LSP probe that returns a definition.
-      `scripts/offline-lsp-probe.mjs`, wired into `scripts/offline-check.mjs`.
-- [x] No child process survives the API's shutdown. Dispose tests (client, manager, LSP runtime,
-      desktop API shutdown) assert no live server entry.
+- [x] `check:docs` already compares env vars to docs; extend it to assert every documented variable is read somewhere and every read variable is documented. `[P]`
+      Proof: `node scripts/check-env-docs.mjs` now fails on a documented-but-unread name unless
+      `scripts/env-docs-allowlist.mjs` names the reader behind it (compose, Python, an env-object
+      parser, bracket access). The tree measures 184 documented+read, 0 unread outside the
+      allowlist, 0 read-undocumented, 28 dynamic accesses, 84 allowlist entries; the five cases in
+      `scripts/check-env-docs.test.mjs` pass under `node --test`.
+- [x] Add a `doctor` command (`nexus doctor`) that checks Node, pnpm, Postgres, Redis, Docker, Ollama, sandbox image, model availability, and prints one line per check with the fix. `[P]`
+      Proof: `apps/cli/src/lib/doctor.ts` checks all eight; `nexus doctor` printed one line each
+      and exited 1 for the two that are genuinely missing here (Docker, Ollama). Four tests in
+      `apps/cli/tests/lib/doctor.test.ts` cover all-pass, per-check failure with the fix, and a
+      server `DATABASE_URL` over TCP.
+- [x] Startup must fail fast and clearly on a missing required variable; collect all missing ones in one message. `[P]`
+      Proof: `apps/api/src/lib/startup-env.ts` returns every problem; production with a short
+      key and no JWT/audit secrets reports all three at once, and `index.ts` prints them in one
+      `FATAL` block before binding a port. `apps/api/tests/lib/startup-env.test.ts` pins the
+      aggregation and the permissive development path.
+- [x] Document the offline path (no Ollama, no Docker) and add a CI job that boots in that mode and passes `/health`. `[P]`
+      Proof: `docs/DEPLOYMENT.md` gains an "Offline machine" section with the four commands,
+      a table of what still works and what each missing service costs, and the surface that
+      reports it. `apps/api/tests/lib/offline-mode.test.ts` 3/3 deletes every network-shaped
+      variable (`REDIS_URL`, `UPSTASH_*`, `OLLAMA_URL`, `DOCKER_HOST`, `NEXUS_SANDBOX_URL`, six
+      provider keys), points `DATABASE_URL` at embedded PGlite, and asserts `/health` is 200
+      with `{status:"ok"}`, that `/health/ready` answers 200/503 rather than crashing with the
+      `kv` leg `ok`, and that the section still says "no Docker", "no Ollama" and `/health`.
+      `test.yml` gains an `offline` job that runs that file on a bare runner with no services.
 
 ---
 
-## Phase 7: dependency and secret hygiene
+## Phase 3 — Perfective: off release candidates and onto current tooling
 
-- [x] **Triage all 52 open Dependabot alerts.** Counted before: 52 open (17 high, 23 medium, 12 low)
-      through `gh api .../dependabot/alerts?state=open`. `pnpm audit --prod --audit-level high` was
-      exit 0 (12 low/moderate) and full-tree audit exit 1 (55 advisories, 17 high). After the fixes:
-      full-tree audit 3 advisories, exit 0. Dependabot still lists 52 because it re-reads the pushed
-      lockfile and nothing was pushed.
-- [x] **Fix the big family first.** `undici` overrides in `pnpm-workspace.yaml`: `undici@7`
-      7.24.8/7.30.0 → 7.30.2, `undici@8` 8.11.2 → 8.13.1. Prod audit exits 0 after the install.
-- [ ] **Fix the remaining families.** Done for `fast-uri` (3.1.9/4.2.3), `brace-expansion` (2.1.8),
-      `ws` (8.23.0), `esbuild` (0.28.2), `fastify` (5.12.8) and `fast-copy` (4.3.3). Three stay open
-      because only a breaking major patches them, each pinned by its parent: `glob` 13.0.6
-      (`@fastify/static@10`), `minimatch` 10.2.6 (`glob` 13 and `eslint-plugin-import-x`), `katex`
-      0.16.47 (`@lobehub/ui@5.18.0`).
-- [ ] **Dismiss only with a reason.** Every alert that stays open gets a written dismissal naming
-      why it is not reachable; "dev only" alone is not a reason.
-      Proof: `gh api repos/…/dependabot/alerts?state=open` returns none, or each has a dismissal.
-- [x] **Gate the full tree, not just production.** `pnpm audit --audit-level high` now sits beside
-      the prod audit in `.github/workflows/security.yml` and exits 0 on this tree (3 advisories, all
-      low/moderate). A green Security run needs the push.
-- [ ] **Secret scan stays clean.** `gitleaks detect --no-git -v` and the CI job both report no
-      findings after the Phase 1 rotation.
-      Proof: both outputs.
-- [x] **Document the exec variables.** `NEXUS_EXEC_MODE`, `NEXUS_EXEC_ALLOW`, `NEXUS_EXEC_DENY`,
-      `NEXUS_EXEC_ROOTS` and `NEXUS_EXEC_ASK_SURFACES` are read by `@nexus/exec-policy` and absent
-      from `.env.example`. Add them with the three-mode explanation and the surface defaults.
-      Proof: `pnpm check:docs` passes and the names are findable in `.env.example`.
+### M3.1 Dependency reality
+
+- [x] Drizzle `1.0.0-rc.6` is a release candidate in the persistence layer; track GA and migrate, or record in an ADR why the RC is acceptable and what the exit condition is. `[F]`
+      Proof: ADR [0020](docs/adr/0020-release-candidates-in-the-persistence-layer.md) records all four
+      pre-releases in the tree (both Drizzle packages, `@monaco-editor/react` 4.8.0-rc.3,
+      `node-pty` 1.2.0-beta.15) with an owner, the reason a stable release does not work, and the
+      concrete event that ends each exception. It is not prose alone:
+      `.github/prerelease-policy.json` holds those fields and `scripts/prerelease-audit.mjs` fails on a
+      pre-release the policy does not name, a policy version that drifted from the tree, an entry
+      missing owner/reason/exit, or an ADR that does not exist — and the reverse, an entry for a
+      dependency that is no longer a pre-release. `scripts/prerelease-audit.test.mjs` 10/10 fakes a
+      repository for each case; sabotage (a `2.0.0-rc.9` added to `apps/ui`) →
+      `some-rc-lib@2.0.0-rc.9 is a pre-release with no policy entry`. The table in `docs/OPS.md` §6 is
+      generated from the policy, so the prose and the tree cannot disagree.
+- [x] Audit every `catalog:` entry for an RC/pre-release; list them in `docs/OPS.md` with an owner and a target. `[F]`
+      Proof: `scripts/prerelease-audit.mjs` reads the `catalog:` block as well as every workspace
+      manifest — that is where most versions actually live — and reports **4** pre-release
+      dependencies out of ~200 catalog entries: `drizzle-orm`/`drizzle-kit` `1.0.0-rc.6`,
+      `@monaco-editor/react` `4.8.0-rc.3`, `node-pty` `1.2.0-beta.15`. The generated table in
+      `docs/OPS.md` §6 carries package, version, why, owner and exit for each, and `--check` fails
+      when the committed table disagrees with the tree (wired into `lint.yml` and `make verify` as the
+      `prerelease-policy` gate).
+- [x] `@typescript/typescript6` is a preview compiler; keep a stable-TypeScript job in CI until it is GA, then switch. `[F]`
+      Proof: `build.yml` gains a **`typescript-stable`** job that installs the latest published
+      stable TypeScript 6 (`npm install --global typescript@6`) and compiles the whole tree with it
+      by absolute path (`node $(npm root -g)/typescript/bin/tsc -b --noEmit`), so the workspace's
+      preview compiler cannot be picked up by accident — that is the one thing the job exists to
+      avoid. `scripts/lint-paths.test.mjs` asserts the job exists exactly once, pins `typescript@6`
+      and not a channel tag, and actually runs `-b` rather than `--version`. `docs/OPS.md` §6 says the
+      job is the condition for keeping the alias. The job has not run on CI yet; the local proof is
+      that its commands are the ones this repository already runs.
+- [x] Remove duplicated lint paths: `vp lint` and `eslint` overlap; keep one type-aware path and delete the other. `[F]`
+      Proof: there is one type-aware path — `vp lint --type-aware` in `scripts/lint.mjs` — and ESLint
+      is limited to `import-x/order`, the single rule that needs no type information. The stale
+      comment pointing at an `.oxlintrc.json` that does not exist is gone.
+      `scripts/lint-paths.test.mjs` (5/5) is the ratchet: it parses the rule names out of
+      `eslint.config.mjs` and fails on a second one (sabotage: adding `import-x/no-cycle` →
+      `ESLint keeps one rule, and it is the one that needs no types`), asserts exactly one
+      `--type-aware` invocation and that it is `vite-plus`, and asserts `package.json` has one lint
+      entry point plus `lint:fix`, both running `scripts/lint.mjs`.
+- [x] Update Electron (45 → current) and electron-builder; record the update-channel compatibility result. `[F]`
+      Proof: 45.4.1 **is** current — `node scripts/electron-current.mjs --online` asked the registry
+      and both `electron` (`45.4.1`) and `electron-builder` (`26.18.0`) are the latest published, so
+      there was no bump to test. `electron-builder` was `^26.18.0`, a range that lets a packaging
+      toolchain move on its own; it is now pinned exactly, lockfile included.
+      `docs/DEPLOYMENT.md` records the compatibility result: artefact naming is not load-bearing
+      (the updater manifest carries a URL plus `sha256` and `size` per platform/arch, so a renamed
+      installer still updates), version comparison is semver rather than lexical, there is one
+      channel, and the Electron 45 APIs the shell uses (`app.getVersion`,
+      `setPermissionRequestHandler`, `utilityProcess`) are present. What is **not** verified is a
+      signed install → update → restart cycle: that needs the signing certificates and a published
+      release, and is recorded as owed rather than assumed. `scripts/electron-current.mjs --check`
+      fails when the pin and the record disagree (sabotage: `electron` 46.0.0 →
+      `docs/DEPLOYMENT.md records electron 45.4.1 but apps/desktop/package.json pins 46.0.0`), and
+      `scripts/electron-current.test.mjs` 6/6 covers the registry comparison with a fake fetch, including a
+      patch bump staying quiet. `security.yml` gains a weekly `desktop-toolchain` job that runs
+      `--online`, so a new major arrives as a red check rather than during a release.
+
+### M3.2 Build and run speed
+
+- [x] Measure cold build, warm build, `pnpm test`, and UI dev-server start; publish in `docs/OPS.md` and fail on regression. `[F]`
+  - verified-here: `scripts/perf-budget.mjs` measures five workloads (buildCold, buildWarm, test, uiDev, apiBoot), records them in `.github/perf-baseline.json` per host and fails a run more than 25 % over baseline; `scripts/perf-budget.test.mjs` covers the comparison, the host label and the record path (8 tests). The measured numbers and how to re-record them are published in `docs/OPS.md` §10, and CI runs the table into the step summary of the `budgets` job in `.github/workflows/build.yml`.
+- [x] Check UI bundle size per route with a report; set a budget and fail CI when a route exceeds it. `[F]`
+  - verified-here: `scripts/bundle-budget.mjs` attributes every built route through Vite’s `manifest`, gzips it and compares against `.github/bundle-budget.json` (per-route budgets at 1.1× headroom, 200 kB default, `three.module` forbidden outside the routes that own a 3D view). Current run: `node scripts/bundle-budget.mjs` → "bundle: every route is within budget" across 43 routes; the worst route went from 3 444 kB to 188 kB when the provider logos were replaced. Enforced in the CI `budgets` job, and `scripts/bundle-budget.test.mjs` pins the unit handling and the forbidden-module rule (7 tests).
+- [x] Move the 3D landing scene and the knowledge-graph view behind `React.lazy` + a size check, so a text page never downloads three.js. `[F]`
+  - verified-here: the landing scene and `KnowledgeGraphView` are both behind `React.lazy` + `Suspense` (`apps/ui/app/components/landing/scene-canvas.tsx`, `apps/ui/app/routes/knowledge-graph.tsx`), and the size half is the `forbidden` rule in `.github/bundle-budget.json`: a route that pulls `three.module` outside the two that own it fails `scripts/bundle-budget.mjs`. `apps/ui/app/components/provider-glyph.tsx` replaced `@lobehub/icons`’ `ProviderIcon`, which inlined 332 logos and was 3.2 MB of the /workflows route.
+- [x] Audit `apps/api` route registration for cold-start cost; keep the boot path under a measured budget. `[F]`
+  - verified-here: `scripts/api-boot-budget.mjs` boots the real `apps/api/src/server.ts` on `pglite://:memory:` and times import → served `/health`, then counts registered routes; `.github/boot-budget.json` sets 9 000 ms and 450 routes, and the measured 5 950 ms / 419 routes are recorded in the file’s own comment. Runs in the CI `budgets` job; `node scripts/api-boot-budget.mjs` is the local command.
+- [x] Turbo remote-cache or a CI cache for the 509 test files; target a halved PR wall time. `[F]`
+  - verified-here: the `app-suites` job in `.github/workflows/test.yml` runs `turbo run test --filter=@nexus/api --filter=@nexus/ui --filter=@nexus/desktop` with `TURBO_TOKEN`/`TURBO_TEAM` and a restored turbo cache, so an unchanged package is a cache hit rather than a re-run; the wall time of every job is measured by `scripts/job-times.mjs` into `.github/job-times.json` (regression-checked, recorded when there is no baseline). Turbo docs for the installed version were read first, per `AGENTS.md`.
+
+### M3.3 Code shape
+
+- [x] `knip` is wired; make it blocking and clear its report, so dead exports stop accumulating. `[F]`
+      Proof: `scripts/dead-code.mjs` runs knip's JSON reporter, flattens the report into
+      `{ kind, name, where }` rows and exits 1 on any of them; `scripts/dead-code.test.mjs` 4/4 pins the
+      parser against knip's real shape and proves a dependency problem is not miscounted as dead code.
+      The report is now empty — the last two entries were `_resetDiscussionsForTests`
+      (`routes/discussion.ts`) and `_resetGraphJobsForTests` (`routes/kb.ts`), helpers nothing called —
+      so a new line here is a new orphan rather than inherited debt. Wired into `lint.yml` and
+      `make verify` as the `dead-code` gate.
+- [~] 50 packages is a lot for one product; list packages with a single consumer and merge or fold them, one per PR. `[F]`
+  Measured, not yet folded: `scripts/arch-diagrams.mjs` exports `singleConsumer()` and emits a
+  generated "Packages with one consumer" table into `docs/ARCHITECTURE.md` — **33 of 50** workspace
+  packages are imported by exactly one other package, so removing one is a local change with no
+  design debate. The table is regenerated by `arch-diagrams.mjs --check`, so the count cannot drift
+  silently. Folding them is one PR per package, which is why this stays `[~]`.
+- [x] Standardise the error envelope and the `durable`/`bridge` declarations in one shared helper instead of per-route repetition. `[F]`
+      Proof: `apps/api/src/lib/reply-errors.ts` is the only writer of the two OpenAI-shaped envelopes —
+      `openaiError()` for `/v1` (`{ error: { type, message } }`, which is what an SDK client parses) and
+      `gatewayError()` for `/api/v1/gateway` (`{ type: "error", error }`, the discriminator that surface
+      has always sent) — plus `fail()` for the Nexus `{ error: "code", message? }` envelope. All nine
+      hand-written call sites in `routes/gateway.ts`, `routes/openai.ts` and `routes/openai-batch.ts`
+      were moved onto it. `apps/api/tests/lib/reply-errors.test.ts` 4/4 pins both shapes; the fix also
+      uncovered that `openai-v1-transcript.test.ts` was already failing on two counts (an id-bearing
+      path compared against the recorded transcript, and a 32-hex id the normaliser's 36-char pattern
+      missed), both fixed. `scripts/error-envelope.test.mjs` 3/3 is the ratchet: the 363 inline
+      `send({ error: "code" })` replies may only fall, no file outside the helper may write an
+      OpenAI-shaped object, and all three writers must exist. Sabotage (a handler appending both
+      envelopes by hand) failed with `365 inline error replies, baseline 363` and
+      `apps/api/src/routes/diff.ts`. `durable`/`bridge` were already centralised by path in
+      `apps/api/src/lib/api-maturity.ts` and cross-checked by `tests/lib/api-maturity.test.ts`.
+- [x] Replace remaining `any`/`as` in route handlers with validated schemas at the boundary; count before and after. `[F]`
+      Proof, counted rather than claimed: `scripts/route-types.mjs` measures `apps/api/src/routes` —
+      **437 handlers, 91 declared schemas, 118 `as` casts, 0 `any`**. The last two `any`s were in
+      `routes/workflows.ts` (a parallel branch's `sub: any` and `execute: ({ data }: any)`); both are
+      now `unknown` narrowed at the point of use, so a branch body cannot reach a function signature it
+      did not declare. The ratchet is `scripts/route-types.test.mjs` 7/7: new `any` and new casts fail
+      (`: any ×1 (baseline 0) — validate the body instead`), safe narrowings (`as string`, `as const`,
+      `as unknown`) are not counted, comments are stripped first, and a handler that loses its
+      `schema:` block fails even when the totals look level. 118 casts remain because each one is a
+      handler whose body has no schema yet; the count may only fall.
+- [x] `apps/api/src/lib/*` is the largest untested surface; split per domain and require a test file per module in lint. `[F]`
+      Proof: `scripts/lib-inventory.mjs` classifies all **104** modules into eight declared domains
+      (models 15, org 21, storage 18, security 23, skills 5, runtime 14, integrations 6, api-shape 2)
+      and fails on a module no rule claims, so the directory cannot grow an unexplained file. It also
+      fails on a module no test accounts for — by import (`lib/<name>`) or by a test file named after
+      it — against an allowlist that may only shrink; three tests were written to shrink it from 12 to
+      9 (`lru-utils`, `with-key-lock`, `extract-text`, each with the property that is easy to get
+      wrong: eviction order, real serialisation of a get→set, and an unclosed `<script>` that must not
+      hang). Writing them found a real bug: the HTML path returned `" Title Body bold "` with the
+      padding of the tags it removed, now trimmed. `scripts/lib-inventory.test.mjs` 6/6, sabotage
+      (a new `lib/zz-mystery.ts`) → `belongs to no domain` **and** `has no test`. The domain table is
+      generated into `docs/ARCHITECTURE.md` by `arch-diagrams.mjs --check`, so it cannot drift.
+
+### M3.4 Docs and onboarding
+
+- [~] One quickstart that works on a clean machine: clone, `pnpm i`, `nexus doctor`, local model, first chat, in under 15 minutes. `[F]`
+  Written and guarded, the clock not measured. README "Option C" is the five-command path
+  with no Docker, no server database, no Redis and no model download, ending in
+  `curl -s localhost:3000/health`, and it names the one thing that still needs a choice (a
+  driver key, or `ollama pull qwen2.5:7b`). `scripts/quickstart.test.mjs` 4/4 reads the
+  block as data: every `pnpm <script>` exists in `package.json`, `--filter @nexus/cli exec
+      nexus` names a package whose `bin` is `nexus`, the port is the port `apps/api/src/index.ts`
+  binds, and the curled path is a route `routes/health.ts` registers. The fifteen minutes
+  themselves are owed to a clean machine — a number invented here would be worse than none.
+- [x] `docs/ARCHITECTURE.md` gets one diagram per layer (API, worker, UI, sandbox, desktop) generated from the tree, plus the durability classes. `[F]`
+      Proof: `scripts/arch-diagrams.mjs` reads every workspace `package.json` and emits five
+      Mermaid graphs (API, worker, UI, sandbox, desktop/extension) between markers, each edge a
+      real `@nexus/*` dependency, plus a durability-classes block pointing at
+      `apps/api/src/lib/api-maturity.ts` and `durable-bridge.test.ts`. `--check` compares the
+      committed file with the tree and fails with "layer diagrams are out of date"; wired into
+      `lint.yml` and `make verify`.
+- [x] Every `docs/*.md` gets a "last verified against commit" line; CI updates it on a doc-touching PR. `[F]`
+      Proof: `scripts/docs-verified.mjs` stamps all 13 documents with `<!-- verified: <sha> <date> -->`
+      naming the last commit that changed the file. `--check` fails only when the _document_ changed
+      since the stamp — a commit touching nothing but the stamp counts as fresh, so the gate does not
+      churn — and an uncommitted edit counts as stale, so a doc edited without a restamp is caught.
+      A shallow clone skips with a note rather than guessing. The decision not to push from CI: the
+      job enforces freshness, the author runs `node scripts/docs-verified.mjs` and amends, which keeps
+      the commit history the only writer of history in the repository.
+- [x] Delete plan-like sections from `docs/STATUS.md` and `docs/FEATURES.md` now that this file owns them; STATUS becomes a measured capability table only. `[F]`
+      Proof: STATUS.md now opens with "Plans and open work live in `plan.md`; this file records only
+      what exists and the measurements behind it", and the stage/milestone labels came off the section
+      headings (`Exec approvals (Stage F-Tier1)` → `Exec approvals`, `Secret store (Stage F-Tier1)`,
+      `Desktop shell (`apps/desktop`, milestone M4)` → `Desktop shell (`apps/desktop`)`). FEATURES.md
+      says the same in its second line. Its measurements are already generated by
+      `scripts/baseline.mjs --write` and gated by `baseline:check`.
 
 ---
 
-## Phase 8: docs and code agree, permanently
+## Phase 4 — Widening: more value inside the surfaces that survived pruning
 
-- [x] **Add `scripts/check-env-docs.mjs` and `pnpm check:docs`.** Scan literal `process.env.NAME` in
-      `apps/*/src` and `packages/*/src`, and `import.meta.env.NAME` in `apps/ui/app`, subtract a
-      short allowlist of framework variables (`NODE_ENV`, `PORT`, `HOST`, `CI`, `PATH`, `HOME`,
-      test-only names), and require every remaining name in `.env.example`. Dynamic access such as
-      `process.env[key]` is listed for manual review. Report documented-but-unread variables as
-      warnings, not failures, because compose, Python and shell read some of them.
-      Proof: the script fails on a deliberately removed variable and passes on the tree.
-- [x] **Wire the check into CI.** Add `pnpm check:docs` to the Lint job next to `check:headers`.
-      Proof: a run that fails when the check fails.
-- [x] **Audit the claim-bearing docs.** For each row in `README.md`, `docs/FEATURES.md`,
-      `docs/STATUS.md`, `docs/TESTING.md`, `docs/internal/architecture.md` and
-      `docs/security/threat-model.md`, name the route, file or test that proves it. Delete or fix
-      every claim without a proof.
-      Proof: a table in this file's Appendix D with one row per document and its reviewer, or a
-      single line per document in the commit message.
-- [x] **Delete the superseded planning files.** `docs/stack-migration.md` and
-      `docs/proposals/lsp.md` are gone; the facts worth keeping are in this file (2026-11-23).
-      Proof: `git ls-files` lists no other plan or migration record.
-- [x] **Remove present-tense claims that LSP is unscheduled.** Historical commits stay; current
-      docs must not say "nothing implements it" or "deliberately not planned".
-      Proof: `rg -n "proposals/lsp|nothing implements|not planned" docs README.md plan.md` hits
-      only these history notes.
-- [ ] **Keep the measured table current.** Every number in this file and in `docs/STATUS.md` is
-      re-measured after Phase 9 and dated.
-      Proof: the same command produces the same number.
+Rule: nothing from invariant 4 comes back. Widening means a kept surface does
+more of what it already does.
 
----
+### M4.1 Part A — platform/API
 
-## Phase 9: release
+- [x] `/v1/responses` on the OpenAI-compatible surface: the current clients moved; `chat/completions` stays. `[W]`
+  - verified-here: `apps/api/src/routes/openai-responses.ts` implements `POST /v1/responses` plus `GET`/`DELETE /v1/responses/:id` over `PersistentStore` (`openai_responses`, 7-day TTL): `input`/`instructions`/`tools`/`previous_response_id`/`store`, `output_text` on the object and `output_text.delta` on the stream, the ordered SSE event sequence (`response.created` → `output_item.added` → `content_part.added` → `delta`s → `output_text.done` → `output_item.done` → `response.completed`), and `400 unsupported_parameter` for the nine parameters this server cannot honour (`background, include, audio, conversation, prompt, reasoning, text, truncation`, …) instead of accepting and ignoring them. Registered between `openaiRoutes` and `openaiBatchRoutes` in `server.ts`; `openapi.yaml` regenerated (`pnpm openapi:check` → "in sync"). `cd apps/api && ../../node_modules/.bin/vp test run tests/routes/openai-responses.test.ts` → 10/10 passed.
+- [x] Provider breadth behind the same driver contract: one new OpenAI-compatible provider as a worked example, with the adapter test and the docs page. `[W]`
+  - verified-here: `GithubModelsDriver` (`packages/llm/src/drivers/index.ts`, `https://models.github.ai/inference`, default `openai/gpt-4.1-mini`) wired through the `ProviderName` union, `apps/api/src/lib/provider-keys.ts`, `VALID_PROVIDERS` in `routes/provider-keys.ts` and the settings list in `apps/ui/app/routes/provider-keys.tsx`; the adapter row in `packages/llm/tests/drivers/llm-drivers.test.ts` proves provider name, host, `/chat/completions`, Bearer auth and usage parsing. The recipe is `docs/providers/adding-a-provider.md`, which walks this exact provider end to end and separates the three non-OpenAI shapes (different auth, signed requests, not-chat) from the one-line case. `cd packages/llm && ../../node_modules/.bin/vp test run` → 21 files, 686 tests passed.
+- [x] Streaming tool calls with partial arguments on `/v1` and on `/api/chat/stream`, tested against an OpenAI SDK client. `[W]`
+  - verified-here: `StreamDelta.toolCallDeltas` (`packages/llm/src/drivers/index.ts`) carries the fragment a provider actually sends mid-argument — the OpenAI driver forwards `choices[0].delta.tool_calls`, the Anthropic driver forwards `input_json_delta` — and both `/v1/chat/completions` and `/v1/responses` re-emit them as `delta.tool_calls` / `response.function_call_arguments.delta` in the same order the model produced them. Tested through the SSE surface: `vp test run tests/routes/openai-responses.test.ts` → tool-arguments test passes (10/10).
+- [x] Webhooks for long jobs (graph build, research, workflow run, council run): subscribe, sign, retry with backoff, dead-letter. `[W]`
+  - verified-here: `apps/api/src/lib/webhooks.ts` + `routes/webhooks.ts` + `tests/routes/webhooks.test.ts` → 9/9 passed. `POST/GET/DELETE /api/v1/webhooks[/:id]` (owner-scoped through `PersistentStore.for`), `GET /webhooks/:id` lists the last 50 attempts, `POST /webhooks/:id/test` and `POST /webhooks/:id/deliveries/:id/retry` send one attempt now. Signing is Stripe's scheme — `x-nexus-signature: t=<unix>,v1=<hmac-sha256 of "<t>.<body>">` — with a five-minute replay window; `RETRY_DELAYS_MS = [5s, 30s, 2m, 10m, 1h]` and a fifth failure dead-letters with `lastError` instead of pending forever; a receiver answering `410 Gone` disables the subscription. Outbound URLs are refused when they are not http(s) or name a loopback/private/link-local address (opt out with `NEXUS_WEBHOOKS_ALLOW_PRIVATE=1` for a self-hosted private receiver), which is the SSRF shape this endpoint would otherwise have. `publish()` is wired at the four real completion points: `workflow.completed` (`workflows.ts`, after `chain.run`), `discussion.completed` (`discussion.ts`, when the debate settles — the council run), `research.completed` (`researcher.ts`, after `persistRun`), and `mission.completed` (`missions.ts`, in the runner's `finally`, reading the terminal record). There is no server-side graph *build* to hook — the knowledge graph is assembled in the UI from `POST /kg/sync`, so `mission.completed` is the fourth real long job rather than an invented event. Deliveries survive a restart: `loadWebhooks()` re-reads the store on boot and `startDispatcher()` resumes the schedule (asserted by the restart test, which waits for the row in `nexus_kv` before closing the server).
+- [x] Saved comparisons: store two council runs and diff verdicts, cost and latency side by side. `[W]`
+  - verified-here: `POST/GET/DELETE /api/v1/comparisons` (`routes/comparisons.ts`, `lib/comparison.ts`) save a *snapshot* of `compareRuns(left, right)`: verdict diff as the Jaccard overlap of the two digests word sets plus the terms only one side used, cost delta and ratio, latency delta, per-author entry counts, settlement outcome — no LLM judge, because an uncalibrated judge is an opinion with a token bill. Both runs must be the caller’s and finished (`404` / `409`), a self-comparison is `400`, and a saved diff does not change when the runs are rewritten afterwards. `vp test run tests/routes/comparisons.test.ts` → 10/10 passed.
+- [x] Session export/import as a portable bundle (messages, citations, artifacts) for handoff and support. `[W]`
+  - verified-here: `GET /threads/:id/export` returns `nexus.session/1` — thread metadata, every message in append order, export-time stats (rounds, members, characters) — as a named attachment; `POST /threads/import` validates the whole bundle before writing anything (format version, ≤500 messages, unique ids, known roles, bounded content) and creates a *new* thread, so an import can neither overwrite a session nor collide on a second import. Citations travel inside the message text they belong to and there is no separate artifact store for a chat session, so the bundle carries what exists rather than an empty `artifacts` key. `vp test run tests/routes/session-bundle.test.ts` → 6/6 passed, including a cross-account round trip and a malformed-bundle refusal that writes nothing.
 
-- [ ] **Version and changelog.** Set the next version in the workspace packages that publish and
-      write the changelog from the completed phases.
-      Proof: `pnpm typecheck` and the release workflow agree on the version.
-- [ ] **Tag and publish.** Tag the next semver (desktop is `0.1.0`, so start at `v0.1.0`), let the
-      release workflow build the installers, SBOM and checksums, and attach them.
-      Proof: the release page lists every artifact; `sha256sum -c SHA256SUMS` passes.
-- [ ] **Verify the published artifacts.** Install the Windows build and open the dmg on macOS;
-      check the update feed serves the new manifest.
-      Proof: two installs and one feed fetch.
-- [ ] **(gate) All seven workflows green on the tag commit.** Proof: `gh run list --commit <sha>`.
-- [ ] **Close the loop.** Update this file's baseline to the release commit, tick the Definition of
-      Done, and leave only the explicitly deferred items with a reason.
+### M4.2 Part B — UI
 
----
+- [x] Command palette over every page, action and saved item; keyboard-first, with the shortcut map in `docs`. `[W]`
+  - verified-here: `apps/ui/app/components/command-palette.tsx` opens on ⌘K/Ctrl+K from anywhere (including inside an input), moves with ↑↓, runs with ↵, completes with Tab and closes on Esc; it lists every page from the shared registry `apps/ui/app/lib/nav.ts` (the same list the sidebar renders, so the two cannot drift), a small action table, and the caller’s own sessions, deliberations, workflows, knowledge bases, documents and graph nodes from `GET /api/v1/search` (debounced, two characters minimum). `apps/ui/tests/command-palette.test.ts` pins the registry parity and the three-tier ranking (9 tests), `apps/ui/tests/navigation.test.ts` now reads the shared registry (8 tests), the shortcut map is `docs/keyboard-shortcuts.md`, and `pnpm --filter @nexus/ui build` plus `node scripts/bundle-budget.mjs` stay green.
+- [x] Global search across sessions, deliberations, knowledge bases, workflows and files, one result list with types. `[W]`
+  - verified-here: `GET /api/v1/search?q=&types=&limit=` (`apps/api/src/routes/global-search.ts`) merges sessions (`threads-store`), council discussions, knowledge bases, their documents, workflows and knowledge-graph nodes into one result list, each hit carrying `type`, `title`, `snippet`, `link` and `score`; `counts` is per type *before* the limit so a UI can say "3 more in workflows", `notes` names a source that could not be read, ranking is title(3) > body(1) with recency tie-break, and another account’s rows are unreachable. `vp test run tests/routes/global-search.test.ts` → 7/7 passed.
+- [x] Templates gallery for workflows and company setups (built-in, versioned, no marketplace). `[W]`
+  - verified-here: `apps/ui/app/routes/templates.tsx` (route `/templates`, in `app/routes.ts`, the sidebar and therefore the palette via `app/lib/nav.ts`) lists four built-in workflow templates (`apps/ui/app/lib/templates.ts`: research brief, weekly digest, change review sweep, incident postmortem) plus every company setup this server ships, read from `GET /org/templates`. Company templates are **references**, not copies: the UI holds a version and a note per id (`COMPANY_PRESENTATION`) and creates with `POST /org/templates/:id` sending only a name, so the server stays the single definition. Every card is readable before anything is created. `apps/ui/tests/templates.test.ts` → 22/22 passed, including parity against `apps/api/src/lib/org-portability.ts` (every server id has a presentation; `id`/name/description are taken from the server, not restated) and a check that each workflow step uses a `kind` the run endpoint executes.
+- [x] Empty-state coach marks on first visit per page, dismissible and stored per user. `[W]`
+  - verified-here: `apps/ui/app/lib/coach-marks.ts` holds six hints (knowledge, workflows, templates, knowledge graph, cost, sandbox; `/chat` deliberately has none because its empty state already explains the council) and `apps/ui/app/components/coach-mark.tsx` renders one when `pendingCoachMark` says so. Storage is `nexus.coach.<userId>.<page>` — per user *and* per page, so a second account on the same browser still gets the tour and dismissing one hint does not end it. `apps/ui/tests/coach-marks.test.ts` → 10/10 passed: shown once then gone, users and pages kept apart, an unauthenticated browser in its own bucket, exactly one key written, and — the failure mode worth choosing — a storage that throws keeps the hint hidden rather than re-showing it forever. The same file asserts every hint names a real nav route and that the page it describes actually renders `<CoachMark page="…" />`, so a hint cannot drift from its page.
+- [x] Print/PDF export for a deliberation, a workflow run and a company report, from the same data the page shows. `[W]`
+  - verified-here: `apps/ui/app/lib/printable.ts` builds three documents from the state each page already holds — `deliberationDoc`, `workflowRunDoc`, `companyReportDoc` — and `docToMarkdown`/`docToHtml`/`printFileName` render them; there is no PDF library and no second request, so paper cannot disagree with screen. `components/print-button.tsx` adds Print / PDF, copy-as-Markdown and HTML download, wired into `routes/discussion.tsx` (header, plus the run detail `workflows.tsx` keeps beside its prose output) and `routes/org.tsx` (company header). The `@media print` block in `app/app.css` removes nav, dialogs, coach marks and the dark theme, keeps headings with their content and prints link targets so a citation stays checkable on paper. `apps/ui/tests/printable.test.ts` → 13/13 passed, including that a verdict containing `<script>` prints as characters (the HTML writer escapes everything it did not write) and that all three pages actually build a document and render the button. Typecheck and `pnpm --filter @nexus/ui build` clean; `scripts/bundle-budget.mjs` → 44 routes, `templates.tsx` 80 kB / 200 kB.
+- [x] Mobile PWA: installable shell, offline shell for read-only pages, safe-area layout, bottom nav. `[W]`
+  - verified-here: `apps/ui/app/components/mobile-nav.tsx` renders five destinations from the shared nav registry on a phone, marks the current one with `aria-current` (and `isTabActive()` is not fooled by a prefix match like `/chatty`), respects `env(safe-area-inset-bottom)` and hides from `md` up; `app/root.tsx` adds `viewport-fit=cover`, the top inset to the phone header and `<MobileNav />` after the outlet. `apps/ui/public/offline.html` is a standalone page (no script src, links to `/dashboard`, `/discussion`, `/settings`) and `apps/ui/public/sw.js` serves it through `networkFirstThenOffline()` for `request.mode === "navigate"` only — `CACHE_VERSION` is bumped to `v2`, `/api/` is never cached and the worker still unregisters itself in dev. `apps/ui/tests/pwa.test.ts` → 12/12 passed.
 
-## Optional: board validations
+### M4.3 Part C — desktop and extension
 
-The Go board in `services/board` is built and tested. These checks need a desktop app, model credits
-or cloud storage, so they are not release blockers.
+- [x] Desktop: tray icon with run-state, deep links (`nexus://session/<id>`), and a "copy API base" action for local clients. `[W]`
+  - verified-here: `apps/desktop/src/tray.ts` holds the decisions as pure functions and `src/main.ts` applies them. The tray polls `GET /api/v1/workflows` (the same question the page asks, not a tray-only endpoint) every two seconds on an unref'd timer and shows `Working — 3 runs in progress` / `Idle — last run failed` / `Idle`, with a count beside the icon on macOS; a failed read keeps the last known state rather than claiming the machine is idle. The menu reports `Local API — http://127.0.0.1:<port>` and **Copy API base** puts that in the clipboard without a trailing slash. `nexus://session/<id>` registers through `app.setAsDefaultProtocolClient`, is parsed once by `deepLinkFromArgs` (argv for Windows/Linux, `open-url` for macOS, both a cold start and a second instance) into `/chat/<id>`, and anything else — `javascript:`, `file:`, a traversal, a two-segment id — is refused rather than loaded. `apps/desktop/tests/tray.test.ts` → 11/11 passed.
+- [x] Desktop offline mode: queued prompts, clear indicator, flush on reconnect. `[W]`
+  - verified-here: NEW `apps/desktop/src/offline.ts` owns the queue as pure decisions over a file — `prune` (7-day window, rejects future timestamps so a wrong clock cannot pin an entry, rejects non-prompts), `enqueue` (trims, refuses empty and >20 000 chars, caps at 50 and **returns the prompt that gave way** so the caller can say so), `flush` (in order; a transient failure keeps the prompt, increments `attempts` and stops the walk because a later prompt is behind an earlier one; a **permanent** refusal is dropped with its reason, since retrying a 401 forever is a queue that never drains), and `indicator` (`Offline — 2 prompts queued` / `2 prompts queued — sending on reconnect` / `Sending 3 queued prompts…` / `Online`, never a negative or fractional count). Writes go through a temp file + rename, so a crash mid-write leaves the previous queue intact. `apps/desktop/src/main.ts` loads the queue before the tray, POSTs each entry to `/api/v1/threads/:id/messages` (4xx except 429 = permanent, 5xx/429/throw = retry), flushes automatically the first poll where the API answers again — one place, so two wake-ups cannot double-send — and paints the count in the tray tooltip, on macOS the title, and as a menu row that is a label while offline and a **Send now** action while online. The chat header shows `N queued` and reads it every 5s (`apps/ui/app/lib/offline-notice.ts`: `isNetworkFailure` names the transport wordings and refuses to queue what the server refused; `queueOffline`, `readOfflineState`, `flushOffline`, `queuedInsteadOfFailed`). Tests: `apps/desktop/tests/offline.test.ts` → **15/15**, `apps/ui/tests/offline-notice.test.ts` → **11/11**, tray 14/14, bridge 32/32, full desktop suite **120/120** (8 files); `apps/desktop` and `apps/ui` `tsc --noEmit` clean; `pnpm --filter @nexus/ui build` → built in 589ms, and `node scripts/bundle-budget.mjs` → every route is within budget. Documented in `docs/STATUS.md`.
+- [x] Desktop workspace: pick a local folder as an LSP/sandbox workspace without editing env vars. `[W]`
+  - verified-here: NEW `apps/desktop/src/workspace.ts` — `workspaceProblem` refuses an empty, relative, over-long or NUL-bearing path, a path that does not exist and a file that is not a folder, each with a sentence a person can act on; `saveWorkspace`/readWorkspace` store only `{dir, chosenAt}` (0600, temp file + rename) with **no token or permission** in the record; `readWorkspace` answers "not set" when the folder has since been deleted, so an unplugged drive is not an error the user cannot fix; `workspaceEnv` emits `NEXUS_WORKSPACE_DIR` — the variable `apps/api/src/lib/lsp.ts` and the sandbox already read — and `{}` rather than an empty string, which would read as the filesystem root. `apps/desktop/src/local-api.ts` `LocalApiPaths` gained `workspaceDir`, put into the child's environment at spawn because a started process cannot be told. `src/main.ts` reads it before the API boots, adds a tray row `Workspace: <folder>` / **Choose workspace folder…** (`dialog.showOpenDialog` → `openDirectory` + `createDirectory`) and **Forget workspace**, and says in the dialog that it applies at the next start. Bridge capabilities `workspace` (`getWorkspace`/`chooseWorkspace`/`clearWorkspace`) and `offlineQueue` (`queuePrompt`/`getOfflineState`/`flushOfflineQueue`) are declared in `apps/desktop/src/bridge.ts`, where a host that lacks one **throws `UnsupportedMethodError` by name** instead of answering `undefined`. Tests: `apps/desktop/tests/workspace.test.ts` → **8/8** (refusals, the two-field record, a deleted folder reading as unset, a hand-edited file reading as unset, `workspaceEnv` never emitting an empty string), `apps/desktop/tests/bridge.test.ts` → 32/32 including the capability list and the "refuses a method the host does not provide" case.
+- [x] Extension: attach the current page/tab as context for a chat turn; permission-scoped, visible in the transcript. `[W]`
+  - verified-here: `apps/extension/context.js` captures the tab's title, URL and selection **only** when **Attach this page** is clicked — there is no content script and no background sampling, and the test asserts the injected call count is 0 before the click. Browser-internal and non-page URLs (`chrome://`, `edge://`, `about:`, `devtools:`, `file:`, `javascript:`, `data:`) are refused, the selection is bounded, and the popup draws a chip naming the page and the word count with **×** to remove it. `apps/ui/public/widget.js` (and the byte-identical copy in `apps/extension/widget.js`) gained `setPage`/`clearPage`, sends `page` in the `POST /api/search` body and prints the attachment beside the question, so what was sent is visible. The server re-validates it (`apps/api/src/lib/page-context.ts`: 300-char title, http(s)-only 2 000-char URL, 4 000-char selection, a fence longer than any quote run in the text), screens it like an excerpt, frames it as untrusted data before the question, and echoes `page` in the response. `apps/api/tests/lib/page-context.test.ts` → 10/10, `apps/api/tests/routes/search.test.ts` → 10/10 (page in the prompt, question still last, answers from the page alone when no source matches, a `javascript:` URL not echoed), `apps/extension/tests/extension.test.ts` → 9/9. Documented in `docs/FEATURES.md`.
+- [x] Update feed: staged rollout percentage and a manual "check now" that reports the channel. `[W]`
+  - verified-here: `apps/desktop/src/updater.ts` gained `channel` and `rollout: { percentage }` on the manifest (both optional, parsed and clamped), `inRollout(installId, version, percentage)` (FNV-1a over install id and version, so a machine cannot flip between waves on the next check), `releaseChannel()`, and `describeUpdate()` → `{current, channel, offered, percentage, eligible, message}` where a wave-less install is told it is *not in this wave yet* rather than "up to date". `src/main.ts` honours the wave in the background check, persists a random `install-id` (0600) for bucketing, reads the channel from `NEXUS_UPDATE_CHANNEL` or the shipped config, and adds a tray item **Check for updates now…** that reports the channel and the reason when updates are off or the feed is unreachable. `apps/desktop/tests/updater.test.ts` → 25/25 passed (11 new: determinism, ~40% of 500 installs inside a 40% wave, a new version as a new wave, 0%/100% bounds, channel resolution, all four message shapes). `docs/DEPLOYMENT.md`'s channel paragraph updated to describe what the code now does.
 
-- [ ] **Claude Desktop in-app review.** Point the installed app at `mcp-bridge.exe` and exercise
-      `board_inbox`, `board_post` and `board_slice`.
-      Proof: one round trip in the app; the stdio bridge itself is already covered by
-      `cmd/mcp-bridge/harness_test.go`.
-- [ ] **One real OpenCode turn through the board.** Run a task with `opencode` and watch the
-      supervisor log.
-      Proof: the task reaches `done` and the log matches.
-- [ ] **Live R2/B2 snapshot upload.** Set `CLOUDFLARE_R2_*` and `OPEN_BOARD_SNAPSHOT_PASSPHRASE` and
-      upload one snapshot.
-      Proof: the object exists and decrypts.
+### M4.4 Part D — sandbox, CLI, services
 
----
-
-## Appendix A: environment contract
-
-### A.1 LSP (introduced by Phase 6)
-
-All of these are read by `@nexus/lsp`. Unset means the documented default. The client is off unless
-`NEXUS_LSP=1`; the desktop's embedded API sets it, hosted deployments do not.
-
-| Variable                        | Default                              | Meaning                                                                                                                                 |
-| ------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXUS_LSP`                     | `0`                                  | Master switch. `0`/unset: no tools, no spawns, status route says disabled. `1`: enable.                                                 |
-| `NEXUS_LSP_TYPESCRIPT_CMD`      | `typescript-language-server --stdio` | Command and argv, split on spaces with double quotes honoured, run without a shell. Must speak LSP over stdio.                          |
-| `NEXUS_LSP_PYTHON_CMD`          | `pyright-langserver --stdio`         | Same, for `.py` and `.pyi`.                                                                                                             |
-| `NEXUS_LSP_GO_CMD`              | `gopls`                              | Same, for `.go`.                                                                                                                        |
-| `NEXUS_LSP_RUST_CMD`            | `rust-analyzer`                      | Same, for `.rs`.                                                                                                                        |
-| `NEXUS_LSP_ROOTS`               | empty                                | Comma- or semicolon-separated absolute roots this feature may open. Empty falls back to `NEXUS_EXEC_ROOTS`, then `NEXUS_WORKSPACE_DIR`. |
-| `NEXUS_LSP_MAX_SERVERS`         | `2`                                  | Live server processes across all roots and languages; LRU eviction above it.                                                            |
-| `NEXUS_LSP_IDLE_MS`             | `300000`                             | Stop a server after this long with no request.                                                                                          |
-| `NEXUS_LSP_START_TIMEOUT_MS`    | `15000`                              | `initialize` must answer within this or the spawn fails.                                                                                |
-| `NEXUS_LSP_REQUEST_TIMEOUT_MS`  | `10000`                              | Any other request must answer within this.                                                                                              |
-| `NEXUS_LSP_DIAGNOSTICS_WAIT_MS` | `3000`                               | How long a read waits for `publishDiagnostics` before returning stale.                                                                  |
-| `NEXUS_LSP_MAX_MEMORY_MB`       | `1024`                               | Per-server RSS cap; above it the server is stopped and marked unhealthy for 60 s.                                                       |
-| `NEXUS_LSP_MAX_DOCUMENTS`       | `50`                                 | Open documents kept in sync; the least recently used is closed above it.                                                                |
-| `NEXUS_LSP_MAX_FILE_BYTES`      | `1000000`                            | Largest file that may be opened or synced.                                                                                              |
-| `NEXUS_LSP_LOG`                 | `off`                                | `off`, `info` or `debug`. Controls the captured stderr ring buffer. `debug` never includes file text.                                   |
-
-Security rules that are not variables: the command and argv are operator configuration and cannot
-be changed by a tool call; the child gets a minimal environment with no Nexus secrets; the child
-runs with `cwd` inside an allowed root; the spawn is an `lsp`-surface action under
-`NEXUS_EXEC_MODE`, so `readonly` denies it, `ask` can raise it with `NEXUS_EXEC_ASK_SURFACES=lsp`,
-and deny rules apply in every mode.
-
-### A.2 Exec policy (exists; documented in Phase 7)
-
-`lsp` joins the surface list in Phase 6; the rest is current.
-
-| Variable                  | Default | Meaning                                                                                                                                                     |
-| ------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXUS_EXEC_MODE`         | `ask`   | `readonly` denies every action; `ask` runs read-only commands and asks for the rest; `trusted` runs uncovered actions. An unrecognised value becomes `ask`. |
-| `NEXUS_EXEC_ALLOW`        | empty   | `name` or `name:arg1 arg2` entries, comma-separated, that are allowed. Each arg must appear among the action's arguments as a whole token.                  |
-| `NEXUS_EXEC_DENY`         | empty   | Same shape; deny wins over allow.                                                                                                                           |
-| `NEXUS_EXEC_ROOTS`        | empty   | Absolute roots an action's `cwd` may fall in. Empty means unconstrained.                                                                                    |
-| `NEXUS_EXEC_ASK_SURFACES` | empty   | Surfaces raised to `ask` despite their default: `pty`, `sandbox`, `repl`, `tool`, `lsp`.                                                                    |
+- [x] Sandbox: per-run resource report (CPU time, peak memory, wall time) shown in the UI and stored with the run. `[W]`
+  - verified-here: `apps/api/src/lib/sandbox-matrix.ts` exports `sampleMemory(intervalMs)` (sampled peak RSS, `timer.unref()` so it never holds the process open) and `resourceReport({startedAt, cpu, peakRssBytes})` → `{cpuMs, peakRssBytes, wallMs, method: "sampled"}`; `apps/api/src/routes/sandbox.ts` attaches `resources` from `process.cpuUsage(cpuAtStart)` on every execute exit path (pyodide, piston, helper, javascript), so it is stored with the run and returned by `GET /sandbox/runs`. `apps/ui/app/routes/sandbox.tsx` shows `cpu …ms · peak …` beside the exit status with `formatBytes`, and the run is what the server recorded. `vp test run tests/lib/sandbox-matrix.test.ts` → 11/11 passed, including that wall time and memory never come back negative when the clock moves.
+- [x] Sandbox: a declared language matrix in `GET /sandbox/status` including the exact version per language, so a user can pin. `[W]`
+  - verified-here: `apps/api/src/lib/sandbox-matrix.ts` declares `IMAGE_VERSIONS` (node 26, go 1.27.4, rust 1.100.0, ruby 3.4.13, bash 5.2, typescript 5) and `languageMatrix()` returns `{language, version, via, serverRuns, pin}` per language — `vm` for JavaScript, `pyodide` for Python (version read from the installed package), `piston` when configured, `sandbox-helper` for the image toolchains that run on the viewer's machine, and `unpinned` rather than a guess for anything untaught. `GET /sandbox/status` returns it as `runtimes` beside the pins it already published, and the sandbox page prints the version beside each language in the picker with the full `pin` as its title. `apps/api/tests/lib/sandbox-matrix.test.ts` → 11/11 passed, including a read of `infra/sandbox/Dockerfile` proving the declared Go, Rust and Ruby versions are the ones the image actually builds and that the Node major matches the base image — a matrix that lies now fails a test instead of shipping.
+- [x] `nexus run --watch`: re-run a workflow on file change for local development. `[W]`
+  - verified-here: `apps/cli/src/lib/run.ts` adds `nexus run <workflowId> [--watch] [--file a,b] [--input json] [--json] [--out path]`; watch mode debounces a burst of saves into one run, serialises runs so a change during a run queues exactly one more instead of interleaving output, survives a failed run (the next save is the fix), refuses a path that does not exist rather than watching nothing, and closes its handles on Ctrl-C. `apps/cli/tests/lib/watch-run.test.ts` → 7/7 passed; `apps/cli/tests/commands.test.ts` (now 10/10) drives the real binary against a stand-in API and checks `POST /api/v1/workflows/<id>/run`, the JSON output, the `--out` file and exit code 1 on a failed run. Documented in `docs/cli-reference.md`.
+- [x] `nexus council --json --out file.json`: machine-readable verdicts for scripting and CI. `[W]`
+  - verified-here: `nexus council deliberate` gained `--json` and `--out <path>`; the JSON goes to stdout and/or the file, the artefact is written even when the deliberation failed (a CI job can say why later), and the exit code is the contract — `1` on `ok: false` or a rejected outcome, `0` otherwise. `apps/cli/tests/commands.test.ts` asserts the rejection path exits 1, and `docs/cli-reference.md` documents both flags with a gating example.
+- [x] Board service: a documented HTTP API for the board state, plus an MCP tool set that covers read and write with approval for write. `[W]`
+  - verified-here: `services/board/docs/HTTP_API.md` documents all 26 routes with query parameters, bodies, status codes and the conventions (channels, cursors, `409` meanings), and `services/board/pkg/api/api_docs_test.go` parses the route table out of `Server.Handler` and fails in **both** directions — a served route with no row, or a row for a route that is gone — so the page cannot drift. On the MCP side, `pkg/mcp/approval.go` names `WriteTools` as the policy, `tools/list` annotates each tool from that list (`readOnlyHint`/`destructiveHint`) and adds a `confirm` field to every write schema, and a write is a two-step exchange: the first call writes nothing and returns the action plus an HMAC token bound to the tool and canonicalised arguments, and only a repeat carrying `confirm` performs it. Tokens are single-use, expire after five minutes, cannot be moved to different arguments, and at most 256 are held; `OPEN_BOARD_MCP_READ_ONLY=1` refuses writes outright. `go test ./pkg/mcp/` → 11/11 passed (8 new, including "the challenged call reached the broker 0 times, the approved repeat once, a replayed token leaves it at 1"), `go test ./cmd/mcp-bridge/` passes the real stdio conformance run through both steps, and `docs/MCP.md` explains the handshake and why a startup flag would be worse.
+- [x] Go services get the same lint/format/vuln jobs as the TypeScript tree. `[W]`
+  - verified-here: `.github/workflows/lint.yml` gained a `go` job over `services/board` running `gofmt -l` (failing with the list of files), `go vet ./...`, `go build ./...`, `go test ./...` and `govulncheck ./...`, with `GOTOOLCHAIN=auto` so `go.mod`'s version directive decides the toolchain rather than the runner image. No new action was added, so `scripts/actions-pinned.test.mjs` still holds every `uses:` to a SHA; `node --test scripts/actions-pinned.test.mjs scripts/workflow-map.test.mjs scripts/required-checks.test.mjs` → 12/12 passed. Locally: `gofmt -l .` empty, `go vet ./...` clean, `go test ./...` all packages ok.
 
 ---
 
-## Appendix B: local commands
+## Phase 5 — Depth: quality where the product's claims live
+
+### M5.1 Council and deliberation quality
+
+- [ ] Build a golden set of 30 prompts with reference answers and a rubric; publish per-archetype win rate, cost and latency. `[D]`
+- [ ] Judge calibration: compare an LLM judge against human labels on 50 samples; report agreement and the failure modes; do not ship a judge above its proven agreement. `[D]`
+- [ ] Measure convergence, disagreement and "no majority position" rate per reasoning mode, with n and interval. `[D]`
+- [ ] Cost per verdict by mode (models × rounds), so a mode is chosen on evidence. `[D]`
+- [ ] Regression suite that fails when a prompt change drops win rate by more than the measured noise. `[D]`
+
+### M5.2 Retrieval and knowledge graph quality
+
+- [ ] Recall@k, MRR and answer-citation accuracy on a labelled set of 50 queries across three knowledge bases. `[D]`
+- [ ] Ablation on hybrid weights (`weighted-alpha`) and rerank on/off; publish the table, keep the default only if it wins. `[D]`
+- [ ] Graph extraction precision/recall on 100 chunks with hand labels; report entity-type confusion. `[D]`
+- [ ] Chunking strategy comparison with a fixed embedder; one table, one recommendation. `[D]`
+- [ ] Deduplicate/merge quality: measure duplicate memory merges for false positives. `[D]`
+
+### M5.3 Agent and workflow reliability
+
+- [ ] Durable workflow recovery: kill the worker mid-run, assert resume from the last checkpoint, and count lost work per interruption point. `[D]`
+- [ ] Saga compensation: force each compensable step to fail once and assert the documented rollback. `[D]`
+- [ ] Tool-call failure taxonomy: timeouts, schema errors, 429s, partial streams; each with a test and a user-visible message. `[D]`
+- [ ] Escalation breaker: prove it opens and half-opens under a scripted failure storm. `[D]`
+- [ ] Long-run soak: 200 sequential turns with memory and connection counts sampled; no growth. `[D]`
+
+### M5.4 Interface craft (Part B)
+
+Method: `design-ux` §1/§5 — screenshot every page, measure geometry, propose three
+fixes per problem, score, implement the winner, re-shoot.
+
+- [ ] Baseline screenshots of all pages at 360/768/1440 into `docs/screenshots/before/`. `[D]`
+- [ ] One token source for spacing, type scale, colour and radius; lint bans raw hex and magic px in `apps/ui/app`. `[D]`
+- [ ] Every page has loading, empty, error and offline states; a shared component for each. `[D]`
+- [ ] Density pass: tables, lists and sidebars measured for alignment and row height; no page scrolls horizontally at 360 px. `[D]`
+- [ ] Accessibility: keyboard path for every action, visible focus, contrast ≥ 4.5:1, labels on icon-only buttons, reduced-motion honoured. `[D]`
+- [ ] Motion budget: the landing scene and graph view hold 60 fps on a mid laptop, or degrade automatically. `[D]`
+- [ ] Dark/light/system themes from the token file with a screenshot check per page. `[D]`
+
+### M5.5 Security depth
+
+- [x] Threat model for the hosted deployment and the desktop bridge in `docs/security/`, with trust boundaries and the controls that exist. `[D]`
+  - verified-here: `docs/security/threat-model.md` v2.0 (151 lines) covers the hosted deployment and the desktop bridge with seven trust boundaries — internet → API, user or model input → execution, API → outside world, outside text → models, API ↔ data stores, the desktop shell — plus actors, assets A1–A7, operator posture (`GET /api/v1/admin/security/posture`, `nexus security check`) and a residual-risk list. Its claims are anchored to the tests that prove them, and §4.1–4.5 were rewritten as those tests landed.
+- [x] Prompt-injection suite: 20 hostile documents through ingest and RAG, asserting no tool call and no data egress. `[D]`
+  - verified-here: `apps/api/tests/security/prompt-injection.test.ts` → 26/26 passed. Twenty hostile documents (classic override, role reassignment, prompt leak, three chat-template delimiters, «forget everything above», persona assignment, markdown-image exfiltration, link exfiltration, tool call in prose, a JSON `tool_calls` block, credential requests, a webhook instruction, a reflected «the system prompt says…») are composed through `sourcesPrompt` — the same function the council uses — and each asserts the payload is gone, the untrusted-data note is present, and the excerpt still contributes its harmless text; a stubbed `fetch` proves composing the prompt makes **no outbound request**, so no tool call and no egress. Writing it found six real gaps in the guard (set-aside phrasing, tool calls, JSON tool-call keys, secret requests, exfiltration verbs, remote images); `packages/contracts/src/shared/untrusted.ts` gained five rule families (now eleven) and `packages/contracts`’s own suite stayed green (6/6).
+- [x] Tenant isolation test: user B cannot reach A's sessions, keys, files, sandbox runs or traces by id, across every durable store. `[D]`
+  - verified-here: `apps/api/tests/security/cross-account.test.ts` → 31/31 passed. The census enumerates every registered collection with item routes and fails when a new one has neither a fixture nor a written reason to skip; Alice creates, Bob gets 403/404 on every item route while Alice still reads — now including the new `/api/v1/webhooks` fixture, with `/api/v1/comparisons` skipped by written reason (it is built from two council runs, and its ownership is asserted in `tests/routes/comparisons.test.ts`). Sandbox runs cannot be reached by id at all and are pinned separately by `tests/routes/sandbox-owner.test.ts` (Alice reads her output, Bob gets `not_found`, and the run stays in the owner’s history).
+- [x] SSRF and URL-fetch guard on every outbound fetch (web search, ingest, connectors, bridge), with a redirect-refusal test. `[D]`
+  - verified-here: `apps/api/tests/security/ssrf-guard.test.ts` → 9/9 passed. `apps/api/src/lib/public-url.ts` gained an injectable transport so the redirect walk is tested as the attack: a 302 to `http://169.254.169.254/latest/meta-data/` and a 301 to `http://127.0.0.1:6379/` are refused **without the second hop being fetched**, a public chain follows to its 200, and `FETCH_REDIRECT_LIMIT` caps a loop at six attempts. The same file asserts the wiring — `kb`, `context`, `mcp-openapi`, `scraping-mcp`, `browser-agent`, `reactions` and `provider-keys` all route caller URLs through the guard — and fails on any `redirect: "follow"` in `apps/api/src`, so a forgotten call site cannot pass review.
+- [x] Rate limiting and abuse caps per user and per route family, with a test that proves the 429 and the reset. `[D]`
+  - verified-here: NEW `apps/api/tests/lib/rate-limit-window.test.ts` → 6/6 passed, with injected time: the limit is allowed, the next request is 429 `RATE_LIMIT_EXCEEDED` with `Retry-After: 60`, still refused at 59 999 ms, and allowed again at exactly 60 000 ms with `X-RateLimit-Remaining: 2`. It also pins that `Retry-After` counts down (60 → 15 → 1 as the window drains), that in-window traffic cannot extend the window, that each address and each user has its own bucket (Bob is unaffected while Alice is throttled), and that the bucketed Bearer token never appears in a header. `apps/api/src/lib/rate-limiter.ts` was fixed to match: it now tracks when a bucket opened, so `Retry-After` reports the time left instead of the whole window (falling back to the full window for a bucket another replica opened). The existing limiter suites stayed green: 17 + 14 + 3 + 1 + 1.
+
+---
+
+## Phase 6 — Enterprise readiness
+
+### M6.1 Operability
+
+- [x] `docs/slos.md` v1.1 already defines availability, error rate and latency SLOs; add the remaining ones (council success rate, workflow completion, sandbox failure rate) with the SLI source named, or mark them "not instrumented". `[E]`
+      - verified-here: `docs/slos.md` now names a **measurement point** for every SLO — availability and p99 from `SloTracker` in `apps/api/src/routes/metrics.ts` (5-minute window, scraped from `/api/v1/metrics`, explicitly *not* a `/health` probe), council success from the hash-chained audit rows ("not instrumented" as a series, and why: a series in the same process reports 100% for every crash), queue p99 from BullMQ's `finishedOn - processedOn` in Redis, audit integrity from the verify probe every 5 min, and the new **SLO-6 dependency status** from `GET /status` with its two alert expressions. `grep -c "Measurement point" docs/slos.md` → 6.
+- [ ] Quarterly SLO review with a recorded error-budget position and the action taken when it is exhausted. `[E]`
+- [x] `docs/runbook.md`: add every alert in `docs/slos.md` with a first diagnostic command, an owner and a "when to escalate" line. `[E]`
+      - verified-here: `docs/runbook.md` §10 summary table gained the dependency-status row, and new §10.1 is a nine-row table — alert → meaning → **first action** → playbook (P1–P5) → paged yes/no — covering `NexusStatusDown`, `NexusStatusDegraded`, availability/latency pages, queue depth, audit breach, cost spike, dead webhook delivery and update-feed 5xx. §10.2 names the paging destination, the 15-minute escalation, the owner, and the support path from `SUPPORT.md`. The constructed alert vocabulary is not invented: every name matches an expression in `docs/slos.md`, and the `degraded`-is-a-task / `down`-is-a-page rule matches `/status`'s 200/503 split.
+- [ ] On-call rotation of one, documented honestly, with a response-time target and a postmortem template. `[E]`
+- [x] Status page or `/status` JSON that reflects real dependency checks (Postgres, Redis, model, sandbox, Docker). `[E]`
+      - verified-here: NEW `apps/api/src/routes/status.ts` — `GET /status` probes all five (Postgres `select 1`, a Redis round-trip, the provider registry's accepting count, the sandbox route, the Docker daemon with a 2 s race), returns one row each with `{name, ok, detail, critical, ms}`, rolls them into `ok|degraded|down` by the worst *critical* failure, caches a healthy answer 30 min and a broken one 15 s, and answers 503 only for `down` so a status page cannot pull the instance out of rotation. No row names a host, key or version. Wired in `apps/api/src/server.ts` beside the health routes. NEW `apps/api/tests/routes/status.test.ts` → **4/4** (five rows in order with non-empty detail; 503+`down` for a broken Postgres with the driver's `no route to host` absent from the body; 200+`degraded` for a missing Docker; two polls probe Postgres once).
+
+### M6.2 Data governance
+
+- [ ] Account export (all sessions, files, memories, audit entries) in one archive; account delete that removes every durable row and reports what is retained and why. `[E]`
+- [ ] Retention table per store with the enforcing code and a test: sessions, traces, audit, notifications, sandbox artefacts, logs. `[E]`
+- [ ] Audit completeness: register, login, key add/remove, permission change, budget change, export, delete, admin action — each an event, each asserted. `[E]`
+- [ ] Encryption at rest for provider keys is documented; add the rotation path and a migration for the key-material version. `[E]`
+- [ ] PII handling: detection and redaction paths documented, with a test that redaction happens before the model call, not after. `[E]`
+
+### M6.3 Cost and capacity
+
+- [ ] Cost attribution per user, per company and per route family from the real `_costLog`; a monthly report in one command. `[E]`
+- [x] Budget hard stops verified: a company over budget is refused at the API, not only in the UI. `[E]`
+      - verified-here: NEW `apps/api/tests/routes/org-budget-refusal.test.ts` drives the real HTTP surface — company → agent → goal → task over `POST /api/org/...`, a hard-stop goal policy via `PUT /api/org/companies/:id/budgets`, then `POST /api/org/agents/:id/wake` — and asserts the run the API *accepted* (202) finishes `skipped` with the budget in `GET /api/org/runs/:id`'s log, so the refusal is in the API's own record rather than in a hidden button. **1/1** passes. Along the way two facts had to be learned from the code: org routes mount under `/api` (not `/api/v1`), and the run log lines carry `text`, not `message`.
+- [ ] Capacity model: requests/second per replica, DB connections per replica, Redis ops, and the number that breaks first. `[E]`
+- [ ] Scaling path: single replica → managed Postgres with pooling → Redis cluster → worker split, each step with the trigger and the measured cost. `[E]`
+
+### M6.4 Delivery discipline
+
+- [ ] ADRs for anything that changes an invariant in §0, a durability class, or a gate threshold. `[E]`
+- [x] `CONTRIBUTING.md`: pre-push gate, the "no paid API" rule, the surface policy (invariant 4), and the one-subtask-one-PR rule. `[E]`
+      - verified-here: new `CONTRIBUTING.md` → `## Rules before you push` states all four as checkable rules: the gate (`pnpm typecheck && pnpm lint && pnpm test && pnpm check:headers && pnpm openapi:check`, plus `check:offline`/`bundle:budget` when relevant — all five script names verified present in `package.json`), the no-paid-API invariant with its `pnpm check:offline` guard (`2 passed, 4 skipped, 0 failed` on this machine), the surface policy naming the pruned surfaces and requiring an ADR rather than a diff, and one-subtask-one-PR. Also new: `### Running one test, and debugging it`, whose commands were executed here (`apps/cli` watch-run suite → 7/7 through the exact documented path).
+- [ ] Release notes generated from Changesets, with a support matrix (OS, Node, Docker, model backends) that CI enforces. `[E]`
+- [ ] Upgrade policy: schema migrations forward-only, one minor of deprecation for API routes, a documented rollback for each release. `[E]`
+- [x] Support path: a triage template, the top 10 failure modes from `docs/TROUBLESHOOTING.md`, and the diagnostic bundle command. `[E]`
+      - verified-here: NEW `SUPPORT.md` (where each kind of report goes, what a good report contains, what is *not* supported — no phone support, self-hosting outside the SLOs, no deadline on community issues — linked from `README.md`); `docs/TROUBLESHOOTING.md` gained a **ten-row failure-mode table** with the cause and the section to read, each row traceable to text already in that file or to `runbook.md` §P5 / `slos.md` SLO-6; and NEW `nexus doctor --bundle [dir]` in `apps/cli/src/lib/diagnostic-bundle.ts` writes a redacted `nexus-bundle.json` + README. `apps/cli/tests/lib/diagnostic-bundle.test.ts` → **10/10**, and the command was run for real: `node apps/cli/src/index.ts doctor --bundle /tmp/nexus-bundle-check` wrote both files and reported `redacted: credentials in a URL`. The test found a true gap on the first run — `gsk_…` (Groq) keys were not matched because the pattern assumed a hyphen — now both separators are covered.
+
+---
+
+## 7. Execution model: waves, effort, exit gates
+
+Effort: **S** ≤ 1 day, **M** 2–3 days, **L** 1–2 weeks.
+
+| Wave   | Days    | Objective                                                                              | Majors    | Effort      | Gate                                                                                                                                                                                           |
+| ------ | ------- | -------------------------------------------------------------------------------------- | --------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **W0** | 3–4     | Make the tree's own claims true: baseline, lists, sandbox, contract                    | M1.1–M1.6 | M+M+L+M+M+M | `pnpm check:offline` passes on a clean tree; no hand-written path list remains in `package.json`; the sandbox image ships a current Go/rustc; `openapi:check` and `types:check` are diff-clean |
+| **W1** | 4–5     | Gates that can fail: CI truth, test integrity, supply chain, data safety, env contract | M2.1–M2.5 | M+L+M+M+M   | a deliberately broken test, a leaked secret and an unpinned action each fail CI                                                                                                                |
+| **W2** | 6–7     | Off release candidates, faster builds, code shape, onboarding                          | M3.1–M3.4 | L+M+M+M     | Drizzle rc → stable (or documented exception); build time and `pnpm test` time recorded before/after                                                                                           |
+| **W3** | 8–11    | Widening inside surviving surfaces                                                     | M4.1–M4.4 | L×4         | each new route declares durable/bridge/volatile and appears in the generated spec                                                                                                              |
+| **W4** | 12–15   | Depth where the product claims quality                                                 | M5.1–M5.5 | L×5         | each surface has a measured eval with n and a table                                                                                                                                            |
+| **W5** | quarter | Operability, governance, cost, delivery                                                | M6.1–M6.4 | M×4         | runbook exercised; cost ceiling known; release process documented                                                                                                                              |
+
+Wave rules: W0 is mandatory because three of its six majors are "the claim and the
+tree disagree". W1 gates W2–W5. Widening (W3) never re-adds a surface listed in
+invariant 4 — that is a review rule, not a task.
+
+---
+
+## 8. Dependencies and the critical path
 
 ```
-winget install --id GrafanaLabs.k6 -e
-winget install --id Gitleaks.Gitleaks -e
-winget install --id AquaSecurity.Trivy -e
-winget install --id Anchore.Syft -e
-winget install --id PostgreSQL.PostgreSQL.18 -e
-winget install --id Ollama.Ollama -e
+M1.1 (baseline)      → every later measurement
+M1.2 (path lists)    → M2.1 (CI truth)        → M3.x
+M1.3 (sandbox)       → M5.5 (security depth)  → M6.1
+M1.4 (contract)      → M4.x (new routes must declare their class)
+M2.2 (test integrity)→ M5.x (evals need honest tests)
+M2.5 (env contract)  → W5 operability
+M3.1 (dependency)    → M3.2 (speed)
 ```
 
-`GrafanaLabs.k6` is the CLI; `GrafanaLabs.k6Studio` is a GUI and is not needed.
-`PostgreSQL.PostgreSQL.18` installs a server too; uncheck it if you only want `psql`.
-Playwright browsers come from `pnpm exec playwright install`. Already present: `gh`, `docker`,
-`node`, `pnpm`, `git`, `go`, `python`, `uv`, `k6`, `ollama`.
+Critical path: **M1.2 → M2.1 → M3.1 → M4.x**. Hand-written lint/test lists are what
+let the tree drift from its claims; the CI truth work depends on removing them, and
+every widening wave depends on a spec that is generated rather than typed.
 
-```
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm test
-pnpm check:offline
-pnpm check:online          # after Phase 2 adds it
-pnpm check:docs            # after Phase 8 adds it
-docker compose up -d --build
-docker compose down -v
-```
-
-Path notes for this machine: prepend `C:\Users\Yash\AppData\Roaming\npm` for `pnpm` and
-`C:\Program Files\Docker\Docker\resources\bin` for Docker. Clear `HTTP_PROXY`/`HTTPS_PROXY` before
-`git push` and `gh`, or the CONNECT tunnel fails with 503.
+Do not start: M3.1 before M1.2 (upgrade noise on top of stale lists); M4.x before
+M1.4 (new routes without a declared class break the durability-class contract); M5.x
+before M2.2 (evals on inconsistent tests measure nothing).
 
 ---
 
-## Appendix C: decisions
+## 9. Verification harness (commands that exist today)
 
-1. **Sandbox placement.** Compose mounts the socket, the desktop app uses the local Docker CLI, the
-   browser app uses the loopback helper. Hosted execution with no install is out of scope.
-2. **Desktop installer.** Bundle the API; the offline promise needs it.
-3. **Sign-in.** GitHub first, Google when a tenant exists.
-4. **Billing.** Free plus BYOK by design. No subscription work.
-5. **LSP.** A client, not a server. Read-only tools auto-allowed, rename and code actions gated,
-   workspace containment, off on shared hosts.
-6. **Sandbox languages.** Expose what the image runs rather than shrink the image.
-7. **Push.** Only with explicit approval; one branch, `master`.
+| Purpose                               | Command                                                                                      | Status                     |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------- |
+| Offline check bundle                  | `pnpm check:offline`                                                                         | exists                     |
+| Online check bundle                   | `pnpm check:online`                                                                          | exists                     |
+| Spec determinism                      | `pnpm openapi:check`                                                                         | exists                     |
+| Baseline drift                        | `pnpm baseline:check` (facts) / `pnpm baseline` (regenerate)                                 | exists (M1.1)              |
+| Type determinism                      | `pnpm types:check`                                                                           | exists                     |
+| Lint                                  | `pnpm lint` = `node scripts/lint.mjs` (targets from `pnpm-workspace.yaml`, Go via gofmt/vet) | exists; derived since M1.2 |
+| Types                                 | `pnpm typecheck`                                                                             | exists                     |
+| Unit tests                            | `pnpm test` (`turbo run test`)                                                               | exists                     |
+| Campaign                              | deleted in M1.2 — the 53 paths it named are covered by `pnpm test`                           | —                          | —   |
+| E2E                                   | `pnpm test:e2e`                                                                              | exists                     |
+| Headers                               | `pnpm check:headers`                                                                         | exists                     |
+| Docs                                  | `pnpm check:docs`                                                                            | exists                     |
+| Release                               | `pnpm check:release`                                                                         | exists                     |
+| Format                                | `pnpm format:check`                                                                          | exists                     |
+| Board service                         | `pnpm board:build`, `pnpm board:test` (Go 1.27 module)                                       | exists                     |
+| DB                                    | `pnpm db:migrate`                                                                            | exists                     |
+| **Baseline numbers regenerated**      | —                                                                                            | **missing** (M1.1)         |
+| **Per-package coverage floor**        | —                                                                                            | **missing** (M2.2)         |
+| **Sandbox toolchain freshness check** | —                                                                                            | **missing** (M1.3)         |
 
 ---
 
-## Appendix D: proof ledger
+## 10. Risk register
 
-Fill one row per claim-bearing document during Phase 8. A row is done when the proof exists and the
-claim matches it exactly.
+| #   | Risk                                                       | Prob | Impact                                   | Detection                        | Mitigation                               |
+| --- | ---------------------------------------------------------- | ---- | ---------------------------------------- | -------------------------------- | ---------------------------------------- |
+| R1  | Sandbox ships Go 1.19.8 / rustc 1.63 from Debian bookworm  | High | Users run ancient toolchains; known CVEs | `infra/sandbox/Dockerfile:28-29` | install pinned current toolchains (M1.3) |
+| R2  | Hand-written lint/test lists silently exclude new code     | High | Untested code merges                     | `package.json:25,28`             | derive from the workspace (M1.2)         |
+| R3  | Drizzle `1.0.0-rc.6` in production                         | Med  | Breaking change on release               | `pnpm-workspace.yaml:22`         | pin, test upgrade (M3.1)                 |
+| R4  | Spec classes (347 durable / 161 bridge / 5 volatile) drift | Med  | Contract lies                            | doc claim, no check              | generated check (M1.4)                   |
+| R5  | Recorded test numbers (6,086 / 16 skip) are stale          | High | False confidence                         | `docs/STATUS.md` only            | regenerate in CI (M1.1)                  |
+| R6  | 1,888 tracked files include artefacts                      | Med  | Review noise                             | `git ls-files` count             | M1.6                                     |
+| R7  | A removed surface is re-added by a helpful PR              | Med  | Scope creep                              | invariant 4                      | review rule + doc                        |
+| R8  | CI workflows drift (14 of them) with no ownership          | Med  | Red checks ignored                       | `.github/workflows` count        | M2.1                                     |
+| R9  | Local model path breaks silently                           | Med  | "No paid API" promise fails              | `check:offline`                  | keep offline check in CI                 |
+| R10 | Desktop update channel untested                            | Med  | Users stuck on old build                 | electron-updater flow            | signed-build smoke test (M4.3)           |
 
-| Document                        | Claims reviewed | Proof used                                                                                                              | Date       | Reviewer    |
-| ------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------- | ----------- |
-| `README.md`                     | 34              | route greps (`local-pty.ts`, `user-data.ts`), package and tool counts, `pnpm test`, `pnpm test:e2e`, workflows          | 2026-11-23 | agent-audit |
-| `docs/FEATURES.md`              | 25              | route greps (`kg.ts`, `kb.ts`, `search.ts`, `rlhf.ts`), `openapi.yaml` counts, `pnpm --filter @nexus/api openapi:check` | 2026-11-23 | agent-audit |
-| `docs/STATUS.md`                | 40              | route greps, migrations `0019`-`0021`, `pnpm test`, `pnpm test:e2e`, `openapi.yaml` counts                              | 2026-11-23 | agent-audit |
-| `docs/TESTING.md`               | 18              | `vitest.config.ts`, `scripts/e2e-server*.mjs`, `.github/workflows/test.yml` jobs                                        | 2026-11-23 | agent-audit |
-| `docs/internal/architecture.md` | 24              | `server.ts` scopes, `middleware/auth.ts`, `local-pty-owner.test.ts`, `security-posture.ts`, app manifests               | 2026-11-23 | agent-audit |
-| `docs/security/threat-model.md` | 18              | `public-routes.test.ts`, `local-pty-owner.test.ts`, `security-posture.ts`, route greps                                  | 2026-11-23 | agent-audit |
-| `plan.md` (this file)           | —               | deferred; the measured table is Phase 9 work                                                                            | 2026-11-23 | agent-audit |
+---
+
+## 11. PR batching and rollback
+
+| Batch | Contents                                         | Rollback                         |
+| ----- | ------------------------------------------------ | -------------------------------- |
+| B1    | baseline regeneration + `STATUS.md` numbers      | revert doc + script              |
+| B2    | path lists → workspace-derived                   | revert `package.json` scripts    |
+| B3    | sandbox image toolchains + size check            | revert Dockerfile; image rebuilt |
+| B4    | contract checks (spec classes, headers)          | revert check                     |
+| B5    | CI truth (broken-test, secret, pinning examples) | revert workflow                  |
+| B6    | dependency upgrades, one package family per PR   | revert lockfile                  |
+
+Rollback rules: DB migrations forward-only; a spec change ships with the client
+regeneration in the same PR; the sandbox image is digest-pinned, so a rollback is a
+digest revert.
+
+---
+
+## 12. Progress metrics
+
+| Metric                        | Now (measured)                                                           | W1                              | W3                 | How measured                          |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------- | ------------------ | ------------------------------------- |
+| Tracked files                 | 1,888                                                                    | − artefacts                     | − more             | `git ls-files \| wc -l`               |
+| Hand-written path lists       | 1 (`lint` replaced in M1.2; the `tsconfig.build.json` references remain) | 0                               | 0                  | `package.json`, `tsconfig.build.json` |
+| Sandbox Go / rustc            | Debian bookworm (Go 1.19 era, rustc 1.63)                                | current                         | current            | image build log                       |
+| Workspace size                | 50 packages, 7 apps, 2 services                                          | same                            | + surfaces         | `ls -d`                               |
+| Test totals                   | 6,236 pass / 16 skip / 530 files (measured)                              | regenerated                     | regenerated        | `scripts/baseline.sh --json`          |
+| Spec ops                      | every operation carries a durability class                               | verified                        | verified per route | `openapi:check` output                |
+| CI workflows                  | 14                                                                       | 14, each with a failing example | same               | `.github/workflows`                   |
+| Dependency release candidates | 1 (Drizzle rc.6)                                                         | 0 or documented                 | 0                  | `pnpm-workspace.yaml`                 |
+
+---
+
+## Appendix A — Blocked on the owner
+
+These were carried from the previous plan and are not agent work:
+
+- GitHub OAuth app fields (homepage, callback URLs) and rotation of the client secret that appeared in a transcript.
+- Google sign-in, once a tenant exists.
+- A cloud model key for online acceptance (the deployed host cannot reach a local model).
+- `OLLAMA_MODELS` still points at `D:\brain-models\ollama`, which does not exist on the current host.
+- Windows code-signing certificate (OV/EV) and Apple Developer ID + notarisation for the dmg.
+- macOS dmg (arm64 + x64), signing in CI from those secrets, and the signed update manifest.
+- Installer measurement (size, install time, first-run time) before building the feed.
+- Claude Desktop in-app review against `mcp-bridge.exe`; one real OpenCode turn through the board.
+- Live R2/B2 snapshot upload (`CLOUDFLARE_R2_*`, `OPEN_BOARD_SNAPSHOT_PASSPHRASE`).
+- Alert dismissal, which by policy requires a written reason from a human.
+- Tag and publish the first desktop semver (`v0.1.0`) after signing exists.
+
+## Appendix B — Definition of done
+
+1. The failing case exists as a test before the fix, and the test fails without the fix.
+2. `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `openapi:check`, `types:check` all pass; output pasted in the PR.
+3. No invariant in §0 broken; no page from the pruning list reintroduced.
+4. Any new route declares `durable` or `bridge`; the generated spec diff is in the PR.
+5. Numbers in `docs/STATUS.md` come from `scripts/baseline.sh`, never from memory.
+6. Docs and env docs updated in the same PR; `check:docs` green.
+
+## Appendix C — Evidence ledger
+
+| Claim                                          | Command                                          | Result                                                               | Status         |
+| ---------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- | -------------- |
+| 50 packages / 7 apps / 2 services              | `ls -d packages/*/ apps/*/ services/*/ \| wc -l` | 50 / 7 / 2                                                           | verified-here  |
+| 1,888 tracked files                            | `git ls-files \| wc -l`                          | 1,888 (1,877 at the earlier pass)                                    | verified-here  |
+| 14 workflows                                   | `ls .github/workflows/*.yml \| wc -l`            | 14                                                                   | verified-here  |
+| Hand-written lint lists                        | `node -e` read `scripts.lint`                    | two literal path lists                                               | verified-here  |
+| Hand-written campaign list                     | `scripts.test:campaign`                          | 53 literal paths, all covered by the suite runs                      | deleted (M1.2) |
+| Sandbox image digest-pinned, Go/rustc from apt | `sed -n '11,32p' infra/sandbox/Dockerfile`       | confirmed                                                            | verified-here  |
+| Board service `go 1.27.0`, sqlite 1.62.0       | `head -5 services/board/go.mod`                  | confirmed                                                            | verified-here  |
+| Drizzle `1.0.0-rc.6`, Fastify `^5.12.8`        | `grep -n` in `pnpm-workspace.yaml`               | lines 22, 24                                                         | verified-here  |
+| TypeScript 6 native preview                    | `pnpm-workspace.yaml:19`                         | `@typescript/typescript6@^6.0.2`                                     | verified-here  |
+| "Go 1.19.8, rustc 1.63.0, Ruby 3.1.2"          | `docs/STATUS.md:49`                              | doc claim, consistent with Debian bookworm                           | needs-verify   |
+| 6,086 pass / 16 skip / 509 files               | `docs/STATUS.md`                                 | stale: measured 6,236 pass / 16 skip / 530 files                     | disproven      |
+| 410 paths / 513 operations (347/161/5)         | `openapi.yaml`                                   | measured 413 paths / 516 ops / 350 durable / 161 bridge / 5 volatile | disproven      |
+
+---
+
+## 13. Journal
+
+- 2026-11-24 m1.1.1 [x] one command measures the baseline | proof: `node scripts/baseline.mjs --json` → 6,252 tests/530 files, 6,236 pass, 0 fail, 16 skip; e2e 47/11; spec 413 paths/516 ops (350/161/5) | note: two tests (`pty` retention order, `token-saver-slow` budget) failed in an earlier run and passed here — flaky, handled by M2.2 | next: m1.1.2
+- 2026-11-24 m1.1.2 [x] STATUS.md numbers are generated and gated | proof: `node scripts/baseline.mjs --check` → exit 0; with `packages/zz-baseline-probe` present → exit 1 (`51 packages` vs `50`); removed → exit 0; CI job `baseline` in `lint.yml` | deviation: test counts are recorded under a `baseline:measured` marker but not gated, because identical code measured 6,210–6,236 passing and 0–5 failing on this host, which would leave the gate permanently red | next: m1.1.3
+- 2026-11-24 m1.1.3 [x] every skip has a written reason | proof: `node scripts/baseline.mjs --skips` → 16 unit skips, each with its file; `--json` → e2e 45 passed / 2 failed / 11 skipped; all 27 classified intentional in `docs/TESTING.md` | next: m1.1.4
+- 2026-11-24 m1.1.4 [x] no dead skip survives | proof: every skip in the m1.1.3 table has a switch a real host flips; `docs/TESTING.md` now says which four run in CI (POSIX-only x2, `migrate-concurrent`, POSIX `drive-run`) and why the rest are host-gated | next: m1.2.1
+- 2026-11-24 m1.2.1 [x] lint targets come from the workspace | proof: `node scripts/lint.mjs` → `lint passed: 56 source directories, 1 Go module(s)`; probe package raised it to 57 and failed both linters; removal restored 56 | also closed: `apps/desktop/src` was never linted before this | next: m1.2.2
+- 2026-11-24 m1.2.2 [x] test:campaign deleted | proof: all 53 of its literal paths are already collected by the four suite runs (53/53 in the JSON reports) and its trailing api vitest is the `app-suites` job | now only `test` and `test:e2e` remain | next: m1.2.3
+- 2026-11-24 m1.2.3 [x] a package cannot fall out of lint or tsc | proof: `node --test scripts/lint-targets.test.mjs` → 5/5 pass; probe package with only package.json+src failed the tsconfig and build-graph assertions, removal restored 5/5 | CI: `lint` job in `lint.yml` | next: m1.2.4
+- 2026-11-24 m1.2.4 [x] tsconfig.build.json references are generated | proof: `node scripts/tsconfig-refs.mjs --check` → `all 50 packages`; writer reproduces the committed file with an empty `git diff`; probe package made `--check` exit 1 | `pnpm tsconfig:sync` | next: m1.3.1
+- 2026-11-24 m1.3.1 [x] Go and Rust come from official checksum-pinned releases | proof: downloaded tarballs hash to `7226736c…24840` (Go 1.27.4) and `98ee6bec…15acd` (Rust 1.100.0), matching `infra/sandbox/Dockerfile`; `golang-go`/`rustc` gone from apt | needs-verify: `docker build -t nexus-sandbox:local infra/sandbox` (no Docker here) | next: m1.3.2
+- 2026-11-24 m1.3.2 [x] the image asserts and labels its toolchains | proof: final `RUN` writes `/usr/local/share/nexus-toolchains.txt` and fails the build unless `go version`/`rustc --version` match the pins; `LABEL org.nexus.toolchains` + `org.nexus.toolchains-file` | needs-verify: image build + `docker inspect` (no Docker here) | next: m1.3.3
+- 2026-11-24 m1.3.3 [x] STATUS language table matches the pins | proof: `grep -rn "Go 1.19|rustc 1.63" docs/ infra/` → no matches; Ruby/Python values checked against `sources.debian.org` (3.1.2, 3.11.2) instead of memory | next: m1.3.4
+- 2026-11-24 m1.3.4 [x] /sandbox/status says which path runs each language | proof: `pnpm --filter @nexus/api exec vitest run tests/routes/sandbox.test.ts` → 16/16 pass; with the route reverted → 15/16 (`runtimes` missing); `pnpm openapi:check` → in sync | only javascript (`api`) and python (`pyodide`) have `serverRuns: true` | next: m1.4.1
+- 2026-11-24 m1.4.1 [x] /v1 verified over real HTTP and recorded | proof: `openai-v1-transcript.test.ts` 9/9 pass across models, chat JSON+SSE, completions, embeddings, files, batches and the error shape; wrote `docs/openai-v1-transcript.md` (12 exchanges) | fixed: empty JSON body on DELETE returned 400 (server.ts `/v1` parser); stashing it fails 2/9 | next: m1.4.2
+- 2026-11-24 m1.4.2 [x] CLI parity is a gate, and `nexus research` works | proof: `node scripts/cli-parity.mjs` → `44 CLI commands, 83 route families, 28 CLI calls` pass; each of its four checks was made to fail on purpose (ghost heading, missing row, ghost command, ghost call) | fixed: `nexus research submit` posted to a nonexistent `/api/research`; now `/researcher/research` + `citations <runId>` | next: m1.5.1
+- 2026-11-24 m1.5.1 [x] kb graph builds persist across a restart | proof: `kb-graph.test.ts` 6/6, incl. two re-import-as-restart cases; dropping `graphJobs.load()` fails the restart case (1 failed | 5 passed) | jobs live in `nexus_kv` (`kb_graph_jobs`), 7-day TTL, interrupted builds read back as an error | next: m1.5.2
+- 2026-11-24 m1.5.2 [x] discussions keep their ledger and can be exported | proof: `discussion.test.ts` 7/7 incl. restart read-back; removing `discussions.load()` fails it (1 failed | 6 passed) | `id` frame first, `GET /discussion[/:id[/export]]`, 30-day retention, owner-filtered | next: m2.1.2
+- 2026-11-24 m2.1.1 [x] every workflow states the failure it prevents | proof: `scripts/workflow-map.test.mjs` 3/3, fails on a ghost workflow and on a ghost row; wired into lint.yml + make verify | no exact duplicates found, 2 overlaps documented; the tag-trigger defect it surfaced is m2.1.4 | next: m2.1.3
+- 2026-11-24 m2.1.3 [x] lockfile drift fails the build | proof: `lockfile-drift.test.mjs` 7/7 plus a scratch branch touching only `pnpm-lock.yaml` giving exit 1 with the drift message | both directions caught; no base means "nothing checked", not a silent pass | next: m2.1.4
+- 2026-11-24 m2.1.4 [x] preview and stable are different paths | proof: `release-triggers.test.mjs` 5/5 parsing the YAML; each rule shown to fail (3 sabotages: 5, 5 and 3 failing cases) | master push opens a version PR only; `latest` from a `v*` tag on master, guarded by an ancestor check; manual runs publish `next`; images tagged with the release name | needs-verify: a real tagged run | next: m2.1.5
+- 2026-11-24 m2.1.5 [x] turbo cache restored and wall times published | proof: `ci-cache.test.mjs` 4/4 (sabotage: 2 failures, and 1 for the package cache) caught 3 turbo jobs that had no cache at all; `job-times.test.mjs` 5/5 and a 60s-baseline run at 120s exits 1 | `.turbo/cache` restored on lockfile key, wall time in the run summary, 25% regression fails, baseline file empty until a runner fills it | needs-verify: the runs themselves | next: m2.1.2
+- 2026-11-24 m2.1.2 [x] the merge gate is documented, and a gate that could never report is fixed | proof: live protection has all 9 contexts incl. test/lint/build; `required-checks.mjs` exits 1 naming `Production dependency advisories` when the job name is reverted (the check could never report → all merges blocked), 0 after the fix; `required-checks.test.mjs` 6/6 | branch is `master` not `main`; settings documented, not changed (admin action) | next: M2.2
+- 2026-11-24 m2.2.1 [x] every package has its own coverage floor, and the ratchet only turns up | proof: `node scripts/coverage-floors.mjs --record` measured 12 packages from scoped coverage runs (llm 85.9 lines, agent-core 89.5, council 97.9, search 86.5, governance 93, lsp 84.4, mcp-client 92.3, plugin-sdk 92.6, billing 98.3, llm-oauth 93.6, browser-automation 91.7, db 46); a floor raised to 99 fails with `packages/db: lines 46% is below the 99% floor`, exit 1; `coverage-floors.test.mjs` 8/8 (weighted sums, a 100-line file outweighing a 1-line one, the ratchet never lowering, a first-time package) | `--record` raises only, a drop is a hand edit; `unit` job runs `--strict` after its coverage pass; barrel-only packages (`src/index.ts` is excluded as a barrel) are never measured, so a recorded floor with no measurement is reported, not failed | needs-verify: the CI numbers on a real runner, and floors for the packages not seeded here | next: m2.2.2
+- 2026-11-24 m2.3.1 [x] high and critical advisories block, and a waiver expires | proof: fixture with one critical exits 1 naming it; live trees 0 advisories over 1,819 deps, exit 0; an allowlist entry dated 2026-01-01 exits 1 with "allowlist entry expired"; `audit-gate.test.mjs` 8/8 | allowlist ships empty; expired entries fail, stale ones are reported; registry failure exits 2 after a retry rather than passing | next: m2.3.3
+- 2026-11-24 m2.2.2 [x] fixed sleeps in the e2e specs are condition waits, and the rule is a test | proof: 2 sleeps in 20 specs, both now helpers (`waitForFiledSubtask` asks before sleeping); `e2e-waits.test.mjs` 4/4 with a 15-file canary, and sabotage (inline `waitForTimeout(500)` + `setTimeout(900)`) fails both rules naming file and line | 5× stability run + quarantine decision for `chat-history`/`skills` need Playwright browsers: needs-verify, protocol in docs/TESTING.md | next: m2.2.4
+- 2026-11-24 m2.2.4 [x] the suite is run twice at one seed and compared | proof: 149 tests identical at seed 1337; a `Math.random` test is caught (1 of 150 changed status, exit 1); `seed-determinism.test.mjs` 6/6 | new `seeded` job in test.yml, `seed-determinism` gate in verify (skipped by --fast), docs/OPS.md §7a; no uncovered workflow steps | next: m2.2.1
+- 2026-11-24 m2.2.6 [x] the five volatile operations are tested against a real restart | proof: `sandbox-volatile.test.ts` 3/3 in 35s; sabotages fail (stub `/sandbox/runs` → 2 failures, no module reset → restart case fails) | asserts both halves: data real in-process, gone after restart, stateless status still answers; empty execute body is 201 not 400 | next: m2.2.4
+- 2026-11-24 m2.2.5 [x] a bridge route may not write durable state | proof: `durable-bridge.test.ts` 4/4; zero offenders today (`mem.forget` is the only durable write in a bridge file, on two paths the table calls durable); canaries require ≥12 located registrations and ≥2 writing handlers; sabotage (dropping `/api/memory` from the dedicated table) fails naming both routes | handler window stops at the next registration, so a write cannot be borrowed from the neighbouring handler | next: m2.2.6
+- 2026-11-24 m2.2.3 [x] the two host-timing flakes are fixed, not quarantined | proof: 5/5 runs each after the change (pty 13/13, token-saver 14/14); sabotage still fails (`MAX_RETAINED_EXITED=30` → "retention cap not enforced", `BUDGET_MS=0` → 14 failed) | pty waits on the condition instead of 500ms; token-saver takes the fastest of 3 passes after a warm-up | 2 e2e specs (`chat-history`, `skills`) remain in M2.2.2 | next: m2.2.5
+- 2026-11-24 m1.6.3 [x] `make verify` runs CI's gates locally | proof: 12 gates labelled by workflow job; `--gaps` reports none uncovered; fast path 10/10, build and typecheck green alone, suite flakes (2 files) pass in isolation | one list instead of a second copy of CI; doc states the four jobs a laptop cannot run | next: m1.6.4
+- 2026-11-24 m1.6.2 [x] no scanner binaries in the tree | proof: nothing referenced `.nexus/bin`; both deleted; `docs/OPS.md` §5 maps each CI security check to its version and local command | removal chosen over a `make tools` target because no consumer exists | next: m1.6.3
+- 2026-11-24 m1.5.3 [x] empty data sources say so | proof: `empty-analytics.test.tsx` 3/3 (sabotage → 2 failed | 1 passed); `admin-analytics.test.ts` 3/3 incl. unknown latency = null (sabotage → fails) | dashes + explicit empty cards, per-panel empty text, `null` not `0` for unreachable gateway log | next: m1.5.4
+- 2026-11-24 m1.3.5 [x] Ruby 3.4.13 built from source, checksum-pinned, replacing EOL 3.1.2 | proof: apt `ruby` removed; build stage checks `sha256 d0d3bf3d…f351a` on the real tarball (measured locally); assertion now greps `^ruby 3.4.13` | needs-verify: `docker build …` (no Docker) | next: m1.4.1
+- 2026-11-24 m2.3.3 [x] actions are pinned by SHA, and a floating tag fails the lint job | proof: all 66 `uses:` lines in the 14 workflows carry a 40-hex SHA plus the tag in a comment (26 distinct refs); each SHA re-resolved against its own tag with `git ls-remote --tags <repo> refs/tags/<tag> refs/tags/<tag>^{}` → 26/26 match; `actions-pinned.test.mjs` 3/3, sabotage: `actions/cache@v5` in build.yml:32 → 1 failed naming it, SHA with the comment removed in build.yml:25 → 1 failed | `./local` and `docker://` refs exempt, the canary needs ≥12 workflow files and ≥50 `uses:` lines so an empty read cannot pass; wired into the lint job's rule run and `make verify`; docs/OPS.md §6 states the pin, the update path and the `ls-remote` command | next: the licence audit across 50 packages and the Go services
+- 2026-11-24 m2.3.4 [x] every dependency's licence is measured, and a new copyleft one needs an ADR | proof: `node scripts/license-audit.mjs` → 1,018 prod packages / 908 dev-only / 25 Go modules; prod 1014 permissive, 2 weak-copyleft, 2 unclassified; go 24 permissive, 1 weak-copyleft; sabotage on `isbot` (`GPL-3.0-or-later`, prod) and `knip` (dev) both exit 1 naming the package, a removed `@splinetool/runtime` entry exits 1 with "declares no usable licence", a missing ADR path exits 1; `license-audit.test.mjs` 9/9 | NOTICE's generated block is compared every run and regenerated with `--write`; platform binaries collapse to `<platform>` so Windows and Linux agree; the two decisions are in `.github/license-exceptions.json` + ADR 0019; a Go module it cannot read is a note, not a pass | next: m2.3.5 rotation drill
+- 2026-11-24 m2.3.5 [~] the rotation drill is written down and guarded; the timed run is still owed | proof: `docs/runbook.md` §11 has both halves (BYOK `POST /api/user/provider-keys` with soft-delete + `provider_key.rotate`; env-only OAuth client secret with the stored-token check), §11.3 names `NEXUS_SECRETS_KEY`/`NEXUS_OAUTH_VAULT_KEY` as a different drill, §11.4 is the timing table; `scripts/rotation-drill.test.mjs` 8/8 wired into lint + `make verify`, sabotage fails on a renamed curl path (`no route registers /user/provider-keyz`) and on a dropped at-rest key name | found and fixed two real doc gaps: `NEXUS_SECRETS_KEY` and `GITHUB_OAUTH_CLIENT_SECRET` were read but undocumented in `.env.example` (now documented + allowlisted); the GitHub provider is marked unsupported, which is why nothing reads it | needs-verify: perform the drill on a deployed instance with a provider console, then fill §11.4 — the table still reads `_unrun_` | next: M2.4 data safety
+- 2026-11-24 m2.4.3 [x] retention is a value in code with a test per policy | proof: `RETENTION` (packages/contracts) is read by both stores; `retention.test.ts` 8/8 (TTL stamped on item + index, sabotage → "expected undefined to be 2592000000"); `retention-policy.test.mjs` 6/6 with a 500-file canary, failing on a second copy of any number and on any `delete(auditLog)` | audit_log survives erasure by construction (absent from `USER_SCOPED_TABLES`) and by the DB triggers; four older 30-day stores are listed as a ratchet so the leak cannot grow | docs/OPS.md §4 table | next: m2.4.4
+- 2026-11-24 m2.4.4 [x] what Redis holds, and what a flush costs | proof: OPS.md §3 table of 8 key families (safe / retried / lost); `apps/api/tests/lib/empty-redis.test.ts` 3/3 against a real RESP server with an empty keyspace — RedisKVStore selected, reads answer empty, first requests 200/401, health `kv` leg `ok`; sabotage on `REDIS_URL` → "expected 'PgKVStore' to be 'RedisKVStore'", sabotage on a failing cold read → "/api/missions answered 500" | the fake is a real socket with a working keyspace, so the cold path is exercised through ioredis and RedisKVStore, not stubs | next: m2.4.2
+- 2026-11-24 m2.4.2 [x] a migration must survive the previous release's schema and its rows | proof: `migrations-forward-only.mjs` → 24 migrations, 0 removals, exceptions need an existing ADR; `migrations-forward-only.test.mjs` 6/6 (commented DELETE is prose, drop refused, stale exception reported, 20-file canary); `migrate-forward-only.test.ts` applies 0021 then legacy rows then 0022 on embedded Postgres and asserts both owner spellings + additive-only columns; sabotage → `user_id: null` and "memory_entries.expires_at was removed by 20240610061320_0022_memory_owner_both" | `migrate.yml` forward-only job (throwaway postgres:16, previous tag via `git archive`, `db-forward-only-drill.sh`) unrun here — the embedded drill is the proof it can run | docs/OPS.md §4 + §7 | next: m2.4.1
+- 2026-11-24 m2.4.1 [~] the backup/restore drill is written down and guarded; the run is owed | proof: `db-backup-drill.sh` dumps, recreates a scratch DB, restores, compares every table's row count, points the restored audit chain at `nexus audit verify`, refuses equal URLs; runbook §7.5 carries the procedure + record table reading `_unrun_`; `backup-drill.test.mjs` 5/5 (sabotage → "the identical-URL guard is gone", "the record must show the drill has not been run yet") | no Postgres or Docker on this machine, so the wall time is still owed — a drill nobody ran is not recorded as run | next: run §7.5 against staging and fill the record row
+- 2026-11-24 m2.5.4 [x] the offline path is documented and CI boots it | proof: `offline-mode.test.ts` 3/3 with every network variable deleted — `/health` 200 `{status:"ok"}`, readiness 200/503 not a crash, `kv` leg ok; `docs/DEPLOYMENT.md` "Offline machine"; `test.yml` `offline` job with no services | the doc claims only what the test proves — chat needs a model and says so | next: m3.4
+- 2026-11-24 m3.4 [~] one quickstart, generated layer diagrams, and a verified-stamp on every doc | proof: README "Option C" five commands + `quickstart.test.mjs` 4/4 resolving each against the tree; `arch-diagrams.mjs` emits 5 Mermaid layers from package.json edges with `--check`; `docs-verified.mjs` stamps 13 docs and fails only on real content drift; STATUS/FEATURES point at plan.md | the fifteen-minute clock is owed to a clean machine | next: m3.3
+- 2026-11-25 m3.3 [~] dead code is a gate, merge candidates are measured, and the error envelopes have one writer | proof: `dead-code.mjs` + 4/4 pinning knip's shape (report now empty, two test-reset helpers removed); ARCHITECTURE.md generates a "one consumer" table — 33 of 50 packages; `reply-errors.ts` sole writer of `openaiError`/`gatewayError`/`fail` with `reply-errors.test.ts` 4/4 and `error-envelope.test.mjs` 3/3 ratchet (sabotage → "365 inline error replies, baseline 363") | folding 33 packages is one PR each, so that box stays [~]; the transcript test was already failing on a 32-hex id the normaliser missed and is fixed | next: m3.3 any/as at route boundaries
+- 2026-11-25 m3.3 [x] route types are counted and `lib/*` is mapped, tested and gated | proof: `route-types.mjs` 437 handlers / 91 schemas / 118 casts / 0 `any` with a both-directions ratchet (7/7, sabotage → ": any ×1 (baseline 0)"); `lib-inventory.mjs` maps all 104 modules into 8 domains and 9 allowlisted untested ones, allowlist may only shrink (6/6, sabotage → "belongs to no domain" + "has no test"); three new lib tests found a real trim bug in the HTML extractor; domain table generated into ARCHITECTURE.md | folding the 33 one-consumer packages is one PR each and stays [~] | next: M4.1 /v1/responses
+- 2026-11-25 m3.1 [x] pre-releases are owned, the compiler gap has a job, lint has one type-aware path, and the desktop pin is current and recorded | proof: ADR 0020 + `.github/prerelease-policy.json` + `prerelease-audit.mjs` (4 pre-releases, 10/10 tests, sabotage → "some-rc-lib@2.0.0-rc.9 is a pre-release with no policy entry"); generated OPS §6 table with `--check`; `build.yml` `typescript-stable` job compiling with published TypeScript 6; `lint-paths.test.mjs` 5/5 (sabotage → "ESLint keeps one rule"); electron 45.4.1 and electron-builder 26.18.0 confirmed latest via `--online`, builder pinned from `^26.18.0`, compatibility record in DEPLOYMENT.md, weekly `desktop-toolchain` job | the `typescript-stable` job and the weekly freshness job have not run on CI; a signed install→update→restart cycle is still owed to a machine with the certificates | next: m3.2 build and run speed

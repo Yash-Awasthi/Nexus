@@ -148,3 +148,39 @@ describe("POST /api/kb/:id/graph", () => {
     expect(gone.statusCode).toBe(404);
   });
 });
+
+describe("a graph build survives a restart", () => {
+  it("reads the finished job back, so the page is not stuck at idle or running", async () => {
+    const id = await makeKb("restart", { "team.txt": "Ada works at Acme and lives in Paris." });
+    expect(await build(id)).toMatchObject({ state: "done", entities: 3 });
+
+    // A restart is a fresh module registry reading the same store.
+    vi.resetModules();
+    const fresh = await import("../../src/routes/kb.ts");
+    expect(await fresh._graphJobForTests(id)).toMatchObject({
+      state: "done",
+      entities: 3,
+      chunksTotal: 1,
+    });
+  });
+
+  it("reports a build that was running when the process died instead of polling forever", async () => {
+    const id = await makeKb("interrupted", { "team.txt": "Ada works at Acme." });
+    vi.resetModules();
+    const fresh = await import("../../src/routes/kb.ts");
+    await fresh._seedGraphJobForTests(id, {
+      state: "running",
+      chunksDone: 0,
+      chunksTotal: 4,
+      of: 4,
+      entities: 0,
+      relationships: 0,
+      failed: 0,
+      startedAt: new Date().toISOString(),
+    });
+    expect(await fresh._graphJobForTests(id)).toMatchObject({
+      state: "error",
+      error: expect.stringMatching(/restarted before this build finished/),
+    });
+  });
+});

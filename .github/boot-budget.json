@@ -1,0 +1,5 @@
+{
+  "$comment": "Milliseconds from importing apps/api/src/server.ts to a served GET /health, with DATABASE_URL=pglite://:memory: and nothing else configured, plus a cap on how many route lines may be registered. Measured by scripts/api-boot-budget.mjs; raising either number is a commit somebody justifies.",
+  "bootMs": 9000,
+  "maxRoutes": 450
+}

@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- verified: c6e5d6c 2026-11-24 -->
 
 # Nexus — Deployment
 
@@ -69,6 +70,38 @@ deploy does not go live, Render's Events show `update_failed` and the start-up l
 > (auth, council, memory, billing, feature-flags, projects, image-gen, voice, scraping). The broader `/api/*` surface is served by an in-memory bridge for
 > demonstration and returns synthetic data.
 
+## Offline machine (no Docker, no Ollama, no server database)
+
+Nexus runs on a laptop with Node and nothing else. This is the path for a first look,
+a locked-down workstation, or a storage-limited machine where a 4 GB sandbox image and
+a model download are out of reach.
+
+```bash
+pnpm install
+cp .env.example .env        # then set NEXUS_API_KEY to any dev value
+pnpm --filter @nexus/cli exec nexus doctor   # says what is missing and what to do
+pnpm dev                     # api + ui
+curl -s localhost:4000/health | jq .          # { "status": "ok" }
+```
+
+What still works: sign-in, threads, missions, notifications, the knowledge base with
+its embedded store, the CLI, and the UI. What does not, and why:
+
+| Missing          | Consequence                                          | What the surface says                                           |
+| ---------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| A model provider | No chat, no council, no research synthesis           | `/health/ready` reports the provider probe; the UI names it     |
+| Docker           | No sandboxed code execution                          | `GET /api/v1/sandbox/status` says `unavailable` with the fix    |
+| Ollama           | No local model (a cloud driver key works)            | `nexus doctor` names the install, not an error                  |
+| Redis / Postgres | Single process only, data does not survive a restart | `/health/ready` `kv`/`db` legs; `docs/OPS.md` §3 lists backends |
+
+The embedded database (`pglite://`, the default when `DATABASE_URL` is unset) and the
+in-process KV fallback are what make that true. `apps/api/tests/lib/offline-mode.test.ts`
+boots the server with every network-shaped variable removed and asserts `/health` is
+`200` with `{"status":"ok"}`, that readiness answers instead of crashing, and that the
+`kv` leg — the only one with no external dependency offline — passes. The `offline boot`
+CI job runs that file on a bare runner, so a new import that needs Docker cannot make
+"works offline" untrue without turning CI red.
+
 ## Docker Compose (local only)
 
 Compose is the local development stack, not a deployment target:
@@ -129,3 +162,79 @@ TOK=$(curl -s -X POST $B/api/v1/auth/register -H 'Content-Type: application/json
   -d "{\"email\":\"$EM\",\"password\":\"Test12345!\",\"name\":\"t\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 curl $B/api/v1/auth/me -H "Authorization: Bearer $TOK"   # 401-free authed response
 ```
+
+## Desktop release: signing, feed and verification
+
+The `Release` workflow builds the installers only on a `v*` tag, and the tag must equal
+`apps/desktop/package.json` (the job fails otherwise). Signing material lives only in GitHub:
+
+| Kind                | Name                                              | Meaning                                              |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| Secret              | `WINDOWS_CSC_LINK`, `WINDOWS_CSC_KEY_PASSWORD`    | Windows code-signing certificate and password        |
+| Secret              | `MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`        | Developer ID Application certificate and password    |
+| Secret              | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | notarisation; absent leaves the app unnotarised      |
+| Secret              | `UPDATE_SIGNING_KEY`                              | Ed25519 private key (PEM) that signs `manifest.json` |
+| Repository variable | `UPDATE_PUBLIC_KEY`                               | matching public key (PEM or base64 SPKI), baked in   |
+
+Create the update keypair once and keep the private half only in GitHub:
+
+```bash
+openssl genpkey -algorithm ED25519 -out update-signing-key.pem
+openssl pkey -in update-signing-key.pem -pubout -out update-public.pem
+# UPDATE_SIGNING_KEY  = cat update-signing-key.pem, into the repository secret
+# UPDATE_PUBLIC_KEY   = cat update-public.pem, into the repository variable
+```
+
+The build bakes `NEXUS_UPDATE_FEED_URL` (defaulting to
+`https://github.com/<owner>/<repo>/releases/latest/download`) and `UPDATE_PUBLIC_KEY` into
+`dist/update-config.json`; without them the tag build fails rather than shipping an app that
+cannot update. The feed is the release's own `manifest.json` and `manifest.json.sig`, so a
+public repository needs no second bucket. For a private repository or a staged rollout, set
+`NEXUS_UPDATE_FEED_URL` to a host that serves those two files and keeps the previous version's
+artifacts.
+
+Before tagging, run the static wiring check and, after downloading a release, verify it without
+installing:
+
+```bash
+pnpm check:release
+pnpm release:verify --dir release --public-key update-public.pem
+```
+
+### Update-channel compatibility record
+
+Both packaging dependencies are pinned exactly, because a toolchain that moves on its own is a
+release that fails without a code change. `node scripts/electron-current.mjs --check` compares
+this table with `apps/desktop/package.json` and fails when they disagree; run it with `--online`
+to ask the registry, which is a weekly question rather than a per-pull-request one.
+
+| Dependency         | Pinned    | Checked against the registry | Result                                             |
+| ------------------ | --------- | ---------------------------- | -------------------------------------------------- |
+| `electron`         | `45.4.1`  | `45.4.1` is the latest       | current; no bump to test                           |
+| `electron-builder` | `26.18.0` | `26.18.0` is the latest      | current; supports the Electron 45 packaging format |
+
+What "compatible" means here, and what was actually run:
+
+- **Artifact names.** `electron-builder.yml` writes `Nexus-Setup-${version}.${ext}` and the
+  macOS `dmg`. The updater's manifest names a URL per platform and arch and verifies `sha256`
+  and `size` before installing, so the filename scheme is not load-bearing — a renamed artefact
+  still updates, because the manifest carries its own hash. That is why there is no
+  channel-name string anywhere in the two to break.
+- **Version comparison.** The updater compares the manifest's `version` with the running
+  `app.getVersion()` semver-wise, not lexically, so `0.10.0` correctly outranks `0.9.0`.
+- **Channel and staged rollout.** The manifest may carry `channel` and
+  `rollout: { percentage }`; both are optional, and a manifest without them behaves exactly as
+  before (one channel, everybody). When present, the app honours them:
+  `describeUpdate()` (`apps/desktop/src/updater.ts`) names the channel in what it reports and
+  decides wave membership from a hash of the install id and the version, so a machine cannot
+  flip between waves on repeated checks. `NEXUS_UPDATE_CHANNEL` (or a `channel` field in
+  `update-config.json`) sets the channel a build follows. The tray's **Check for updates now…**
+  reports the channel, the offered version and the rollout state, or the reason there is none —
+  "up to date on channel beta" is a different sentence from "up to date on stable", and people
+  misread the second when they mean the first.
+- **Electron 45 specific.** `app.getVersion()`, `session.setPermissionRequestHandler` and the
+  `utilityProcess` API used by the API sidecar are all present in 45; nothing in the shell uses
+  a deprecated remote module or `webContents.sendInputEvent` behaviour that changed.
+- **Not verified here:** an actual signed install → update → restart cycle needs the code-signing
+  certificates and a published release. That is the desktop equivalent of the backup drill: the
+  procedure and the guards exist, the run is owed to a machine with the secrets.

@@ -26,6 +26,11 @@ export default defineConfig({
   build: {
     // The API's CSP allows fonts from 'self' only, so a small font must stay a file, not a data: URI.
     assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),
+    // Routing decides the shape of what ships: one chunk per route plus the shared
+    // ones. `scripts/bundle-budget.mjs` reads this manifest to know which file a
+    // reader downloads for /workflows as opposed to /chat, and a budget that cannot
+    // name the page it is measuring cannot be argued with.
+    manifest: true,
   },
   define: {
     // Prevent build errors from packages that reference __filename

@@ -25,16 +25,27 @@ const MAX_REDIRECTS = 5;
 /**
  * Fetch a caller-supplied URL: every hop must pass {@link unsafeUrlReason}, and off the desktop
  * the socket is pinned to the checked address, so neither DNS nor a redirect can reach inside.
+ *
+ * `send` is injectable so the redirect walk can be tested without a network: the property that
+ * matters — a 302 to `169.254.169.254` is refused before it is fetched — is about this loop,
+ * not about the socket.
  */
-export async function fetchPublic(url: string, init: RequestInit = {}): Promise<Response> {
+export async function fetchPublic(
+  url: string,
+  init: RequestInit = {},
+  send: typeof fetch = callerFetch,
+): Promise<Response> {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const why = unsafeUrlReason(current);
     if (why) throw new Error(why);
-    const res = await callerFetch(current, { ...init, redirect: "manual" });
+    const res = await send(current, { ...init, redirect: "manual" });
     const location = res.headers.get("location");
     if (res.status < 300 || res.status > 399 || !location) return res;
     current = new URL(location, current).href;
   }
-  throw new Error("Too many redirects");
+  throw new Error(`Too many redirects (limit ${MAX_REDIRECTS})`);
 }
+
+/** The redirect walk's own constant, exported for the test that pins it. */
+export const FETCH_REDIRECT_LIMIT = MAX_REDIRECTS;

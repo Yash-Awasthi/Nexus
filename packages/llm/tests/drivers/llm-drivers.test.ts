@@ -33,6 +33,7 @@ import {
   NebiusDriver,
   VeniceDriver,
   QwenDriver,
+  GithubModelsDriver,
   Ai360Driver,
   VercelAIGatewayDriver,
   DoubaoDriver,
@@ -272,6 +273,12 @@ describe.each([
   { name: "ChutesDriver", Factory: ChutesDriver, provider: "chutes", url: "llm.chutes.ai" },
   { name: "NebiusDriver", Factory: NebiusDriver, provider: "nebius", url: "api.studio.nebius.ai" },
   { name: "VeniceDriver", Factory: VeniceDriver, provider: "venice", url: "api.venice.ai" },
+  {
+    name: "GithubModelsDriver",
+    Factory: GithubModelsDriver,
+    provider: "github_models",
+    url: "models.github.ai/inference",
+  },
   { name: "QwenDriver", Factory: QwenDriver, provider: "qwen", url: "dashscope.aliyuncs.com" },
   { name: "Ai360Driver", Factory: Ai360Driver, provider: "ai360", url: "api.360.cn" },
   {

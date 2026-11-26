@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- verified: c6e5d6c 2026-11-24 -->
 
 # Nexus — Architecture & Repository Layout
 
@@ -126,3 +127,242 @@ nexus/
 - ADR-0010: HMAC-chained audit log for tamper evidence
 - ADR-0015: Piston for multi-language execution outside the Docker sandbox
 - ADR-0018: BullMQ repeatable jobs for domain feed polling
+
+## Layer diagrams
+
+<!-- begin:generated layers (scripts/arch-diagrams.mjs) -->
+
+### API (apps/api)
+
+```mermaid
+graph LR
+  pkg_api["@nexus/api"]
+  pkg_adaptive_scraper["@nexus/adaptive-scraper · packages/adaptive-scraper"]
+  pkg_api --> pkg_adaptive_scraper
+  pkg_admin_gateway["@nexus/admin-gateway · packages/admin-gateway"]
+  pkg_api --> pkg_admin_gateway
+  pkg_agent_core["@nexus/agent-core · packages/agent-core"]
+  pkg_api --> pkg_agent_core
+  pkg_auth["@nexus/auth · packages/auth"]
+  pkg_api --> pkg_auth
+  pkg_billing["@nexus/billing · packages/billing"]
+  pkg_api --> pkg_billing
+  pkg_bots["@nexus/bots · packages/bots"]
+  pkg_api --> pkg_bots
+  pkg_browser_automation["@nexus/browser-automation · packages/browser-automation"]
+  pkg_api --> pkg_browser_automation
+  pkg_code_repl["@nexus/code-repl · packages/code-repl"]
+  pkg_api --> pkg_code_repl
+  pkg_contracts["@nexus/contracts · packages/contracts"]
+  pkg_api --> pkg_contracts
+  pkg_council["@nexus/council · packages/council"]
+  pkg_api --> pkg_council
+  pkg_db["@nexus/db · packages/db"]
+  pkg_api --> pkg_db
+  pkg_doc_pipeline["@nexus/doc-pipeline · packages/doc-pipeline"]
+  pkg_api --> pkg_doc_pipeline
+  pkg_escalation_breaker["@nexus/escalation-breaker · packages/escalation-breaker"]
+  pkg_api --> pkg_escalation_breaker
+  pkg_exec_policy["@nexus/exec-policy · packages/exec-policy"]
+  pkg_api --> pkg_exec_policy
+  pkg_feature_flags["@nexus/feature-flags · packages/feature-flags"]
+  pkg_api --> pkg_feature_flags
+  pkg_gateway["@nexus/gateway · packages/gateway"]
+  pkg_api --> pkg_gateway
+  pkg_gateway_log["@nexus/gateway-log · packages/gateway-log"]
+  pkg_api --> pkg_gateway_log
+  pkg_hooks["@nexus/hooks · packages/hooks"]
+  pkg_api --> pkg_hooks
+  pkg_kv["@nexus/kv · packages/kv"]
+  pkg_api --> pkg_kv
+  pkg_llm["@nexus/llm · packages/llm"]
+  pkg_api --> pkg_llm
+  pkg_llm_accounts["@nexus/llm-accounts · packages/llm-accounts"]
+  pkg_api --> pkg_llm_accounts
+  pkg_llm_cache["@nexus/llm-cache · packages/llm-cache"]
+  pkg_api --> pkg_llm_cache
+  pkg_llm_oauth["@nexus/llm-oauth · packages/llm-oauth"]
+  pkg_api --> pkg_llm_oauth
+  pkg_llm_tracer["@nexus/llm-tracer · packages/llm-tracer"]
+  pkg_api --> pkg_llm_tracer
+  pkg_lsp["@nexus/lsp · packages/lsp"]
+  pkg_api --> pkg_lsp
+  pkg_mail_ingest["@nexus/mail-ingest · packages/mail-ingest"]
+  pkg_api --> pkg_mail_ingest
+  pkg_mcp_client["@nexus/mcp-client · packages/mcp-client"]
+  pkg_api --> pkg_mcp_client
+  pkg_mcp_openapi["@nexus/mcp-openapi · packages/mcp-openapi"]
+  pkg_api --> pkg_mcp_openapi
+  pkg_memory["@nexus/memory · packages/memory"]
+  pkg_api --> pkg_memory
+  pkg_nlp_utils["@nexus/nlp-utils · packages/nlp-utils"]
+  pkg_api --> pkg_nlp_utils
+  pkg_plugin_sdk["@nexus/plugin-sdk · packages/plugin-sdk"]
+  pkg_api --> pkg_plugin_sdk
+  pkg_pty["@nexus/pty · packages/pty"]
+  pkg_api --> pkg_pty
+  pkg_researcher["@nexus/researcher · packages/researcher"]
+  pkg_api --> pkg_researcher
+  pkg_rlhf_pipeline["@nexus/rlhf-pipeline · packages/rlhf-pipeline"]
+  pkg_api --> pkg_rlhf_pipeline
+  pkg_sandbox["@nexus/sandbox · packages/sandbox"]
+  pkg_api --> pkg_sandbox
+  pkg_scraping_mcp["@nexus/scraping-mcp · packages/scraping-mcp"]
+  pkg_api --> pkg_scraping_mcp
+  pkg_sdk["@nexus/sdk · packages/sdk"]
+  pkg_api --> pkg_sdk
+  pkg_search["@nexus/search · packages/search"]
+  pkg_api --> pkg_search
+  pkg_search_orchestrator["@nexus/search-orchestrator · packages/search-orchestrator"]
+  pkg_api --> pkg_search_orchestrator
+  pkg_session_sync["@nexus/session-sync · packages/session-sync"]
+  pkg_api --> pkg_session_sync
+  pkg_shared["@nexus/shared · packages/shared"]
+  pkg_api --> pkg_shared
+  pkg_sse["@nexus/sse · packages/sse"]
+  pkg_api --> pkg_sse
+  pkg_stealth_browser["@nexus/stealth-browser · packages/stealth-browser"]
+  pkg_api --> pkg_stealth_browser
+  pkg_stream_recovery["@nexus/stream-recovery · packages/stream-recovery"]
+  pkg_api --> pkg_stream_recovery
+  pkg_telemetry["@nexus/telemetry · packages/telemetry"]
+  pkg_api --> pkg_telemetry
+  pkg_tool_registry["@nexus/tool-registry · packages/tool-registry"]
+  pkg_api --> pkg_tool_registry
+  pkg_trigger_engine["@nexus/trigger-engine · packages/trigger-engine"]
+  pkg_api --> pkg_trigger_engine
+  pkg_worker["@nexus/worker · apps/worker"]
+  pkg_api --> pkg_worker
+```
+
+### Worker (apps/worker)
+
+```mermaid
+graph LR
+  pkg_worker["@nexus/worker"]
+  pkg_agent_core["@nexus/agent-core · packages/agent-core"]
+  pkg_worker --> pkg_agent_core
+  pkg_browser_automation["@nexus/browser-automation · packages/browser-automation"]
+  pkg_worker --> pkg_browser_automation
+  pkg_contracts["@nexus/contracts · packages/contracts"]
+  pkg_worker --> pkg_contracts
+  pkg_council["@nexus/council · packages/council"]
+  pkg_worker --> pkg_council
+  pkg_db["@nexus/db · packages/db"]
+  pkg_worker --> pkg_db
+  pkg_governance["@nexus/governance · packages/governance"]
+  pkg_worker --> pkg_governance
+  pkg_llm["@nexus/llm · packages/llm"]
+  pkg_worker --> pkg_llm
+  pkg_mcp_client["@nexus/mcp-client · packages/mcp-client"]
+  pkg_worker --> pkg_mcp_client
+  pkg_memory["@nexus/memory · packages/memory"]
+  pkg_worker --> pkg_memory
+  pkg_pipeline_signal["@nexus/pipeline-signal · packages/pipeline-signal"]
+  pkg_worker --> pkg_pipeline_signal
+  pkg_sandbox["@nexus/sandbox · packages/sandbox"]
+  pkg_worker --> pkg_sandbox
+  pkg_search["@nexus/search · packages/search"]
+  pkg_worker --> pkg_search
+  pkg_sse["@nexus/sse · packages/sse"]
+  pkg_worker --> pkg_sse
+  pkg_stealth_browser["@nexus/stealth-browser · packages/stealth-browser"]
+  pkg_worker --> pkg_stealth_browser
+  pkg_telemetry["@nexus/telemetry · packages/telemetry"]
+  pkg_worker --> pkg_telemetry
+```
+
+### UI (apps/ui)
+
+```mermaid
+graph LR
+  pkg_ui["@nexus/ui"]
+  pkg_stream_recovery["@nexus/stream-recovery · packages/stream-recovery"]
+  pkg_ui --> pkg_stream_recovery
+```
+
+### Sandbox (apps/sandbox-helper + @nexus/sandbox)
+
+```mermaid
+graph LR
+  pkg_sandbox_helper["@nexus/sandbox-helper"]
+  pkg_sandbox["@nexus/sandbox · packages/sandbox"]
+  pkg_sandbox_helper --> pkg_sandbox
+```
+
+### Desktop and extension (apps/desktop, apps/extension)
+
+```mermaid
+graph LR
+  pkg_desktop["@nexus/desktop"]
+  pkg_extension["@nexus/extension (not a workspace package)"]
+```
+
+### Durability classes
+
+Declared per route in `apps/api/src/lib/api-maturity.ts` and asserted by
+`apps/api/tests/lib/durable-bridge.test.ts`: `durable` writes survive a restart,
+`bridge` mutates through to a durable store before answering, and
+`dedicated-volatile` is deliberately not durable.
+
+### Packages with one consumer
+
+Measured, not chosen: these packages are imported by exactly one workspace package,
+so folding them into that consumer removes a `package.json` without a design debate.
+A package with two consumers is a real boundary; these are candidates, in the order
+the count grows.
+
+| Package                      | Only consumer    |
+| ---------------------------- | ---------------- |
+| `@nexus/adaptive-scraper`    | `@nexus/api`     |
+| `@nexus/admin-gateway`       | `@nexus/api`     |
+| `@nexus/auth`                | `@nexus/api`     |
+| `@nexus/billing`             | `@nexus/api`     |
+| `@nexus/bots`                | `@nexus/api`     |
+| `@nexus/code-repl`           | `@nexus/api`     |
+| `@nexus/doc-pipeline`        | `@nexus/api`     |
+| `@nexus/escalation-breaker`  | `@nexus/api`     |
+| `@nexus/exec-policy`         | `@nexus/api`     |
+| `@nexus/feature-flags`       | `@nexus/api`     |
+| `@nexus/gateway`             | `@nexus/api`     |
+| `@nexus/gateway-log`         | `@nexus/api`     |
+| `@nexus/hooks`               | `@nexus/api`     |
+| `@nexus/kv`                  | `@nexus/api`     |
+| `@nexus/llm-accounts`        | `@nexus/api`     |
+| `@nexus/llm-cache`           | `@nexus/api`     |
+| `@nexus/llm-oauth`           | `@nexus/api`     |
+| `@nexus/llm-tracer`          | `@nexus/api`     |
+| `@nexus/llm-translate`       | `@nexus/gateway` |
+| `@nexus/mail-ingest`         | `@nexus/api`     |
+| `@nexus/mcp-openapi`         | `@nexus/api`     |
+| `@nexus/nlp-utils`           | `@nexus/api`     |
+| `@nexus/pipeline-signal`     | `@nexus/worker`  |
+| `@nexus/pty`                 | `@nexus/api`     |
+| `@nexus/researcher`          | `@nexus/api`     |
+| `@nexus/rlhf-pipeline`       | `@nexus/api`     |
+| `@nexus/scraping-mcp`        | `@nexus/api`     |
+| `@nexus/sdk`                 | `@nexus/api`     |
+| `@nexus/search-orchestrator` | `@nexus/api`     |
+| `@nexus/session-sync`        | `@nexus/api`     |
+| `@nexus/tool-registry`       | `@nexus/api`     |
+| `@nexus/trigger-engine`      | `@nexus/api`     |
+| `@nexus/worker`              | `@nexus/api`     |
+
+#### `apps/api/src/lib` by domain
+
+The same rule set keeps `scripts/lib-inventory.mjs` honest: every module in
+`apps/api/src/lib` belongs to exactly one domain, and a module no test names is on a
+list that may only shrink.
+
+| Domain         | Modules | What it is for                                   |
+| -------------- | ------- | ------------------------------------------------ |
+| `runtime`      | 14      | schedules work inside this process               |
+| `api-shape`    | 2       | defines the HTTP contract                        |
+| `storage`      | 18      | owns rows or files that outlive the process      |
+| `security`     | 23      | decides whether a caller may do something        |
+| `org`          | 21      | the company-of-agents surfaces                   |
+| `integrations` | 6       | speaks a protocol that is not ours               |
+| `models`       | 15      | talks to a model provider or routes between them |
+| `skills`       | 5       | imports, compresses or runs a skill              |
+
+<!-- end:generated layers -->

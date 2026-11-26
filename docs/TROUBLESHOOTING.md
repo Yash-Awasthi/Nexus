@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- verified: c6e5d6c 2026-11-24 -->
 
 # Nexus — Troubleshooting
 
@@ -55,3 +56,39 @@ publishes `3000`. Stop the conflicting process or change `PORT`.
 Turbo builds dependencies first (`dependsOn: ["^build"]`). Run a clean build of the
 dependency graph: `turbo run build --filter=@nexus/<pkg>...`. A stale `dist/` can also
 cause this — `pnpm clean` then rebuild.
+
+---
+
+## The ten failures that account for most reports
+
+If one line describes your problem, the fix is the linked section above. If none does, run
+the diagnostic bundle below and open an issue with it.
+
+| # | What you see                                                       | Why                                            | Where |
+| - | ------------------------------------------------------------------ | ---------------------------------------------- | ----- |
+| 1 | `[startup] FATAL: NEXUS_API_KEY is not set`                        | The API refuses to start without a key         | Setup |
+| 2 | `503 encryption unavailable` when saving a provider key            | `NEXUS_SECRETS_KEY` is unset or the wrong length | BYOK |
+| 3 | `No key configured for provider: X`                                | User paths never fall back to the env key      | BYOK |
+| 4 | UI loads, every `/api` call 404s                                   | The API is not running behind the dev proxy    | Dev servers |
+| 5 | `EADDRINUSE` on 3000 / 5173                                        | Something already holds the port               | Dev servers |
+| 6 | `pnpm db:migrate` hangs or fails                                   | Postgres unreachable, or a half-applied migration | Setup |
+| 7 | `tsc` errors in a package you did not edit                         | A stale `dist/` or an unbuilt dependency       | Build |
+| 8 | A workflow run finishes `skipped` with "over its … budget"         | A hard-stop budget policy is exhausted         | [`runbook.md` §P5](runbook.md) |
+| 9 | `docker compose up` cannot reach the daemon                        | Docker is not running                          | Setup |
+| 10 | `/status` says `degraded`                                          | An optional dependency (Redis, sandbox, Docker) is out | [`slos.md` SLO-6](slos.md) |
+
+## Reporting it: the diagnostic bundle
+
+One command collects what a report needs, already redacted:
+
+```bash
+nexus doctor --bundle ./report     # writes nexus-bundle.json + a README into ./report
+```
+
+The bundle contains the `nexus doctor` rows and, if the API answers, its own `/status` and
+`/health` documents — no environment dump, no logs, no session contents. Credentials are removed
+on the way in: provider-key shapes (`sk-…`, `gsk_…`, `ghp_…`), JSON web tokens, AWS access keys,
+webhook signatures, passwords in a `DATABASE_URL`, and secrets in a query string. The bundle's
+README lists what was removed, so a reader can see that a value was taken out rather than
+thinking the field was empty. Read the file before you attach it: a credential in a shape the
+tool does not recognise is still a credential. Where to send it is in [`SUPPORT.md`](../SUPPORT.md).

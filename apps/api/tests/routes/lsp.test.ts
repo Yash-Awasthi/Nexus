@@ -5,9 +5,9 @@
  * approves it.
  */
 import crypto from "node:crypto";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { FastifyInstance } from "fastify";
@@ -16,8 +16,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 const SECRET = "lsp-routes-secret";
 const DB = "pglite://:memory:lsp-routes";
 const ROOT = mkdtempSync(join(tmpdir(), "nexus-lsp-routes-"));
+const STUB_DIR = mkdtempSync(join(tmpdir(), "nexus-lsp-path-"));
+const STUB_NAME = "nexus-lsp-stub";
+const STUB_FILE = process.platform === "win32" ? `${STUB_NAME}.CMD` : STUB_NAME;
 const FAKE_SERVER = fileURLToPath(
   new URL("../../../../packages/lsp/src/testing/fake-server.mjs", import.meta.url),
+);
+
+writeFileSync(
+  join(STUB_DIR, STUB_FILE),
+  process.platform === "win32" ? "@echo off\r\n" : "#!/bin/sh\n",
 );
 
 process.env.NEXUS_JWT_SECRET = SECRET;
@@ -25,6 +33,9 @@ process.env.DATABASE_URL = DB;
 process.env.NEXUS_LSP = "1";
 process.env.NEXUS_LSP_ROOTS = ROOT;
 process.env.NEXUS_LSP_TYPESCRIPT_CMD = `"${process.execPath}" "${FAKE_SERVER}" --stdio`;
+process.env.NEXUS_LSP_PYTHON_CMD = `"${process.execPath}" --stdio`;
+process.env.NEXUS_LSP_GO_CMD = `"${process.execPath}" --stdio`;
+process.env.NEXUS_LSP_RUST_CMD = `"${process.execPath}" --stdio`;
 delete process.env.NEXUS_EXEC_MODE;
 delete process.env.NEXUS_EXEC_DENY;
 delete process.env.NEXUS_EXEC_ASK_SURFACES;
@@ -65,6 +76,7 @@ afterAll(async () => {
   await _resetLspForTests();
   await closePgPools();
   rmSync(ROOT, { recursive: true, force: true });
+  rmSync(STUB_DIR, { recursive: true, force: true });
   delete process.env.NEXUS_EXEC_ASK_SURFACES;
   delete process.env.NEXUS_EXEC_DENY;
 });
@@ -102,6 +114,44 @@ describe("GET /api/v1/lsp/status", () => {
     expect(text).not.toContain("fake-server.mjs");
     expect(text).not.toContain(process.execPath);
     expect(text).not.toContain("NEXUS_LSP_TYPESCRIPT_CMD");
+  });
+});
+
+describe("per-language availability", () => {
+  it("marks an absent binary unavailable and names the variable", async () => {
+    const original = process.env.NEXUS_LSP_PYTHON_CMD;
+    process.env.NEXUS_LSP_PYTHON_CMD = "nexus-missing-langserver-xyz --stdio";
+    try {
+      const res = await call("GET", "/api/v1/lsp/status", MEMBER);
+      const python = res
+        .json<{ languages: { language: string; available: boolean; reason?: string }[] }>()
+        .languages.find((entry) => entry.language === "python");
+      expect(python?.available).toBe(false);
+      expect(python?.reason).toBe(
+        "python: set NEXUS_LSP_PYTHON_CMD to a nexus-missing-langserver-xyz binary",
+      );
+      expect(res.body).not.toContain("--stdio");
+    } finally {
+      process.env.NEXUS_LSP_PYTHON_CMD = original;
+    }
+  });
+
+  it("marks a stub executable on PATH available", async () => {
+    const originalPath = process.env.PATH;
+    const original = process.env.NEXUS_LSP_GO_CMD;
+    process.env.PATH = `${STUB_DIR}${delimiter}${originalPath ?? ""}`;
+    process.env.NEXUS_LSP_GO_CMD = STUB_NAME;
+    try {
+      const res = await call("GET", "/api/v1/lsp/status", MEMBER);
+      const go = res
+        .json<{ languages: { language: string; available: boolean; reason?: string }[] }>()
+        .languages.find((entry) => entry.language === "go");
+      expect(go?.available, res.body).toBe(true);
+      expect(go?.reason).toBeUndefined();
+    } finally {
+      process.env.PATH = originalPath;
+      process.env.NEXUS_LSP_GO_CMD = original;
+    }
   });
 });
 

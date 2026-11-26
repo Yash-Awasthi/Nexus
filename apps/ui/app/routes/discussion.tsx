@@ -19,12 +19,14 @@ import { Link } from "react-router";
 import type { Route } from "./+types/discussion";
 
 import { Page, PageHeader } from "~/components/page";
+import { ExportButtons, PrintButton } from "~/components/print-button";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import { syncCouncilFromServer, type CouncilMember } from "~/lib/council";
 import { Markdown } from "~/lib/markdown";
+import { deliberationDoc } from "~/lib/printable";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -82,6 +84,19 @@ export default function Discussion() {
     abortRef.current = null;
     setRunning(false);
   }, []);
+
+  /**
+   * The printable form of this discussion, built from the same state the page renders — not
+   * from a second request. Printing a deliberation nobody finished prints what happened, with
+   * the reason it stopped.
+   */
+  const printable = deliberationDoc({
+    topic,
+    members: members.map((m) => ({ label: m.label, model: m.model })),
+    ledger: entries,
+    outcome,
+    ...(outcome ? { reasonText: REASON_TEXT[outcome.reason] ?? outcome.reason } : {}),
+  });
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -167,6 +182,14 @@ export default function Discussion() {
             </Link>
             .
           </>
+        }
+        actions={
+          outcome ? (
+            <>
+              <ExportButtons doc={printable} />
+              <PrintButton doc={printable} />
+            </>
+          ) : null
         }
       />
 

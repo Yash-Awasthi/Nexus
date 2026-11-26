@@ -36,6 +36,51 @@ const RULES: { name: string; pattern: RegExp }[] = [
     pattern:
       /\[\/?(?:SYSTEM|INST)\]|<<\/?SYS>>|<\|(?:im_start|im_end|system|user|assistant|endoftext)\|>/gi,
   },
+  // «Forget everything above» carries no noun the override rule can look for.
+  {
+    name: "forget_wide",
+    pattern:
+      /\b(?:forget|discard)\s+(?:everything|anything|all\s+of\s+it)\s+(?:above|before|you\s+(?:were\s+told|know|learned))\b[^.\n]*/gi,
+  },
+  // A persona the model is told to become. The nouns are listed rather than matched loosely,
+  // so «You are now ready to deploy» stays ordinary writing.
+  {
+    name: "persona",
+    pattern:
+      /\byou\s+are\s+now\s+(?:an?\s+)?(?:unrestricted|unfiltered|unjailbroken|jailbroken|uncensored|operator|administrator|admin|root|developer\s+mode|dan|the\s+system|my\s+(?:assistant|tool|translator|shell))(?:\s+[^.\n]*)?/gi,
+  },
+  // An instruction to use a tool. Untrusted text can never need one: its callers already hold
+  // the tools they allow.
+  {
+    name: "tool_call",
+    pattern: /\b(?:call|invoke|execute|run)\s+(?:the\s+)?(?:tool|function)\b[^.\n]*/gi,
+  },
+  {
+    name: "tool_json",
+    pattern: /"?(?:tool_calls|function_call|tool_use)"?\s*:/gi,
+  },
+  // Secrets, as opposed to prompts: a document that asks for the key is asking for A2.
+  {
+    name: "secret_request",
+    pattern:
+      /\b(?:reveal|show|print|output|send|give|tell|dump|share|leak)\s+(?:me\s+)?(?:your|the)\s+(?:api\s*keys?|secret|token|password|credentials?|environment|env\s+vars?)\b[^.\n]*/gi,
+  },
+  // Turning document text into an outbound request is exfiltration, whoever wrote it.
+  {
+    name: "exfil",
+    pattern:
+      /\b(?:send|forward|email|post|upload|deliver|submit|transmit)\b[^.\n]{0,80}?https?:\/\/[^\s)\]]+/gi,
+  },
+  // An image a client would dereference on render is the same attack without a verb.
+  {
+    name: "remote_image",
+    pattern: /!\[[^\]]*\]\(\s*https?:\/\/[^)]*\)/gi,
+  },
+  // «The system prompt says to …» is an instruction wearing the system's authority.
+  {
+    name: "system_claim",
+    pattern: /\b(?:the\s+)?system\s+(?:prompt|instructions?)\s+(?:say|tell|require|want|ask)s?\b[^.\n]*/gi,
+  },
 ];
 
 export const REMOVED = "[instruction removed]";

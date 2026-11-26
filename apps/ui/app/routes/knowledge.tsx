@@ -15,6 +15,7 @@ import KnowledgeGraphPage from "./knowledge-graph";
 import MemoryPage from "./memory";
 import SearchPage from "./search";
 
+import { CoachMark } from "~/components/coach-mark";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 const TABS = [
@@ -34,6 +35,7 @@ export default function KnowledgePage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <CoachMark page="/knowledge" />
       <Tabs
         value={active.id}
         onValueChange={(value) => {

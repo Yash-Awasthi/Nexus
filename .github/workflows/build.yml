@@ -22,11 +22,89 @@ jobs:
         node: ["24", "26"]
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: ${{ matrix.node }}
           cache: true
+      # Turbo caches task output in .turbo/cache. Without this the cache starts
+      # empty on every run and the build is paid for twice.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ matrix.node }}-
+      # Wall time is measured from here, so it includes checkout and install.
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+        shell: bash
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
+      # Publishes the wall time into the run summary and fails on a 25% regression
+      # against .github/job-times.json (no baseline yet means recorded, not judged).
+      - run: node scripts/job-times.mjs --job build --started "$STARTED"
+        if: always()
+        shell: bash
+
+  # The two things a user notices before any feature: how long a page takes to arrive
+  # and how long the API takes to start. Both are budgets in the tree
+  # (.github/bundle-budget.json, .github/boot-budget.json), not sentences in a doc.
+  budgets:
+    name: Budgets (per-route bundle, API boot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version: "26"
+          cache: true
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node26-budgets-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node26-budgets-
+      - run: pnpm install --frozen-lockfile
+      # The manifest the bundle budget reads is written by the UI build.
+      - run: pnpm --filter @nexus/ui build
+      - name: Per-route bundle budget
+        run: node scripts/bundle-budget.mjs
+      # Route registration is synchronous work before the first request; the number
+      # is measured with an embedded database so it is the boot path, not a network.
+      - name: API boot budget
+        run: node scripts/api-boot-budget.mjs
+      # Wall times for the slow paths, recorded (this runner has no baseline yet) so
+      # the first number a maintainer sees is today's, not a memory of last year's.
+      - name: Slow-path timings
+        run: |
+          node scripts/perf-budget.mjs --only uiDev,apiBoot --record
+          echo '### Slow paths' >> "$GITHUB_STEP_SUMMARY"
+          echo '| workload | wall time | host |' >> "$GITHUB_STEP_SUMMARY"
+          node -e "const b=require('./.github/perf-baseline.json');for(const [k,v] of Object.entries(b))console.log('| '+k+' | '+v.ms+'ms | '+v.host+' |')" >> "$GITHUB_STEP_SUMMARY"
+
+  # `typescript` resolves to `@typescript/typescript6`, a preview channel, and the compiler
+  # itself is TypeScript 7 via `@typescript/native`. A construct only the preview accepts
+  # would ship and then fail for whoever is on stable 6.x. This job compiles the tree with
+  # the latest published stable TypeScript instead, so the gap is found here — by us, on a
+  # pull request — rather than by a user. Delete it when the alias can go.
+  typescript-stable:
+    name: Typecheck (stable TypeScript 6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version: 26
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      # The global binary is called by absolute path: `pnpm exec tsc` would find the
+      # workspace's preview compiler first, which is the one this job exists to avoid.
+      - run: npm install --global typescript@6 --no-fund --no-audit
+      - run: node -p "require(process.env.npm_config_prefix + '/node_modules/typescript/package.json').version"
+      - run: echo "TSC=$(npm root -g)/typescript/bin/tsc" >> "$GITHUB_ENV"
+      - run: node "$TSC" --version
+      # `react-router typegen` writes the route tree the UI typechecks against; the build
+      # job runs it through `pnpm typecheck`, so this job has to as well.
+      - run: pnpm --filter @nexus/ui exec react-router typegen
+      - run: node "$TSC" -b --noEmit

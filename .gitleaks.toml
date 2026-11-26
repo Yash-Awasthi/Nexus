@@ -28,6 +28,12 @@ paths = [
   "CONTRIBUTING.md",
   "apps/api/tests/",
   "packages/.*/tests/",
+  "packages/.*/src/.*\\.test\\.ts",
+  # Local runtime stores and the desktop build staging are gitignored, never
+  # shipped, and hold local credentials that a working-tree scan must not
+  # report as repository findings.
+  "apps/api/data/stores/",
+  "\\.nexus/",
 ]
 
 # Custom rules on top of defaults

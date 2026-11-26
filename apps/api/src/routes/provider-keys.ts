@@ -32,6 +32,7 @@ const VALID_PROVIDERS = [
   "openrouter",
   "xai",
   "together",
+  "github_models",
   "perplexity",
   "cohere",
   "cerebras",

@@ -3,9 +3,13 @@
  * The OpenAI API at /v1: any OpenAI client works with Nexus by pointing its base URL here.
  *
  *   GET  /v1/models            — every model the caller's saved keys (and the server's) reach
- *   POST /v1/chat/completions  — JSON or SSE, tools both ways
+ *   POST /v1/chat/completions  — JSON or SSE, tools both ways, tool arguments streamed as fragments
  *   POST /v1/completions       — legacy prompt API, answered as one chat turn
  *   POST /v1/embeddings       — relayed to the named provider's own endpoint
+ *
+ * The Responses API (`POST /v1/responses`), which current SDKs call first, lives in
+ * ./openai-responses.ts; it shares `resolveModel` below so both surfaces choose a provider
+ * the same way.
  *
  * A model is "provider/model", e.g. "groq/openai/gpt-oss-20b"; the named provider answers first
  * and the rest of the caller's chain takes over if it fails. Any other name uses the default chain.
@@ -24,6 +28,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { getProviderSnapshot, type FailoverDriver } from "../lib/llm-failover.ts";
 import { listUserModels, userEndpoint } from "../lib/provider-keys.ts";
 import { callerFetch } from "../lib/public-url.ts";
+import { openaiError } from "../lib/reply-errors.ts";
 import { semanticLookup, semanticStore } from "../lib/semantic-cache.ts";
 import { getUserDrivers } from "../lib/user-context.ts";
 
@@ -55,7 +60,7 @@ interface ChatBody {
 }
 
 const invalid = (reply: FastifyReply, message: string, status = 400) =>
-  reply.code(status).send({ error: { message, type: "invalid_request_error", code: null } });
+  openaiError(reply, status, "invalid_request_error", message, { code: null });
 
 const text = (c: ChatMessage["content"]): string =>
   typeof c === "string"
@@ -154,7 +159,7 @@ async function complete(driver: FailoverDriver, opts: LlmRequestOptions, reply: 
  * The driver for a requested model, and the model id that driver should receive. "nexus/free"
  * routes across the caller's free models only; "auto" and "nexus/auto" use the whole chain.
  */
-async function resolve(
+export async function resolveModel(
   requested: string,
   userId: string | undefined,
 ): Promise<{ driver: FailoverDriver | undefined; model: string }> {
@@ -197,7 +202,7 @@ export async function openaiRoutes(app: FastifyInstance): Promise<void> {
     const body = request.body ?? {};
     if (typeof body.model !== "string" || !Array.isArray(body.messages) || !body.messages.length)
       return invalid(reply, "model and messages are required");
-    const { driver, model } = await resolve(body.model, request.nexusUserId);
+    const { driver, model } = await resolveModel(body.model, request.nexusUserId);
     if (!driver) return invalid(reply, "No provider key is saved for this account.", 404);
     const opts = toRequest(body, model);
     const id = `chatcmpl-${randomUUID()}`;
@@ -277,11 +282,33 @@ export async function openaiRoutes(app: FastifyInstance): Promise<void> {
         })}\n\n`,
       );
     send({ role: "assistant", content: "" });
+    // Tool calls are forwarded as they are written, not only at the end: `index` is the
+    // slot the client appends to, and the first fragment of a slot carries `id`/`name`.
+    const toolSlots = new Map<number, number>();
     try {
       const res = await driver.stream(opts, (d) => {
         if (d.delta) send({ content: d.delta });
+        for (const partial of d.toolCallDeltas ?? []) {
+          const index = partial.index ?? 0;
+          if (!toolSlots.has(index)) toolSlots.set(index, toolSlots.size);
+          send({
+            tool_calls: [
+              {
+                index: toolSlots.get(index),
+                ...(partial.id ? { id: partial.id } : {}),
+                ...(partial.id || partial.name ? { type: "function" } : {}),
+                function: {
+                  ...(partial.name ? { name: partial.name } : {}),
+                  ...(partial.argumentsDelta ? { arguments: partial.argumentsDelta } : {}),
+                },
+              },
+            ],
+          });
+        }
       });
-      send(res.toolCalls?.length ? { tool_calls: toolCalls(res.toolCalls) } : {}, finish(res));
+      // A provider that only reports calls at the end still ends with them named once.
+      if (res.toolCalls?.length && toolSlots.size === 0) send({ tool_calls: toolCalls(res.toolCalls) });
+      send({}, finish(res));
     } catch (err) {
       raw.write(`data: ${JSON.stringify(upstreamError(err))}\n\n`);
     }
@@ -293,7 +320,7 @@ export async function openaiRoutes(app: FastifyInstance): Promise<void> {
     const prompt = Array.isArray(body.prompt) ? body.prompt.join("") : body.prompt;
     if (typeof body.model !== "string" || typeof prompt !== "string")
       return invalid(reply, "model and prompt are required");
-    const { driver, model } = await resolve(body.model, request.nexusUserId);
+    const { driver, model } = await resolveModel(body.model, request.nexusUserId);
     if (!driver) return invalid(reply, "No provider key is saved for this account.", 404);
     try {
       const messages = [{ role: "user", content: prompt }];

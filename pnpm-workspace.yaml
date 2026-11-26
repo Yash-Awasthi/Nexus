@@ -47,6 +47,10 @@ overrides:
   "esbuild@0": ^0.28.2
   "fast-copy@4": ^4.3.3
   "undici@8": ^8.13.1
+  "glob@13": ^14.0.2
+  "minimatch@9": ^11.0.1
+  "minimatch@10": ^11.0.1
+  "katex@0": ^0.18.2
   vite@*: "catalog:"
   vitest@*: "catalog:"
 
@@ -66,6 +70,7 @@ allowBuilds:
   "@mongodb-js/zstd": false
   core-js: false
   esbuild: true
+  electron-winstaller: false
   msgpackr-extract: true
   node-liblzma: false
   node-pty: true

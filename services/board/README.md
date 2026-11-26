@@ -24,8 +24,8 @@ start at [`docs/README.md`](docs/README.md). A ready-to-merge Claude Desktop ent
 Requires Go 1.27 or newer. There are no external services and no runtime dependencies.
 
 ```bash
-go build -o vb.exe ./cmd/open-board
-go build -o mcp-bridge.exe ./cmd/mcp-bridge   # optional: Claude Desktop bridge
+go build -o bin/vb.exe ./cmd/open-board
+go build -o bin/mcp-bridge.exe ./cmd/mcp-bridge   # optional: Claude Desktop bridge
 ```
 
 On Linux or macOS use `-o vb` and `-o mcp-bridge`.
@@ -135,7 +135,7 @@ Example Claude Desktop configuration:
 {
   "mcpServers": {
     "open-board": {
-      "command": "C:\\GITHUB\\open\\mcp-bridge.exe",
+      "command": "C:\\GITHUB\\open\\services\\board\\bin\\mcp-bridge.exe",
       "env": { "VB_URL": "http://127.0.0.1:4100", "VB_CHANNEL": "default" }
     }
   }

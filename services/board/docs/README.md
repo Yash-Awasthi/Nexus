@@ -9,6 +9,8 @@ entry point and the code. Every file in this folder is indexed below.
 | [`mission.txt`](mission.txt)                                         | Acceptance mission: what "done" means for this repository.      | Active                                          |
 | [`SRS_Agent_Board_v3.0.md`](SRS_Agent_Board_v3.0.md)                 | Authoritative requirements (FR-1..FR-7, ABP/1.0 protocol).      | Active                                          |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                 | System architecture, file layout, credentials, snapshot format. | Active                                          |
+| [`HTTP_API.md`](HTTP_API.md)                                         | Every HTTP route, checked against the route table by a test.    | Active                                          |
+| [`MCP.md`](MCP.md)                                                   | The MCP bridge's tools and the approval step for every write.   | Active                                          |
 | [`claude_desktop_config.json`](claude_desktop_config.json)           | Ready-to-merge Claude Desktop MCP server entry.                 | Active                                          |
 | [`SRS_Agent_Board_v2.0.md`](SRS_Agent_Board_v2.0.md)                 | Earlier requirements revision.                                  | Superseded by v3.0                              |
 | [`SRS_Agent_Board_v1.0.md`](SRS_Agent_Board_v1.0.md)                 | Earlier requirements revision (numbered NFR-1..NFR-5).          | Superseded by v3.0; its NFRs are still measured |

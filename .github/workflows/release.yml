@@ -4,6 +4,7 @@ name: Release
 on:
   push:
     branches: [master]
+    tags: ["v*"]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -11,40 +12,86 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  release:
-    name: Changesets release
+  # A push to master only opens (or updates) the version PR. Publishing happens on
+  # a v* tag, so "what shipped" is a decision someone made and pinned, not a
+  # side effect of merging. The npm 'latest' dist-tag is written here and only
+  # here; npm-publish.yml publishes previews under 'next'.
+  version-pr:
+    name: Version PR (no publish)
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
-      id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "26"
           cache: pnpm
-          registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
-      - name: Create Release PR or publish
-        uses: changesets/action@v2.1.2
+      - name: Open or update the version PR
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          publish-script: ${{ secrets.NPM_TOKEN && 'pnpm release' || '' }}
           version-script: pnpm version-packages
           commit-message: "chore(release): version packages"
           pr-title: "chore(release): version packages"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || '' }}
 
-  # docker-release runs independently — does not block on / wait for changesets
+  publish:
+    name: Publish stable packages (tag ${{ github.ref_name }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+      # A tag pushed from an unmerged branch must not publish: stable comes from
+      # master, where the version PR was merged.
+      - name: The tag is on master
+        run: |
+          git fetch --depth=1 origin master
+          if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
+            echo "::error::${{ github.ref_name }} is not on master; stable publishes from master only"
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      # Same turbo cache as CI: a tag publish should not rebuild from scratch.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node26-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node26-
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - run: pnpm build
+      - name: Publish to the latest dist-tag
+        run: pnpm changeset publish --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+      - name: Job wall time
+        if: always()
+        run: node scripts/job-times.mjs --job release-publish --started "$STARTED"
+
+  # Images ship with the tag they belong to: `:latest` and the tag's own name,
+  # not the SHA of whatever master happened to be at.
   docker-release:
     name: Build + sign Docker images (${{ matrix.service }}, ${{ matrix.context }}, ${{ matrix.dockerfile }}, ${{ matrix.image }})
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
       packages: write
@@ -63,13 +110,13 @@ jobs:
             image: ghcr.io/yash-awasthi/nexus/worker
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -77,21 +124,21 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
             ${{ matrix.image }}:latest
-            ${{ matrix.image }}:${{ github.sha }}
+            ${{ matrix.image }}:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           sbom: true
           provenance: true
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign image (keyless OIDC)
         run: |
@@ -99,7 +146,7 @@ jobs:
             ${{ matrix.image }}@${{ steps.build.outputs.digest }}
 
       - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0.24.3
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: spdx-json
@@ -113,7 +160,166 @@ jobs:
             ${{ matrix.image }}@${{ steps.build.outputs.digest }}
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sbom-${{ matrix.service }}
           path: sbom-${{ matrix.service }}.spdx.json
+
+  # Tag builds only: the signed installers and the update feed. Signing material
+  # comes from secrets; with none set the build is unsigned and the feed step
+  # refuses to publish rather than shipping an unauthenticated manifest.
+  desktop:
+    name: Desktop installers (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+          cache: pnpm
+      - name: Check the tag matches the app version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          APP=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "$VERSION" != "$APP" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match apps/desktop $APP"
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - name: Build the UI the app serves
+        run: pnpm --filter @nexus/ui build
+      - name: Build the shell and its bundled API
+        run: |
+          pnpm --filter @nexus/desktop build
+          pnpm --filter @nexus/desktop build:api
+      - name: Bake the update feed and public key
+        env:
+          NEXUS_UPDATE_FEED_URL: https://github.com/${{ github.repository }}/releases/latest/download
+          NEXUS_UPDATE_PUBLIC_KEY: ${{ vars.UPDATE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$NEXUS_UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::Set the UPDATE_PUBLIC_KEY repository variable; refusing to ship an app that cannot update"
+            exit 1
+          fi
+          pnpm --filter @nexus/desktop update:config
+      - name: Package
+        run: pnpm --filter @nexus/desktop exec electron-builder --config electron-builder.yml --publish never
+        env:
+          # One certificate per run: the Windows OV/EV cert on Windows, the
+          # Developer ID Application cert on macOS. Empty means unsigned.
+          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WINDOWS_CSC_LINK || secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || secrets.MACOS_CSC_KEY_PASSWORD }}
+          # macOS notarisation; the hook skips when these are empty.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: desktop-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            apps/desktop/dist-installers/*.exe
+            apps/desktop/dist-installers/*.dmg
+
+  desktop-feed:
+    name: Signed update feed and release page
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: desktop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+      - name: Install Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - name: Generate the source SBOM
+        run: |
+          # `pnpm sbom` runs syft over the checkout; no dependency install is needed.
+          export PATH="$(dirname "${{ steps.syft.outputs.cmd }}"):$PATH"
+          pnpm sbom
+          mv sbom.json "$RUNNER_TEMP/sbom.cdx.json"
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          path: release
+          merge-multiple: true
+      - name: Sign the update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          UPDATE_PUBLIC_KEY: ${{ vars.UPDATE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::error::UPDATE_SIGNING_KEY is not set; refusing to publish an unsigned feed"
+            exit 1
+          fi
+          printf '%s' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-key.pem"
+          # The key the app embeds and the key that signs the feed must be the
+          # same, or every client silently rejects the update.
+          node -e '
+            const { createPrivateKey, createPublicKey } = require("node:crypto");
+            const { readFileSync } = require("node:fs");
+            const key = createPrivateKey(readFileSync(process.env.RUNNER_TEMP + "/update-key.pem", "utf8"));
+            const pub = createPublicKey(key);
+            const pem = pub.export({ type: "spki", format: "pem" }).toString().replace(/\\s+/g, "");
+            const der = pub.export({ type: "spki", format: "der" }).toString("base64");
+            const declared = (process.env.UPDATE_PUBLIC_KEY || "").replace(/\\s+/g, "");
+            if (declared !== pem && declared !== der) {
+              console.error("UPDATE_SIGNING_KEY does not match the UPDATE_PUBLIC_KEY variable");
+              process.exit(1);
+            }
+          '
+          VERSION="${GITHUB_REF_NAME#v}"
+          node scripts/release/build-update-manifest.mjs \
+            --version "$VERSION" \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}" \
+            --dir release \
+            --key-file "$RUNNER_TEMP/update-key.pem" \
+            --out release
+          rm -f "$RUNNER_TEMP/update-key.pem"
+      - name: Generate an SBOM for the desktop bundle
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: release/sbom-desktop.spdx.json
+      - name: Attach the source SBOM
+        run: cp "$RUNNER_TEMP/sbom.cdx.json" release/sbom.cdx.json
+      - name: Write checksums
+        run: |
+          cd release
+          # Covers every published asset; SHA256SUMS.sig covers this list.
+          sha256sum *.exe *.dmg manifest.json manifest.json.sig sbom*.json | LC_ALL=C sort -k2 > SHA256SUMS
+      - name: Sign the checksum list
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          # Signing needs the release key: with no UPDATE_SIGNING_KEY this fails
+          # closed instead of publishing an unauthenticated hash list.
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::error::UPDATE_SIGNING_KEY is not set; refusing to publish an unsigned hash list"
+            exit 1
+          fi
+          printf '%s' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/hash-key.pem"
+          node scripts/release/sign-checksums.mjs \
+            --file release/SHA256SUMS \
+            --key-file "$RUNNER_TEMP/hash-key.pem" \
+            --out release/SHA256SUMS.sig
+          rm -f "$RUNNER_TEMP/hash-key.pem"
+      - name: Publish the release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: release/*
+          generate_release_notes: true

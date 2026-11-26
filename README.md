@@ -86,6 +86,33 @@ docker compose up
 curl http://localhost:3000/health   # verify
 ```
 
+### Option C — 15 minutes, no Docker (first chat)
+
+For a machine with Node 24+ and pnpm 12+: no Docker, no Postgres server, no Redis, no
+model download. Everything below is copy-paste, and every step says how you know it
+worked.
+
+```bash
+git clone https://github.com/Yash-Awasthi/Nexus.git
+cd Nexus
+
+pnpm install                             # 1. one workspace install
+cp .env.example .env                     # 2. then set NEXUS_API_KEY to any dev value
+pnpm --filter @nexus/cli exec nexus doctor   # 3. one line per dependency, each with its fix
+pnpm dev                                 # 4. API :3000, UI :5173
+curl -s localhost:3000/health            # 5. {"status":"ok"} — the API is up
+```
+
+Open <http://localhost:5173>, sign up with the e-mail of your choice (dev mode sends the
+verification link to the console), and you have threads, missions, notifications, the
+knowledge base and the CLI. **Chat needs a model**: either a driver key in `.env`
+(`GROQ_API_KEY`, `OPENAI_API_KEY`, …) or a local model through Ollama
+(`ollama pull qwen2.5:7b`), which `nexus doctor` will tell you is missing until you do.
+
+What this path deliberately skips — and what each loss costs — is in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#offline-machine-no-docker-no-ollama-no-server-database).
+The embedded database and the in-process KV are the reason it works.
+
 ### Option B — Local dev (hot reload)
 
 ```bash
@@ -210,6 +237,7 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 | [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown  |
 | [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template            |
+| [SUPPORT.md](SUPPORT.md)                           | Where to ask, what a good report has, what is not supported |
 
 ---
 
@@ -235,6 +263,7 @@ and open a PR. See [CONTRIBUTING.md](CONTRIBUTING.md).
 Code execution runs in a sandbox (`--network none`, read-only filesystem, memory cap).
 Audit log entries are HMAC-SHA256 chained, and secrets are read from the environment.
 Report vulnerabilities privately via GitHub Security Advisories; see [SECURITY.md](SECURITY.md).
+For where a question or a bug report goes, and what support can promise, see [SUPPORT.md](SUPPORT.md).
 
 ---
 

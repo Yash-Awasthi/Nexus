@@ -24,6 +24,7 @@ export default [
   route("workspaces", "routes/workspaces.tsx"),
   route("invitations/:token", "routes/invitations.tsx"),
   route("workflows", "routes/workflows.tsx"),
+  route("templates", "routes/templates.tsx"),
   route("skills", "routes/skills.tsx"),
   route("knowledge", "routes/knowledge.tsx"),
   route("knowledge-bases", "routes/knowledge-bases.tsx"),

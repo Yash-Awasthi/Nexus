@@ -20,6 +20,13 @@ import type { FastifyInstance } from "fastify";
 
 import { guardExec } from "../lib/exec-guard.ts";
 import { ownerIdFor } from "../lib/owner.ts";
+import {
+  languageMatrix,
+  pyodideVersion,
+  resourceReport,
+  sampleMemory,
+  IMAGE_VERSIONS,
+} from "../lib/sandbox-matrix.ts";
 import { runUntrustedJs } from "../lib/untrusted-js.ts";
 import { runUntrustedPython } from "../lib/untrusted-python.ts";
 
@@ -58,6 +65,8 @@ function recordResult(
     durationMs: number;
     language?: string;
     source?: "api" | "helper";
+    /** What the run cost; kept with the record so a history row can show it. */
+    resources?: { cpuMs: number; peakRssBytes: number; wallMs: number; method: string };
   },
 ): void {
   _sandboxResults.set(result.executionId, {
@@ -158,16 +167,30 @@ export async function sandboxRoutes(
     const languages = usingCustomPiston
       ? [...SANDBOX_LANGUAGES, ...PISTON_ONLY_LANGUAGES]
       : [...SANDBOX_LANGUAGES];
+    // Per-language truth, with the version each language actually runs: a caller that pins
+    // behaviour needs `3.4.13`, not "ruby". One source — `languageMatrix` — decides `via` and
+    // `serverRuns` as well as the version, so the page, the pin and the status cannot disagree.
+    const runtimes = languageMatrix({
+      nodeVersion: process.version.replace(/^v/, ""),
+      pyodideVersion: pyodideVersion(),
+      pistonAvailable: usingCustomPiston,
+      dockerAvailable: dockerAvail,
+      languages,
+    });
     return reply.send({
       available: true,
       dockerAvailable: dockerAvail,
       pistonAvailable: usingCustomPiston,
       pythonRuntime: "pyodide-local",
       languages,
+      runtimes,
+      imageVersions: IMAGE_VERSIONS,
       pistonUrl: process.env.PISTON_URL ?? null,
       note: usingCustomPiston
-        ? undefined
-        : "JS and Python run in the API; Go, Rust, Ruby, TypeScript and Bash run through the local sandbox helper. Set PISTON_URL to a self-hosted Piston for r.",
+        ? "Piston answers every language this deployment lists, and the sandbox image is still the path for skill code and missions."
+        : dockerAvail
+          ? "JS and Python run in the API; the other image languages run through the local sandbox helper on your machine. Set PISTON_URL to a self-hosted Piston to run them on the server, and for r."
+          : "JS and Python run in the API. No Docker daemon answers here, so the sandbox image is unavailable: Go, Rust, Ruby, TypeScript and Bash need Docker for the helper or a self-hosted PISTON_URL. r needs PISTON_URL.",
     });
   });
 
@@ -177,6 +200,18 @@ export async function sandboxRoutes(
       const { code, language = "javascript" } = request.body;
       const executionId = crypto.randomUUID();
       const startedAt = Date.now();
+      const cpuAtStart = process.cpuUsage();
+      // Peak resident memory during the run, sampled; see `ResourceReport.method`.
+      const memory = sampleMemory();
+      /** The figures for this run, for every exit path to attach to its result. */
+      const resources = () => {
+        const peakRssBytes = memory.stop();
+        return resourceReport({
+          startedAt,
+          cpu: process.cpuUsage(cpuAtStart),
+          peakRssBytes,
+        });
+      };
       const lang = language.toLowerCase();
 
       // The exec policy decides per language. This surface runs uncovered
@@ -207,6 +242,7 @@ export async function sandboxRoutes(
             exitCode: r.exitCode,
             language: "python",
             durationMs: r.durationMs,
+            resources: resources(),
           };
           recordResult(ownerIdFor(request), result);
           return reply.code(201).send(result);
@@ -230,6 +266,7 @@ export async function sandboxRoutes(
             exitCode: pResult.exitCode,
             language: pistonLang,
             durationMs: pResult.durationMs,
+            resources: resources(),
           };
           recordResult(ownerIdFor(request), result);
           return reply.code(201).send(result);
@@ -244,6 +281,7 @@ export async function sandboxRoutes(
             exitCode: 1,
             language: lang,
             durationMs: Date.now() - startedAt,
+            resources: resources(),
           };
           recordResult(ownerIdFor(request), result);
           return reply.code(201).send(result);
@@ -263,6 +301,7 @@ export async function sandboxRoutes(
         language: "javascript",
         durationMs: r.durationMs,
         truncated: r.truncated,
+        resources: resources(),
       };
       recordResult(ownerIdFor(request), result);
       return reply.code(201).send(result);

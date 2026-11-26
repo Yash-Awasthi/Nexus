@@ -151,8 +151,26 @@ func TestMCPBridgeStdioConformance(t *testing.T) {
 		t.Fatalf("warm-up board_slice failed: %s", text)
 	}
 
+	// Every write is a two-step exchange: the first call is asked to approve, and only the repeat
+	// with its token writes. The harness goes through both steps because a client that skips the
+	// first would silently write nothing.
+	challenged, isErr, _ := callTool("board_post", map[string]any{
+		"thread": "sprint-5", "message": "@claude bridge hello", "actor": "claude-desktop",
+	})
+	if isErr {
+		t.Fatalf("board_post challenge failed: %s", challenged)
+	}
+	var approval struct {
+		ApprovalRequired bool   `json:"approval_required"`
+		Confirm          string `json:"confirm"`
+	}
+	if err := json.Unmarshal([]byte(challenged), &approval); err != nil || !approval.ApprovalRequired {
+		t.Fatalf("board_post did not ask for approval first: %s", challenged)
+	}
+
 	posted, isErr, postLatency := callTool("board_post", map[string]any{
 		"thread": "sprint-5", "message": "@claude bridge hello", "actor": "claude-desktop",
+		"confirm": approval.Confirm,
 	})
 	if isErr || !strings.Contains(posted, "bridge hello") {
 		t.Fatalf("board_post failed: %s", posted)

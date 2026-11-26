@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Builds the per-user Windows NSIS installer and the notarised macOS dmg.
+# Signing material comes only from the environment in CI (Phase 1 secrets):
+# CSC_LINK/CSC_KEY_PASSWORD for Windows, APPLE_ID/TEAM_ID/APP_PASSWORD for
+# notarisation. With none set the build is unsigned, which is a local build.
+appId: com.nexus.desktop
+productName: Nexus
+copyright: Copyright © Nexus contributors
+directories:
+  output: dist-installers
+  buildResources: build
+asar: true
+# electron-builder hook names are top-level, not per-platform.
+afterSign: scripts/notarize.cjs
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: resources/api
+    to: api
+  # The API bundle keeps npm packages external, so the staged production tree
+  # must ship beside it; without this the packaged app cannot load pglite.
+  - from: resources/api/node_modules
+    to: api/node_modules
+  - from: resources/ui
+    to: ui
+publish: null
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Nexus-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  artifactName: Nexus-${version}-${arch}.${ext}
+linux:
+  target: [AppImage]
+  category: Development
+  artifactName: Nexus-${version}-${arch}.${ext}

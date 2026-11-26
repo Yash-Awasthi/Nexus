@@ -95,15 +95,17 @@ export async function analyticsRoutes(
       });
     } catch {
       // Gateway log unavailable (no KV) — report token totals from deps.costLog only.
+      // Latency and error rate are unknown here, not zero: a `0` would read as a
+      // measured p50 of zero milliseconds, which is not what a missing log means.
       const tokens = deps.costLog.reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
       return reply.send({
         totalUsers,
         costUsd,
         requests: deps.costLog.length,
         tokens,
-        latencyP50ms: 0,
-        latencyP99ms: 0,
-        errorRate: 0,
+        latencyP50ms: null,
+        latencyP99ms: null,
+        errorRate: null,
         source: "cost-log",
       });
     }

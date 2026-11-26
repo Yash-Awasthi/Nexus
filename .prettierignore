@@ -29,3 +29,6 @@ apps/api/data/stores/
 # openapi-typescript output, byte-compared against a fresh run by
 # `pnpm types:check` — reformatting it would fail that comparison.
 **/src/generated/
+
+# Electron installers and unpacked app output (build artifacts).
+apps/desktop/dist-installers/

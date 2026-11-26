@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from "vite-plus/test";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 
 import { startTracing } from "../src/otel.ts";
-import { TOOL_SPAN_NAME, withToolSpan } from "../src/tool-span.ts";
+import { TOOL_SPAN_NAME, TURN_SPAN_NAME, withToolSpan, withTurnSpan } from "../src/tool-span.ts";
 
 class MemoryExporter {
   readonly spans: ReadableSpan[] = [];
@@ -63,5 +63,35 @@ describe("tool spans", () => {
     expect(span.attributes["lsp.language"]).toBe("typescript");
     expect(span.attributes["lsp.operation"]).toBe("definition");
     expect(span.attributes["tool.name"]).toBe("lsp_definition");
+  });
+
+  it("nests LSP tool calls under the turn span", async () => {
+    exporter.spans.length = 0;
+    await withTurnSpan(async () => {
+      // Same call shape as the agent-core LSP wrapper: extra attrs on a tool span.
+      await withToolSpan("lsp_definition", "auto_allowed", async () => undefined, {
+        "lsp.language": "typescript",
+        "lsp.operation": "definition",
+      });
+      await withToolSpan("lsp_references", "auto_allowed", async () => undefined, {
+        "lsp.language": "typescript",
+        "lsp.operation": "references",
+      });
+    });
+
+    const turns = exporter.spans.filter((span) => span.name === TURN_SPAN_NAME);
+    const tools = exporter.spans.filter((span) => span.name === TOOL_SPAN_NAME);
+    expect(turns).toHaveLength(1);
+    expect(tools).toHaveLength(2);
+
+    const [turn] = turns;
+    if (!turn) throw new Error("no turn span was exported");
+    const turnContext = turn.spanContext();
+    for (const tool of tools) {
+      const toolContext = tool.spanContext();
+      expect(toolContext.traceId).toBe(turnContext.traceId);
+      expect(tool.parentSpanContext?.spanId).toBe(turnContext.spanId);
+      expect(tool.attributes["lsp.language"]).toBe("typescript");
+    }
   });
 });

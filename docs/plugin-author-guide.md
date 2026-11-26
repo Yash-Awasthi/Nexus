@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- verified: c6e5d6c 2026-11-24 -->
 
 # Plugin Author Guide
 

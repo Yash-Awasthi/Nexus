@@ -27,6 +27,26 @@ async function waitForRun(api: Api, id: string): Promise<string> {
   return "timeout";
 }
 
+/**
+ * A discussion files its outcome on its own schedule. Poll for the filed subtask
+ * instead of sleeping a guessed interval: the wait ends as soon as the facts are
+ * there, and a failure says what was still missing instead of "too early".
+ */
+async function waitForFiledSubtask(
+  api: Api,
+  taskId: string,
+): Promise<{ id: string; identifier: string } | undefined> {
+  for (let i = 0; i < 60; i++) {
+    const d = await api.get<{
+      comments: { body: string }[];
+      subtasks: { id: string; identifier: string }[];
+    }>(`/api/org/tasks/${taskId}`);
+    if (/^Filed /.test(d.comments.at(-1)?.body ?? "")) return d.subtasks.at(-1);
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  return undefined;
+}
+
 test("a run's answer lands in the task thread and its trace opens", async ({ page, api }) => {
   const cid = (await api.post<{ id: string }>("/api/org/companies", { name: unique("PW Runs") }))
     .id;
@@ -200,15 +220,7 @@ test("a filed decision reports back in its discussion when it is done", async ({
     title: "Agree on the word ship. Each of you: reply with only the line FINAL: ship",
   });
   await api.post(`/api/org/tasks/${t.id}/discuss`, { agentIds: ids, rounds: 2, fileOutcome: true });
-  let filed: { id: string; identifier: string } | undefined;
-  for (let i = 0; i < 60 && !filed; i++) {
-    await new Promise((r) => setTimeout(r, 2500));
-    const d = await api.get<{
-      comments: { body: string }[];
-      subtasks: { id: string; identifier: string }[];
-    }>(`/api/org/tasks/${t.id}`);
-    if (/^Filed /.test(d.comments.at(-1)?.body ?? "")) filed = d.subtasks.at(-1);
-  }
+  const filed = await waitForFiledSubtask(api, t.id);
   expect(filed, "the agents did not settle on the decision").toBeTruthy();
   await api.post(`/api/org/tasks/${filed!.id}/status`, { status: "in_progress" });
   await api.post(`/api/org/tasks/${filed!.id}/status`, { status: "done" });

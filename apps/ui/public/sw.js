@@ -9,11 +9,14 @@
  * Cache names are versioned — bump CACHE_VERSION on deploy to purge stale caches.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const SHELL_CACHE = `nexus-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `nexus-static-${CACHE_VERSION}`;
 
-const SHELL_URLS = ["/", "/dashboard", "/chat", "/manifest.json", "/favicon.svg"];
+/** Read-only pages that are worth having offline: they render from data already on the device. */
+const SHELL_URLS = ["/", "/dashboard", "/chat", "/offline.html", "/manifest.json", "/favicon.svg"];
+/** Served for a navigation that cannot reach the network and is not in the cache. */
+const OFFLINE_URL = "/offline.html";
 
 // Dev guard — the shell cache is a production artifact. Vite dev serves
 // transformed modules under content-hashed, server-invalidated URLs
@@ -86,11 +89,37 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // A page navigation: try the network, fall back to the cached copy, then to the offline
+  // shell. Without the last step an uncached page on a dead connection is the browser's own
+  // error page, which tells the user nothing and offers nothing.
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirstThenOffline(request));
+    return;
+  }
+
   // App shell — StaleWhileRevalidate
   event.respondWith(staleWhileRevalidate(request, SHELL_CACHE));
 });
 
 // ── Strategies ───────────────────────────────────────────────────────────────
+
+async function networkFirstThenOffline(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch {
+    const cached = await cache.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    const offline = await caches.match(OFFLINE_URL);
+    if (offline) return offline;
+    return new Response("You are offline.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+}
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);

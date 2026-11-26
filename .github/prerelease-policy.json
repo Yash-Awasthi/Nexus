@@ -1,0 +1,33 @@
+{
+  "$comment": "Every installed pre-release dependency, with the three things a release candidate needs: who owns it, why it is acceptable, and what would make us leave. scripts/prerelease-audit.mjs fails on a pre-release that is not here, an entry whose version no longer matches the tree, and an entry without an ADR that exists.",
+  "packages": {
+    "drizzle-orm": {
+      "version": "1.0.0-rc.6",
+      "owner": "db",
+      "why": "The only release line that ships the typed relational queries and migration splitter this repository is written against; 0.44 is a different API, not a smaller version of this one.",
+      "exit": "Migrate when 1.0.0 is GA: bump the catalog, hand-run `migrate-forward-only.test.ts` and `migrations-forward-only.mjs`, and delete this entry.",
+      "adr": "0020-release-candidates-in-the-persistence-layer.md"
+    },
+    "drizzle-kit": {
+      "version": "1.0.0-rc.6",
+      "owner": "db",
+      "why": "Must match drizzle-orm exactly; a generator from a different line emits migrations the runtime cannot read.",
+      "exit": "Same commit as drizzle-orm: GA, then regenerate every migration once and confirm `migrations-forward-only.mjs` still passes.",
+      "adr": "0020-release-candidates-in-the-persistence-layer.md"
+    },
+    "@monaco-editor/react": {
+      "version": "4.8.0-rc.3",
+      "owner": "ui",
+      "why": "4.7 does not lift Monaco out of the server-rendered bundle; the RC is the release that made the editor import-safe, and the code editor is unusable without it.",
+      "exit": "Move to 4.8.x stable when published; the only API used is `<Editor>` with `onMount`, so the swap is a version bump plus one screenshot.",
+      "adr": "0020-release-candidates-in-the-persistence-layer.md"
+    },
+    "node-pty": {
+      "version": "1.2.0-beta.15",
+      "owner": "pty",
+      "why": "1.1 has no Node 26 prebuild, so it compiles native code on every install; the beta ships the prebuilt binary the terminal needs.",
+      "exit": "1.2.0 stable, or 1.1 gaining a Node 26 prebuild — either removes the beta and the build step.",
+      "adr": "0020-release-candidates-in-the-persistence-layer.md"
+    }
+  }
+}

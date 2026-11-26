@@ -4,3 +4,4 @@
 /mcp-bridge.exe
 /serve.log
 *.log
+/bin/

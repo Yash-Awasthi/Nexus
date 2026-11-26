@@ -81,6 +81,28 @@ function busOn<T>(type: string, cb: (d: T) => void): () => void {
 
 // ── Core deliberation ─────────────────────────────────────────────────────────
 
+/**
+ * The user-facing reason a chat-stream POST failed. A 429 is a throttle, not a
+ * broken turn, so it names the Retry-After wait instead of the HTTP status.
+ */
+export function streamErrorMessage(status: number, retryAfter: string | null, body = ""): string {
+  if (status === 429) {
+    const seconds = Math.ceil(Number(retryAfter));
+    return Number.isFinite(seconds) && seconds > 0
+      ? `API rate limit reached. Try again in ${seconds}s.`
+      : "API rate limit reached. Try again in a moment.";
+  }
+  let detail = "";
+  try {
+    const parsed = JSON.parse(body) as { message?: string; error?: string };
+    detail = parsed.message ?? parsed.error ?? "";
+  } catch {
+    detail = body.trim().slice(0, 200);
+  }
+  if (detail) return `${detail} (${status})`;
+  return `Chat stream failed (${status}).`;
+}
+
 export async function deliberate(args: {
   threadId: string;
   message: string;
@@ -158,7 +180,8 @@ export async function deliberate(args: {
     });
 
     if (!res.ok || !res.body) {
-      throw new Error(`Chat stream failed: ${res.status} ${res.statusText}`);
+      const detail = res.ok ? "" : await res.text().catch(() => "");
+      throw new Error(streamErrorMessage(res.status, res.headers.get("retry-after"), detail));
     }
 
     const reader = res.body.getReader();

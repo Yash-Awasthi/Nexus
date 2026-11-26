@@ -158,6 +158,9 @@ export class PersistentStore<T> {
   values(): IterableIterator<T> {
     return this._mem.values();
   }
+  entries(): IterableIterator<[string, T]> {
+    return this._mem.entries();
+  }
   delete(id: string): void {
     this._mem.delete(id);
     void this._write(id, null);

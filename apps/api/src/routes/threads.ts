@@ -20,6 +20,12 @@
 import type { FastifyInstance } from "fastify";
 
 import { emitReaction } from "../lib/reactions.ts";
+import {
+  buildBundle,
+  bundleFilename,
+  MAX_BUNDLE_BYTES,
+  validateBundle,
+} from "../lib/session-bundle.ts";
 import { appendGraphEvent } from "../lib/session-graph.ts";
 import {
   appendMessages,
@@ -158,4 +164,62 @@ export async function threadsRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({ stored });
     },
   );
+
+  /**
+   * GET /threads/:id/export — the whole deliberation as one JSON file.
+   *
+   * Sent as an attachment with a readable filename, because the point of an export is to
+   * leave the browser: a support ticket, a second machine, an account that is not this one.
+   * It carries every message in append order — the bundle is the transcript, not a summary.
+   */
+  app.get<{ Params: { id: string } }>("/threads/:id/export", AUTH, async (request, reply) => {
+    const thread = await getThread(request.nexusUserId, request.params.id);
+    if (!thread) return reply.code(404).send({ error: "not_found" });
+    const messages = await listMessages(request.nexusUserId, request.params.id);
+    const bundle = buildBundle(thread, messages);
+    return reply
+      .header("content-type", "application/json; charset=utf-8")
+      .header(
+        "content-disposition",
+        `attachment; filename="${bundleFilename(thread.title, thread.createdAt)}"`,
+      )
+      .send(bundle);
+  });
+
+  /**
+   * POST /threads/import — accept a bundle as a new thread.
+   *
+   * Always a new thread id, even when the bundle names one that exists: importing is a copy,
+   * so it can neither overwrite somebody's session nor fail because a copy was already made.
+   * The bundle is validated whole before anything is written — a half-imported session would
+   * be worse than a refused one.
+   */
+  app.post<{ Body: unknown }>("/threads/import", AUTH, async (request, reply) => {
+    const raw = request.body;
+    const checked = validateBundle(raw);
+    if (!checked.ok) {
+      return reply.code(400).send({ error: "invalid_bundle", message: checked.reason });
+    }
+    const { bundle } = checked;
+    const encoded = Buffer.byteLength(JSON.stringify(bundle));
+    if (encoded > MAX_BUNDLE_BYTES) {
+      return reply
+        .code(413)
+        .send({ error: "bundle_too_large", message: `limit is ${MAX_BUNDLE_BYTES} bytes` });
+    }
+
+    const thread = await createThread(request.nexusUserId, {
+      title: bundle.thread.title,
+      mode: bundle.thread.mode ?? "imported",
+    });
+    const stored = await appendMessages(request.nexusUserId, thread.id, bundle.messages);
+    void appendGraphEvent(request.nexusUserId, `thread:${thread.id}`, "deliberation", {
+      title: thread.title,
+      node: { id: "thread", kind: "thread", label: thread.title, link: `/chat/${thread.id}` },
+    });
+    return reply.code(201).send({
+      thread,
+      imported: { messages: bundle.messages.length, stored, sourceThreadId: bundle.thread.id },
+    });
+  });
 }

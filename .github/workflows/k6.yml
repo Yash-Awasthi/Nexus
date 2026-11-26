@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Run k6 smoke test
-        uses: grafana/k6-action@v0.3.1
+        uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
         with:
           filename: infra/k6/smoke-test.js
           flags: --env BASE_URL=${{ github.event.inputs.target_url || 'http://localhost:3000' }} --env API_KEY=${{ secrets.NEXUS_API_KEY_STAGING }}
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # No staging deployment configured means nothing to load-test; skip, don't fail.
       - name: Check for a staging target
@@ -48,7 +48,7 @@ jobs:
       # would replace them with a default scenario the script does not define.
       - name: Run k6 load test
         if: steps.target.outputs.set == 'yes'
-        uses: grafana/k6-action@v0.3.1
+        uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
         with:
           filename: infra/k6/load-test.js
           flags: >
@@ -57,7 +57,7 @@ jobs:
 
       - name: Upload results
         if: always() && steps.target.outputs.set == 'yes'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: k6-results-${{ github.run_id }}
           path: summary.json

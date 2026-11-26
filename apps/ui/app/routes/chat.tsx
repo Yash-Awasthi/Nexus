@@ -33,6 +33,14 @@ import { SendToCompany } from "~/components/org/SendToCompany";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
+  canQueueOffline,
+  isNetworkFailure,
+  offlineNotice,
+  queueOffline,
+  queuedInsteadOfFailed,
+  readOfflineState,
+} from "~/lib/offline-notice";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -198,6 +206,8 @@ export default function Chat() {
   const streamingRef = useRef(false);
   // Home's ask box hands its question over as ?q=.
   const [input, setInput] = useState(() => search.get("q") ?? "");
+  /** Prompts the host is holding because the API was unreachable, when it can hold any. */
+  const [queued, setQueued] = useState(0);
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [activeSTM, setActiveSTM] = useState<STMModuleId[]>([]);
   const [mode, setMode] = useState("standard");
@@ -242,6 +252,23 @@ export default function Chat() {
   councilRef.current = council;
   const threadIdRef = useRef(threadId);
   threadIdRef.current = threadId;
+
+  /** Keep the queued-prompt count true while the page is open: the tray flushes on its own. */
+  useEffect(() => {
+    if (!canQueueOffline()) return;
+    let live = true;
+    const read = () => {
+      void readOfflineState().then((state) => {
+        if (live && state) setQueued(state.queued);
+      });
+    };
+    read();
+    const timer = setInterval(read, 5000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   // ── Load council, archetypes, preferences, threads ──────────────────────────
   useEffect(() => {
@@ -429,11 +456,18 @@ export default function Chat() {
       });
     } catch (err) {
       const raw = err instanceof Error ? err.message : "The deliberation failed.";
-      const msg = /\b40[13]\b/.test(raw)
-        ? "Your session expired. Sign in again, then resend."
-        : raw;
       streamingRef.current = false;
       setStreaming(false);
+      // A connection failure is the one case where the text is worth keeping: the host has a file
+      // and a flush timer, so the prompt goes there instead of only into an error message.
+      const held = isNetworkFailure(raw) ? await queueOffline(prompt, id) : null;
+      if (held !== null) setQueued(held);
+      const msg =
+        held !== null
+          ? queuedInsteadOfFailed(held)
+          : /\b40[13]\b/.test(raw)
+            ? "Your session expired. Sign in again, then resend."
+            : raw;
       setGroups((prev) =>
         prev.length
           ? [...prev.slice(0, -1), { ...prev[prev.length - 1], error: msg, done: true }]
@@ -575,6 +609,14 @@ export default function Chat() {
           <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
             {current?.title ?? "New deliberation"}
           </h1>
+          {queued > 0 && (
+            <span
+              className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+              title={offlineNotice(queued)}
+            >
+              {queued} queued
+            </span>
+          )}
           {threadId && (
             <Button
               variant="ghost"

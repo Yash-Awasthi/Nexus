@@ -21,17 +21,32 @@ jobs:
       matrix:
         node: ["24", "26"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # --changed diffs against the PR base, which needs history.
           fetch-depth: 0
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: ${{ matrix.node }}
           cache: true
 
+      # Turbo caches task output in .turbo/cache; without restoring it every run
+      # pays for the whole graph again. Keyed on the lockfile, so a dependency
+      # change is a miss and anything else is a hit.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node${{ matrix.node }}-
+      # Wall time is measured from here, so it includes checkout, install and
+      # every suite in this job.
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+        shell: bash
+
       # Verify the committed dependency graph; never auto-heal it in CI.
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       # Run vp from the workspace root so the root vitest.config.ts controls
       # the include globs (packages/*/tests/**) rather than having each
@@ -76,7 +91,7 @@ jobs:
         run: pnpm types:check
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         if: always() && github.event_name == 'push' && matrix.node == '26'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -86,41 +101,115 @@ jobs:
           files: coverage/lcov.info,packages/*/coverage/lcov.info
           fail_ci_if_error: false
 
-  app-suites:
-    name: App package suites
-    if: github.event_name == 'pull_request'
+      # Per-package floors with a ratchet: a package cannot hide behind the global
+      # threshold, and --record only ever raises a floor (a drop is a hand edit).
+      - name: Coverage floors per package
+        if: github.event_name == 'push'
+        run: node scripts/coverage-floors.mjs --strict
+
+      # Publishes this job's wall time into the run summary and fails on a 25%
+      # regression against .github/job-times.json; no baseline means recorded only.
+      - name: Job wall time
+        if: always()
+        shell: bash
+        run: node scripts/job-times.mjs --job unit --started "$STARTED"
+
+  offline:
+    name: Offline boot (no Docker, no Ollama)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
 
       - run: pnpm install --frozen-lockfile
 
+      # docs/DEPLOYMENT.md "Offline machine" claims the server boots on a bare laptop.
+      # The test removes every network-shaped variable and asserts /health answers, so
+      # an import that needs Docker or a model provider fails here instead of on a
+      # user's machine. Deliberately no services: this job must not have them.
+      - name: Boot with nothing reachable
+        working-directory: apps/api
+        run: ../../node_modules/.bin/vp test run tests/lib/offline-mode.test.ts
+
+  seeded:
+    name: Seeded determinism (same seed twice)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version: "26"
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # A test that passes only in one order is holding state it does not own.
+      # Same seed twice means the same order, so any difference in the result is
+      # nondeterminism the seed does not reach (wall-clock, Math.random, a shared
+      # temp file) rather than shuffle noise. Double the suite, so it is a
+      # separate job instead of a step in the unit matrix.
+      - name: Run the suite twice at the same shuffle seed
+        # Seed 1337 is the script default; repeating it here would only drift.
+        run: node scripts/seed-determinism.mjs
+        env:
+          DATABASE_URL: postgresql://test:test@localhost/nexus_ci
+          CI: "true"
+
+  app-suites:
+    name: App package suites
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      # Turbo reaches a remote cache when both are set, and stays on the restore-cache
+      # below when they are not — so this is an opt-in for a repository that has a
+      # team, not a required secret. A cache hit is what makes a second pull request
+      # that touches one app stop paying for the other two.
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version: "26"
+          cache: true
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node26-apps-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node26-apps-
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile
+
       # apps/api, apps/ui and apps/desktop each carry their own vitest config —
       # apps/api's setup file stubs pg and Redis for every file in the suite.
       # The root run excludes them for that reason, so without this job the API
       # route tests (the whole HTTP surface) would gate nothing.
-      - name: API suite
-        run: pnpm --filter @nexus/api test
+      #
+      # Through turbo rather than `pnpm --filter … test`: the task hash is the file
+      # contents, so an app whose sources did not change is restored from the cache
+      # instead of run again for the whole suite.
+      - name: API, UI and desktop suites
+        run: pnpm exec turbo run test --filter=@nexus/api --filter=@nexus/ui --filter=@nexus/desktop
         env:
           DATABASE_URL: postgresql://test:test@localhost/nexus_ci
 
-      - name: UI suite
-        run: pnpm --filter @nexus/ui test
-
-      - name: Desktop suite
-        run: pnpm --filter @nexus/desktop test
+      # Same 25% regression rule as the other timed jobs; `.turbo/cache` hits show up
+      # here as a shorter wall time rather than as a claim in the docs.
+      - name: Job wall time
+        if: always()
+        run: node scripts/job-times.mjs --job app-suites --started "$STARTED"
 
   desktop-e2e:
     name: Desktop E2E
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
@@ -156,8 +245,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
@@ -186,8 +275,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
@@ -209,23 +298,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: "26"
           cache: true
       - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-node26-browser-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-node26-browser-
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - run: node --test scripts/e2e-server.test.mjs scripts/e2e-offline.test.mjs scripts/unit-offline.test.mjs
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - name: Job wall time
+        if: always()
+        run: node scripts/job-times.mjs --job browser --started "$STARTED"
 
   python:
     name: Python tests (nexus-ingest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.14"
           enable-cache: true

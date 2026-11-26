@@ -26,6 +26,7 @@ import { handOff } from "../lib/org-work.ts";
 import { ANON_OWNER, claimable, ownsRow } from "../lib/owner.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { emitReaction, provideReactionDeps } from "../lib/reactions.ts";
+import { publish } from "../lib/webhooks.ts";
 
 const now = (): string => new Date().toISOString();
 
@@ -62,6 +63,31 @@ function applySchedule(wf: _Workflow, value: unknown): void {
     throw new WorkflowInputError("schedule must be a five-field cron, e.g. 0 9 * * 1-5");
   wf.schedule = expr || null;
   wf.nextRunAt = expr ? (nextCronRun(expr, new Date())?.toISOString() ?? null) : null;
+}
+
+/**
+ * The workflows a caller owns, newest-changed first.
+ *
+ * Read-only and distinct from the `/workflows` listing that the page uses: this one exists
+ * so global search can name a workflow without a second HTTP hop.
+ */
+export function listWorkflowsFor(userId: string | undefined): {
+  id: string;
+  name: string;
+  status: string;
+  updatedAt: string;
+  steps: number;
+}[] {
+  return [..._workflowStore.values()]
+    .filter((wf) => !wf.ownerId || !userId || wf.ownerId === userId)
+    .map((wf) => ({
+      id: wf.id,
+      name: wf.name,
+      status: wf.status,
+      updatedAt: wf.lastRunAt ?? wf.createdAt,
+      steps: Array.isArray(wf.steps) ? wf.steps.length : 0,
+    }))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 let runDue: ((at: Date) => Promise<string[]>) | null = null;
@@ -301,17 +327,23 @@ export async function workflowsRoutes(
           timeout,
         });
       } else if (kind === "parallel") {
-        const subSteps = Array.isArray(s.steps) ? s.steps : [];
+        const subSteps: unknown[] = Array.isArray(s.steps) ? s.steps : [];
         chain = chain.andParallel({
           id: stepId,
           name: s.name ? String(s.name) : undefined,
-          steps: subSteps.map((sub: any, i: number) => ({
-            id: `${stepId}-branch-${i}`,
-            execute: async ({ data }: any) => {
-              if (typeof sub.execute === "function") return sub.execute(data);
-              return data;
-            },
-          })),
+          steps: subSteps.map((raw: unknown, i: number) => {
+            // Branch bodies are user-authored JSON: an object, or something that cannot have
+            // an `execute` at all — either way, only a function is called.
+            const sub = (raw ?? {}) as { execute?: unknown };
+            return {
+              id: `${stepId}-branch-${i}`,
+              execute: async ({ data }: { data: unknown }) => {
+                if (typeof sub.execute === "function")
+                  return (sub.execute as (d: unknown) => unknown)(data);
+                return data;
+              },
+            };
+          }),
           continueOnFailure: Boolean(s.continueOnFailure),
         });
       } else {
@@ -366,6 +398,15 @@ export async function workflowsRoutes(
         name: wf.name,
         status: result.status,
       });
+      // A workflow run answers long before it finishes, so the completion also goes out as
+      // a webhook: an integrator with a server should not have to poll `GET /workflows/:id`
+      // for a schedule it did not trigger.
+      publish("workflow.completed", {
+        workflowId: wf.id,
+        name: wf.name,
+        status: result.status,
+        ...(wf.ownerId ? { ownerId: wf.ownerId } : {}),
+      }, wf.ownerId ?? userId);
       return result as unknown as { status: string } & Record<string, unknown>;
     } catch (err) {
       wf.status = "error";

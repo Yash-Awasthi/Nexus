@@ -13,11 +13,11 @@ import { ApprovalInbox } from "~/components/org/ApprovalInbox";
 import { BudgetPanel } from "~/components/org/BudgetPanel";
 import { GoalTree } from "~/components/org/GoalTree";
 import { MemoryPanel } from "~/components/org/MemoryPanel";
-import { OrgChart } from "~/components/org/OrgChart";
-import { InboxCard, OverviewPanel, PortfolioStrip } from "~/components/org/OverviewPanel";
+import { OrgChart } from "~/components/org/OrgChart";import { InboxCard, OverviewPanel, PortfolioStrip } from "~/components/org/OverviewPanel";
 import { RoutineList } from "~/components/org/RoutineList";
 import { RunList } from "~/components/org/RunList";
 import { TaskBoard } from "~/components/org/TaskBoard";
+import { PrintButton } from "~/components/print-button";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -30,6 +30,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
+import { companyReportDoc } from "~/lib/printable";
 import {
   StatusPill,
   orgApi,
@@ -426,6 +427,22 @@ export default function OrgPage() {
                   <Download className="size-4" /> Export
                 </Button>
               )}
+              {/* Prints what this page already knows: mission, tree, open work. No second request. */}
+              <PrintButton
+                doc={companyReportDoc({
+                  company: {
+                    name: company.name,
+                    mission: company.mission ?? "",
+                  },
+                  agents: agents.map((a) => ({
+                    name: a.name,
+                    title: a.title,
+                    role: a.role,
+                    ...(a.status ? { status: a.status } : {}),
+                    ...(a.reportsTo ? { reportsTo: a.reportsTo } : {}),
+                  })),
+                })}
+              />
               {!manage ? null : company.status === "active" ? (
                 <Button
                   size="sm"

@@ -6,8 +6,9 @@
  * file imports no API, exec-policy or tool module.
  */
 
-import { readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFileSync, type Dirent } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { createLspClient, type LspClient, type LspClientOptions } from "./client.ts";
@@ -32,6 +33,15 @@ export const MAX_SYMBOL_CHILDREN = 20;
 const CRASH_WINDOW_MS = 60_000;
 const UNHEALTHY_MS = 60_000;
 const RSS_SAMPLE_MS = 15_000;
+
+/** tsserver reports "No Project" until a file is open, so warm workspace queries. */
+const REPRESENTATIVE_EXTENSIONS: Record<LspLanguage, readonly string[]> = {
+  typescript: [".ts", ".tsx", ".js", ".jsx"],
+  python: [".py", ".pyi"],
+  go: [".go"],
+  rust: [".rs"],
+};
+const WARM_SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next"]);
 
 export type LspManagerErrorCode =
   | ContainmentCode
@@ -423,25 +433,48 @@ export class LspManagerImpl implements LspManager {
     if (!prepared.ok) return prepared;
     const documents = prepared.entry.documents;
     if (!documents) return failure("SERVER_EXITED", "language server is not running");
+    const pulled = await this.pullDiagnostics(prepared);
+    if (pulled) return pulled;
     const waited = await documents.waitForDiagnostics(
       prepared.uri,
       prepared.version,
       this.config.diagnosticsWaitMs,
     );
-    const truncated = waited.diagnostics.length > MAX_DIAGNOSTICS;
+    return this.diagnosticsResult(prepared.path, waited.diagnostics, waited.stale);
+  }
+
+  /**
+   * Some servers (pyright) only answer `textDocument/diagnostic`; a server
+   * without it errors and the push path above still runs.
+   */
+  private async pullDiagnostics(prepared: Prepared): Promise<LspDiagnosticsResult | undefined> {
+    let raw: { items?: unknown[] };
+    try {
+      raw = await this.call<{ items?: unknown[] }>(prepared.entry, "textDocument/diagnostic", {
+        textDocument: { uri: prepared.uri },
+      });
+    } catch {
+      return undefined;
+    }
+    if (!Array.isArray(raw?.items)) return undefined;
+    return this.diagnosticsResult(prepared.path, raw.items, false);
+  }
+
+  private diagnosticsResult(path: string, raw: unknown[], stale: boolean): LspDiagnosticsResult {
+    const truncated = raw.length > MAX_DIAGNOSTICS;
     const diagnostics: LspDiagnostic[] = [];
-    for (const raw of waited.diagnostics.slice(0, MAX_DIAGNOSTICS)) {
-      const item = raw as { range?: RangeLike; severity?: number; message?: string };
-      if (!item.range || typeof item.message !== "string") continue;
+    for (const item of raw.slice(0, MAX_DIAGNOSTICS)) {
+      const entry = item as { range?: RangeLike; severity?: number; message?: string };
+      if (!entry.range || typeof entry.message !== "string") continue;
       diagnostics.push({
-        path: prepared.path,
-        line: item.range.start.line + 1,
-        column: item.range.start.character + 1,
-        severity: severityName(item.severity),
-        message: item.message,
+        path,
+        line: entry.range.start.line + 1,
+        column: entry.range.start.character + 1,
+        severity: severityName(entry.severity),
+        message: entry.message,
       });
     }
-    return { ok: true, diagnostics, stale: waited.stale, truncated };
+    return { ok: true, diagnostics, stale, truncated };
   }
 
   async rename(input: LspRenameInput): Promise<LspEditResult | LspFailure> {
@@ -521,6 +554,7 @@ export class LspManagerImpl implements LspManager {
     if (!language) return failure("NO_SERVER", "no language server command is configured");
     const server = await this.serverFor(language);
     if (!server.ok) return server;
+    await this.openRepresentative(server.entry);
     try {
       const raw = await this.call<unknown>(server.entry, "workspace/symbol", {
         query: input.query,
@@ -800,6 +834,50 @@ export class LspManagerImpl implements LspManager {
       entry.unhealthyUntil = this.now() + UNHEALTHY_MS;
       entry.unhealthyReason = `RSS ${Math.round(rss / 1024 / 1024)} MB exceeded ${this.config.maxMemoryMb} MB`;
       await this.stopEntry(entry);
+    }
+  }
+
+  /**
+   * Open one file of the server's language so project-based servers have a
+   * project before a workspace-wide query. Reads stay inside the confined root.
+   */
+  private async openRepresentative(entry: PoolEntry): Promise<void> {
+    if (!entry.documents || entry.documents.openCount > 0) return;
+    const extensions = REPRESENTATIVE_EXTENSIONS[entry.language];
+    const queue = [entry.root];
+    for (let visited = 0; queue.length > 0 && visited < 300; visited += 1) {
+      const dir = queue.shift();
+      if (!dir) break;
+      let entries: Dirent[];
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+      for (const entryOnDisk of entries) {
+        if (entryOnDisk.isDirectory()) {
+          if (!WARM_SKIP_DIRS.has(entryOnDisk.name) && !entryOnDisk.name.startsWith(".")) {
+            queue.push(join(dir, entryOnDisk.name));
+          }
+          continue;
+        }
+        if (!entryOnDisk.isFile()) continue;
+        if (!extensions.some((ext) => entryOnDisk.name.endsWith(ext))) continue;
+        const path = join(dir, entryOnDisk.name);
+        try {
+          const text = await readFile(path, "utf8");
+          if (Buffer.byteLength(text) > this.config.maxFileBytes) continue;
+          entry.documents.open({
+            uri: pathToFileURL(path).href,
+            languageId: entry.language,
+            text,
+          });
+        } catch {
+          // A file that disappears mid-scan is not a reason to fail the query.
+        }
+        return;
+      }
     }
   }
 
