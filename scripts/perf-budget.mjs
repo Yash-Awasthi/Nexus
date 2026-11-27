@@ -221,22 +221,21 @@ if (invokedDirectly) {
     }
     const verdict = judge(name, ms, baseline);
     results[name] = { ms: Math.round(ms), host: HERE, at: new Date().toISOString() };
-    console.log(
-      `${verdict.ok ? "✔" : "✖"} ${name}: ${Math.round(ms)}ms — ${verdict.reason}`,
-    );
+    console.log(`${verdict.ok ? "✔" : "✖"} ${name}: ${Math.round(ms)}ms — ${verdict.reason}`);
     if (!verdict.ok && argv.includes("--check")) failed++;
   }
 
   if (argv.includes("--record")) {
-    writeFileSync(
-      BASELINE,
-      `${JSON.stringify({ ...readBaseline(), ...results }, null, 2)}\n`,
+    writeFileSync(BASELINE, `${JSON.stringify({ ...readBaseline(), ...results }, null, 2)}\n`);
+    console.log(
+      `\nperf: recorded ${Object.keys(results).join(", ")} into .github/perf-baseline.json`,
     );
-    console.log(`\nperf: recorded ${Object.keys(results).join(", ")} into .github/perf-baseline.json`);
     process.exit(0);
   }
   if (argv.includes("--check")) {
-    console.log(failed === 0 ? "\nperf: within budget" : `\nperf: ${failed} workload(s) over budget`);
+    console.log(
+      failed === 0 ? "\nperf: within budget" : `\nperf: ${failed} workload(s) over budget`,
+    );
     process.exit(failed === 0 ? 0 : 1);
   }
 }

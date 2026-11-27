@@ -22,6 +22,7 @@ import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
 import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
+import { retentionTtlMs } from "@nexus/contracts";
 import { db } from "@nexus/db";
 import {
   users,
@@ -47,6 +48,7 @@ import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-toke
 import { appLink, sendMail } from "../lib/mailer.ts";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { emitReaction } from "../lib/reactions.ts";
+import { fail } from "../lib/reply-errors.ts";
 import { securityEvent } from "../lib/security-events.ts";
 import {
   endAllSessions,
@@ -119,7 +121,9 @@ function generateRefreshToken(): string {
 
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
-const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
+// The session lifetime lives in the retention policy, not here: `apps/api/tests/lib/retention.test.ts` asserts
+// that this constant, the refresh cookie's Max-Age and the policy are the same number.
+const REFRESH_TOKEN_TTL_MS = retentionTtlMs("sessions");
 
 interface RotatedMark {
   userId: string;
@@ -283,13 +287,8 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
   if (!dbAvailable) {
     // Graceful degradation — auth routes return 503 with clear message
-    const notConfigured = async (
-      _req: unknown,
-      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
-    ) =>
-      reply
-        .code(503)
-        .send({ error: "auth_unavailable", message: "DATABASE_URL is not configured" });
+    const notConfigured = async (_req: unknown, reply: FastifyReply) =>
+      fail(reply, 503, "auth_unavailable", { message: "DATABASE_URL is not configured" });
     app.post("/auth/register", notConfigured);
     app.post("/auth/login", notConfigured);
     app.post("/auth/refresh", notConfigured);
@@ -344,7 +343,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
 
       if (existing.length > 0) {
-        return reply.code(409).send({ error: "email_taken", message: "Email already registered" });
+        return fail(reply, 409, "email_taken", { message: "Email already registered" });
       }
 
       const passwordHash = await hashPassword(password);
@@ -366,7 +365,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         })
         .returning();
 
-      if (!user) return reply.code(500).send({ error: "insert_failed" });
+      if (!user) return fail(reply, 500, "insert_failed");
 
       const { accessToken, rawRefresh } = await startSession(user, request.headers["user-agent"]);
 

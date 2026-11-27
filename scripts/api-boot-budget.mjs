@@ -12,6 +12,7 @@
  * budget is measured, not hoped for: raising it is a commit somebody has to justify.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -35,20 +36,62 @@ export async function measureBoot() {
   const app = await buildServer();
   const health = await app.inject({ method: "GET", url: "/health" });
   const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
-  const routes = app.printRoutes({ commonPrefix: false }).split("\n").filter((line) => line.includes("(")).length;
+  const routes = app
+    .printRoutes({ commonPrefix: false })
+    .split("\n")
+    .filter((line) => line.includes("(")).length;
   await app.close();
   return { elapsedMs, status: health.statusCode, routes };
+}
+
+/**
+ * How many times the gate boots the server before it believes a number.
+ *
+ * One measurement is not reproducible on a machine that is also running something else: the same
+ * commit measured 7.3 s, 9.7 s and 11.5 s in a row here while nothing in the boot path changed. The
+ * noise is one-sided — another process can only slow a boot down, never speed it up past what the
+ * code costs — so the minimum of a few runs measures the boot path and the maximum measures the
+ * machine. Enforcing the maximum would fail builds for reasons that have nothing to do with the
+ * commit, and the usual repair is to raise the budget, which is exactly how a budget stops meaning
+ * anything.
+ */
+export const SAMPLES = 5;
+
+/** One cold boot in a child process: a second boot in the same process would reuse module state. */
+function sampleInChild() {
+  const out = execFileSync(process.execPath, [fileURLToPath(import.meta.url), "--sample"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  // The boot logs to stdout, so the sample is the one line with its own shape.
+  const line = out.split("\n").find((row) => row.startsWith('{"elapsedMs"'));
+  if (!line) throw new Error(`a boot sample printed nothing usable: ${JSON.stringify(out)}`);
+  return JSON.parse(line);
+}
+
+/** Every sample, in order, so a report can show the spread rather than one number. */
+export function measureBootSamples(count = SAMPLES) {
+  return Array.from({ length: count }, sampleInChild);
+}
+
+/** The fastest of several cold boots — the number the budget is about. */
+export function bestBoot(count = SAMPLES) {
+  const samples = measureBootSamples(count);
+  const best = samples.reduce((a, b) => (b.elapsedMs < a.elapsedMs ? b : a));
+  return { ...best, samples: samples.map((sample) => Math.round(sample.elapsedMs)) };
 }
 
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
-if (invokedDirectly) {
+if (invokedDirectly && process.argv.includes("--sample")) {
+  console.log(JSON.stringify(await measureBoot()));
+} else if (invokedDirectly) {
   const limits = budget();
-  const measured = await measureBoot();
+  const measured = bestBoot();
   const rounded = Math.round(measured.elapsedMs);
   console.log(
-    `api boot: ${rounded}ms to /health ${measured.status}, ${measured.routes} route lines (budget ${limits.bootMs}ms)`,
+    `api boot: best ${rounded}ms of ${measured.samples.join("/")}ms to /health ${measured.status}, ${measured.routes} route lines (budget ${limits.bootMs}ms)`,
   );
   if (process.argv.includes("--write")) {
     writeFileSync(

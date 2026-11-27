@@ -792,6 +792,9 @@ async function executeRun(queued: Run): Promise<void> {
       outputTokens: run.outputTokens,
       costUsd: run.costUsd,
       userId: run.ownerId,
+      // An org run is the one call site where the company is not a guess: the run belongs to it.
+      companyId: run.companyId,
+      family: "org",
     });
   }
   run.output = result.output.slice(0, 50_000);

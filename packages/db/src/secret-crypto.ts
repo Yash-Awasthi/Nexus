@@ -31,6 +31,22 @@ export function getSecretKey(): Buffer | null {
   return null;
 }
 
+/**
+ * The key this instance was using before a rotation, if one was set.
+ *
+ * Rotation in place is two deploys, not one: set `NEXUS_SECRETS_KEY` to the new key and `NEXUS_SECRETS_KEY_PREVIOUS`
+ * to the old one, run the rotation so every row is re-encrypted, then drop the previous variable. Without the
+ * second step the first deploy makes every stored credential unreadable — a rotation that only writes is a
+ * rotation that loses data.
+ */
+export function getPreviousSecretKey(): Buffer | null {
+  // Read by literal name so `check:env-docs` can see the read; a bracket lookup is a dynamic access and the scan
+  // would report the variable as documented-but-unread, which is how a real gap hides behind a false positive.
+  const hex = process.env.NEXUS_SECRETS_KEY_PREVIOUS;
+  if (hex && /^[0-9a-fA-F]{64}$/.test(hex)) return Buffer.from(hex, "hex");
+  return null;
+}
+
 /** True when a usable encryption key is configured. */
 export function isSecretCryptoAvailable(): boolean {
   return getSecretKey() !== null;
@@ -41,6 +57,10 @@ export function isSecretCryptoAvailable(): boolean {
  * base64(`[iv(12)|tag(16)|ciphertext]`). Key resolution and fail/fallback policy
  * are the caller's concern — this is the shared primitive used by `encryptSecret`
  * as well as the MFA and connector vaults (which apply their own fallback rules).
+ *
+ * The bare form is version 1 of the key material. `encryptSecret` writes a
+ * `v1:`-prefixed envelope around it so a future change of algorithm can be read
+ * back without guessing at the base64 shape; both forms decrypt here.
  */
 export function encryptWithKey(key: Buffer, plaintext: string): string {
   const iv = randomBytes(12);
@@ -49,6 +69,9 @@ export function encryptWithKey(key: Buffer, plaintext: string): string {
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, enc]).toString("base64");
 }
+
+/** The prefix written today. Rows stored before it existed carry no prefix and are read as v1. */
+export const SECRET_ENVELOPE = "v1:";
 
 /** Low-level AES-256-GCM decrypt with an explicit 32-byte key. Throws on tamper. */
 export function decryptWithKey(key: Buffer, stored: string): string {
@@ -61,16 +84,60 @@ export function decryptWithKey(key: Buffer, stored: string): string {
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
 }
 
-/** Encrypt UTF-8 plaintext → base64(`[iv|tag|ciphertext]`). Throws if no key. */
+/** Encrypt UTF-8 plaintext → `v1:` + base64(`[iv|tag|ciphertext]`). Throws if no key. */
 export function encryptSecret(plaintext: string): string {
   const key = getSecretKey();
   if (!key) throw new SecretCryptoUnavailableError();
-  return encryptWithKey(key, plaintext);
+  return SECRET_ENVELOPE + encryptWithKey(key, plaintext);
 }
 
 /** Decrypt a value produced by `encryptSecret`. Throws if no key or on tamper. */
 export function decryptSecret(stored: string): string {
   const key = getSecretKey();
   if (!key) throw new SecretCryptoUnavailableError();
-  return decryptWithKey(key, stored);
+  return decryptWithKey(key, unwrap(stored));
+}
+
+/**
+ * Strip the envelope prefix. A row written before the prefix existed is returned unchanged, which is exactly how
+ * rotation knows there is work to do: `stored === unwrap(stored)` means it is still version 1 on disk.
+ */
+export function unwrap(stored: string): string {
+  return stored.startsWith(SECRET_ENVELOPE) ? stored.slice(SECRET_ENVELOPE.length) : stored;
+}
+
+/** True when a stored value already carries the current envelope. */
+export function isCurrentEnvelope(stored: string): boolean {
+  return stored.startsWith(SECRET_ENVELOPE);
+}
+
+/**
+ * Decrypt with the current key, falling back to the previous one during a rotation.
+ *
+ * Returns which key worked so the caller can tell "already rotated" from "read with the old key and needs
+ * re-writing" without attempting the decryption twice.
+ */
+export function decryptSecretAnyKey(stored: string): {
+  plaintext: string;
+  key: "current" | "previous";
+} {
+  const body = unwrap(stored);
+  const current = getSecretKey();
+  if (current) {
+    try {
+      return { plaintext: decryptWithKey(current, body), key: "current" };
+    } catch {
+      // Fall through to the previous key; a GCM tag failure is the only way here.
+    }
+  }
+  const previous = getPreviousSecretKey();
+  if (previous) {
+    try {
+      return { plaintext: decryptWithKey(previous, body), key: "previous" };
+    } catch {
+      // Fall through: both keys failed, so the message names both rather than leaking one GCM tag error.
+    }
+  }
+  if (!current && !previous) throw new SecretCryptoUnavailableError();
+  throw new Error("Stored secret does not decrypt with the current or the previous key");
 }

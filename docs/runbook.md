@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # Nexus Operational Runbook
 
@@ -193,6 +193,9 @@ curl -s "$NEXUS_API_URL/api/v1/audit/log/verify" \
 
 ## 5. Scaling guidelines
 
+Numbers behind this section: `docs/CAPACITY.md` (measured on one machine, with the command to reproduce).
+The staged path below is ordered by what actually breaks first, not by what is most interesting to build.
+
 | Component | Scale trigger                | Action                                                 |
 | --------- | ---------------------------- | ------------------------------------------------------ |
 | `api`     | p99 latency > 500ms          | Raise the Render instance count or plan                |
@@ -200,6 +203,21 @@ curl -s "$NEXUS_API_URL/api/v1/audit/log/verify" \
 | `ingest`  | Scrape backlog > 30min       | Add ingest replicas; lower `FINSCRAPE_MAX_ARTICLES`    |
 | Postgres  | CPU > 70%, connections > 80% | Raise the Neon compute size; use the pooled connection |
 | Redis     | Memory > 80%                 | Raise `maxmemory`; move to a managed instance          |
+
+### 5.1 The staged path, with the trigger for each step
+
+Each step names what it buys and what it costs. "Measured" means a number from `docs/CAPACITY.md`; the rest is
+stated as the constraint it is, rather than as a figure nobody took.
+
+| Step                                  | Trigger to take it                                                               | What it buys                                                                                                                  | What it costs                                                                                                                                               |
+| ------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Single replica**                 | — (starting point)                                                               | ~2 500 RPS of cheap routes measured; far more than an early deployment sends                                                  | One boot (≈6.2 s measured) per deploy; a restart is a brief outage of one                                                                                   |
+| **2. Managed Postgres with a pooler** | second API replica is wanted, **or** any DB-bound route's p99 exceeds its budget | Removes the 10-connections-per-replica ceiling: 10 replicas × 10 connections would otherwise exhaust the default 100 sessions | A pooler hop per query (sub-millisecond locally, one more component to monitor); connection limits become the pooler's configuration rather than Postgres's |
+| **3. Redis cluster**                  | Redis memory > 80%, or a single Redis becomes a latency contributor              | More memory and more round-trip parallelism; the KV layer is a single client today                                            | The durable stores' read-modify-write assumes one instance; cluster mode makes that a key-slot question, so this step is a code change, not a config change |
+| **4. Worker split**                   | queue depth > 500 sustained, or worker CPU starves the API's event loop          | Removes background work from the request path so the API's ~2 500 RPS ceiling stops being shared                              | Two deployables, two boot budgets, two sets of env docs — the ops surface roughly doubles                                                                   |
+
+Order matters: step 2 before step 3 or 4, because adding replicas at step 1 runs into the connection ceiling first
+— the failure looks like pool exhaustion (`P3` in §6), not like a slow query.
 
 ---
 
@@ -434,17 +452,17 @@ your pager or chat service if you want notifications off the box.
 Each alert names its playbook, so the first action is never "investigate". "Paged?" is
 who hears about it when nobody is looking at a dashboard.
 
-| Alert                       | Meaning                                                   | First action                                                                 | Playbook | Paged? |
-| --------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- | -------- | ------ |
-| `NexusStatusDown`           | `GET /status` said `down`: a critical dependency is out    | `curl $NEXUS_URL/status` — the failing row names the dependency and the probe | P1       | yes    |
-| `NexusStatusDegraded`       | A non-critical row failed: Redis, sandbox or Docker       | Read the row: Redis → queue drain is at risk; Docker → image languages only  | P2       | no     |
-| `NexusAPIAvailabilityPage`  | Real requests are failing, `/health` may still be green   | Roll back the last deploy before diagnosing                              | P1       | yes    |
-| `NexusAPILatencyPage`       | p99 over 5s for 3 minutes                                 | Check `/status`: a slow dependency, not a slow route                     | P1       | yes    |
-| Queue depth rising          | The worker is not draining (or providers are slow)        | `llen bull:nexus-high:wait`, then `docker compose ps worker`              | P2       | yes    |
-| Audit chain breach          | `audit/log/verify` is false                               | Stop writes; preserve rows; treat as T3                                  | P4       | yes    |
-| Cost spike                  | Spend above the day's expectation                         | Find the dearest verdicts, then lower `budgetUsd`                         | P5       | no     |
-| Dead webhook delivery       | A receiver refused five deliveries; the hook is `dead`    | Inspect `/webhooks/:id`, fix the receiver, `POST .../deliveries/:id/retry` | —        | no     |
-| Update feed 5xx             | `/updates/latest.json` is unreachable for autoupdate      | Check the CDN; clients answer "feed unreachable" and keep running         | P1       | no     |
+| Alert                      | Meaning                                                 | First action                                                                  | Playbook | Paged? |
+| -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | -------- | ------ |
+| `NexusStatusDown`          | `GET /status` said `down`: a critical dependency is out | `curl $NEXUS_URL/status` — the failing row names the dependency and the probe | P1       | yes    |
+| `NexusStatusDegraded`      | A non-critical row failed: Redis, sandbox or Docker     | Read the row: Redis → queue drain is at risk; Docker → image languages only   | P2       | no     |
+| `NexusAPIAvailabilityPage` | Real requests are failing, `/health` may still be green | Roll back the last deploy before diagnosing                                   | P1       | yes    |
+| `NexusAPILatencyPage`      | p99 over 5s for 3 minutes                               | Check `/status`: a slow dependency, not a slow route                          | P1       | yes    |
+| Queue depth rising         | The worker is not draining (or providers are slow)      | `llen bull:nexus-high:wait`, then `docker compose ps worker`                  | P2       | yes    |
+| Audit chain breach         | `audit/log/verify` is false                             | Stop writes; preserve rows; treat as T3                                       | P4       | yes    |
+| Cost spike                 | Spend above the day's expectation                       | Find the dearest verdicts, then lower `budgetUsd`                             | P5       | no     |
+| Dead webhook delivery      | A receiver refused five deliveries; the hook is `dead`  | Inspect `/webhooks/:id`, fix the receiver, `POST .../deliveries/:id/retry`    | —        | no     |
+| Update feed 5xx            | `/updates/latest.json` is unreachable for autoupdate    | Check the CDN; clients answer "feed unreachable" and keep running             | P1       | no     |
 
 A `degraded` status is a task, not a page: the product still answers. A `down` status is a
 page, because it cannot.
@@ -540,11 +558,48 @@ env change, and a restart — and the stored refresh tokens must survive all thr
 `NEXUS_SECRETS_KEY` seals every stored provider key, and `NEXUS_OAUTH_VAULT_KEY`
 seals every stored OAuth token. Changing either one makes every existing ciphertext
 unreadable — the rows survive, the plaintext does not. Rotating an **at-rest** key is
-a different procedure (re-encrypt under the new key while the old one is still
-configured) and is deliberately out of scope here; mixing it into a credential drill
-is how a rotation becomes an outage.
+out of scope here — it is a different procedure (§11.4: re-encrypt while the old key
+is still configured), and mixing it into a credential drill is how a rotation becomes
+an outage.
 
-### 11.4 Drill record
+### 11.4 The at-rest key (`NEXUS_SECRETS_KEY`) — two deploys, not one
+
+This is the procedure §11.3 sends you to. The rule it exists for: **the new key is set
+while the old one can still decrypt**, otherwise the deploy that changes the variable
+makes every stored provider key unreadable at once.
+
+1. Generate the new key: `openssl rand -hex 32`.
+2. Deploy with **both**: `NEXUS_SECRETS_KEY=<new>` and
+   `NEXUS_SECRETS_KEY_PREVIOUS=<old>`. Reads now try the new key and fall back to the
+   old one; writes use the new one.
+3. Re-encrypt the table, seeing the shape first:
+
+   ```bash
+   node apps/api/src/rotate-secrets.ts --dry-run
+   node apps/api/src/rotate-secrets.ts
+   ```
+
+   The report is `N scanned, M rotated, K already current` plus any `skipped` rows.
+   A skipped row is one nothing can decrypt — it is left untouched and named, so look
+   at it rather than re-running.
+
+4. Check, in order:
+
+   - [ ] `SELECT key_material_version, count(*) FROM user_provider_credentials GROUP BY 1`
+         returns only version `2` (or only rows with `encrypted_key IS NULL`, which
+         local providers legitimately have)
+   - [ ] A stored key still resolves: send one message through a BYOK provider
+   - [ ] A stored OAuth token still refreshes (its vault key was not touched)
+   - [ ] The chain still verifies: `pnpm --filter @nexus/cli exec nexus audit verify`
+
+5. Deploy again **without** `NEXUS_SECRETS_KEY_PREVIOUS`. Until this step the old key
+   remains a working second way in, which is the whole point of doing it in two.
+
+Rollback at any point before step 5: put the old value back in `NEXUS_SECRETS_KEY` and
+remove the previous variable. After step 5 the old key is gone, so keep it in your
+secret manager until the drill is signed off below — not in the deployment.
+
+### 11.5 Drill record
 
 Fill this in after a real run; an empty row means the drill has not been done.
 

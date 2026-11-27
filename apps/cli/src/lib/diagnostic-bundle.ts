@@ -35,9 +35,17 @@ const SECRET_SHAPES: { name: string; pattern: RegExp; replace: string }[] = [
   },
   { name: "github token", pattern: /\bgh[pousr]_[A-Za-z0-9]{16,}/g, replace: "gh-REDACTED" },
   { name: "slack token", pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}/g, replace: "xox-REDACTED" },
-  { name: "json web token", pattern: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, replace: "jwt-REDACTED" },
+  {
+    name: "json web token",
+    pattern: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+    replace: "jwt-REDACTED",
+  },
   { name: "aws access key", pattern: /\bAKIA[0-9A-Z]{16}\b/g, replace: "AKIA-REDACTED" },
-  { name: "webhook signature", pattern: /\bt=\d+,v1=[a-f0-9]{32,}/g, replace: "t=REDACTED,v1=REDACTED" },
+  {
+    name: "webhook signature",
+    pattern: /\bt=\d+,v1=[a-f0-9]{32,}/g,
+    replace: "t=REDACTED,v1=REDACTED",
+  },
   {
     name: "credentials in a URL",
     pattern: /\b([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+):([^@/\s]+)@/gi,
@@ -75,7 +83,10 @@ export function redact(text: string): Redaction {
 }
 
 /** Redact every string in a JSON-shaped value, dropping secret-named fields entirely. */
-export function redactDeep(value: unknown, removed = new Set<string>()): { value: unknown; removed: string[] } {
+export function redactDeep(
+  value: unknown,
+  removed = new Set<string>(),
+): { value: unknown; removed: string[] } {
   const walk = (input: unknown): unknown => {
     if (typeof input === "string") {
       const result = redact(input);

@@ -72,9 +72,8 @@ describe("ranking", () => {
     return [...commands]
       .map((command) => ({ command, score: score(command.label, command.haystack, needle) }))
       .filter((entry) => entry.score > 0)
-      .sort(
-        (a, b) => b.score - a.score || a.command.label.localeCompare(b.command.label),
-      )[0]?.command.label;
+      .sort((a, b) => b.score - a.score || a.command.label.localeCompare(b.command.label))[0]
+      ?.command.label;
   };
 
   it("puts an exact label first", () => {

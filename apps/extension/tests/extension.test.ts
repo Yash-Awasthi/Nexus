@@ -49,11 +49,15 @@ describe("attaching the current page", () => {
   /** context.js is a classic script: it publishes itself on the global object. */
   const load = async () => {
     await import(pathToFileURL(join(dir, "context.js")).href);
-    return (globalThis as unknown as { NexusContext: Record<string, (...args: never[]) => unknown> })
-      .NexusContext as unknown as {
+    return (
+      globalThis as unknown as { NexusContext: Record<string, (...args: never[]) => unknown> }
+    ).NexusContext as unknown as {
       LIMITS: { title: number; url: number; selection: number };
       acceptableUrl: (url: unknown) => string | null;
-      attachPage: (chrome: unknown, tabId: unknown) => Promise<{
+      attachPage: (
+        chrome: unknown,
+        tabId: unknown,
+      ) => Promise<{
         title: string;
         url: string;
         selection: string;
@@ -146,15 +150,19 @@ describe("attaching the current page", () => {
 
   it("describes the attachment in words, and says how much of it there is", async () => {
     const api = await load();
-    expect(api.attachmentLabel({ title: "Status page", url: "https://example.com/s", selection: "" })).toBe(
-      "Status page",
-    );
     expect(
-      api.attachmentLabel({ title: "Status page", url: "https://example.com/s", selection: "two words" }),
+      api.attachmentLabel({ title: "Status page", url: "https://example.com/s", selection: "" }),
+    ).toBe("Status page");
+    expect(
+      api.attachmentLabel({
+        title: "Status page",
+        url: "https://example.com/s",
+        selection: "two words",
+      }),
     ).toBe("Status page — 2 words selected");
-    expect(
-      api.attachmentLabel({ title: "", url: "https://example.com/s", selection: "one" }),
-    ).toBe("example.com — 1 word selected");
+    expect(api.attachmentLabel({ title: "", url: "https://example.com/s", selection: "one" })).toBe(
+      "example.com — 1 word selected",
+    );
     expect(api.attachmentLabel(null)).toBe("");
   });
 
@@ -164,6 +172,6 @@ describe("attaching the current page", () => {
     expect(widget).toContain("...(page ? { page } : {})");
     expect(widget).toContain('add("ctx"');
     // And the URL it accepts is the same one the server accepts.
-    expect(widget).toContain("/^https?:\\/\\//i.test(String(page.url || \"\"))");
+    expect(widget).toContain('/^https?:\\/\\//i.test(String(page.url || ""))');
   });
 });

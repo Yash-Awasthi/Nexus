@@ -31,25 +31,29 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { CHART_SERIES, token } from "~/lib/tokens";
 
-const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ef4444", "#06b6d4"];
+// The pie uses the same five-hue token series as every other chart, so a slice, a bar and a line
+// for the same provider agree — and a theme switch moves all three together.
+const PIE_COLORS: string[] = [...CHART_SERIES, CHART_SERIES[1], CHART_SERIES[2]];
 
 // ─── Shared chart theme ────────────────────────────────────────────────────────
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "#1c1c1c",
-  border: "1px solid #333",
+  backgroundColor: token("popover"),
+  border: `1px solid ${token("border")}`,
   borderRadius: 8,
   fontSize: 12,
+  color: token("popover-foreground"),
 };
 
 const GRID_PROPS = {
   strokeDasharray: "3 3" as const,
-  stroke: "#333",
+  stroke: token("border"),
 };
 
 const AXIS_PROPS = {
-  stroke: "#888" as const,
+  stroke: token("muted-foreground") as string,
   fontSize: 12,
   tickLine: false,
   axisLine: false,
@@ -77,7 +81,7 @@ function renderPieLabel(props: PieLabelRenderProps) {
     <text
       x={x}
       y={y}
-      fill="#fff"
+      fill={token("primary-foreground")}
       textAnchor="middle"
       dominantBaseline="central"
       fontSize={11}
@@ -219,11 +223,16 @@ export default function AnalyticsCharts() {
                   <YAxis {...AXIS_PROPS} />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    labelStyle={{ color: "#ccc" }}
-                    itemStyle={{ color: "#10b981" }}
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                    labelStyle={{ color: token("popover-foreground") }}
+                    itemStyle={{ color: token("chart-3") }}
+                    cursor={{ fill: token("accent") }}
                   />
-                  <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Requests" />
+                  <Bar
+                    dataKey="count"
+                    fill={token("chart-3")}
+                    radius={[4, 4, 0, 0]}
+                    name="Requests"
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -260,7 +269,7 @@ export default function AnalyticsCharts() {
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_STYLE}
-                      itemStyle={{ color: "#ccc" }}
+                      itemStyle={{ color: token("popover-foreground") }}
                       formatter={(value) => [`${value}%`, "Share"]}
                     />
                   </PieChart>
@@ -318,15 +327,15 @@ export default function AnalyticsCharts() {
                   />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    labelStyle={{ color: "#ccc" }}
+                    labelStyle={{ color: token("popover-foreground") }}
                     itemStyle={{ fontSize: 12 }}
-                    cursor={{ stroke: "#444" }}
+                    cursor={{ stroke: token("border") }}
                   />
                   <Line
                     yAxisId="left"
                     type="monotone"
                     dataKey="requests"
-                    stroke="#10b981"
+                    stroke={token("chart-3")}
                     strokeWidth={2}
                     dot={false}
                     name="Requests"
@@ -335,7 +344,7 @@ export default function AnalyticsCharts() {
                     yAxisId="right"
                     type="monotone"
                     dataKey="cost"
-                    stroke="#f59e0b"
+                    stroke={token("chart-4")}
                     strokeWidth={2}
                     dot={false}
                     name="Cost ($)"

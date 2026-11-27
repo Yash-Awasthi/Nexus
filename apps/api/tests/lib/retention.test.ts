@@ -105,3 +105,58 @@ describe("retention: audit log", () => {
     expect(sql).toMatch(/CREATE TRIGGER audit_log_no_update/);
   });
 });
+
+describe("retention: sessions", () => {
+  it("expires a refresh token in 30 days", () => {
+    expect(RETENTION.sessions.ttlMs).toBe(30 * DAY_MS);
+    expect(RETENTION.sessions.indefinite).toBeUndefined();
+  });
+
+  it("is one number for the cookie and the row, not two that happen to match", () => {
+    for (const file of ["../../src/routes/auth-users.ts", "../../src/lib/sign-in-finish.ts"]) {
+      const source = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+      expect(source).toContain('retentionTtlMs("sessions")');
+      // A literal here is the second copy that drifts when one of them is edited.
+      expect(source).not.toMatch(/REFRESH_TOKEN_TTL_MS = \d/);
+    }
+  });
+});
+
+describe("retention: sandbox artefacts", () => {
+  it("reclaims an idle drive after 30 days, with the worker using the same number", async () => {
+    const { DRIVE_IDLE_MS } = await import("@nexus/sandbox");
+    expect(RETENTION.sandboxArtefacts.ttlMs).toBe(DRIVE_IDLE_MS);
+    expect(RETENTION.sandboxArtefacts.ttlMs).toBe(30 * DAY_MS);
+  });
+});
+
+describe("retention: logs", () => {
+  it("states that the deployment owns the window rather than inventing one", () => {
+    expect(RETENTION.logs.ttlMs).toBeUndefined();
+    expect(RETENTION.logs.maxEntries).toBeUndefined();
+    expect(RETENTION.logs.indefinite).toBe(false);
+    expect(RETENTION.logs.description).toMatch(/stdout/);
+  });
+
+  it("writes no log file, which is what makes that statement true", () => {
+    for (const file of ["../../src/server.ts", "../../src/lib/security-events.ts"]) {
+      const source = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+      // A pino destination or an appendFile would be a local sink with no window of its own.
+      expect(source).not.toMatch(/pino\.destination\(/);
+      expect(source).not.toMatch(/appendFileSync\([^)]*\.log/);
+    }
+  });
+});
+
+describe("retention: every policy names the code that enforces it", () => {
+  const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
+
+  it.each(Object.values(RETENTION).map((policy) => [policy.key, policy] as const))(
+    "%s resolves to a file that still contains its symbol",
+    (_key, policy) => {
+      expect(policy.description.length).toBeGreaterThan(20);
+      const source = readFileSync(`${ROOT}${policy.enforcedBy.file}`, "utf8");
+      expect(source).toContain(policy.enforcedBy.symbol);
+    },
+  );
+});

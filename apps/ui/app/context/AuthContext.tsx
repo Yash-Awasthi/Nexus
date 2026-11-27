@@ -317,3 +317,13 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+/**
+ * The same context for a component that can do its job without a user — a coach mark, a print
+ * button. It returns `null` outside the provider rather than throwing, so such a component renders
+ * nothing instead of taking the page down with it. Anything that needs to know *who* is signed in
+ * must still use `useAuth`.
+ */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}

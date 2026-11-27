@@ -370,9 +370,6 @@ importers:
       '@nexus/doc-pipeline':
         specifier: workspace:*
         version: link:../../packages/doc-pipeline
-      '@nexus/escalation-breaker':
-        specifier: workspace:*
-        version: link:../../packages/escalation-breaker
       '@nexus/exec-policy':
         specifier: workspace:*
         version: link:../../packages/exec-policy
@@ -382,9 +379,6 @@ importers:
       '@nexus/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
-      '@nexus/gateway-log':
-        specifier: workspace:*
-        version: link:../../packages/gateway-log
       '@nexus/hooks':
         specifier: workspace:*
         version: link:../../packages/hooks
@@ -466,9 +460,6 @@ importers:
       '@nexus/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
-      '@nexus/tool-registry':
-        specifier: workspace:*
-        version: link:../../packages/tool-registry
       '@nexus/trigger-engine':
         specifier: workspace:*
         version: link:../../packages/trigger-engine
@@ -1007,8 +998,6 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(jsdom@30.1.2(@noble/hashes@1.8.0))
 
-  packages/escalation-breaker: {}
-
   packages/exec-policy:
     devDependencies:
       vite-plus:
@@ -1027,17 +1016,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(jsdom@30.1.2(@noble/hashes@1.8.0))
 
-  packages/gateway:
-    dependencies:
-      '@nexus/llm-translate':
-        specifier: workspace:*
-        version: link:../llm-translate
-
-  packages/gateway-log:
-    devDependencies:
-      vite-plus:
-        specifier: 'catalog:'
-        version: 1.7.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(playwright@1.64.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(vitest@5.1.0)(yaml@2.9.1)
+  packages/gateway: {}
 
   packages/governance:
     devDependencies:
@@ -1108,12 +1087,6 @@ importers:
         version: 1.7.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(playwright@1.64.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(vitest@5.1.0)(yaml@2.9.1)
 
   packages/llm-tracer:
-    devDependencies:
-      vite-plus:
-        specifier: 'catalog:'
-        version: 1.7.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(playwright@1.64.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(vitest@5.1.0)(yaml@2.9.1)
-
-  packages/llm-translate:
     devDependencies:
       vite-plus:
         specifier: 'catalog:'
@@ -1248,6 +1221,9 @@ importers:
       '@nexus/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client
+      '@nexus/nlp-utils':
+        specifier: workspace:*
+        version: link:../nlp-utils
     devDependencies:
       vite-plus:
         specifier: 'catalog:'
@@ -1324,12 +1300,6 @@ importers:
       fast-check:
         specifier: 'catalog:'
         version: 4.10.2
-      vite-plus:
-        specifier: 'catalog:'
-        version: 1.7.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(playwright@1.64.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(vitest@5.1.0)(yaml@2.9.1)
-
-  packages/tool-registry:
-    devDependencies:
       vite-plus:
         specifier: 'catalog:'
         version: 1.7.0(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@8.3.8000(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(playwright@1.64.0)(terser@5.49.2)(tsx@4.23.12)(typescript@6.0.3)(vitest@5.1.0)(yaml@2.9.1)

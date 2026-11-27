@@ -300,7 +300,7 @@ export function TaskBoard({
                       className="w-full rounded-lg border bg-card p-2.5 text-left text-sm shadow-xs hover:border-primary/40"
                       data-testid="task-card"
                     >
-                      <div className="flex items-center gap-2 text-[11px]">
+                      <div className="flex items-center gap-2 text-2xs">
                         <span className="font-mono text-muted-foreground">{t.identifier}</span>
                         <span className={`font-medium ${PRIORITY_TONE[t.priority]}`}>
                           {t.priority}

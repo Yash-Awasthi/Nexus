@@ -288,7 +288,7 @@ export function RunList({
                   {r.outcome?.summary || r.error || r.reason}
                 </p>
               </div>
-              <div className="shrink-0 text-right font-mono text-[11px] text-muted-foreground">
+              <div className="shrink-0 text-right font-mono text-2xs text-muted-foreground">
                 <p>{usd(r.costUsd)}</p>
                 <p>{timeAgo(r.queuedAt)}</p>
               </div>

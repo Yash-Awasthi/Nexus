@@ -25,11 +25,12 @@ import type { FastifyInstance } from "fastify";
 
 import { getKGStore } from "../lib/knowledge-graph-store.ts";
 import { ownerIdFor } from "../lib/owner.ts";
-import { requireAuthWithTier } from "../middleware/auth.ts";
-import { listKbsFor } from "./kb.ts";
-import { listDiscussionsFor, readDiscussion } from "./discussion.ts";
-import { listWorkflowsFor } from "./workflows.ts";
 import { searchThreads } from "../lib/threads-store.ts";
+import { requireAuthWithTier } from "../middleware/auth.ts";
+
+import { listDiscussionsFor, readDiscussion } from "./discussion.ts";
+import { listKbsFor } from "./kb.ts";
+import { listWorkflowsFor } from "./workflows.ts";
 
 /** The names a caller can pass in `types`. */
 export const SEARCH_TYPES = [
@@ -236,7 +237,3 @@ export async function globalSearchRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 }
-
-/** Exported for the test: the ranking is the part worth pinning. */
-export const _scoreOf = scoreOf;
-export const _snippet = snippet;

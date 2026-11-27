@@ -38,8 +38,8 @@ import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { useAuth } from "~/context/AuthContext";
 import { useTheme } from "~/context/ThemeContext";
 import { apiFetch } from "~/lib/api";
-import { allNavItems } from "~/lib/nav";
 import { useLocalPlane } from "~/lib/local-plane";
+import { allNavItems } from "~/lib/nav";
 import { cn } from "~/lib/utils";
 
 type CommandKind = "page" | "action" | "result";
@@ -338,7 +338,7 @@ export function CommandPalette() {
             className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {searching && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />}
-          <kbd className="hidden shrink-0 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:block">
+          <kbd className="hidden shrink-0 rounded border px-1.5 py-0.5 text-3xs text-muted-foreground sm:block">
             esc
           </kbd>
         </div>
@@ -358,7 +358,7 @@ export function CommandPalette() {
               return (
                 <div key={command.id}>
                   {showsGroup && (
-                    <p className="px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                    <p className="px-3 pt-2 pb-1 text-2xs font-medium tracking-wide text-muted-foreground uppercase">
                       {groupLabel}
                     </p>
                   )}
@@ -387,7 +387,7 @@ export function CommandPalette() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between border-t px-3 py-1.5 text-2xs text-muted-foreground">
           <span className="flex items-center gap-3">
             <span>↑↓ move</span>
             <span>↵ open</span>

@@ -12,7 +12,11 @@
 #   @nexus/council  — debate engine, best-of-n, gauntlet (packages/council)
 #   @nexus/search   — retrieval, hybrid search, GraphRAG, KG, reranker (packages/search)
 #   @nexus/agent-core — agents, engine, runtime kernel, workflow, STM (packages/agent-core)
-#   @nexus/gateway-log    — gateway request log (packages/gateway-log)
+#
+# `@nexus/gateway-log` used to be here and is now `apps/api/src/lib/gateway-log.ts`: it had one
+# importer and no dependencies, so the package boundary only cost a `package.json` to keep in sync
+# (`docs/ARCHITECTURE.md` § "Packages with one consumer"). Its last published version stays on npm;
+# nothing here publishes it again.
 #
 # Secrets required (set in repo settings → Secrets → Actions):
 #   NPM_TOKEN — npm automation token (read+write, no MFA)

@@ -14,7 +14,9 @@
         "src/migrate.ts",
         "src/grant-admin.ts",
         "scripts/*.ts",
-        "tests/**/*.test.ts"
+        "tests/**/*.test.ts",
+        "src/rotate-secrets.ts",
+        "src/cost-report.ts"
       ],
       "project": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
     },
@@ -32,6 +34,14 @@
     },
     "apps/cli": {
       "entry": ["src/runtime-cli.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "packages/council": {
+      "entry": ["src/eval/cli.ts", "src/index.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "packages/search": {
+      "entry": ["src/eval/cli.ts", "src/index.ts"],
       "project": ["src/**/*.ts", "tests/**/*.ts"]
     }
   },

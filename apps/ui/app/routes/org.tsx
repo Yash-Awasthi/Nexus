@@ -13,7 +13,8 @@ import { ApprovalInbox } from "~/components/org/ApprovalInbox";
 import { BudgetPanel } from "~/components/org/BudgetPanel";
 import { GoalTree } from "~/components/org/GoalTree";
 import { MemoryPanel } from "~/components/org/MemoryPanel";
-import { OrgChart } from "~/components/org/OrgChart";import { InboxCard, OverviewPanel, PortfolioStrip } from "~/components/org/OverviewPanel";
+import { OrgChart } from "~/components/org/OrgChart";
+import { InboxCard, OverviewPanel, PortfolioStrip } from "~/components/org/OverviewPanel";
 import { RoutineList } from "~/components/org/RoutineList";
 import { RunList } from "~/components/org/RunList";
 import { TaskBoard } from "~/components/org/TaskBoard";
@@ -30,7 +31,6 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
-import { companyReportDoc } from "~/lib/printable";
 import {
   StatusPill,
   orgApi,
@@ -42,6 +42,7 @@ import {
   useVisibleInterval,
   CompanyCan,
 } from "~/lib/org";
+import { companyReportDoc } from "~/lib/printable";
 
 export function meta() {
   return [{ title: "Company — Nexus" }];
@@ -478,7 +479,7 @@ export default function OrgPage() {
                 {t.label}
                 {t.id === "approvals" && pending > 0 && (
                   <span
-                    className="ml-1.5 rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white"
+                    className="ml-1.5 rounded-full bg-destructive px-1.5 text-2xs font-semibold text-white"
                     data-testid="pending-badge"
                   >
                     {pending}

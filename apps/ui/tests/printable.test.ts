@@ -112,7 +112,9 @@ describe("a workflow run", () => {
 
   it("names the workflow and keeps the result and the trace apart", () => {
     expect(doc.title).toBe("Workflow run: Weekly digest");
-    expect(doc.meta.find((m) => m.label === "Steps")?.value).toBe("Gather (agent) → Decisions (agent)");
+    expect(doc.meta.find((m) => m.label === "Steps")?.value).toBe(
+      "Gather (agent) → Decisions (agent)",
+    );
     expect(doc.sections.map((s) => s.heading)).toEqual(["Result", "Step trace"]);
     expect(doc.sections[0]!.body).toBe("42 items, 3 decisions");
     expect(doc.sections[1]!.body).toContain("[started] Gather");
@@ -138,7 +140,13 @@ describe("a company report", () => {
     agents: [
       { name: "Lead", title: "Engagement lead", role: "manager" },
       { name: "Tech", title: "Technical reviewer", role: "analyst", reportsTo: "Lead" },
-      { name: "Gone", title: "Former analyst", role: "analyst", status: "terminated", reportsTo: "Lead" },
+      {
+        name: "Gone",
+        title: "Former analyst",
+        role: "analyst",
+        status: "terminated",
+        reportsTo: "Lead",
+      },
     ],
     tasks: [
       { title: "Draft the memo", status: "open", assignee: "Tech" },
@@ -252,12 +260,14 @@ describe("the pages", () => {
     expect(css).toContain("@media print");
     const block = css.slice(css.indexOf("@media print"));
     // Navigation, dialogs and anything marked print:hidden leave the page.
-    for (const selector of ["nav", "aside", "[role=\"dialog\"]", ".print\\:hidden"]) {
+    for (const selector of ["nav", "aside", '[role="dialog"]', ".print\\:hidden"]) {
       expect(block, selector).toContain(selector);
     }
     // A citation printed without its URL is not a citation.
     expect(block).toContain('a[href^="http"]::after');
     // And the rules do not leak into the screen layout.
-    expect(css.slice(0, css.indexOf("@media print"))).not.toContain("[role=\"dialog\"] {\n    display: none");
+    expect(css.slice(0, css.indexOf("@media print"))).not.toContain(
+      '[role="dialog"] {\n    display: none',
+    );
   });
 });

@@ -2642,6 +2642,7 @@ export class VertexDriver extends OpenAICompatibleDriver {
 // ── Driver registry + factory ──────────────────────────────────────────────────
 
 export type ProviderName =
+  | "openai"
   | "anthropic"
   | "groq"
   | "deepseek"

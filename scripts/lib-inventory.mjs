@@ -26,7 +26,7 @@ export const DOMAINS = [
     domain: "models",
     why: "talks to a model provider or routes between them",
     match:
-      /^(llm-|model-|provider-keys|prompt-cache|semantic-cache|routing-data|oauth-|chat-safety|citations|injection-classifier|moderation-score|models-seed)/,
+      /^(llm-|model-|provider-keys|prompt-cache|semantic-cache|routing-data|oauth-|chat-safety|citations|injection-classifier|moderation-score|models-seed|comparison)/,
   },
   {
     domain: "skills",
@@ -42,26 +42,30 @@ export const DOMAINS = [
     domain: "storage",
     why: "owns rows or files that outlive the process",
     match:
-      /(-store|^.*history$|^persistent-store|^pg-pool|^session-graph|^knowledge-graph-store|^drive-durability|^archetype-store|^threads-store|^notifications-store|^shared-kv|^migrate-embedded|^migration-lock|^memory-|^diff-history|^cost-log|^council-transcript)/,
+      /(-store|^.*history$|^persistent-store|^pg-pool|^session-graph|^knowledge-graph-store|^drive-durability|^archetype-store|^threads-store|^notifications-store|^shared-kv|^migrate-embedded|^migration-lock|^memory-|^diff-history|^cost-|^council-transcript|^gateway-log)/,
   },
   {
     domain: "security",
     why: "decides whether a caller may do something",
     match:
-      /^(secret-|crypto-utils|auth-hardening|pat-|security-|exec-|untrusted-|sso-|sign-in-finish|grant-admin|session-revocation|owner|audit-|trust-proxy|issue-access-token|public-url|gdpr-erasure|user-context)/,
+      /^(secret-|crypto-utils|auth-hardening|pat-|security-|exec-|untrusted-|sso-|sign-in-finish|grant-admin|session-|owner|audit-|trust-proxy|issue-access-token|public-url|gdpr-erasure|user-context|user-export)/,
   },
   {
     domain: "runtime",
     why: "schedules work inside this process",
     match:
-      /^(agent-|idle-map|rate-|startup-env|plugin-host|lsp|symbols|channels|reactions|request-traces|sentry-reporter|with-key-lock)/,
+      /^(agent-|idle-map|rate-|startup-env|plugin-host|lsp|symbols|channels|reactions|request-traces|sentry-reporter|with-key-lock|page-context|sandbox-matrix|tool-registry|escalation-breaker)/,
   },
   {
     domain: "integrations",
     why: "speaks a protocol that is not ours",
-    match: /^(cf-adapter|duckduckgo|mailer|site-import|lru-utils|extract-text)/,
+    match: /^(cf-adapter|duckduckgo|mailer|site-import|lru-utils|extract-text|webhooks)/,
   },
-  { domain: "api-shape", why: "defines the HTTP contract", match: /^(api-maturity|reply-errors)$/ },
+  {
+    domain: "api-shape",
+    why: "defines the HTTP contract",
+    match: /^(api-maturity|api-deprecation|reply-errors)$/,
+  },
 ];
 
 /** Modules with no test that names them. May only shrink. */
@@ -72,7 +76,6 @@ export const UNTESTED = [
   "oauth-drivers",
   "plugin-host",
   "sentry-reporter",
-  "sign-in-finish",
   "sso-link",
   "semantic-cache",
 ];

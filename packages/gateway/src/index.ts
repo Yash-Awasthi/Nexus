@@ -24,7 +24,7 @@
 
 import { randomUUID } from "crypto";
 
-import { translate } from "@nexus/llm-translate";
+import { translate } from "./llm-translate.ts";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -215,7 +215,7 @@ export function resolveModel(
 
 /** Anthropic Messages request → OpenAI chat/completions request */
 export function toOpenAIRequest(req: AnthropicRequest, resolvedModel: string): OAIRequest {
-  // Delegate to the canonical hub translator (@nexus/llm-translate). Unlike the old
+  // Delegate to the canonical hub translator (`./llm-translate.ts`). Unlike the old
   // bespoke flattening, it preserves tool calls / tool results / multi-turn
   // structure — the parts that break agents when dropped. The provider-resolved
   // model overrides the client's alias; everything else (system → system message,

@@ -10,8 +10,8 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { judgeRoute, readBudget, routeClosures } from "./bundle-budget.mjs";
 
@@ -77,7 +77,10 @@ test("a per-route budget overrides the default, in both directions", () => {
   assert.deepEqual(judgeRoute("big.tsx", closures.get("big.tsx"), budget).problems, []);
   // The default still applies to a route without its own entry.
   const tight = { defaultGzipKb: 40, perRoute: { "big.tsx": { gzipKb: 500 } } };
-  assert.equal(judgeRoute("chat.tsx", closures.get("chat.tsx"), tight).problems[0].kind, "over-budget");
+  assert.equal(
+    judgeRoute("chat.tsx", closures.get("chat.tsx"), tight).problems[0].kind,
+    "over-budget",
+  );
 });
 
 test("a module that must stay dynamic fails a route that imports it statically", () => {
@@ -98,7 +101,10 @@ test("a module that must stay dynamic fails a route that imports it statically",
   const graph = routeClosures(withGraph, readSize).get("graph.tsx");
   const problems = judgeRoute("graph.tsx", graph, budget).problems;
   assert.equal(problems[0].kind, "forbidden");
-  assert.match(problems[0].message, /statically includes assets\/three\.module-x\.js — three is 540 kB/);
+  assert.match(
+    problems[0].message,
+    /statically includes assets\/three\.module-x\.js — three is 540 kB/,
+  );
   // Listed as allowed, the same route passes: the rule is a decision, not a ban.
   const allowed = { ...budget, forbidden: { "three.module": { allowedIn: ["graph.tsx"] } } };
   assert.deepEqual(judgeRoute("graph.tsx", graph, allowed).problems, []);
@@ -115,23 +121,28 @@ test("a missing budget file still carries a default rule", () => {
   assert.equal(budget.defaultGzipKb, 200);
 });
 
-test("the committed budgets are met by the build that is in the tree", { skip: !existsSync(MANIFEST) }, () => {
-  const tree = JSON.parse(readFileSync(MANIFEST, "utf8"));
-  const closures = routeClosures(tree, readSize);
-  // A build that produced no route chunks would pass every assertion below for the
-  // wrong reason: gate the canary first.
-  assert.ok(closures.size >= 30, `only ${closures.size} routes in the manifest`);
-  const budget = readBudget();
-  const failures = [];
-  for (const [route, closure] of closures) {
-    for (const problem of judgeRoute(route, closure, budget).problems) failures.push(problem.message);
-  }
-  assert.deepEqual(failures, []);
-  // The 3D renderer is the specific promise: no page downloads it before it draws.
-  for (const [route, closure] of closures) {
-    assert.ok(
-      !closure.files.some((file) => file.includes("three.module")),
-      `${route} downloads three.js without being asked to`,
-    );
-  }
-});
+test(
+  "the committed budgets are met by the build that is in the tree",
+  { skip: !existsSync(MANIFEST) },
+  () => {
+    const tree = JSON.parse(readFileSync(MANIFEST, "utf8"));
+    const closures = routeClosures(tree, readSize);
+    // A build that produced no route chunks would pass every assertion below for the
+    // wrong reason: gate the canary first.
+    assert.ok(closures.size >= 30, `only ${closures.size} routes in the manifest`);
+    const budget = readBudget();
+    const failures = [];
+    for (const [route, closure] of closures) {
+      for (const problem of judgeRoute(route, closure, budget).problems)
+        failures.push(problem.message);
+    }
+    assert.deepEqual(failures, []);
+    // The 3D renderer is the specific promise: no page downloads it before it draws.
+    for (const [route, closure] of closures) {
+      assert.ok(
+        !closure.files.some((file) => file.includes("three.module")),
+        `${route} downloads three.js without being asked to`,
+      );
+    }
+  },
+);

@@ -14,6 +14,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { styleText } from "node:util";
 
+import type { Command } from "commander";
+
 import { api, fail } from "./client.ts";
 
 export interface RunResult {
@@ -117,7 +119,7 @@ export async function watchAndRun(options: WatchOptions): Promise<Watcher> {
 }
 
 /** Register `nexus run`. */
-export function registerRunCommand(program: import("commander").Command): void {
+export function registerRunCommand(program: Command): void {
   program
     .command("run <workflowId>")
     .description("Run a stored workflow; --watch re-runs it when a file changes")
@@ -145,7 +147,8 @@ export function registerRunCommand(program: import("commander").Command): void {
       })();
 
       const once = async (): Promise<RunResult> => {
-        const data = await api.post<RunResult>(`/workflows/${workflowId}/run`, {
+        // Workflows live on the unversioned bridge (/api/workflows), not /api/v1.
+        const data = await api.unversioned<RunResult>("POST", `/api/workflows/${workflowId}/run`, {
           ...(input === undefined ? {} : { input }),
         });
         if (typeof opts["out"] === "string") {
@@ -162,7 +165,11 @@ export function registerRunCommand(program: import("commander").Command): void {
           if (data.status === "error") process.exitCode = 1;
           return;
         }
-        const watcher = await watchAndRun({ workflowId, paths, run: async () => void (await once()) });
+        const watcher = await watchAndRun({
+          workflowId,
+          paths,
+          run: async () => void (await once()),
+        });
         // Ctrl-C is the documented way out; release the handles so the process can exit.
         process.once("SIGINT", () => {
           watcher.close();

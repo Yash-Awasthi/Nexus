@@ -32,6 +32,7 @@
 
 import type { KVStore } from "@nexus/kv";
 
+import { currentCostScope } from "./cost-attribution.ts";
 import { MODEL_CATALOG } from "./model-discovery.ts";
 import { getSharedKV, withTimeout } from "./shared-kv.ts";
 import { getCacheUserId } from "./user-context.ts";
@@ -46,6 +47,11 @@ export interface CostEntry {
    * without one are pre-attribution or system-internal calls; personal
    * analytics never show them under a user's name. */
   userId?: string;
+  /** Which part of the product made the call (lib/cost-attribution.ts). Absent on
+   * rows written outside a request or before attribution existed. */
+  family?: string;
+  /** The company the spend belongs to, set only where that is unambiguous (org runs). */
+  companyId?: string;
   /** False when the model has no price row, so `costUsd` is 0 rather than a guess. */
   pricingKnown?: false;
 }
@@ -362,6 +368,7 @@ export function trackCost(
   const inp = usage?.inputTokens ?? 0;
   const out = usage?.outputTokens ?? 0;
   const owner = getCacheUserId() ?? undefined;
+  const scope = currentCostScope();
   costLogStore.record({
     ts: new Date().toISOString(),
     model: key,
@@ -370,5 +377,9 @@ export function trackCost(
     costUsd: price ? (inp * price[0] + out * price[1]) / 1_000_000 : 0,
     ...(price ? {} : { pricingKnown: false as const }),
     ...(owner ? { userId: owner } : {}),
+    // Attribution is read at record time from the async scope, so every existing call site that already goes
+    // through `trackCost` gains the family without being edited — the seam is one hook, not forty handlers.
+    ...(scope.family ? { family: scope.family } : {}),
+    ...(scope.companyId ? { companyId: scope.companyId } : {}),
   });
 }

@@ -36,9 +36,12 @@ jobs:
       # it prevents, the lockfile and manifests move together, stable publishes
       # from a tag while previews take the `next` dist-tag, and every turbo job
       # restores its cache and reports its wall time.
-      - run: node --test scripts/workflow-map.test.mjs scripts/lockfile-drift.test.mjs scripts/release-triggers.test.mjs scripts/ci-cache.test.mjs scripts/job-times.test.mjs scripts/required-checks.test.mjs scripts/seed-determinism.test.mjs scripts/coverage-floors.test.mjs scripts/e2e-waits.test.mjs scripts/audit-gate.test.mjs scripts/actions-pinned.test.mjs scripts/license-audit.test.mjs scripts/rotation-drill.test.mjs scripts/retention-policy.test.mjs scripts/migrations-forward-only.test.mjs scripts/backup-drill.test.mjs scripts/quickstart.test.mjs scripts/dead-code.test.mjs scripts/error-envelope.test.mjs scripts/route-types.test.mjs scripts/lib-inventory.test.mjs scripts/prerelease-audit.test.mjs scripts/lint-paths.test.mjs scripts/electron-current.test.mjs scripts/perf-budget.test.mjs scripts/bundle-budget.test.mjs
+      - run: node --test scripts/workflow-map.test.mjs scripts/lockfile-drift.test.mjs scripts/release-triggers.test.mjs scripts/ci-cache.test.mjs scripts/job-times.test.mjs scripts/required-checks.test.mjs scripts/seed-determinism.test.mjs scripts/coverage-floors.test.mjs scripts/e2e-waits.test.mjs scripts/audit-gate.test.mjs scripts/actions-pinned.test.mjs scripts/license-audit.test.mjs scripts/rotation-drill.test.mjs scripts/retention-policy.test.mjs scripts/migrations-forward-only.test.mjs scripts/backup-drill.test.mjs scripts/quickstart.test.mjs scripts/dead-code.test.mjs scripts/error-envelope.test.mjs scripts/route-types.test.mjs scripts/lib-inventory.test.mjs scripts/prerelease-audit.test.mjs scripts/lint-paths.test.mjs scripts/electron-current.test.mjs scripts/perf-budget.test.mjs scripts/bundle-budget.test.mjs scripts/design-tokens.test.mjs
       # Licence audit: a strong copyleft dependency needs an ADR, a dependency that
       # declares no licence needs a decision, and NOTICE has to match both.
+      # Every colour and size in the UI comes from apps/ui/app/app.css: a literal is a failure,
+      # and the two ratcheted counts may only fall.
+      - run: node scripts/design-tokens.mjs
       - run: node scripts/license-audit.mjs
       # Migrations only go forward: a migration that drops or truncates something
       # needs an entry in .github/migration-exceptions.json naming an existing ADR.
@@ -75,6 +78,17 @@ jobs:
       - run: node scripts/prerelease-audit.mjs --check
       # The desktop toolchain is pinned exactly; the record must match the pin.
       - run: node scripts/electron-current.mjs
+      # The retrieval and merge tables are generated: a ranking change that leaves the
+      # published numbers stale fails here instead of shipping a doc that describes the old code.
+      - run: pnpm evals:check
+      # The council's golden-set tables are generated the same way: a change to the judge,
+      # the rubric or a mode that leaves the published numbers stale fails here.
+      - run: pnpm council:evals:check
+      # Release notes are generated from changesets, and the support matrix is checked against
+      # the build matrix, the Dockerfile base and the driver registry — claims, not prose.
+      - run: pnpm release:notes:check
+      - run: node --test scripts/support-matrix.test.mjs scripts/adr-coverage.test.mjs scripts/oncall-doc.test.mjs scripts/capacity-doc.test.mjs scripts/slo-review.test.mjs
+      - run: pnpm slo:review
       - run: pnpm check:release
 
   go:

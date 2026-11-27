@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: theme-color — the <meta> value is read by the browser chrome before any CSS loads
 
+import { ChevronsUpDown, LogOut, Moon, Plus, Sun, UserCircle } from "lucide-react";
 import { useEffect } from "react";
 import {
   isRouteErrorResponse,
@@ -15,9 +17,11 @@ import {
 
 import type { Route } from "./+types/root";
 
-import { CommandPalette } from "~/components/command-palette";
 import { NotificationBell } from "~/components/NotificationBell";
 import { NexusMark } from "~/components/brand";
+import { CommandPalette } from "~/components/command-palette";
+import { MobileNav } from "~/components/mobile-nav";
+import { OfflineBar, ServerTroubleBar } from "~/components/states";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -42,7 +46,6 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
-import { MobileNav } from "~/components/mobile-nav";
 import { AuthProvider, bootstrapSession, useAuth } from "~/context/AuthContext";
 import { NotificationsProvider } from "~/context/NotificationsContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
@@ -87,10 +90,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         {/* Phase 3.15 — PWA manifest */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#1c1d22" />
@@ -317,6 +317,9 @@ export default function App() {
                   <span className="text-sm font-semibold tracking-tight">Nexus</span>
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto">
+                  {/* One offline bar for the whole app: a page cannot forget to render it. */}
+                  <OfflineBar />
+                  <ServerTroubleBar />
                   <Outlet />
                 </div>
                 <MobileNav />
@@ -345,41 +348,56 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   const is404 = isRouteErrorResponse(error) && error.status === 404;
 
+  // The document is rendered here, not only the message. In SPA mode the prerendered shell is an
+  // <html> element, so a boundary returning <main> alone would swap out the document root and
+  // hydrate against a node that is not there — React #418, then a full re-render of the tree.
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-6">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div className="mx-auto size-20 rounded-2xl bg-destructive/10 flex items-center justify-center">
-          <span className="text-4xl font-bold text-destructive">{is404 ? "404" : "!"}</span>
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{message}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">{details}</p>
-        </div>
-        <div className="flex items-center justify-center gap-3">
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Go Home
-          </a>
-          <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-        {stack && (
-          <details className="text-left">
-            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-              Stack Trace
-            </summary>
-            <pre className="mt-2 w-full p-3 rounded-md bg-muted text-xs overflow-x-auto">
-              <code className="text-muted-foreground">{stack}</code>
-            </pre>
-          </details>
-        )}
-      </div>
-    </main>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title>Nexus</title>
+        <Meta />
+        <Links />
+      </head>
+      <body className="bg-background text-foreground antialiased">
+        <main className="flex min-h-screen items-center justify-center p-6">
+          <div className="w-full max-w-md space-y-6 text-center">
+            <div className="mx-auto flex size-20 items-center justify-center rounded-2xl bg-destructive/10">
+              <span className="text-4xl font-bold text-destructive">{is404 ? "404" : "!"}</span>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{message}</h1>
+              <p className="text-sm leading-relaxed text-muted-foreground">{details}</p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <a
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Go home
+              </a>
+              <button
+                onClick={() => window.history.back()}
+                className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                Go back
+              </button>
+            </div>
+            {stack && (
+              <details className="text-left">
+                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                  Stack trace
+                </summary>
+                <pre className="mt-2 w-full overflow-x-auto rounded-md bg-muted p-3 text-xs">
+                  <code className="text-muted-foreground">{stack}</code>
+                </pre>
+              </details>
+            )}
+          </div>
+        </main>
+        <Scripts />
+      </body>
+    </html>
   );
 }

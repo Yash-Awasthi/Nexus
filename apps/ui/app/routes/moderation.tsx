@@ -123,7 +123,11 @@ function CheckTab() {
             onChange={(e) => setText(e.target.value)}
             className="resize-none"
           />
-          {err && <p className="text-destructive text-xs">{err}</p>}
+          {err && (
+            <p role="alert" className="text-destructive text-xs">
+              {err}
+            </p>
+          )}
           <Button onClick={check} disabled={loading || !text.trim()}>
             {loading ? (
               <>
@@ -294,7 +298,11 @@ function BatchTab() {
           )}
         </Button>
       </div>
-      {err && <p className="text-destructive text-xs">{err}</p>}
+      {err && (
+        <p role="alert" className="text-destructive text-xs">
+          {err}
+        </p>
+      )}
       {results.length > 0 && (
         <div className="flex items-center gap-3 text-sm text-muted-foreground pt-1">
           <span>{results.filter((r) => r.result.flagged).length} flagged</span>

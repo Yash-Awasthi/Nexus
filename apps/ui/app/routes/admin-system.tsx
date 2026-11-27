@@ -202,7 +202,7 @@ export default function AdminSystemPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-3xs">
                           {config.type}
                         </Badge>
                       </td>
@@ -212,11 +212,17 @@ export default function AdminSystemPage() {
                             <Button
                               variant="ghost"
                               size="icon-xs"
+                              aria-label={`Save ${config.key}`}
                               onClick={() => saveEdit(config.key)}
                             >
                               <Check className="size-3 text-success" />
                             </Button>
-                            <Button variant="ghost" size="icon-xs" onClick={cancelEdit}>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="Cancel"
+                              onClick={cancelEdit}
+                            >
                               <X className="size-3 text-destructive" />
                             </Button>
                           </div>
@@ -224,6 +230,7 @@ export default function AdminSystemPage() {
                           <Button
                             variant="ghost"
                             size="icon-xs"
+                            aria-label={`Edit ${config.key}`}
                             onClick={() => startEdit(config.key, config.value)}
                           >
                             <Pencil className="size-3" />

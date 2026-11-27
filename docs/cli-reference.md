@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # Nexus CLI Reference
 
@@ -34,8 +34,10 @@ nexus --version
 ## `nexus doctor`
 
 Check the local toolchain before the first run. One line per prerequisite, each
-with the fix; `--json` prints the rows for a script. Exits 1 when a required
-check fails. Embedded PGlite and the in-process queue count as ready when
+with the fix; `--json` prints the rows for a script. Exits 1 when a **required**
+check fails — `node`, `pnpm`, and a configured `DATABASE_URL`/`REDIS_URL` — not
+when an optional one is missing, because the app runs on Node plus pnpm with
+embedded stores. Embedded PGlite and the in-process queue count as ready when
 `DATABASE_URL`/`REDIS_URL` are unset.
 
 ```bash
@@ -43,8 +45,19 @@ nexus doctor
 # ✓ node           v26.8.1
 # ✓ pnpm           12.21.0
 # ✓ postgres       embedded PGlite (DATABASE_URL unset)
-# ✗ docker         not found  fix: install Docker Desktop; sandboxed code execution needs it
+# ✓ redis          in-process queue (REDIS_URL unset)
+# ! docker         not found (sandboxed code execution needs it)  fix: install Docker Desktop; everything else runs without it
+# ! ollama         127.0.0.1:11434 unreachable (a driver key works instead)  fix: install Ollama and run `ollama serve`, or set GROQ_API_KEY / OPENAI_API_KEY in .env
+#
+# ! 2 optional check(s) need attention: docker, ollama
+#   the app runs without them; each line above says what it enables
 ```
+
+Measured on a clean clone (Windows, Node 26, warm pnpm store, no Docker and no
+Ollama): clone 2 s, `pnpm install` 49 s, `nexus doctor` 2 s — and the report above
+is a **success**, exit 0. Before that was true the command exited 1 there, so the
+README's copy-paste step looked like a failure on a machine where everything it
+needed was installed.
 
 `--bundle [dir]` writes a redacted diagnostic bundle for a bug report instead of printing the
 table: `nexus-bundle.json` (doctor rows plus the API's `/status` and `/health`, when reachable)
@@ -389,6 +402,7 @@ moving with it, or when a row names a command that does not exist.
 | `chat-suggestions` | API only          | 2      |
 | `code-agent`       | API only          | 5      |
 | `context`          | API only          | 4      |
+| `comparisons`      | API only          | 2      |
 | `costs`            | API only          | 7      |
 | `council`          | `nexus council`   | 7      |
 | `csp-report`       | API only          | 1      |
@@ -447,6 +461,7 @@ moving with it, or when a row names a command that does not exist.
 | `tasks`            | API only          | 3      |
 | `threads`          | API only          | 3      |
 | `tokens`           | API only          | 2      |
+| `webhooks`         | API only          | 5      |
 | `traces`           | API only          | 4      |
 | `tts`              | API only          | 1      |
 | `user`             | API only          | 2      |
@@ -479,13 +494,13 @@ moving with it, or when a row names a command that does not exist.
 Run a stored workflow without opening the UI. This is the loop for editing a workflow's prompts:
 save the file, see the output, save again.
 
-| Option        | Required | Description                                                        |
-| ------------- | -------- | ------------------------------------------------------------------ |
-| `--watch`     | —        | Run again whenever a file changes (Ctrl-C to stop)                  |
-| `--file`      | —        | File or directory to watch; comma-separate several (default: `.`)   |
-| `--input`     | —        | Run input as JSON                                                   |
-| `--json`      | —        | Print the raw result as JSON                                        |
-| `--out`       | —        | Write that JSON to a file                                           |
+| Option    | Required | Description                                                       |
+| --------- | -------- | ----------------------------------------------------------------- |
+| `--watch` | —        | Run again whenever a file changes (Ctrl-C to stop)                |
+| `--file`  | —        | File or directory to watch; comma-separate several (default: `.`) |
+| `--input` | —        | Run input as JSON                                                 |
+| `--json`  | —        | Print the raw result as JSON                                      |
+| `--out`   | —        | Write that JSON to a file                                         |
 
 ```bash
 nexus run wf_8f21 --input '{"query":"weekly digest"}'

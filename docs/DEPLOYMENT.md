@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # Nexus — Deployment
 

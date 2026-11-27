@@ -59,21 +59,42 @@ export const navGroups: NavGroup[] = [
   {
     label: "Deliberate",
     items: [
-      { to: "/dashboard", icon: LayoutDashboard, label: "Home", end: true, keywords: ["dashboard", "start"] },
-      { to: "/chat", icon: MessageSquare, label: "Council", keywords: ["chat", "ask", "verdict", "deliberate"] },
+      {
+        to: "/dashboard",
+        icon: LayoutDashboard,
+        label: "Home",
+        end: true,
+        keywords: ["dashboard", "start"],
+      },
+      {
+        to: "/chat",
+        icon: MessageSquare,
+        label: "Council",
+        keywords: ["chat", "ask", "verdict", "deliberate"],
+      },
       {
         to: "/discussion",
         icon: MessagesSquare,
         label: "Discussion",
         keywords: ["debate", "council", "ledger", "rounds"],
       },
-      { to: "/archetypes", icon: Hexagon, label: "Archetypes", keywords: ["persona", "members", "prompts"] },
+      {
+        to: "/archetypes",
+        icon: Hexagon,
+        label: "Archetypes",
+        keywords: ["persona", "members", "prompts"],
+      },
     ],
   },
   {
     label: "Company",
     items: [
-      { to: "/org", icon: Building2, label: "Companies", keywords: ["org", "team", "budget", "company"] },
+      {
+        to: "/org",
+        icon: Building2,
+        label: "Companies",
+        keywords: ["org", "team", "budget", "company"],
+      },
       { to: "/projects", icon: FolderKanban, label: "Projects", keywords: ["tasks", "project"] },
       { to: "/workspaces", icon: UsersIcon, label: "Workspaces", keywords: ["members", "invite"] },
     ],
@@ -81,7 +102,12 @@ export const navGroups: NavGroup[] = [
   {
     label: "Automate",
     items: [
-      { to: "/workflows", icon: GitFork, label: "Workflows", keywords: ["automation", "cron", "run", "steps"] },
+      {
+        to: "/workflows",
+        icon: GitFork,
+        label: "Workflows",
+        keywords: ["automation", "cron", "run", "steps"],
+      },
       {
         to: "/templates",
         icon: LayoutTemplate,
@@ -94,13 +120,24 @@ export const navGroups: NavGroup[] = [
   {
     label: "Knowledge",
     items: [
-      { to: "/knowledge", icon: Database, label: "Knowledge", keywords: ["kb", "documents", "rag", "upload"] },
+      {
+        to: "/knowledge",
+        icon: Database,
+        label: "Knowledge",
+        keywords: ["kb", "documents", "rag", "upload"],
+      },
     ],
   },
   {
     label: "Tools",
     items: [
-      { to: "/search", icon: Database, label: "Search", end: false, keywords: ["find", "web", "retrieval"] },
+      {
+        to: "/search",
+        icon: Database,
+        label: "Search",
+        end: false,
+        keywords: ["find", "web", "retrieval"],
+      },
       { to: "/sandbox", icon: Terminal, label: "Sandbox", keywords: ["code", "run", "execute"] },
       {
         to: "/terminals",
@@ -109,15 +146,35 @@ export const navGroups: NavGroup[] = [
         requires: "terminal",
         keywords: ["shell", "pty", "console"],
       },
-      { to: "/knowledge-graph", icon: Network, label: "Knowledge graph", keywords: ["entities", "graph", "nodes"] },
-      { to: "/costs", icon: DollarSign, label: "Usage & cost", keywords: ["spend", "tokens", "billing"] },
+      {
+        to: "/knowledge-graph",
+        icon: Network,
+        label: "Knowledge graph",
+        keywords: ["entities", "graph", "nodes"],
+      },
+      {
+        to: "/costs",
+        icon: DollarSign,
+        label: "Usage & cost",
+        keywords: ["spend", "tokens", "billing"],
+      },
     ],
   },
   {
     label: "Settings",
     items: [
-      { to: "/settings", icon: Settings, label: "Preferences", keywords: ["theme", "profile", "options"] },
-      { to: "/provider-keys", icon: KeyRound, label: "Models & keys", keywords: ["api key", "provider", "byok"] },
+      {
+        to: "/settings",
+        icon: Settings,
+        label: "Preferences",
+        keywords: ["theme", "profile", "options"],
+      },
+      {
+        to: "/provider-keys",
+        icon: KeyRound,
+        label: "Models & keys",
+        keywords: ["api key", "provider", "byok"],
+      },
       { to: "/mcp-servers", icon: Boxes, label: "MCP servers", keywords: ["tools", "mcp"] },
       { to: "/api-tokens", icon: Key, label: "API tokens", keywords: ["token", "programmatic"] },
     ],
@@ -127,14 +184,49 @@ export const navGroups: NavGroup[] = [
     admin: true,
     items: [
       { to: "/admin/users", icon: UsersIcon, label: "Users", keywords: ["accounts", "admin"] },
-      { to: "/admin/analytics", icon: BarChart3, label: "Analytics", keywords: ["metrics", "usage"] },
+      {
+        to: "/admin/analytics",
+        icon: BarChart3,
+        label: "Analytics",
+        keywords: ["metrics", "usage"],
+      },
       { to: "/admin/traces", icon: Activity, label: "Traces", keywords: ["requests", "latency"] },
-      { to: "/gateway", icon: Network, label: "Gateway", keywords: ["proxy", "models", "upstream"] },
-      { to: "/admin/audit", icon: ScrollText, label: "Audit log", keywords: ["events", "security"] },
-      { to: "/moderation", icon: ShieldAlert, label: "Content filter", keywords: ["moderation", "safety"] },
-      { to: "/admin/feedback", icon: MessageSquare, label: "Feedback", keywords: ["reports", "thumbs"] },
-      { to: "/admin/feature-flags", icon: Flag, label: "Feature flags", keywords: ["flags", "rollout"] },
-      { to: "/admin/system", icon: Server, label: "System", keywords: ["health", "status", "diagnostics"] },
+      {
+        to: "/gateway",
+        icon: Network,
+        label: "Gateway",
+        keywords: ["proxy", "models", "upstream"],
+      },
+      {
+        to: "/admin/audit",
+        icon: ScrollText,
+        label: "Audit log",
+        keywords: ["events", "security"],
+      },
+      {
+        to: "/moderation",
+        icon: ShieldAlert,
+        label: "Content filter",
+        keywords: ["moderation", "safety"],
+      },
+      {
+        to: "/admin/feedback",
+        icon: MessageSquare,
+        label: "Feedback",
+        keywords: ["reports", "thumbs"],
+      },
+      {
+        to: "/admin/feature-flags",
+        icon: Flag,
+        label: "Feature flags",
+        keywords: ["flags", "rollout"],
+      },
+      {
+        to: "/admin/system",
+        icon: Server,
+        label: "System",
+        keywords: ["health", "status", "diagnostics"],
+      },
     ],
   },
 ];

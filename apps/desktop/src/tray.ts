@@ -33,7 +33,9 @@ export interface TrayState {
 /** The menu item showing state; disabled, because it is a label and not an action. */
 export function statusLabel(state: TrayState): string {
   if (state.running > 0) {
-    return state.running === 1 ? "Working — 1 run in progress" : `Working — ${state.running} runs in progress`;
+    return state.running === 1
+      ? "Working — 1 run in progress"
+      : `Working — ${state.running} runs in progress`;
   }
   if (state.failed > 0) {
     return state.failed === 1 ? "Idle — last run failed" : `Idle — ${state.failed} runs failed`;
@@ -44,8 +46,7 @@ export function statusLabel(state: TrayState): string {
 /** The tooltip, which is the only text visible while the menu is closed. */
 export function trayTooltip(state: TrayState): string {
   const queued = state.queued ?? 0;
-  if (state.online === false)
-    return `Nexus — offline${queued > 0 ? `, ${queued} queued` : ""}`;
+  if (state.online === false) return `Nexus — offline${queued > 0 ? `, ${queued} queued` : ""}`;
   if (queued > 0) return `Nexus — ${statusLabel(state)}, ${queued} queued`;
   return `Nexus — ${statusLabel(state)}`;
 }
@@ -113,7 +114,10 @@ export function trayMenu(
 ): TrayMenuItem[] {
   const items: TrayMenuItem[] = [
     { label: statusLabel(state), enabled: false },
-    { label: state.local ? `Local API — ${state.apiBase}` : `Remote API — ${state.apiBase}`, enabled: false },
+    {
+      label: state.local ? `Local API — ${state.apiBase}` : `Remote API — ${state.apiBase}`,
+      enabled: false,
+    },
     {
       label: "Copy API base",
       click: actions.copyApiBase,

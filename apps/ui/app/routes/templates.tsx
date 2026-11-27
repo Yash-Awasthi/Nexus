@@ -14,8 +14,8 @@
 import { Building2, Check, GitFork, Loader2, Plus, Repeat, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { Page, PageHeader } from "~/components/page";
 import { CoachMark } from "~/components/coach-mark";
+import { Page, PageHeader } from "~/components/page";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -55,7 +55,9 @@ export function readServerTemplates(body: unknown): ServerTemplate[] {
         id: r.id,
         name: r.name,
         description: typeof r.description === "string" ? r.description : "",
-        agents: Array.isArray(r.agents) ? r.agents.filter((a): a is string => typeof a === "string") : [],
+        agents: Array.isArray(r.agents)
+          ? r.agents.filter((a): a is string => typeof a === "string")
+          : [],
       },
     ];
   });
@@ -179,7 +181,7 @@ export default function TemplatesRoute() {
                   <div className="flex items-center gap-2">
                     <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
                     <CardTitle className="text-base">{template.name}</CardTitle>
-                    <Badge variant="outline" className="ml-auto font-mono text-[10px]">
+                    <Badge variant="outline" className="ml-auto font-mono text-3xs">
                       v{template.version}
                     </Badge>
                   </div>
@@ -262,7 +264,8 @@ export default function TemplatesRoute() {
                 {chosen.kind === "workflow" && chosen.schedule && (
                   <p className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Repeat className="size-3" aria-hidden="true" />
-                    Runs on {chosen.schedule} after creation. Change the schedule on the workflow page.
+                    Runs on {chosen.schedule} after creation. Change the schedule on the workflow
+                    page.
                   </p>
                 )}
 
@@ -273,9 +276,12 @@ export default function TemplatesRoute() {
                 )}
 
                 {created && (
-                  <p className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                  <p className="flex items-center gap-2 text-xs text-success">
                     <Check className="size-4" aria-hidden="true" />
-                    Created — <a className="underline" href={created.href}>{created.label}</a>
+                    Created —{" "}
+                    <a className="underline" href={created.href}>
+                      {created.label}
+                    </a>
                   </p>
                 )}
               </div>

@@ -63,9 +63,9 @@ afterAll(async () => {
 
 describe("a company over its budget", () => {
   it("skips the run the API accepted, and says why", async () => {
-    const company = (
-      await call("POST", "/api/org/companies", { name: "Budget Co" })
-    ).json<{ id: string }>();
+    const company = (await call("POST", "/api/org/companies", { name: "Budget Co" })).json<{
+      id: string;
+    }>();
     const agent = (
       await call("POST", `/api/org/companies/${company.id}/agents`, { name: "Worker" })
     ).json<{ id: string }>();

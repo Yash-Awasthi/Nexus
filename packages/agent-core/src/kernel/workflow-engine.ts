@@ -243,6 +243,12 @@ export class WorkflowEngine implements IWorkflowReplay {
   private persistence?: IRuntimePersistence;
   private eventBus?: IEventBus;
   private runtimeGraph?: RuntimeGraph;
+  /**
+   * Checkpoint loading is asynchronous because it reads persistence. A caller that decides
+   * whether to resume must wait for it: a restarted engine that answers "no checkpoint" one
+   * microtask early starts the workflow from zero and reports a recovery that never happened.
+   */
+  private readonly ready: Promise<void>;
 
   constructor(
     registry: IWorkflowRegistry,
@@ -260,8 +266,8 @@ export class WorkflowEngine implements IWorkflowReplay {
     this.persistence = persistence;
     this.eventBus = eventBus;
     this.runtimeGraph = runtimeGraph;
-    // Load any persisted checkpoints on construction
-    this.loadCheckpoints();
+    // Load any persisted checkpoints on construction; `ready` is what a resume waits on.
+    this.ready = this.loadCheckpoints();
   }
 
   // ── Event Subscription API ─────────────────────────────────────────────
@@ -406,6 +412,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     executionId: string,
     replayOptions?: ReplayOptions,
   ): Promise<IWorkflowExecution> {
+    await this.ready;
     const def = this.registry.getWorkflow(workflowId);
     if (!def) {
       throw new Error(`Workflow definition ${workflowId} not found.`);
@@ -651,6 +658,31 @@ export class WorkflowEngine implements IWorkflowReplay {
         if (cp) {
           cp.status = "paused";
           cp.error = errorMsg;
+          // A worker that dies mid-run leaves the tasks it already finished in persistence
+          // under their task ids. Read them back so the resume after the restart skips
+          // finished work instead of repeating it; only the in-flight task is lost.
+          for (const t of def.tasks) {
+            if (cp.completedTaskIds.includes(t.id) || cp.failedTaskIds.includes(t.id)) continue;
+            try {
+              const persisted = this.persistence
+                ? await this.persistence.getState<{ status?: string; result?: unknown }>(t.id)
+                : undefined;
+              if (
+                persisted &&
+                (persisted.status === "succeeded" || persisted.status === "completed")
+              ) {
+                cp.completedTaskIds = [...cp.completedTaskIds, t.id];
+                cp.taskResults[t.id] = persisted;
+              }
+            } catch {
+              // An unreadable task result is a task that has to run again.
+            }
+          }
+          cp.pendingTaskIds = def.tasks
+            .filter(
+              (t) => !cp!.completedTaskIds.includes(t.id) && !cp!.failedTaskIds.includes(t.id),
+            )
+            .map((t) => t.id);
           await this.persistCheckpoints();
         }
 
@@ -937,6 +969,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   async continueAfterCrash(
     executionId?: string,
   ): Promise<{ resumed: IWorkflowExecution | null; checkpoint?: WorkflowCheckpoint }> {
+    await this.ready;
     // If no execution ID specified, find the most recent paused checkpoint
     if (!executionId) {
       const pausedCheckpoints = Array.from(this.checkpoints.values())
@@ -954,16 +987,21 @@ export class WorkflowEngine implements IWorkflowReplay {
       return { resumed: null, checkpoint: cp };
     }
 
-    // Run with side-effect suppression to avoid duplicating state
+    // Resume the *same* execution id, so the paused checkpoint is the one the engine loads:
+    // a fresh id would start from zero and re-run finished tasks while leaving the paused record
+    // paused forever. Side effects stay suppressed so the recovery cannot duplicate telemetry.
     const generation = ++this.replayGenerationCounter;
-    const result = await this.executeWorkflow(
-      cp.workflowId,
-      cp.executionId + "-recover-" + Date.now(),
-      {
-        suppressSideEffects: true,
-        replayGeneration: generation,
-      },
-    );
+    const result = await this.executeWorkflow(cp.workflowId, cp.executionId, {
+      suppressSideEffects: true,
+      replayGeneration: generation,
+    });
+
+    // A recovery that finished must retire the paused record, or every later restart finds the
+    // same dead checkpoint and replays work that already happened.
+    if (result.status === "succeeded" && this.checkpoints.has(cp.executionId)) {
+      this.checkpoints.delete(cp.executionId);
+      await this.persistCheckpoints();
+    }
 
     // Record recovery lineage
     const lineage: ReplayLineage = this.replayLineage.get(executionId) || {

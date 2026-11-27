@@ -34,11 +34,11 @@ import {
   type CommandExecutor,
   type LlmToolFn,
 } from "@nexus/agent-core/runtime";
-import { EscalationBreaker, type BreakerAction } from "@nexus/escalation-breaker";
 import type { ExecAction } from "@nexus/exec-policy";
 import { executeCode, resolveUntrustedRunner } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
+import { EscalationBreaker, type BreakerAction } from "../lib/escalation-breaker.ts";
 import { APPROVAL_TTL_MS, classifyAction } from "../lib/exec-approvals.ts";
 import { guardExec } from "../lib/exec-guard.ts";
 import { authorizeLspSpawn } from "../lib/lsp.ts";
@@ -178,7 +178,7 @@ async function startMission(
 
   const skills = opts.skills ?? [];
 
-  // Runaway/cost guardrail (@nexus/escalation-breaker): a
+  // Runaway/cost guardrail (`lib/escalation-breaker.ts`): a
   // steer → constrain → stop ladder fed by tool-call/error signals and per-
   // iteration usage. `steer`/`constrain` land as visible phase notes; `stop`
   // aborts the run through the same controller the route's DELETE uses. The

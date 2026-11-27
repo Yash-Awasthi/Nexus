@@ -14,11 +14,12 @@
  *   DELETE /api/v1/mcp/servers/:id       — soft-delete
  *   POST   /api/v1/mcp/servers/:id/test  — live connection test (http transport only)
  */
-import { Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Pencil, Plug } from "lucide-react";
+import { Plus, Trash2, Loader2, CheckCircle2, Pencil, Plug } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
 import { OpenApiTools } from "~/components/OpenApiTools";
 import { Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -235,10 +236,7 @@ export default function McpServersPage() {
       />
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <PageError title="Could not load MCP servers" message={error} onRetry={() => void load()} />
       )}
       {success && (
         <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">

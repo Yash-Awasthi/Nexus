@@ -109,7 +109,7 @@ function RunBars({ days }: { days: Overview["days"] }) {
           </div>
         ))}
       </div>
-      <div className="flex justify-between font-mono text-[10px] text-muted-foreground" aria-hidden>
+      <div className="flex justify-between font-mono text-3xs text-muted-foreground" aria-hidden>
         <span>{days[0]?.day.slice(5)}</span>
         <span>today</span>
       </div>
@@ -266,7 +266,7 @@ export function OverviewPanel({
           ["Tasks done", o.tasks.done ?? 0],
         ].map(([label, v]) => (
           <div key={label} className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] uppercase text-muted-foreground">{label}</p>
+            <p className="text-2xs uppercase text-muted-foreground">{label}</p>
             <p className="font-mono text-xl">{v}</p>
           </div>
         ))}
@@ -280,15 +280,15 @@ export function OverviewPanel({
           </p>
           <dl className="grid grid-cols-3 gap-2 font-mono text-sm">
             <div>
-              <dt className="text-[11px] text-muted-foreground">Today</dt>
+              <dt className="text-2xs text-muted-foreground">Today</dt>
               <dd>{usd(o.spend.todayUsd)}</dd>
             </div>
             <div>
-              <dt className="text-[11px] text-muted-foreground">Month</dt>
+              <dt className="text-2xs text-muted-foreground">Month</dt>
               <dd>{usd(o.spend.monthUsd)}</dd>
             </div>
             <div>
-              <dt className="text-[11px] text-muted-foreground">Total</dt>
+              <dt className="text-2xs text-muted-foreground">Total</dt>
               <dd>{usd(o.spend.lifetimeUsd)}</dd>
             </div>
           </dl>
@@ -463,7 +463,7 @@ function AskBox({ companyId, agents }: { companyId: string; agents: Agent[] }) {
           {asks.slice(0, 5).map((a) => (
             <li key={a.task.id} className="rounded-lg border p-3 text-sm" data-testid="ask">
               <p className="font-medium">{a.task.title}</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground">
                 {a.task.identifier} · {names.get(a.task.assigneeAgentId ?? "") ?? "agent"} ·{" "}
                 {a.task.status.replace("_", " ")}
               </p>

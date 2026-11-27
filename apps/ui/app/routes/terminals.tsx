@@ -19,6 +19,7 @@ import { Plus, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { apiFetch, authFetch } from "~/lib/api";
@@ -222,7 +223,7 @@ export default function Terminals() {
             ))}
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <PageError message={error} />}
 
       <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
         <ul className="space-y-1" aria-label="Sessions">

@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # Nexus Service Level Objectives (SLOs)
 
@@ -130,13 +130,13 @@ cannot keep a free database awake. `degraded` is a `200` and `down` is a `503`, 
 
 ## Error budget tracking
 
-| SLO              | Budget/month       | Burned (track in Grafana) |
-| ---------------- | ------------------ | ------------------------- |
-| API availability | 3.6 hours          | —                         |
-| API latency      | Violations × 5min  | —                         |
-| Council success  | Failures / total   | —                         |
-| Queue p99        | Violations × 10min | —                         |
-| Audit integrity  | 0                  | —                         |
-| Dependency status | 5 min of `down`   | —                         |
+| SLO               | Budget/month       | Burned (track in Grafana) |
+| ----------------- | ------------------ | ------------------------- |
+| API availability  | 3.6 hours          | —                         |
+| API latency       | Violations × 5min  | —                         |
+| Council success   | Failures / total   | —                         |
+| Queue p99         | Violations × 10min | —                         |
+| Audit integrity   | 0                  | —                         |
+| Dependency status | 5 min of `down`    | —                         |
 
 Review error-budget consumption in the weekly ops review.

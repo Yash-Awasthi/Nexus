@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: mask gradient — a transparent-to-white mask, where the alpha is geometry rather than colour
 import { animate, createSpring, utils, type JSAnimation } from "animejs";
 import { useEffect, useRef, type PointerEvent, type ReactNode, type RefObject } from "react";
 

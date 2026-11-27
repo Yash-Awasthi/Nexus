@@ -87,10 +87,57 @@ export interface ComparisonDiff {
 }
 
 const STOP_WORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "had", "has", "have",
-  "if", "in", "into", "is", "it", "its", "of", "on", "or", "that", "the", "their", "then",
-  "there", "these", "they", "this", "to", "was", "were", "which", "with", "we", "you", "our",
-  "i", "will", "would", "can", "should", "not", "no", "so", "than", "too", "also", "any",
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "for",
+  "from",
+  "had",
+  "has",
+  "have",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "its",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "their",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "to",
+  "was",
+  "were",
+  "which",
+  "with",
+  "we",
+  "you",
+  "our",
+  "i",
+  "will",
+  "would",
+  "can",
+  "should",
+  "not",
+  "no",
+  "so",
+  "than",
+  "too",
+  "also",
+  "any",
 ]);
 
 /** Words worth comparing: lowercased, letters and digits, stop words removed. */
@@ -205,9 +252,7 @@ export function compareRuns(left: RunSide, right: RunSide): ComparisonDiff {
       rightTokens: right.totalTokens,
       delta: right.totalTokens - left.totalTokens,
       ratio:
-        left.totalTokens > 0
-          ? Number((right.totalTokens / left.totalTokens).toFixed(2))
-          : null,
+        left.totalTokens > 0 ? Number((right.totalTokens / left.totalTokens).toFixed(2)) : null,
     },
     latency: {
       leftMs: leftMetrics.wallMs,
@@ -218,7 +263,8 @@ export function compareRuns(left: RunSide, right: RunSide): ComparisonDiff {
           : null,
     },
     authors: [...byLabel.values()].sort(
-      (a, b) => b.leftEntries + b.rightEntries - (a.leftEntries + a.rightEntries) ||
+      (a, b) =>
+        b.leftEntries + b.rightEntries - (a.leftEntries + a.rightEntries) ||
         a.label.localeCompare(b.label),
     ),
     outcome: {

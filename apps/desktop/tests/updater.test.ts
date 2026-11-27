@@ -417,7 +417,13 @@ describe("channels and staged rollouts", () => {
   const manifest = (extra: Partial<UpdateManifest> = {}): UpdateManifest => ({
     version: "0.3.0",
     artifacts: [
-      { platform: "win32", arch: "x64", url: "https://u.example.test/a.exe", sha256: "a".repeat(64), size: 1 },
+      {
+        platform: "win32",
+        arch: "x64",
+        url: "https://u.example.test/a.exe",
+        sha256: "a".repeat(64),
+        size: 1,
+      },
     ],
     ...extra,
   });
@@ -429,7 +435,13 @@ describe("channels and staged rollouts", () => {
         channel: "Beta",
         rollout: { percentage: 40 },
         artifacts: [
-          { platform: "win32", arch: "x64", url: "https://u.example.test/a.exe", sha256: "a".repeat(64), size: 1 },
+          {
+            platform: "win32",
+            arch: "x64",
+            url: "https://u.example.test/a.exe",
+            sha256: "a".repeat(64),
+            size: 1,
+          },
         ],
       }),
     );
@@ -439,7 +451,10 @@ describe("channels and staged rollouts", () => {
   });
 
   it("treats a missing rollout as everyone, and clamps a nonsense one", () => {
-    expect(parseManifest(Buffer.from(JSON.stringify({ ...manifest(), artifacts: manifest().artifacts }))).rollout).toBeUndefined();
+    expect(
+      parseManifest(Buffer.from(JSON.stringify({ ...manifest(), artifacts: manifest().artifacts })))
+        .rollout,
+    ).toBeUndefined();
     const clamped = parseManifest(
       Buffer.from(
         JSON.stringify({
@@ -497,7 +512,12 @@ describe("channels and staged rollouts", () => {
       manifest: manifest({ channel: "beta", rollout: { percentage: 1 } }),
       installId: excluded,
     });
-    expect(check).toMatchObject({ eligible: false, offered: "0.3.0", percentage: 1, channel: "beta" });
+    expect(check).toMatchObject({
+      eligible: false,
+      offered: "0.3.0",
+      percentage: 1,
+      channel: "beta",
+    });
     expect(check.message).toContain("1% of installs");
     expect(check.message).toContain("not in this wave");
   });
@@ -513,7 +533,9 @@ describe("channels and staged rollouts", () => {
     });
     expect(check.eligible).toBe(true);
     expect(check.offered).toBe("0.3.0");
-    expect(check.message).toBe("0.3.0 is available on channel stable (50% rollout, this install is included).");
+    expect(check.message).toBe(
+      "0.3.0 is available on channel stable (50% rollout, this install is included).",
+    );
   });
 
   it("offers an un-staged release to everyone, with no percentage in the sentence", () => {

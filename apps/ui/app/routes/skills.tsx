@@ -177,7 +177,7 @@ function MissionProgress({
                     ? "default"
                     : "destructive"
               }
-              className="text-[10px]"
+              className="text-3xs"
             >
               {mission.lastReview.unparsed
                 ? "review inconclusive — no structured verdict"
@@ -185,13 +185,13 @@ function MissionProgress({
             </Badge>
           )}
           {mission.memoryFrom && (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-3xs">
               continuing from {mission.memoryFrom.missionId.slice(-8)} —{" "}
               {mission.memoryFrom.outcome}
             </Badge>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground shrink-0">
+        <span className="text-3xs text-muted-foreground shrink-0">
           iter {mission.iteration + 1}/{mission.maxIterations} · {mission.actingSteps} steps ·{" "}
           {(mission.usage?.totalTokens ?? 0).toLocaleString()} tokens
         </span>
@@ -200,7 +200,7 @@ function MissionProgress({
       {mission.skills && mission.skills.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {mission.skills.map((s) => (
-            <Badge key={s.id} variant="secondary" className="text-[10px]">
+            <Badge key={s.id} variant="secondary" className="text-3xs">
               skill: {s.name}
             </Badge>
           ))}
@@ -556,7 +556,7 @@ function CodeViewer({ code }: { code: string }) {
   return (
     <div className="rounded-md bg-muted border border-border overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted">
-        <span className="text-[10px] text-muted-foreground font-mono">{lines.length} lines</span>
+        <span className="text-3xs text-muted-foreground font-mono">{lines.length} lines</span>
         <Button
           size="sm"
           variant="ghost"
@@ -730,7 +730,10 @@ function ImportDialog({
           </p>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+            <div
+              role="alert"
+              className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
+            >
               {error}
             </div>
           )}
@@ -1149,7 +1152,10 @@ export default function SkillsPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       {error && (
-        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+        <div
+          role="alert"
+          className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2"
+        >
           {error}
           <button onClick={() => setError(null)} className="font-bold">
             ✕
@@ -1259,7 +1265,7 @@ export default function SkillsPage() {
                   </div>
                   <Badge
                     variant="outline"
-                    className={`text-[10px] shrink-0 ${languageColors[skill.language]}`}
+                    className={`text-3xs shrink-0 ${languageColors[skill.language]}`}
                   >
                     {skill.language}
                   </Badge>
@@ -1269,7 +1275,7 @@ export default function SkillsPage() {
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap gap-1">
                   {skill.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-[10px]">
+                    <Badge key={tag} variant="secondary" className="text-3xs">
                       {tag}
                     </Badge>
                   ))}
@@ -1359,7 +1365,7 @@ export default function SkillsPage() {
               {selectedSkill && (
                 <Badge
                   variant="outline"
-                  className={`text-[10px] ml-2 ${languageColors[selectedSkill.language]}`}
+                  className={`text-3xs ml-2 ${languageColors[selectedSkill.language]}`}
                 >
                   {selectedSkill.language}
                 </Badge>
@@ -1371,7 +1377,7 @@ export default function SkillsPage() {
               <p className="text-sm text-muted-foreground">{selectedSkill.description}</p>
               <div className="flex flex-wrap gap-1 mb-1">
                 {selectedSkill.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px]">
+                  <Badge key={tag} variant="secondary" className="text-3xs">
                     {tag}
                   </Badge>
                 ))}
@@ -1581,13 +1587,13 @@ export default function SkillsPage() {
                   <div className="text-lg font-semibold">
                     {compressResult.report.inputTokens.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">tokens before</div>
+                  <div className="text-3xs text-muted-foreground">tokens before</div>
                 </div>
                 <div className="rounded-md border p-2 text-center">
                   <div className="text-lg font-semibold">
                     {compressResult.report.outputTokens.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">tokens after</div>
+                  <div className="text-3xs text-muted-foreground">tokens after</div>
                 </div>
                 <div className="rounded-md border p-2 text-center border-primary/40 bg-primary/5">
                   <div className="text-lg font-semibold text-primary">
@@ -1596,25 +1602,25 @@ export default function SkillsPage() {
                       ({(compressResult.report.savedRatio * 100).toFixed(0)}%)
                     </span>
                   </div>
-                  <div className="text-[10px] text-muted-foreground">tokens saved</div>
+                  <div className="text-3xs text-muted-foreground">tokens saved</div>
                 </div>
               </div>
 
               {/* Kept / dropped */}
               <div className="flex flex-wrap gap-1">
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-3xs">
                   matched by{" "}
                   {compressResult.report.matchSource === "semantic"
                     ? "semantic embeddings"
                     : "keywords"}
                 </Badge>
                 {compressResult.report.keptSkills.map((s) => (
-                  <Badge key={s.id} variant="default" className="text-[10px]">
+                  <Badge key={s.id} variant="default" className="text-3xs">
                     kept: {s.name} ({s.score})
                   </Badge>
                 ))}
                 {compressResult.report.droppedSkills.map((s) => (
-                  <Badge key={s.id} variant="outline" className="text-[10px] text-muted-foreground">
+                  <Badge key={s.id} variant="outline" className="text-3xs text-muted-foreground">
                     dropped: {s.name}
                   </Badge>
                 ))}

@@ -23,7 +23,7 @@ import {
   prune,
   saveQueue,
   type QueuedPrompt,
-} from "../src/offline.ts";
+} from "../src/offline";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "nexus-offline-"));
 
@@ -66,7 +66,11 @@ describe("prune", () => {
   });
 
   it("drops entries that are not prompts at all", () => {
-    const queue = [prompt("real"), { id: 1 } as unknown as QueuedPrompt, null as unknown as QueuedPrompt];
+    const queue = [
+      prompt("real"),
+      { id: 1 } as unknown as QueuedPrompt,
+      null as unknown as QueuedPrompt,
+    ];
     expect(prune(queue).map((p) => p.text)).toEqual(["real"]);
   });
 });

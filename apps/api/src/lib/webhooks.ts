@@ -43,9 +43,6 @@ export const WEBHOOK_EVENTS = [
   "webhook.test",
 ] as const;
 
-/** The four long jobs, without the test-only event. */
-export const JOB_EVENTS = WEBHOOK_EVENTS.filter((event) => event !== "webhook.test");
-
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export interface WebhookSubscription {
@@ -207,7 +204,8 @@ export function createSubscription(
   const checked = checkUrl(input.url);
   if (!checked.ok) return { ok: false, reason: checked.reason };
   const events = normaliseEvents(input.events);
-  if (events === null) return { ok: false, reason: `events must be a subset of ${WEBHOOK_EVENTS.join(", ")}` };
+  if (events === null)
+    return { ok: false, reason: `events must be a subset of ${WEBHOOK_EVENTS.join(", ")}` };
   const subscription: WebhookSubscription = {
     id: `whsub_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
     ownerId: normaliseOwner(ownerId),
@@ -256,7 +254,7 @@ export function publish(
 ): WebhookDelivery[] {
   const owner = ownerId === undefined ? undefined : normaliseOwner(ownerId);
   const created: WebhookDelivery[] = [];
-  for (const [key, subscription] of subscriptions.entries()) {
+  for (const subscription of subscriptions.values()) {
     if (!subscription.active) continue;
     if (owner && subscription.ownerId !== owner) continue;
     if (subscription.events !== "*" && !subscription.events.includes(event)) continue;
@@ -278,7 +276,10 @@ export function publish(
 }
 
 /** The body a receiver gets. Stable field names, one envelope for every event. */
-export function envelope(delivery: WebhookDelivery): { json: string; headers: Record<string, string> } {
+export function envelope(delivery: WebhookDelivery): {
+  json: string;
+  headers: Record<string, string>;
+} {
   const timestamp = Math.floor(Date.now() / 1000);
   const body = JSON.stringify({
     id: delivery.id,
@@ -307,7 +308,11 @@ function subscriptionById(id: string, ownerId: string): WebhookSubscription | un
 }
 
 /** Record one attempt. 2xx delivers, 410 cancels the subscription, anything else retries. */
-function record(delivery: WebhookDelivery, status: DeliveryStatus, extra: Partial<WebhookDelivery> = {}) {
+function record(
+  delivery: WebhookDelivery,
+  status: DeliveryStatus,
+  extra: Partial<WebhookDelivery> = {},
+) {
   const next: WebhookDelivery = { ...delivery, ...extra, status, attempts: delivery.attempts + 1 };
   deliveries.set(`${delivery.ownerId}::${delivery.id}`, next);
   return next;
@@ -345,7 +350,10 @@ export async function deliverNow(
     }
     if (res.status === 410) {
       // "Gone" is the receiver telling us to stop, and it is the one answer we obey.
-      subscriptions.set(`${subscription.ownerId}::${subscription.id}`, { ...subscription, active: false });
+      subscriptions.set(`${subscription.ownerId}::${subscription.id}`, {
+        ...subscription,
+        active: false,
+      });
       return record(delivery, "failed", {
         lastStatusCode: res.status,
         lastError: "receiver answered 410 Gone; the subscription was disabled",

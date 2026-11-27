@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: hero gradient — one background-image string whose stops are alpha ramps of the accent, not a theme surface
 import { animate, onScroll, splitText, stagger } from "animejs";
 import {
   ArrowRight,
@@ -200,7 +201,7 @@ function SectionRail({ active }: { active: string }) {
         >
           <span
             className={cn(
-              "font-mono text-[10px] tracking-[0.16em] uppercase opacity-0 transition-opacity group-hover:opacity-100",
+              "font-mono text-3xs tracking-[0.16em] uppercase opacity-0 transition-opacity group-hover:opacity-100",
               active === key ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -253,7 +254,7 @@ function Hero({ calm }: { calm: boolean }) {
         <div className="max-w-[46rem]">
           <p
             data-reveal
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 font-mono text-[11px] tracking-[0.16em] text-muted-foreground uppercase backdrop-blur"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 font-mono text-2xs tracking-[0.16em] text-muted-foreground uppercase backdrop-blur"
           >
             <span className="size-1.5 rounded-full bg-success" /> Open source · bring your own keys
           </p>
@@ -314,7 +315,7 @@ function Hero({ calm }: { calm: boolean }) {
       <a
         href="#seat"
         aria-label="Scroll to how it works"
-        className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 font-mono text-[10px] tracking-[0.24em] text-muted-foreground uppercase sm:flex"
+        className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 font-mono text-3xs tracking-[0.24em] text-muted-foreground uppercase sm:flex"
       >
         Scroll
         <span className="h-10 w-px bg-gradient-to-b from-white/50 to-transparent [animation:drift_2.4s_ease-in-out_infinite]" />
@@ -391,7 +392,7 @@ function Stage({
         <div className="max-w-md rounded-xl border border-white/10 bg-background/55 p-6 backdrop-blur-md sm:p-7 lg:max-w-[30rem]">
           <p
             data-reveal
-            className="flex items-center gap-3 font-mono text-[11px] tracking-[0.2em] text-primary uppercase"
+            className="flex items-center gap-3 font-mono text-2xs tracking-[0.2em] text-primary uppercase"
           >
             <Icon className="size-4" /> {index} / 04 · {eyebrow}
           </p>
@@ -409,7 +410,7 @@ function Stage({
             {chips.map((c) => (
               <li
                 key={c}
-                className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-[11px] text-muted-foreground"
+                className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-2xs text-muted-foreground"
               >
                 {c}
               </li>
@@ -426,7 +427,7 @@ function Demo() {
     <section data-scene="demo" id="demo" className="relative">
       <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
         <div className="max-w-2xl">
-          <p data-reveal className="font-mono text-[11px] tracking-[0.2em] text-primary uppercase">
+          <p data-reveal className="font-mono text-2xs tracking-[0.2em] text-primary uppercase">
             See it think
           </p>
           <h2
@@ -496,7 +497,7 @@ function Features() {
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 lg:grid-cols-4">
           {NUMBERS.map((n) => (
             <div key={n.label} data-reveal className="bg-background/70 p-5 backdrop-blur-md sm:p-7">
-              <dt className="order-2 mt-1 font-mono text-[11px] tracking-[0.16em] text-muted-foreground uppercase">
+              <dt className="order-2 mt-1 font-mono text-2xs tracking-[0.16em] text-muted-foreground uppercase">
                 {n.label}
               </dt>
               <dd className="font-display text-5xl sm:text-6xl">
@@ -507,7 +508,7 @@ function Features() {
         </dl>
 
         <div className="mt-24 max-w-2xl">
-          <p data-reveal className="font-mono text-[11px] tracking-[0.2em] text-primary uppercase">
+          <p data-reveal className="font-mono text-2xs tracking-[0.2em] text-primary uppercase">
             Features
           </p>
           <h2
@@ -543,7 +544,7 @@ function Local() {
     <section data-scene="local" id="local" className="relative">
       <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-32">
         <div className="lg:order-2">
-          <p data-reveal className="font-mono text-[11px] tracking-[0.2em] text-primary uppercase">
+          <p data-reveal className="font-mono text-2xs tracking-[0.2em] text-primary uppercase">
             Desktop
           </p>
           <h2
@@ -591,7 +592,7 @@ function Local() {
                 ["Network", "Only the providers you use"],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                  <dt className="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-[0.16em] text-muted-foreground uppercase">
                     {k}
                   </dt>
                   <dd className="mt-1 font-medium">{v}</dd>

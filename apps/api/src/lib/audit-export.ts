@@ -14,7 +14,9 @@ import { auditLog } from "@nexus/db/schema";
 import type { KVStore } from "@nexus/kv";
 import { s3Bucket, s3ConfigFromEnv, type S3Bucket } from "@nexus/sandbox";
 import { asc, gt } from "drizzle-orm";
+import type { FastifyBaseLogger } from "fastify";
 
+import { emitAuditEvent } from "./audit-emitter.ts";
 import { getSecurityKV } from "./shared-kv.ts";
 
 const CURSOR = "audit-export:cursor";
@@ -68,7 +70,7 @@ export async function exportAuditLog(bucket: S3Bucket, opts: ExportOptions): Pro
  * Export on a timer when AUDIT_EXPORT_S3_* names a bucket. Runs in the API process because
  * that is where entries are written, with or without a separate worker. Returns a stopper.
  */
-export function startAuditExport(log: { warn: (o: object, m: string) => void }): () => void {
+export function startAuditExport(log: FastifyBaseLogger): () => void {
   const cfg = s3ConfigFromEnv(process.env, "AUDIT_EXPORT_S3", "audit/");
   if (!cfg) return () => {};
   const bucket = s3Bucket(cfg);
@@ -78,7 +80,25 @@ export function startAuditExport(log: { warn: (o: object, m: string) => void }):
     if (running) return;
     running = true;
     try {
-      await exportAuditLog(bucket, { prefix: cfg.prefix, retainDays, kv: getSecurityKV() });
+      const written = await exportAuditLog(bucket, {
+        prefix: cfg.prefix,
+        retainDays,
+        kv: getSecurityKV(),
+      });
+      // An export copies evidence out of the database, so the copy is itself an event: an empty tick
+      // writes nothing, because an audit log full of "nothing happened" hides the ones that matter.
+      if (written > 0) {
+        void emitAuditEvent(
+          {
+            entityType: "audit_log",
+            entityId: cfg.prefix,
+            action: "audit.exported",
+            actor: "system:audit-export",
+            payload: { entries: written, prefix: cfg.prefix },
+          },
+          log,
+        );
+      }
     } catch (err) {
       log.warn({ err: String(err) }, "audit export failed; retrying next interval");
     } finally {

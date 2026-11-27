@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: brand mark — the Google logo is drawn in Google's own colours, which are not ours to re-theme
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";

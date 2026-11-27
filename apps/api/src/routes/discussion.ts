@@ -33,8 +33,8 @@ import type { FastifyInstance } from "fastify";
 import { ANON_OWNER, loadArchetypeStore, resolveCouncilMembers } from "../lib/archetype-store.ts";
 import { ownerIdFor } from "../lib/owner.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
-import { publish } from "../lib/webhooks.ts";
 import { buildUserDriverRegistry } from "../lib/provider-keys.ts";
+import { publish } from "../lib/webhooks.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 import { resolveCouncilModelAlias, resolveMemberModel } from "./council.ts";
@@ -118,16 +118,18 @@ export async function readDiscussion(id: string): Promise<DiscussionRecord | und
  * open it) rather than the whole ledger: a search result that carries forty rounds of text
  * is a search result nobody scrolls.
  */
-export async function listDiscussionsFor(userId: string | undefined): Promise<{
-  id: string;
-  topic: string;
-  settled: boolean;
-  reason: string;
-  startedAt: string;
-  finishedAt?: string;
-  contributions: number;
-  participants: string[];
-}[]> {
+export async function listDiscussionsFor(userId: string | undefined): Promise<
+  {
+    id: string;
+    topic: string;
+    settled: boolean;
+    reason: string;
+    startedAt: string;
+    finishedAt?: string;
+    contributions: number;
+    participants: string[];
+  }[]
+> {
   await loadDiscussions();
   const owner = userId ?? ANON_OWNER;
   return [...discussions.values()]

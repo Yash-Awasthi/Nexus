@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Route } from "./+types/archetypes";
 
 import { EmptyState, Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -133,7 +134,9 @@ export default function ArchetypesPage() {
         </div>
       </PageHeader>
 
-      {error && <p className="text-sm text-destructive">Could not load archetypes: {error}</p>}
+      {error && (
+        <PageError title="Could not load archetypes" message={error} onRetry={() => void load()} />
+      )}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Yours</h2>
@@ -436,7 +439,11 @@ function Editor({
               />
             </Labelled>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

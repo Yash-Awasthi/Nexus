@@ -11,7 +11,6 @@
  * is a phone layout that forgot to stop.
  */
 import { Menu } from "lucide-react";
-
 import { Link, useLocation } from "react-router";
 
 import { Button } from "~/components/ui/button";
@@ -52,7 +51,7 @@ export function MobileNav() {
             to={tab.to}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-w-0 flex-1 flex-col items-center rounded-md px-1 py-1.5 text-[11px] font-medium",
+              "flex min-w-0 flex-1 flex-col items-center rounded-md px-1 py-1.5 text-2xs font-medium",
               active ? "text-primary" : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -64,7 +63,7 @@ export function MobileNav() {
         variant="ghost"
         size="sm"
         onClick={() => setOpenMobile(true)}
-        className="flex flex-1 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[11px] font-medium text-muted-foreground"
+        className="flex flex-1 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-2xs font-medium text-muted-foreground"
         aria-label="All pages"
       >
         <Menu className="size-4" aria-hidden="true" />

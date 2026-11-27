@@ -113,6 +113,22 @@ What this path deliberately skips — and what each loss costs — is in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#offline-machine-no-docker-no-ollama-no-server-database).
 The embedded database and the in-process KV are the reason it works.
 
+**Measured, not estimated** — clean clone, Windows, Node 26, warm pnpm store, no Docker and no
+Ollama, every step dying as written:
+
+| Step                           | Wall time                                 |
+| ------------------------------ | ----------------------------------------- |
+| `git clone`                    | 2 s (local) / 8 s (GitHub)                |
+| `pnpm install`                 | 49 s (from the store) / 82 s (cold store) |
+| `nexus doctor`                 | 2 s, exit 0                               |
+| `pnpm dev` → `/health` answers | 23 s                                      |
+| **Steps 1–5 together**         | **~1.5 minutes**                          |
+
+That leaves about thirteen of the fifteen minutes for the step that needs a choice and a
+download: `ollama pull qwen2.5:7b` (~4.7 GB) or a driver key. The two numbers this table cannot
+promise are the model download — a network measurement, not ours — and the browser sign-up, which
+is a human clicking a link the dev server prints.
+
 ### Option B — Local dev (hot reload)
 
 ```bash
@@ -226,18 +242,19 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 
 ## Documentation
 
-| Doc                                                | What's in it                                            |
-| -------------------------------------------------- | ------------------------------------------------------- |
-| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage          |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs      |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability   |
-| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing              |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                       |
-| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore          |
-| [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown  |
-| [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template            |
-| [SUPPORT.md](SUPPORT.md)                           | Where to ask, what a good report has, what is not supported |
+| Doc                                                | What's in it                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage                            |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs                        |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability                     |
+| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing                                |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                                         |
+| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore                            |
+| [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown                    |
+| [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants                   |
+| [docs/DESIGN-TOKENS.md](docs/DESIGN-TOKENS.md)     | The one place UI colour and size come from, and the gate that enforces it |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template                              |
+| [SUPPORT.md](SUPPORT.md)                           | Where to ask, what a good report has, what is not supported               |
 
 ---
 

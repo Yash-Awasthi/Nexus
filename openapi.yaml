@@ -2634,6 +2634,19 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/users/{id}/export:
+    get:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/v1/users/{id}/data:
     delete:
       tags:

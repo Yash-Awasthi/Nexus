@@ -28,9 +28,8 @@ process.env.NEXUS_WEBHOOKS_ALLOW_PRIVATE = "1";
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildServer } = await import("../../src/server.ts");
-const { verify, RETRY_DELAYS_MS, checkUrl, _resetWebhooksForTests } = await import(
-  "../../src/lib/webhooks.ts"
-);
+const { verify, RETRY_DELAYS_MS, checkUrl, _resetWebhooksForTests } =
+  await import("../../src/lib/webhooks.ts");
 
 function tokenFor(userId: string): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -155,7 +154,9 @@ describe("subscriptions", () => {
     const created = await call("POST", "/api/v1/webhooks", { url: receiverUrl });
     const { id } = (await created.json()) as { id: string };
     expect((await call("GET", `/api/v1/webhooks/${id}`, undefined, otherAuth)).status).toBe(404);
-    expect((await call("POST", `/api/v1/webhooks/${id}/test`, undefined, otherAuth)).status).toBe(404);
+    expect((await call("POST", `/api/v1/webhooks/${id}/test`, undefined, otherAuth)).status).toBe(
+      404,
+    );
     expect((await call("DELETE", `/api/v1/webhooks/${id}`, undefined, otherAuth)).status).toBe(404);
     // …and the owner still can.
     expect((await call("DELETE", `/api/v1/webhooks/${id}`)).status).toBe(204);
@@ -175,7 +176,10 @@ describe("delivery", () => {
 
     const sent = await call("POST", `/api/v1/webhooks/${id}/test`);
     expect(sent.status).toBe(200);
-    const result = (await sent.json()) as { ok: boolean; delivery: { status: string; attempts: number } };
+    const result = (await sent.json()) as {
+      ok: boolean;
+      delivery: { status: string; attempts: number };
+    };
     expect(result.ok).toBe(true);
     expect(result.delivery.status).toBe("delivered");
     expect(result.delivery.attempts).toBe(1);

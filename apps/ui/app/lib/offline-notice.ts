@@ -50,10 +50,7 @@ export function isNetworkFailure(message: string): boolean {
  * Returns the new queue length, or `null` when there is no host to queue with — the caller then
  * keeps its own error message rather than claiming the work was saved.
  */
-export async function queueOffline(
-  text: string,
-  sessionId: string | null,
-): Promise<number | null> {
+export async function queueOffline(text: string, sessionId: string | null): Promise<number | null> {
   if (!canQueueOffline() || !text.trim()) return null;
   try {
     return await hostInvoke<number>("offlineQueue", "queuePrompt", { text, sessionId });
@@ -69,7 +66,7 @@ export async function readOfflineState(): Promise<OfflineState | null> {
     const state = await hostInvoke<OfflineState>("offlineQueue", "getOfflineState");
     return {
       online: state?.online !== false,
-      queued: Math.max(0, Math.trunc(Number(state?.queued ?? 0))),
+      queued: Math.max(0, Math.trunc(state?.queued ?? 0)),
     };
   } catch {
     return null;

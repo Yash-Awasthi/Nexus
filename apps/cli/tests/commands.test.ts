@@ -138,7 +138,9 @@ describe("nexus CLI", () => {
       },
     ];
     const run = await nexus("run", "wf_1", "--json");
-    expect(seen).toEqual(["POST /api/v1/workflows/wf_1/run"]);
+    // Workflows are on the unversioned bridge: `/api/workflows`, not `/api/v1/workflows`.
+    // The parity check (`scripts/cli-parity.mjs`) is what found this — a 404 nobody hit yet.
+    expect(seen).toEqual(["POST /api/workflows/wf_1/run"]);
     expect(run.out).toContain('"status": "success"');
     expect(run.code).toBe(0);
   }, 60_000);

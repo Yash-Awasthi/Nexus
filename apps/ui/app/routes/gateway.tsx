@@ -9,6 +9,7 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -112,7 +113,7 @@ export default function Gateway() {
           </Button>
         }
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <PageError message={error} />}
       {data && (
         <>
           <ChainCard

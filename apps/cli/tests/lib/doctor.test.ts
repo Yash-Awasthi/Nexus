@@ -2,7 +2,13 @@
 /** `nexus doctor` reports each prerequisite with the fix, and never throws. */
 import { describe, expect, it } from "vite-plus/test";
 
-import { collectDoctor, formatDoctor, type DoctorDeps } from "../../src/lib/doctor.ts";
+import {
+  collectDoctor,
+  doctorExitCode,
+  formatDoctor,
+  optionalMisses,
+  type DoctorDeps,
+} from "../../src/lib/doctor.ts";
 
 function deps(overrides: Partial<DoctorDeps> = {}): DoctorDeps {
   return {
@@ -26,7 +32,7 @@ describe("collectDoctor", () => {
     expect(rows.find((row) => row.name === "model")?.detail).toBe("qwen2.5:7b");
   });
 
-  it("fails Docker and Ollama separately and carries the fix", async () => {
+  it("marks Docker and Ollama as optional warnings that still carry the fix", async () => {
     const rows = await collectDoctor(
       {},
       deps({
@@ -35,10 +41,32 @@ describe("collectDoctor", () => {
       }),
     );
     const status = Object.fromEntries(rows.map((row) => [row.name, row]));
-    expect(status.docker?.status).toBe("fail");
+    expect(status.docker?.status).toBe("warn");
+    expect(status.docker?.required).toBe(false);
     expect(status.docker?.fix).toContain("Docker Desktop");
-    expect(status.ollama?.status).toBe("fail");
-    expect(status["sandbox image"]?.status).toBe("warn");
+    expect(status.ollama?.status).toBe("warn");
+    expect(status.ollama?.required).toBe(false);
+    expect(status.ollama?.fix).toContain("GROQ_API_KEY");
+    // No Docker means no image to inspect, so the row is absent rather than a second complaint.
+    expect(status["sandbox image"]).toBeUndefined();
+    // The quickstart runs on a machine with neither, so the command has to succeed there.
+    expect(doctorExitCode(rows)).toBe(0);
+    expect(optionalMisses(rows).map((row) => row.name)).toEqual(["docker", "ollama"]);
+  });
+
+  it("still exits 1 when something required is missing", async () => {
+    const rows = await collectDoctor({}, deps());
+    expect(doctorExitCode(rows)).toBe(0);
+
+    const broken = rows.map((row) =>
+      row.name === "pnpm" ? { ...row, status: "fail" as const, detail: "not found" } : row,
+    );
+    expect(doctorExitCode(broken)).toBe(1);
+  });
+
+  it("a required check that is merely a warning is still non-zero", () => {
+    expect(doctorExitCode([{ name: "node", status: "warn", detail: "v20" }])).toBe(1);
+    expect(doctorExitCode([{ name: "node", status: "ok", detail: "v26" }])).toBe(0);
   });
 
   it("checks a server DATABASE_URL over TCP", async () => {

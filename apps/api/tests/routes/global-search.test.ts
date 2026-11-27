@@ -52,15 +52,23 @@ async function call(method: string, url: string, body?: unknown, as = auth): Pro
 interface Result {
   query: string;
   total: number;
-  results: { type: string; id: string; title: string; snippet: string; link: string; score: number }[];
+  results: {
+    type: string;
+    id: string;
+    title: string;
+    snippet: string;
+    link: string;
+    score: number;
+  }[];
   counts: Record<string, number>;
   notes: string[];
   filteredBy: string[] | null;
 }
 
 const search = async (q: string, extra = "", as = auth): Promise<Result> =>
-  (await (await call("GET", `/api/v1/search?q=${encodeURIComponent(q)}${extra}`, undefined, as))
-    .json()) as Result;
+  (await (
+    await call("GET", `/api/v1/search?q=${encodeURIComponent(q)}${extra}`, undefined, as)
+  ).json()) as Result;
 
 beforeAll(async () => {
   await migrateEmbedded(getPgPool(DB)!);

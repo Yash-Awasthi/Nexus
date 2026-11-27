@@ -438,7 +438,11 @@ export default function APITokens() {
               />
             </div>
 
-            {err && <p className="text-destructive text-xs">{err}</p>}
+            {err && (
+              <p role="alert" className="text-destructive text-xs">
+                {err}
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>

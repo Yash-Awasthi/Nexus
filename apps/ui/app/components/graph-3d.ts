@@ -19,6 +19,13 @@ import {
   WebGLRenderer,
 } from "three";
 
+import {
+  QUALITY_STEPS,
+  SAMPLE_FRAMES,
+  nextQualityStep,
+  pixelRatioFor,
+  shouldAnimate,
+} from "~/lib/adaptive-quality";
 import { layoutGraph } from "~/lib/graph-layout";
 
 export interface GraphNode {
@@ -181,6 +188,9 @@ export function mountGraph(
   let rotY = 0.4;
   let rotX = 0.25;
   let auto = !opts.reducedMotion;
+  let quality = opts.reducedMotion ? QUALITY_STEPS.length - 1 : 0;
+  let frames = 0;
+  let windowStart = performance.now();
   let dragging = false;
   let moved = 0;
   let last = { x: 0, y: 0 };
@@ -261,6 +271,24 @@ export function mountGraph(
   renderer.setAnimationLoop((now: number) => {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
+
+    // Measure, then step down if the frame budget is not holding. The judgement is made once per
+    // sample window so one slow frame (a garbage collection, a page transition) cannot demote the
+    // graph for the rest of the session.
+    frames += 1;
+    if (frames >= SAMPLE_FRAMES) {
+      const fps = (frames * 1000) / Math.max(1, now - windowStart);
+      const next = nextQualityStep(quality, fps);
+      if (next !== quality) {
+        quality = next;
+        renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
+        if (!shouldAnimate(quality) && !opts.reducedMotion) auto = false;
+        resize();
+      }
+      frames = 0;
+      windowStart = now;
+    }
+
     if (auto && !dragging) rotY += dt * 0.12;
     render();
   });
@@ -272,7 +300,7 @@ export function mountGraph(
       distance = Math.max(minDistance, Math.min(maxDistance, distance * factor));
     },
     spin(on) {
-      auto = on && !opts.reducedMotion;
+      auto = on && !opts.reducedMotion && shouldAnimate(quality);
     },
     dispose() {
       renderer.setAnimationLoop(null);

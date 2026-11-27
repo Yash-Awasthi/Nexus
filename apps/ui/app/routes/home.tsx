@@ -83,23 +83,29 @@ export default function Home() {
   const [usage, setUsage] = useState<UsagePoint[]>([]);
 
   useEffect(() => {
-    void listThreads().then(setThreads);
-    void syncCouncilFromServer().then(setCouncil);
+    // Every loader normalises what came back instead of trusting it. An empty or partial backend — a restart,
+    // a proxy that answers `{}`, a version skew — used to reach `undefined.length` inside the render and put
+    // the whole dashboard on the error boundary; the rest of the app was fine, so the first page after sign-in
+    // was the one that broke.
+    void listThreads().then((rows) => setThreads(Array.isArray(rows) ? rows : []));
+    void syncCouncilFromServer().then((rows) => setCouncil(Array.isArray(rows) ? rows : []));
     void fetch("/api/user/provider-keys")
       .then((r) => (r.ok ? r.json() : { keys: [] }))
       .then((d: { keys?: unknown[] } | unknown[]) =>
-        setKeys(Array.isArray(d) ? d.length : (d.keys?.length ?? 0)),
+        setKeys(Array.isArray(d) ? d.length : ((d as { keys?: unknown[] })?.keys?.length ?? 0)),
       )
       .catch(() => setKeys(0));
-    void orgApi<{ companies: PortfolioRow[] }>("/portfolio")
-      .then((d) => setCompanies(d.companies))
+    void orgApi<{ companies?: PortfolioRow[] }>("/portfolio")
+      .then((d) => setCompanies(Array.isArray(d?.companies) ? d.companies : []))
       .catch(() => setCompanies([]));
     void orgApi<InboxDigest>("/inbox")
-      .then(setInbox)
+      .then((d) => setInbox(d && Array.isArray(d.companies) ? d : null))
       .catch(() => undefined);
     void fetch("/api/dashboard?days=30")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { series?: UsagePoint[] } | null) => setUsage(d?.series ?? []))
+      .then((d: { series?: UsagePoint[] } | null) =>
+        setUsage(Array.isArray(d?.series) ? d.series : []),
+      )
       .catch(() => undefined);
   }, []);
 
@@ -316,7 +322,7 @@ export default function Home() {
             ) : (
               <ul className="space-y-3 py-1">
                 {inbox.companies
-                  .filter((c) => c.items.length)
+                  .filter((c) => Array.isArray(c.items) && c.items.length > 0)
                   .map((c) => (
                     <li key={c.companyId}>
                       <Link

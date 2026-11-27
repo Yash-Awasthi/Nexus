@@ -11,6 +11,11 @@
  * `--record` only ever raises a floor. A drop needs a hand edit to the JSON and a
  * reason in the commit, which is the point: coverage falling by a point is either
  * a decision or a mistake, and the file records which.
+ *
+ * Floors are measured from the whole-suite run (`pnpm exec vp test run --coverage`
+ * at the root), because that is the run CI gates on. A scoped run measures a
+ * different file set — it can omit files no test touched — so its percentages are
+ * not comparable with these and a red scoped check means "run the whole suite".
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

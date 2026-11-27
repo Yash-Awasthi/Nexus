@@ -71,14 +71,22 @@ export function languageMatrix(input: {
         };
       case "python":
         if (input.pistonAvailable) {
-          return { language, version: null, via: "piston" as const, serverRuns: true, pin: "piston" };
+          return {
+            language,
+            version: null,
+            via: "piston" as const,
+            serverRuns: true,
+            pin: "piston",
+          };
         }
         return {
           language,
           version: input.pyodideVersion,
           via: "pyodide" as const,
           serverRuns: true,
-          pin: input.pyodideVersion ? `pyodide ${input.pyodideVersion}` : "pyodide (version unreadable)",
+          pin: input.pyodideVersion
+            ? `pyodide ${input.pyodideVersion}`
+            : "pyodide (version unreadable)",
         };
       case "bash":
         return {
@@ -86,7 +94,9 @@ export function languageMatrix(input: {
           version: input.pistonAvailable ? null : IMAGE_VERSIONS.bash,
           via: input.pistonAvailable ? ("piston" as const) : ("sandbox-image" as const),
           serverRuns: input.pistonAvailable,
-          pin: input.pistonAvailable ? "piston" : `bash ${IMAGE_VERSIONS.bash} in the sandbox image`,
+          pin: input.pistonAvailable
+            ? "piston"
+            : `bash ${IMAGE_VERSIONS.bash} in the sandbox image`,
         };
       case "go":
         return {
@@ -102,7 +112,9 @@ export function languageMatrix(input: {
           version: input.pistonAvailable ? null : IMAGE_VERSIONS.rust,
           via: input.pistonAvailable ? ("piston" as const) : ("sandbox-helper" as const),
           serverRuns: input.pistonAvailable,
-          pin: input.pistonAvailable ? "piston" : `rust ${IMAGE_VERSIONS.rust} in the sandbox image`,
+          pin: input.pistonAvailable
+            ? "piston"
+            : `rust ${IMAGE_VERSIONS.rust} in the sandbox image`,
         };
       case "ruby":
         return {
@@ -110,7 +122,9 @@ export function languageMatrix(input: {
           version: input.pistonAvailable ? null : IMAGE_VERSIONS.ruby,
           via: input.pistonAvailable ? ("piston" as const) : ("sandbox-helper" as const),
           serverRuns: input.pistonAvailable,
-          pin: input.pistonAvailable ? "piston" : `ruby ${IMAGE_VERSIONS.ruby} in the sandbox image`,
+          pin: input.pistonAvailable
+            ? "piston"
+            : `ruby ${IMAGE_VERSIONS.ruby} in the sandbox image`,
         };
       default:
         // A language this file has not been taught: say so rather than invent a version.

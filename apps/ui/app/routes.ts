@@ -49,4 +49,6 @@ export default [
   route("admin/feedback", "routes/admin-feedback.tsx"),
   route("moderation", "routes/moderation.tsx"),
   route("gateway", "routes/gateway.tsx"),
+  // A URL the app does not know renders inside the shell, not as a replaced document.
+  route("*", "routes/not-found.tsx"),
 ] satisfies RouteConfig;

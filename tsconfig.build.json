@@ -38,9 +38,6 @@
       "path": "packages/doc-pipeline"
     },
     {
-      "path": "packages/escalation-breaker"
-    },
-    {
       "path": "packages/exec-policy"
     },
     {
@@ -48,9 +45,6 @@
     },
     {
       "path": "packages/gateway"
-    },
-    {
-      "path": "packages/gateway-log"
     },
     {
       "path": "packages/governance"
@@ -75,9 +69,6 @@
     },
     {
       "path": "packages/llm-tracer"
-    },
-    {
-      "path": "packages/llm-translate"
     },
     {
       "path": "packages/lsp"
@@ -144,9 +135,6 @@
     },
     {
       "path": "packages/telemetry"
-    },
-    {
-      "path": "packages/tool-registry"
     },
     {
       "path": "packages/trigger-engine"

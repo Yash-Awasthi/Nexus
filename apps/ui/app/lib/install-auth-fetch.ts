@@ -17,6 +17,7 @@
  */
 
 // Relative, not the `~` alias: the unit test imports this module without vite.
+import { noteApiHealthy, noteApiTrouble } from "./api-health";
 import { getSessionToken, sessionReady } from "./session-token";
 
 type RefreshSessionFn = () => Promise<boolean>;
@@ -74,16 +75,27 @@ export function createAuthFetch(
       } catch {
         /* keep the caller's init */
       }
-      return original(input as RequestInfo | URL, finalInit).then(async (res) => {
-        if (!retried && res.status === 401 && sameOriginApi && hadToken && !isAuthEndpoint) {
-          const refreshed = await refreshSession();
-          // Retry from the CALLER's init (not finalInit): finalInit already
-          // carries the stale Authorization header that just 401'd, and the
-          // retry must attach the freshly rotated token.
-          if (refreshed) return attempt(init, true);
-        }
-        return res;
-      });
+      return original(input as RequestInfo | URL, finalInit).then(
+        async (res) => {
+          if (sameOriginApi && !isAuthEndpoint) {
+            if (res.status >= 500) noteApiTrouble(res.status);
+            else noteApiHealthy();
+          }
+          if (!retried && res.status === 401 && sameOriginApi && hadToken && !isAuthEndpoint) {
+            const refreshed = await refreshSession();
+            // Retry from the CALLER's init (not finalInit): finalInit already
+            // carries the stale Authorization header that just 401'd, and the
+            // retry must attach the freshly rotated token.
+            if (refreshed) return attempt(init, true);
+          }
+          return res;
+        },
+        // A socket that never answered is the strongest form of "the server is not there".
+        (error: unknown) => {
+          if (sameOriginApi && !isAuthEndpoint) noteApiTrouble(0);
+          throw error;
+        },
+      );
     };
 
     const start = () => {

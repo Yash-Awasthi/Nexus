@@ -18,9 +18,8 @@ process.env.DATABASE_URL = DB;
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_SECRETS_KEY = "cd".repeat(32);
 
-const { validateBundle, buildBundle, bundleFilename, BUNDLE_FORMAT, MAX_MESSAGES } = await import(
-  "../../src/lib/session-bundle.ts"
-);
+const { validateBundle, buildBundle, bundleFilename, BUNDLE_FORMAT, MAX_MESSAGES } =
+  await import("../../src/lib/session-bundle.ts");
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildServer } = await import("../../src/server.ts");
@@ -72,11 +71,36 @@ beforeAll(async () => {
 describe("the format", () => {
   it("counts what it exports instead of trusting the caller", () => {
     const bundle = buildBundle(
-      { id: "t1", title: "Migration A/B", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      {
+        id: "t1",
+        title: "Migration A/B",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
       [
-        { id: "m1", role: "user", content: "Should we ship?", round: 0, createdAt: new Date().toISOString() },
-        { id: "m2", role: "opinion", member: "Ada", content: "Yes.", round: 1, createdAt: new Date().toISOString() },
-        { id: "m3", role: "verdict", member: "Chair", content: "Yes, with a switch.", round: 2, createdAt: new Date().toISOString() },
+        {
+          id: "m1",
+          role: "user",
+          content: "Should we ship?",
+          round: 0,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "m2",
+          role: "opinion",
+          member: "Ada",
+          content: "Yes.",
+          round: 1,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "m3",
+          role: "verdict",
+          member: "Chair",
+          content: "Yes, with a switch.",
+          round: 2,
+          createdAt: new Date().toISOString(),
+        },
       ],
     );
     expect(bundle.format).toBe(BUNDLE_FORMAT);
@@ -87,7 +111,12 @@ describe("the format", () => {
 
   it("refuses an unknown format, a duplicate id, an unknown role and an oversized set", () => {
     const good = buildBundle(
-      { id: "t", title: "T", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      {
+        id: "t",
+        title: "T",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
       [],
     );
     expect(validateBundle({ ...good, format: "nexus.session/2" })).toMatchObject({
@@ -97,14 +126,23 @@ describe("the format", () => {
     expect(validateBundle("not an object")).toMatchObject({ ok: false });
     expect(validateBundle({ ...good, thread: { title: "" } })).toMatchObject({ ok: false });
     const dup = { ...good, messages: [message({ id: "same" }), message({ id: "same" })] };
-    expect(validateBundle(dup)).toMatchObject({ ok: false, reason: expect.stringContaining("duplicated") });
+    expect(validateBundle(dup)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("duplicated"),
+    });
     const badRole = { ...good, messages: [message({ role: "root" })] };
-    expect(validateBundle(badRole)).toMatchObject({ ok: false, reason: expect.stringContaining("role") });
+    expect(validateBundle(badRole)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("role"),
+    });
     const tooMany = {
       ...good,
       messages: Array.from({ length: MAX_MESSAGES + 1 }, (_, i) => message({ id: `m${i}` })),
     };
-    expect(validateBundle(tooMany)).toMatchObject({ ok: false, reason: expect.stringContaining("limited to") });
+    expect(validateBundle(tooMany)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("limited to"),
+    });
   });
 
   it("names the file after the session and the day it started", () => {
@@ -123,14 +161,20 @@ describe("export and import", () => {
     await call("POST", `/api/threads/${id}/messages`, {
       messages: [
         { id: "m1", role: "user", content: "Should we ship on Friday?", round: 0 },
-        { id: "m2", role: "opinion", member: "Ada", content: "Yes, behind a kill switch.", round: 1 },
+        {
+          id: "m2",
+          role: "opinion",
+          member: "Ada",
+          content: "Yes, behind a kill switch.",
+          round: 1,
+        },
         { id: "m3", role: "verdict", member: "Chair", content: "Ship, with a switch.", round: 2 },
       ],
     });
 
     const exported = await call("GET", `/api/threads/${id}/export`);
     expect(exported.status).toBe(200);
-    expect(exported.headers.get("content-disposition")).toContain("attachment; filename=\"session-");
+    expect(exported.headers.get("content-disposition")).toContain('attachment; filename="session-');
     expect(exported.headers.get("content-type")).toContain("application/json");
     const bundle = (await exported.json()) as {
       format: string;
@@ -166,7 +210,9 @@ describe("export and import", () => {
     // Importing twice makes two sessions, not a conflict.
     const again = await call("POST", "/api/threads/import", bundle, reviewerAuth);
     expect(again.status).toBe(201);
-    expect(((await again.json()) as { thread: { id: string } }).thread.id).not.toBe(result.thread.id);
+    expect(((await again.json()) as { thread: { id: string } }).thread.id).not.toBe(
+      result.thread.id,
+    );
   });
 
   it("refuses a malformed bundle with a reason, and writes nothing", async () => {
@@ -192,7 +238,9 @@ describe("export and import", () => {
   it("keeps an export private: another account cannot export a thread it does not own", async () => {
     const created = await call("POST", "/api/threads", { title: "Private" });
     const { id } = (await created.json()) as { id: string };
-    expect((await call("GET", `/api/threads/${id}/export`, undefined, reviewerAuth)).status).toBe(404);
+    expect((await call("GET", `/api/threads/${id}/export`, undefined, reviewerAuth)).status).toBe(
+      404,
+    );
     expect((await call("GET", "/api/threads/does-not-exist/export")).status).toBe(404);
   });
 });

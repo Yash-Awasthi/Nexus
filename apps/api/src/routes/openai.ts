@@ -307,7 +307,8 @@ export async function openaiRoutes(app: FastifyInstance): Promise<void> {
         }
       });
       // A provider that only reports calls at the end still ends with them named once.
-      if (res.toolCalls?.length && toolSlots.size === 0) send({ tool_calls: toolCalls(res.toolCalls) });
+      if (res.toolCalls?.length && toolSlots.size === 0)
+        send({ tool_calls: toolCalls(res.toolCalls) });
       send({}, finish(res));
     } catch (err) {
       raw.write(`data: ${JSON.stringify(upstreamError(err))}\n\n`);

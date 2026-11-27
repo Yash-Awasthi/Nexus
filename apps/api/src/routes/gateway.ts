@@ -30,7 +30,6 @@ import {
   type UltraplinianMessage,
   type SamplingParams as UltraplinianSamplingParams,
 } from "@nexus/council/gauntlet";
-import { KVGatewayLog } from "@nexus/gateway-log";
 import { globalHooks } from "@nexus/hooks";
 import { KVTokenBudget, BudgetExceededError } from "@nexus/llm/budget";
 import { compressAuto } from "@nexus/llm/compress";
@@ -62,12 +61,11 @@ import { registryFromEnv } from "@nexus/llm-oauth";
 import { FixedEmbedder, MemoryManager, createBestEmbedder } from "@nexus/memory";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 // oxlint-disable-next-line @typescript-eslint/no-unused-vars
-import { createDefaultRegistry } from "@nexus/tool-registry";
-import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { parseCompressHeader } from "../lib/agent-queue.ts";
 import { costLogStore, scopeCostEntriesToUser, trackCost } from "../lib/cost-log.ts";
+import { KVGatewayLog } from "../lib/gateway-log.ts";
 import { getLlmCacheStats } from "../lib/llm-cache-driver.ts";
 import { getMemoryStore } from "../lib/memory-store.ts";
 import { createOAuthTokenStore } from "../lib/oauth-token-store.ts";
@@ -75,6 +73,8 @@ import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/promp
 import { listUserDrivers, listUserModels } from "../lib/provider-keys.ts";
 import { gatewayError } from "../lib/reply-errors.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
+import { createDefaultRegistry } from "../lib/tool-registry.ts";
+import type { ToolRegistry } from "../lib/tool-registry.ts";
 import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.ts";
 
 import { getDefaultDriver, getFreeDriver } from "./api-bridge.ts";

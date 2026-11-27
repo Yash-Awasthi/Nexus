@@ -41,7 +41,7 @@ function Node({ node, depth, actions }: { node: OrgNode; depth: number; actions:
               : ""}
             {a.model ? ` · ${a.model}` : ""}
           </p>
-          <p className="text-[11px] text-muted-foreground">Last run {timeAgo(a.lastHeartbeatAt)}</p>
+          <p className="text-2xs text-muted-foreground">Last run {timeAgo(a.lastHeartbeatAt)}</p>
         </button>
         <div className={`shrink-0 gap-1 ${actions.readOnly ? "hidden" : "flex"}`}>
           <Button

@@ -37,9 +37,16 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 
+import {
+  deprecationFor,
+  deprecationHeaders,
+  goneBody,
+  isPastSunset,
+} from "./lib/api-deprecation.ts";
 import { maturityForPath, MATURITY_DESCRIPTION, type Maturity } from "./lib/api-maturity.ts";
 import { startAuditExport } from "./lib/audit-export.ts";
 import { attachChannels } from "./lib/channels.ts";
+import { familyOf, withCostScope } from "./lib/cost-attribution.ts";
 import { costLogStore } from "./lib/cost-log.ts";
 import { startDriveBackups } from "./lib/drive-durability.ts";
 import { idle as idleOrgRuns } from "./lib/org-runtime.ts";
@@ -73,9 +80,9 @@ import { docPipelineRoutes } from "./routes/doc-pipeline.ts";
 import { execApprovalRoutes } from "./routes/exec-approvals.ts";
 import { featureFlagsRoutes } from "./routes/feature-flags.ts";
 import { gatewayRoutes } from "./routes/gateway.ts";
+import { globalSearchRoutes } from "./routes/global-search.ts";
 import { governanceRoutes } from "./routes/governance.ts";
 import { healthRoutes } from "./routes/health.ts";
-import { statusRoutes } from "./routes/status.ts";
 import { hooksRoutes } from "./routes/hooks.ts";
 import { ingestRoutes } from "./routes/ingest.ts";
 import { libertasRoutes } from "./routes/libertas.ts";
@@ -111,10 +118,10 @@ import { scrapingMcpRoutes } from "./routes/scraping-mcp.ts";
 import { secretRoutes } from "./routes/secrets.ts";
 import { sessionSyncRoutes } from "./routes/session-sync.ts";
 import { sseRoutes } from "./routes/sse.ts";
+import { statusRoutes } from "./routes/status.ts";
 import { threadsRoutes } from "./routes/threads.ts";
 import { userDataRoutes } from "./routes/user-data.ts";
 import { webhookRoutes } from "./routes/webhooks.ts";
-import { globalSearchRoutes } from "./routes/global-search.ts";
 import { workspacesRoutes } from "./routes/workspaces.ts";
 
 // Resolve pino-pretty to an absolute path so pino's transport worker can load it
@@ -159,6 +166,48 @@ export function enterUserContext(
   void resolveIdentity(request)
     .catch(() => undefined)
     .then(() => asUser(request.nexusUserId ?? null, done, request._llmSteps));
+}
+
+/**
+ * Apply the deprecation register (`lib/api-deprecation.ts`) to a request.
+ *
+ * Runs as a preHandler so the route template is known and the headers can still be set. A route marked
+ * `deprecated` gets `Deprecation`/`Sunset`/`Link` and is served normally; a route past its sunset — or marked
+ * `gone` — answers 410 with the replacement named. Both branches are only reachable when the table has an entry, so
+ * the cost on every other request is one array lookup over an empty list.
+ */
+export function applyDeprecation(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: (error?: Error) => void,
+): void {
+  const route = deprecationFor(request.method, request.routeOptions?.url ?? request.url);
+  if (!route) return done();
+
+  const retired = route.stage === "gone" || isPastSunset(route);
+  if (retired) {
+    void reply.code(410).send(goneBody(route));
+    return;
+  }
+  for (const [name, value] of Object.entries(deprecationHeaders(route))) reply.header(name, value);
+  return done();
+}
+
+/**
+ * Tag every model call made while serving this request with the family of route that caused it, so the monthly
+ * cost report can answer "what was the money spent on" and not only "who spent it".
+ *
+ * The family comes from the route template rather than the URL: `/chat/stream` is a template, while a raw URL
+ * carries ids and query strings that would each become a bucket. This runs after `enterUserContext`, so the scope
+ * sits inside the user's async context and survives every await the handler makes.
+ */
+export function enterCostScope(
+  request: FastifyRequest,
+  _reply: FastifyReply,
+  done: () => void,
+): void {
+  const route = request.routeOptions?.url ?? request.url;
+  withCostScope({ family: familyOf(route) }, done);
 }
 
 /**
@@ -440,6 +489,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(
     async (api) => {
       api.addHook("preHandler", enterUserContext);
+      api.addHook("preHandler", applyDeprecation);
+      api.addHook("preHandler", enterCostScope);
       api.addHook("onResponse", traceLlmRequest);
       // Core platform
       await api.register(ingestRoutes);
@@ -561,6 +612,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       scoped.addHook("preHandler", requireAuthWithTier);
       scoped.addHook("preHandler", apiScopeRL);
       scoped.addHook("preHandler", enterUserContext);
+      scoped.addHook("preHandler", applyDeprecation);
+      scoped.addHook("preHandler", enterCostScope);
       scoped.addHook("onResponse", traceLlmRequest);
       await scoped.register(apiBridgeRoutes);
       await scoped.register(notificationsRoutes);

@@ -71,9 +71,7 @@ export function buildBundle(
   };
 }
 
-export type ValidationResult =
-  | { ok: true; bundle: SessionBundle }
-  | { ok: false; reason: string };
+export type ValidationResult = { ok: true; bundle: SessionBundle } | { ok: false; reason: string };
 
 function isIso(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
@@ -86,7 +84,8 @@ function isIso(value: unknown): value is string {
  * message is an importer that silently imports something other than what the file says.
  */
 export function validateBundle(raw: unknown): ValidationResult {
-  if (typeof raw !== "object" || raw === null) return { ok: false, reason: "bundle must be an object" };
+  if (typeof raw !== "object" || raw === null)
+    return { ok: false, reason: "bundle must be an object" };
   const bundle = raw as Partial<SessionBundle>;
   if (bundle.format !== BUNDLE_FORMAT) {
     return {
@@ -95,14 +94,18 @@ export function validateBundle(raw: unknown): ValidationResult {
     };
   }
   const thread = bundle.thread;
-  if (typeof thread !== "object" || thread === null) return { ok: false, reason: "thread is missing" };
+  if (typeof thread !== "object" || thread === null)
+    return { ok: false, reason: "thread is missing" };
   if (typeof thread.title !== "string" || !thread.title.trim()) {
     return { ok: false, reason: "thread.title must be a non-empty string" };
   }
   if (thread.title.length > 300) return { ok: false, reason: "thread.title is too long" };
   if (!Array.isArray(bundle.messages)) return { ok: false, reason: "messages must be an array" };
   if (bundle.messages.length > MAX_MESSAGES) {
-    return { ok: false, reason: `messages is limited to ${MAX_MESSAGES}; this bundle has ${bundle.messages.length}` };
+    return {
+      ok: false,
+      reason: `messages is limited to ${MAX_MESSAGES}; this bundle has ${bundle.messages.length}`,
+    };
   }
 
   const seen = new Set<string>();
@@ -119,15 +122,22 @@ export function validateBundle(raw: unknown): ValidationResult {
     }
     seen.add(message.id);
     if (typeof message.role !== "string" || !ROLES.has(message.role)) {
-      return { ok: false, reason: `messages[${index}].role must be one of ${[...ROLES].join(", ")}` };
+      return {
+        ok: false,
+        reason: `messages[${index}].role must be one of ${[...ROLES].join(", ")}`,
+      };
     }
     if (typeof message.content !== "string") {
       return { ok: false, reason: `messages[${index}].content must be a string` };
     }
     if (message.content.length > MAX_CONTENT_CHARS) {
-      return { ok: false, reason: `messages[${index}].content is longer than ${MAX_CONTENT_CHARS} characters` };
+      return {
+        ok: false,
+        reason: `messages[${index}].content is longer than ${MAX_CONTENT_CHARS} characters`,
+      };
     }
-    const round = typeof message.round === "number" && Number.isFinite(message.round) ? message.round : 0;
+    const round =
+      typeof message.round === "number" && Number.isFinite(message.round) ? message.round : 0;
     messages.push({
       id: message.id,
       role: message.role as ThreadMessage["role"],

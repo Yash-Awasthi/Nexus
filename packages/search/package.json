@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@nexus/contracts": "workspace:*",
-    "@nexus/mcp-client": "workspace:*"
+    "@nexus/mcp-client": "workspace:*",
+    "@nexus/nlp-utils": "workspace:*"
   },
   "devDependencies": {
     "vite-plus": "catalog:"

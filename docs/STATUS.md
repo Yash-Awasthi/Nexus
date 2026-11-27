@@ -1,4 +1,4 @@
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # Nexus — Feature Status (local, no paid APIs)
 
@@ -15,8 +15,8 @@ _Last verified 2026-11-24 (`node scripts/baseline.mjs --write`; unit, e2e and pr
 
 | Measure   | Value                                                                                    |
 | --------- | ---------------------------------------------------------------------------------------- |
-| Workspace | 50 packages, 7 apps, 2 services                                                          |
-| API spec  | 416 paths, 519 operations: 353 durable, 161 bridge, 5 dedicated-volatile, 0 unclassified |
+| Workspace | 46 packages, 7 apps, 2 services                                                          |
+| API spec  | 429 paths, 537 operations: 371 durable, 161 bridge, 5 dedicated-volatile, 0 unclassified |
 
 <!-- baseline:measured -->
 
@@ -288,7 +288,7 @@ bundle rather than only in the checkout.
 ("failed to fetch", a timeout, a refused socket) is handed to the main process and written to
 `<userData>/offline-queue.json`; the chat header shows `N queued`, the tray says
 `2 prompts queued — waiting for the API`, and the two-second run-state poll flushes the queue in
-order the first time the API answers again. A prompt the server *refused* is never queued — it goes
+order the first time the API answers again. A prompt the server _refused_ is never queued — it goes
 into the message as an error — because retrying a 401 forever is a queue that never drains
 (`apps/desktop/src/offline.ts`, `apps/ui/app/lib/offline-notice.ts`). The workspace folder is chosen
 from the tray (`Choose workspace folder…`) or over the bridge (`chooseWorkspace`), stored in

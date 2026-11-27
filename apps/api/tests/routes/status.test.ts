@@ -95,7 +95,10 @@ describe("GET /status", () => {
     expect(degradedRes.statusCode).toBe(200);
     const body = degradedRes.json<{ status: string; rows: StatusRow[] }>();
     expect(body.status).toBe("degraded");
-    expect(body.rows.find((row) => row.name === "docker")).toMatchObject({ ok: false, critical: false });
+    expect(body.rows.find((row) => row.name === "docker")).toMatchObject({
+      ok: false,
+      critical: false,
+    });
     await degraded.close();
   });
 

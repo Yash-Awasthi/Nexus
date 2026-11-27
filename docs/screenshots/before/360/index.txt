@@ -1,0 +1,33 @@
+# Baseline screenshots at 360x800
+# Regenerate: NEXUS_CAPTURE_BASELINE=1 pnpm test:e2e baseline-screenshots
+360/home.jpg
+360/login.jpg
+360/dashboard.jpg
+360/chat.jpg
+360/discussion.jpg
+360/archetypes.jpg
+360/org.jpg
+360/projects.jpg
+360/workspaces.jpg
+360/workflows.jpg
+360/templates.jpg
+360/skills.jpg
+360/knowledge.jpg
+360/search.jpg
+360/sandbox.jpg
+360/terminals.jpg
+360/knowledge-graph.jpg
+360/costs.jpg
+360/settings.jpg
+360/provider-keys.jpg
+360/mcp-servers.jpg
+360/api-tokens.jpg
+360/admin-users.jpg
+360/admin-analytics.jpg
+360/admin-traces.jpg
+360/gateway.jpg
+360/admin-audit.jpg
+360/moderation.jpg
+360/admin-feedback.jpg
+360/admin-feature-flags.jpg
+360/admin-system.jpg

@@ -1,0 +1,5 @@
+{
+  "why": "Colour literals are zero: one is a failure. Arbitrary Tailwind sizes and inline px are ratcheted at what exists today, so new code cannot add more and the number can only fall. Lower these as files are migrated; never raise one without saying why in the commit.",
+  "arbitraryValues": 75,
+  "inlinePx": 66
+}

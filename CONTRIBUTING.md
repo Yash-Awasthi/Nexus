@@ -165,6 +165,7 @@ Two more are worth running when your change touches what they cover:
 ```bash
 pnpm check:offline      # the local model path still works (see rule 2)
 pnpm bundle:budget      # the UI route you touched is still inside its size budget
+pnpm tokens:check       # you did not write a colour literal or a magic size (docs/DESIGN-TOKENS.md)
 ```
 
 **2. A local run never requires a paid API.** The no-paid-API promise is a product invariant, not

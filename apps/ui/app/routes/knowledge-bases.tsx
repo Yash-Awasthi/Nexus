@@ -22,6 +22,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "react-router";
 
 import { Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -274,7 +275,7 @@ function KBDetail({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{doc.name}</p>
                 {doc.docClass && doc.docClass !== "other" && (
-                  <p className="truncate text-[11px] text-muted-foreground">
+                  <p className="truncate text-2xs text-muted-foreground">
                     {[doc.docClass, ...(doc.tags ?? []).filter((t) => t !== doc.docClass)].join(
                       " · ",
                     )}
@@ -282,7 +283,7 @@ function KBDetail({
                 )}
               </div>
               <span className="text-xs text-muted-foreground shrink-0">{doc.size}</span>
-              <Badge variant="outline" className="text-[10px] uppercase shrink-0">
+              <Badge variant="outline" className="text-3xs uppercase shrink-0">
                 {doc.type}
               </Badge>
               <Button
@@ -481,7 +482,11 @@ function KBGraph({ kbId }: { kbId: string }) {
           );
         })}
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       {running && (
         <p className="text-xs text-muted-foreground" role="status">
           Reading chunk {job.chunksDone ?? 0} of {job.chunksTotal}. This can take a few minutes; you
@@ -570,7 +575,11 @@ function KBSearch({ kbId }: { kbId: string }) {
         <Switch checked={split} onCheckedChange={setSplit} size="sm" />
         Split a multi-part question into sub-questions (uses your default model)
       </label>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       {result && (
         <div className="space-y-2">
           {result.subQuestions && result.subQuestions.length > 0 && (
@@ -605,13 +614,21 @@ export default function KnowledgeBasesPage() {
   const [newKBName, setNewKBName] = useState("");
   const [newKBDesc, setNewKBDesc] = useState("");
   const [loading, setLoading] = useState(true);
+  // A failed list is not an empty one: "no knowledge bases yet" invited people to create a duplicate
+  // base that they already had.
+  const [listError, setListError] = useState<string | null>(null);
 
   // ── Fetch knowledge bases from backend ────────────────────────────────────
   const loadKBs = useCallback(() => {
+    setListError(null);
     return fetch("/api/kb?limit=50")
-      .then((r) => (r.ok ? (r.json() as Promise<{ kbs?: ApiKB[] }>) : Promise.reject()))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{ kbs?: ApiKB[] }>)
+          : Promise.reject(new Error(r.statusText || `HTTP ${r.status}`)),
+      )
       .then((data) => setKBs((data.kbs ?? []).map(normalizeKB)))
-      .catch(() => {})
+      .catch((e: Error) => setListError(e.message || "The list could not be read."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -699,11 +716,19 @@ export default function KnowledgeBasesPage() {
         }
       />
 
+      {listError && (
+        <PageError
+          title="Your knowledge bases could not be loaded"
+          message={listError}
+          onRetry={() => void loadKBs()}
+        />
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
-      ) : kbs.length === 0 ? (
+      ) : kbs.length === 0 && !listError ? (
         <Card className="py-12">
           <CardContent className="flex flex-col items-center gap-2 text-center">
             <Database className="size-8 text-muted-foreground" />
@@ -732,12 +757,12 @@ export default function KnowledgeBasesPage() {
                     <CardTitle className="text-sm">{kb.name}</CardTitle>
                     <div className="flex items-center gap-1">
                       {kb.status === "indexed" ? (
-                        <Badge variant="outline" className="text-[10px] text-success">
+                        <Badge variant="outline" className="text-3xs text-success">
                           <CheckCircle className="size-2.5 mr-1" />
                           Indexed
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] text-warning">
+                        <Badge variant="outline" className="text-3xs text-warning">
                           <Loader2 className="size-2.5 mr-1 animate-spin" />
                           Indexing
                         </Badge>

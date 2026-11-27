@@ -134,7 +134,7 @@ export function ContextPicker({
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate">{r.label}</span>
                   {r.source === "lsp" && (
-                    <span className="shrink-0 rounded border px-1 text-[10px] uppercase text-muted-foreground">
+                    <span className="shrink-0 rounded border px-1 text-3xs uppercase text-muted-foreground">
                       lsp
                     </span>
                   )}
@@ -145,7 +145,7 @@ export function ContextPicker({
           ))}
         </ul>
       )}
-      <p className="border-t px-3 py-1 text-[11px] text-muted-foreground">
+      <p className="border-t px-3 py-1 text-2xs text-muted-foreground">
         ↑↓ move · Enter pick · Esc close
       </p>
     </div>

@@ -231,7 +231,7 @@ export function RoutineList({
                     {r.webhookId ? " · webhook" : ""}
                     {r.nextRunAt ? ` · next ${new Date(r.nextRunAt).toLocaleString()}` : ""}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-2xs text-muted-foreground">
                     Last fired {timeAgo(r.lastFiredAt)}
                     {r.history[0] ? ` (${r.history[0].result.replace("_", " ")})` : ""}
                   </p>

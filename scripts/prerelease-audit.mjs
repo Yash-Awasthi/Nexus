@@ -20,6 +20,8 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { canonical, formatDoc } from "./lib/generated-doc.mjs";
+
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const POLICY = join(ROOT, ".github/prerelease-policy.json");
 const OPS = join(ROOT, "docs/OPS.md");
@@ -181,12 +183,14 @@ if (invokedDirectly) {
         ? `${doc}\n\n${body}\n`
         : doc.slice(0, start) + body + doc.slice(end + END.length);
     writeFileSync(OPS, next);
+    formatDoc("docs/OPS.md");
     console.log(`prerelease audit: wrote ${installed.length} row(s) into docs/OPS.md`);
     process.exit(0);
   }
   if (process.argv.includes("--check")) {
     const doc = readFileSync(OPS, "utf8");
-    if (!doc.includes(table())) {
+    // Content, not alignment: `vp fmt` pads the committed table, the generator emits it unpadded.
+    if (!canonical(doc).includes(canonical(table()))) {
       console.error(
         "✖ the pre-release table in docs/OPS.md is out of date — run node scripts/prerelease-audit.mjs --write",
       );

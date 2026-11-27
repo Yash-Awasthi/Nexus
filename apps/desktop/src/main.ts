@@ -48,13 +48,6 @@ import { enqueue, flush, loadQueue, saveQueue, type QueuedPrompt } from "./offli
 import { syncOnce } from "./sync";
 import { fileSyncState, httpSyncTransport } from "./sync-node";
 import {
-  clearWorkspace,
-  describeWorkspace,
-  readWorkspace,
-  saveWorkspace,
-  workspaceProblem,
-} from "./workspace";
-import {
   copyableApiBase,
   deepLinkFromArgs,
   PROTOCOL,
@@ -81,6 +74,13 @@ import {
   type UpdateCheck,
   type UpdatePlatform,
 } from "./updater";
+import {
+  clearWorkspace,
+  describeWorkspace,
+  readWorkspace,
+  saveWorkspace,
+  workspaceProblem,
+} from "./workspace";
 
 // Set either variable to point the window at a service that is already
 // running (the dev server, or a cloud deployment). With both unset the app
@@ -448,7 +448,12 @@ async function checkUpdatesNow(dataDir: string): Promise<UpdateCheck> {
   }
   try {
     const { manifest } = await fetchManifest({ feedUrl, publicKey, fetchImpl: fetch });
-    const check = describeUpdate({ current, manifest, installId: installId(), configuredChannel: channel });
+    const check = describeUpdate({
+      current,
+      manifest,
+      installId: installId(),
+      configuredChannel: channel,
+    });
     if (check.eligible && app.isPackaged) {
       const staged = await stageUpdate({
         manifest,
@@ -476,7 +481,8 @@ async function checkUpdatesNow(dataDir: string): Promise<UpdateCheck> {
  * A failed boot is the rollback trigger. If the pending update names a verified
  * previous installer, restore it and restart; otherwise report the failure once.
  */
-async function bootFailed(err: unknown): Promise<void> {  console.error(err);
+async function bootFailed(err: unknown): Promise<void> {
+  console.error(err);
   const dir = updatesDir(app.getPath("userData"));
   const pending = readPending(dir);
   if (pending) {
@@ -646,7 +652,11 @@ app.whenReady().then(
         if (picked.canceled || !folder) return;
         const problem = workspaceProblem(folder);
         if (problem) {
-          await dialog.showMessageBox({ type: "error", title: "Not a workspace", message: problem });
+          await dialog.showMessageBox({
+            type: "error",
+            title: "Not a workspace",
+            message: problem,
+          });
           return;
         }
         saveWorkspace(queueDir, folder);
@@ -745,7 +755,12 @@ app.whenReady().then(
             next.failed !== trayState.failed ||
             wasOnline !== apiOnline;
           if (changed) {
-            trayState = { ...trayState, running: next.running, failed: next.failed, online: apiOnline };
+            trayState = {
+              ...trayState,
+              running: next.running,
+              failed: next.failed,
+              online: apiOnline,
+            };
             paintTray();
           }
           // Back from a gap: send what was typed during it. This is the only place a flush is
@@ -797,7 +812,10 @@ app.whenReady().then(
         writeFileSync(councilFile(), JSON.stringify(members, null, 2), "utf8"),
       auth,
       queuePrompt: async (input) => {
-        const next = enqueue(queuedPrompts, { text: input.text, sessionId: input.sessionId ?? null });
+        const next = enqueue(queuedPrompts, {
+          text: input.text,
+          sessionId: input.sessionId ?? null,
+        });
         queuedPrompts = next.queue;
         saveQueue(dataDir, queuedPrompts);
         trayState = { ...trayState, queued: queuedPrompts.length, online: apiOnline };

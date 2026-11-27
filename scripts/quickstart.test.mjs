@@ -10,7 +10,9 @@
  * be a route the API registers.
  *
  * It does not measure the fifteen minutes — that needs a clean machine, and a number
- * invented here would be worse than none.
+ * invented here would be worse than none. What it does check is that the measured table the
+ * README now carries is still the table a reader gets: every step named, a total, and the two
+ * things the numbers deliberately do not cover (the model download and the browser sign-up).
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -86,4 +88,36 @@ test("the health URL it curls is a route the API serves", () => {
     const path = url.split("/").filter(Boolean).pop() ?? "";
     assert.ok(route.includes(`"/${path}"`), `/api/${path} is not registered by health routes`);
   }
+});
+
+/**
+ * The measurement claim is data too: a table edited to a nicer number with no method beside it,
+ * or one that stops naming what it cannot cover, is worse than no table.
+ */
+test("the measured table names its steps, its total and what it does not cover", () => {
+  assert.match(section, /Measured, not estimated/, "the table must announce itself as measured");
+  for (const step of ["git clone", "pnpm install", "nexus doctor", "pnpm dev"])
+    assert.ok(section.includes(step), `the measured table lost the ${step} row`);
+  assert.match(section, /\*\*Steps 1–5 together\*\*/);
+  assert.match(section, /ollama pull qwen2\.5:7b/, "the model download must be named as uncovered");
+  assert.match(section, /network measurement, not ours/);
+});
+
+/**
+ * Step 3 promises `nexus doctor` can succeed on a machine with no Docker and no Ollama — the
+ * whole point of Option C. That promise holds only while the doctor marks them optional, so the
+ * two files are read together.
+ */
+test("nexus doctor can exit 0 on the machine Option C describes", () => {
+  const doctor = readFileSync("apps/cli/src/lib/doctor.ts", "utf8");
+  assert.match(
+    doctor,
+    /export function doctorExitCode/,
+    "the exit rule must be a function the tests can call, not a status check inline in the command",
+  );
+  for (const name of ["docker", "ollama"])
+    assert.ok(
+      new RegExp(`name: "${name}"[\\s\\S]{0,320}required: false`).test(doctor),
+      `${name} is required again, so the quickstart's step 3 fails where it is meant to pass`,
+    );
 });

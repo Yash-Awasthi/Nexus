@@ -61,7 +61,8 @@ form button:disabled { opacity: 0.6; cursor: default; }
 
   class NexusWidget extends HTMLElement {
     connectedCallback() {
-      if (this.shadowRoot) return;      const root = this.attachShadow({ mode: "open" });
+      if (this.shadowRoot) return;
+      const root = this.attachShadow({ mode: "open" });
       const inline = this.getAttribute("mode") === "inline";
       root.innerHTML = `<style>${STYLE}</style>
 <button class="launch" part="launcher" aria-label="Open questions" aria-expanded="false">?</button>
@@ -141,7 +142,9 @@ form button:disabled { opacity: 0.6; cursor: default; }
         chip.append(title);
         chip.append(
           document.createTextNode(
-            page.selection ? ` — ${page.selection.trim().split(/\s+/).length} words selected` : " — page attached",
+            page.selection
+              ? ` — ${page.selection.trim().split(/\s+/).length} words selected`
+              : " — page attached",
           ),
         );
         chip.title = page.url;

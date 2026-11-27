@@ -92,7 +92,7 @@ export function MemoryPanel({ companyId, refreshKey }: { companyId: string; refr
               data-testid="lesson"
             >
               <div className="min-w-0 flex-1">
-                <p className="mb-1 flex flex-wrap items-center gap-2 text-[11px]">
+                <p className="mb-1 flex flex-wrap items-center gap-2 text-2xs">
                   <span className={`rounded px-1.5 py-0.5 font-medium ${KIND_TONE[l.kind]}`}>
                     {l.kind}
                   </span>

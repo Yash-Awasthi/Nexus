@@ -158,9 +158,11 @@ test("an ADR that does not exist cannot justify an entry", () => {
 
 test("the table in docs/OPS.md is generated from the policy and the tree", () => {
   const doc = readFileSync(new URL("../docs/OPS.md", import.meta.url), "utf8");
-  for (const entry of prereleases())
-    assert.ok(
-      doc.includes(`\`${entry.name}\` | \`${entry.version}\``),
-      `${entry.name} is not in the table`,
-    );
+  // Column padding is the formatter's business: `prettier` re-pads a markdown table whenever a cell in it grows, so
+  // the assertion matches the cells rather than one exact run of spaces between them.
+  const cell = (value) => "`" + value + "`";
+  for (const entry of prereleases()) {
+    const row = new RegExp(cell(entry.name) + "\\s*\\|\\s*" + cell(entry.version));
+    assert.ok(row.test(doc), `${entry.name} is not in the table`);
+  }
 });

@@ -117,11 +117,11 @@ function Card({
   return (
     <li className="space-y-2 rounded-lg border bg-card p-3" data-testid="approval-card">
       <div className="flex items-start gap-2">
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium uppercase">
+        <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium uppercase">
           {KIND[a.type]}
         </span>
         <p className="min-w-0 flex-1 font-medium">{a.title}</p>
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-2xs text-muted-foreground">
           {timeAgo(a.createdAt)}
         </span>
       </div>
@@ -353,7 +353,7 @@ export function ApprovalInbox({
               data-testid="exec-approval"
             >
               <div className="flex items-center gap-2">
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium uppercase">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium uppercase">
                   Command
                 </span>
                 <code className="min-w-0 flex-1 truncate text-sm">

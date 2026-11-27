@@ -99,6 +99,8 @@ const SUBROUTES = [
 ];
 const PUBLIC = [
   "/",
+  // The catch-all route for a URL that names nothing: it is reached by typing, not by a link.
+  "/*",
   "/login",
   "/register",
   "/forgot-password",

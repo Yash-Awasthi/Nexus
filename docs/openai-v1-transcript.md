@@ -1,4 +1,4 @@
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
 
 # The OpenAI surface, as a client sees it
 

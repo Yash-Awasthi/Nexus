@@ -86,10 +86,14 @@ export async function comparisonRoutes(app: FastifyInstance): Promise<void> {
       await load();
       const { left, right, label } = request.body ?? {};
       if (typeof left !== "string" || typeof right !== "string") {
-        return fail(reply, 400, "invalid_request", { message: "left and right must be discussion ids" });
+        return fail(reply, 400, "invalid_request", {
+          message: "left and right must be discussion ids",
+        });
       }
       if (left === right) {
-        return fail(reply, 400, "invalid_request", { message: "a run cannot be compared to itself" });
+        return fail(reply, 400, "invalid_request", {
+          message: "a run cannot be compared to itself",
+        });
       }
       const owner = ownerIdFor(request);
       const runs = await Promise.all([readDiscussion(left), readDiscussion(right)]);

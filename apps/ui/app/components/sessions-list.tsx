@@ -95,7 +95,7 @@ export function SessionsList({ userId }: { userId?: string }) {
                 <p className="truncate text-sm">
                   {s.userAgent ?? "Unknown device"}
                   {s.current && (
-                    <Badge variant="outline" className="ml-2 text-[10px]">
+                    <Badge variant="outline" className="ml-2 text-3xs">
                       This device
                     </Badge>
                   )}

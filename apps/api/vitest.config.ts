@@ -14,6 +14,13 @@ export default defineConfig({
     // it. These budgets bound a hang, not a slow boot.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // One worker per file, and every file boots a Fastify app plus an embedded
+    // Postgres: more workers than cores means the CPU is oversubscribed and the
+    // boot-heavy tests miss their timeouts while the assertions are fine. Measured
+    // on a 20-core machine, full suite: 20 workers → 195 s with 1–2 timeouts per
+    // run; 6 workers → 227 s with none. The suite is 30 s slower and deterministic,
+    // which is the trade this config exists to make.
+    maxWorkers: 6,
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

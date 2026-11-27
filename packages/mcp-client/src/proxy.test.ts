@@ -70,6 +70,23 @@ describe("McpProxyClient", () => {
     ).toThrow(/duplicate server name/);
   });
 
+  it("refuses to be built with no servers at all", () => {
+    expect(() => new McpProxyClient([])).toThrow(/at least one server/);
+  });
+
+  it("reports the registered servers in the order they were given", () => {
+    const { client: a } = fakeServer("alpha", []);
+    const { client: b } = fakeServer("beta", []);
+    const proxy = new McpProxyClient([
+      { name: "beta", client: b },
+      { name: "alpha", client: a },
+    ]);
+    // Order is the operator's, not alphabetical: it is what the status page shows.
+    expect(proxy.serverNames()).toEqual(["beta", "alpha"]);
+    // Before the first sweep there is nothing to report, and that is not "everything failed".
+    expect(proxy.failures()).toEqual([]);
+  });
+
   it("merges unique tools across servers keeping their original names", async () => {
     const { client: a } = fakeServer("alpha", [hit("weather"), hit("geo")]);
     const { client: b } = fakeServer("beta", [hit("search")]);

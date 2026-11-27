@@ -60,7 +60,9 @@ async function call(method: string, url: string, body?: unknown): Promise<Respon
 }
 
 /** Read an SSE body into `{ event, data }` pairs, ignoring the `[DONE]` sentinel. */
-async function events(res: Response): Promise<{ event: string | null; data: Record<string, unknown> }[]> {
+async function events(
+  res: Response,
+): Promise<{ event: string | null; data: Record<string, unknown> }[]> {
   const text = await res.text();
   const out: { event: string | null; data: Record<string, unknown> }[] = [];
   for (const block of text.split("\n\n")) {
@@ -71,7 +73,8 @@ async function events(res: Response): Promise<{ event: string | null; data: Reco
       if (line.startsWith("event: ")) event = line.slice(7).trim();
       else if (line.startsWith("data: ")) data.push(line.slice(6));
     }
-    if (data.length) out.push({ event, data: JSON.parse(data.join("\n")) as Record<string, unknown> });
+    if (data.length)
+      out.push({ event, data: JSON.parse(data.join("\n")) as Record<string, unknown> });
   }
   return out;
 }
@@ -107,13 +110,22 @@ beforeAll(async () => {
               {
                 delta: {
                   tool_calls: [
-                    { index: 0, id: "call_abc", type: "function", function: { name: "search", arguments: '{"q":' } },
+                    {
+                      index: 0,
+                      id: "call_abc",
+                      type: "function",
+                      function: { name: "search", arguments: '{"q":' },
+                    },
                   ],
                 },
               },
             ],
           },
-          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"nexus"}' } }] } }] },
+          {
+            choices: [
+              { delta: { tool_calls: [{ index: 0, function: { arguments: '"nexus"}' } }] } },
+            ],
+          },
           { choices: [{ delta: {}, finish_reason: "tool_calls" }] },
         ])
           res.write(`data: ${JSON.stringify(frame)}\n\n`);
@@ -124,7 +136,12 @@ beforeAll(async () => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
-          choices: [{ message: { role: "assistant", content: "Answer from upstream" }, finish_reason: "stop" }],
+          choices: [
+            {
+              message: { role: "assistant", content: "Answer from upstream" },
+              finish_reason: "stop",
+            },
+          ],
           usage: { prompt_tokens: 5, completion_tokens: 2 },
         }),
       );
@@ -161,7 +178,11 @@ it("POST /v1/responses answers a response object with output_text and usage", as
   expect(Number.isInteger(body.created_at)).toBe(true);
   expect(body.model).toBe("harbor/tiny");
   expect(body.output_text).toBe("Answer from upstream");
-  const output = body.output as { type: string; role: string; content: { type: string; text: string }[] }[];
+  const output = body.output as {
+    type: string;
+    role: string;
+    content: { type: string; text: string }[];
+  }[];
   expect(output[0]!.type).toBe("message");
   expect(output[0]!.role).toBe("assistant");
   expect(output[0]!.content[0]!.type).toBe("output_text");
@@ -207,7 +228,11 @@ it("a function_call_output item reaches the provider as a tool turn", async () =
     messages: { role: string; content: string; tool_call_id?: string }[];
   };
   expect(sent.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool"]);
-  expect(sent.messages[2]).toMatchObject({ role: "tool", content: '{"temp":31}', tool_call_id: "call_1" });
+  expect(sent.messages[2]).toMatchObject({
+    role: "tool",
+    content: '{"temp":31}',
+    tool_call_id: "call_1",
+  });
 });
 
 it("flat Responses tools are handed to the provider as tool definitions", async () => {
@@ -225,7 +250,9 @@ it("flat Responses tools are handed to the provider as tool definitions", async 
     ],
   });
   expect(res.status).toBe(200);
-  const sent = received.at(-1)!.body as { tools?: { function?: { name?: string }; name?: string }[] };
+  const sent = received.at(-1)!.body as {
+    tools?: { function?: { name?: string }; name?: string }[];
+  };
   expect(sent.tools?.[0]).toMatchObject({
     function: { name: "search", description: "Search the web" },
   });
@@ -294,7 +321,9 @@ it("a parameter this endpoint cannot honour is refused, not silently ignored", a
       [param]: param === "include" ? ["file_search_call.results"] : true,
     });
     expect(res.status, param).toBe(400);
-    const body = (await res.json()) as { error: { code?: string; param?: string; message?: string } };
+    const body = (await res.json()) as {
+      error: { code?: string; param?: string; message?: string };
+    };
     expect(body.error.code).toBe("unsupported_parameter");
     expect(body.error.param).toBe(param);
     expect(body.error.message).toContain(param);
@@ -338,7 +367,15 @@ it("/v1/chat/completions streams tool calls as partial arguments, not one block 
   const fragments = frames
     .flatMap((frame) => {
       const choices = frame.data.choices as
-        | { delta?: { tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[]
+        | {
+            delta?: {
+              tool_calls?: {
+                index?: number;
+                id?: string;
+                function?: { name?: string; arguments?: string };
+              }[];
+            };
+          }[]
         | undefined;
       return choices?.[0]?.delta?.tool_calls ?? [];
     })

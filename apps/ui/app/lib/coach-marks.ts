@@ -88,7 +88,11 @@ export interface CoachStore {
 }
 
 /** Whether this user has dismissed this page's hint. A store that throws counts as dismissed. */
-export function isDismissed(page: string, userId: string | null | undefined, store: CoachStore): boolean {
+export function isDismissed(
+  page: string,
+  userId: string | null | undefined,
+  store: CoachStore,
+): boolean {
   try {
     return store.getItem(coachKey(page, userId)) === "1";
   } catch {

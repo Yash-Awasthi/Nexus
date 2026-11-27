@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: fcff384 2026-11-25 -->
 
 # Nexus — Architecture & Repository Layout
 
@@ -48,10 +48,10 @@ How the apps, packages, and infrastructure fit together. For per-feature detail 
 │  │  └────────────────┘  └──────────────┘  └────────────────────────┘    │   │
 │  │                                                                      │   │
 │  │  governance · hooks · kv · llm-cache · llm-oauth · llm-tracer ·      │   │
-│  │  llm-translate · doc-pipeline · nlp-utils · pipeline-signal ·        │   │
+│  │  feature-flags · doc-pipeline · nlp-utils · pipeline-signal ·        │   │
 │  │  trigger-engine · stream-recovery · stealth-browser · researcher ·   │   │
 │  │  browser-automation · session-sync · pty · exec-policy ·             │   │
-│  │  escalation-breaker · tool-registry · mcp-openapi · ...              │   │
+│  │  search-orchestrator · llm-accounts · mcp-openapi · ...              │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │  PostgreSQL (pgvector) · Redis (BullMQ) · Docker (sandbox image)            │
@@ -119,7 +119,8 @@ nexus/
 
 ## Key design decisions
 
-12 ADRs live in [`docs/adr/`](adr/). Notable:
+The ADRs live in [`docs/adr/`](adr/) — one decision each, most recent first when you read the
+list of files. Notable:
 
 - ADR-0002: Postgres as the only state store
 - ADR-0004: pgvector over a dedicated vector DB
@@ -127,6 +128,9 @@ nexus/
 - ADR-0010: HMAC-chained audit log for tamper evidence
 - ADR-0015: Piston for multi-language execution outside the Docker sandbox
 - ADR-0018: BullMQ repeatable jobs for domain feed polling
+- ADR-0022: versioned `v1:` secret envelopes, so rotation can run without downtime
+- ADR-0024: budgets and retention, with the enforcer named in the same table
+- ADR-0025: fold single-consumer packages, keep the boundaries that earn their keep
 
 ## Layer diagrams
 
@@ -161,16 +165,12 @@ graph LR
   pkg_api --> pkg_db
   pkg_doc_pipeline["@nexus/doc-pipeline · packages/doc-pipeline"]
   pkg_api --> pkg_doc_pipeline
-  pkg_escalation_breaker["@nexus/escalation-breaker · packages/escalation-breaker"]
-  pkg_api --> pkg_escalation_breaker
   pkg_exec_policy["@nexus/exec-policy · packages/exec-policy"]
   pkg_api --> pkg_exec_policy
   pkg_feature_flags["@nexus/feature-flags · packages/feature-flags"]
   pkg_api --> pkg_feature_flags
   pkg_gateway["@nexus/gateway · packages/gateway"]
   pkg_api --> pkg_gateway
-  pkg_gateway_log["@nexus/gateway-log · packages/gateway-log"]
-  pkg_api --> pkg_gateway_log
   pkg_hooks["@nexus/hooks · packages/hooks"]
   pkg_api --> pkg_hooks
   pkg_kv["@nexus/kv · packages/kv"]
@@ -227,8 +227,6 @@ graph LR
   pkg_api --> pkg_stream_recovery
   pkg_telemetry["@nexus/telemetry · packages/telemetry"]
   pkg_api --> pkg_telemetry
-  pkg_tool_registry["@nexus/tool-registry · packages/tool-registry"]
-  pkg_api --> pkg_tool_registry
   pkg_trigger_engine["@nexus/trigger-engine · packages/trigger-engine"]
   pkg_api --> pkg_trigger_engine
   pkg_worker["@nexus/worker · apps/worker"]
@@ -312,41 +310,36 @@ so folding them into that consumer removes a `package.json` without a design deb
 A package with two consumers is a real boundary; these are candidates, in the order
 the count grows.
 
-| Package                      | Only consumer    |
-| ---------------------------- | ---------------- |
-| `@nexus/adaptive-scraper`    | `@nexus/api`     |
-| `@nexus/admin-gateway`       | `@nexus/api`     |
-| `@nexus/auth`                | `@nexus/api`     |
-| `@nexus/billing`             | `@nexus/api`     |
-| `@nexus/bots`                | `@nexus/api`     |
-| `@nexus/code-repl`           | `@nexus/api`     |
-| `@nexus/doc-pipeline`        | `@nexus/api`     |
-| `@nexus/escalation-breaker`  | `@nexus/api`     |
-| `@nexus/exec-policy`         | `@nexus/api`     |
-| `@nexus/feature-flags`       | `@nexus/api`     |
-| `@nexus/gateway`             | `@nexus/api`     |
-| `@nexus/gateway-log`         | `@nexus/api`     |
-| `@nexus/hooks`               | `@nexus/api`     |
-| `@nexus/kv`                  | `@nexus/api`     |
-| `@nexus/llm-accounts`        | `@nexus/api`     |
-| `@nexus/llm-cache`           | `@nexus/api`     |
-| `@nexus/llm-oauth`           | `@nexus/api`     |
-| `@nexus/llm-tracer`          | `@nexus/api`     |
-| `@nexus/llm-translate`       | `@nexus/gateway` |
-| `@nexus/mail-ingest`         | `@nexus/api`     |
-| `@nexus/mcp-openapi`         | `@nexus/api`     |
-| `@nexus/nlp-utils`           | `@nexus/api`     |
-| `@nexus/pipeline-signal`     | `@nexus/worker`  |
-| `@nexus/pty`                 | `@nexus/api`     |
-| `@nexus/researcher`          | `@nexus/api`     |
-| `@nexus/rlhf-pipeline`       | `@nexus/api`     |
-| `@nexus/scraping-mcp`        | `@nexus/api`     |
-| `@nexus/sdk`                 | `@nexus/api`     |
-| `@nexus/search-orchestrator` | `@nexus/api`     |
-| `@nexus/session-sync`        | `@nexus/api`     |
-| `@nexus/tool-registry`       | `@nexus/api`     |
-| `@nexus/trigger-engine`      | `@nexus/api`     |
-| `@nexus/worker`              | `@nexus/api`     |
+| Package                      | Only consumer   |
+| ---------------------------- | --------------- |
+| `@nexus/adaptive-scraper`    | `@nexus/api`    |
+| `@nexus/admin-gateway`       | `@nexus/api`    |
+| `@nexus/auth`                | `@nexus/api`    |
+| `@nexus/billing`             | `@nexus/api`    |
+| `@nexus/bots`                | `@nexus/api`    |
+| `@nexus/code-repl`           | `@nexus/api`    |
+| `@nexus/doc-pipeline`        | `@nexus/api`    |
+| `@nexus/exec-policy`         | `@nexus/api`    |
+| `@nexus/feature-flags`       | `@nexus/api`    |
+| `@nexus/gateway`             | `@nexus/api`    |
+| `@nexus/hooks`               | `@nexus/api`    |
+| `@nexus/kv`                  | `@nexus/api`    |
+| `@nexus/llm-accounts`        | `@nexus/api`    |
+| `@nexus/llm-cache`           | `@nexus/api`    |
+| `@nexus/llm-oauth`           | `@nexus/api`    |
+| `@nexus/llm-tracer`          | `@nexus/api`    |
+| `@nexus/mail-ingest`         | `@nexus/api`    |
+| `@nexus/mcp-openapi`         | `@nexus/api`    |
+| `@nexus/pipeline-signal`     | `@nexus/worker` |
+| `@nexus/pty`                 | `@nexus/api`    |
+| `@nexus/researcher`          | `@nexus/api`    |
+| `@nexus/rlhf-pipeline`       | `@nexus/api`    |
+| `@nexus/scraping-mcp`        | `@nexus/api`    |
+| `@nexus/sdk`                 | `@nexus/api`    |
+| `@nexus/search-orchestrator` | `@nexus/api`    |
+| `@nexus/session-sync`        | `@nexus/api`    |
+| `@nexus/trigger-engine`      | `@nexus/api`    |
+| `@nexus/worker`              | `@nexus/api`    |
 
 #### `apps/api/src/lib` by domain
 
@@ -356,13 +349,13 @@ list that may only shrink.
 
 | Domain         | Modules | What it is for                                   |
 | -------------- | ------- | ------------------------------------------------ |
-| `runtime`      | 14      | schedules work inside this process               |
-| `api-shape`    | 2       | defines the HTTP contract                        |
-| `storage`      | 18      | owns rows or files that outlive the process      |
-| `security`     | 23      | decides whether a caller may do something        |
+| `runtime`      | 18      | schedules work inside this process               |
+| `api-shape`    | 3       | defines the HTTP contract                        |
+| `storage`      | 21      | owns rows or files that outlive the process      |
+| `security`     | 27      | decides whether a caller may do something        |
 | `org`          | 21      | the company-of-agents surfaces                   |
-| `integrations` | 6       | speaks a protocol that is not ours               |
-| `models`       | 15      | talks to a model provider or routes between them |
+| `integrations` | 7       | speaks a protocol that is not ours               |
+| `models`       | 16      | talks to a model provider or routes between them |
 | `skills`       | 5       | imports, compresses or runs a skill              |
 
 <!-- end:generated layers -->

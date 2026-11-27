@@ -94,6 +94,12 @@ export interface LoopStepConfig<INPUT, DATA> {
   execute: (ctx: StepContext<INPUT, DATA>, item: unknown, index: number) => Promise<unknown>;
   /** Max iterations safety limit */
   maxIterations?: number;
+  /**
+   * Fold the per-item results into one value. Without it the loop's output is the array of results;
+   * the builder used to accept this option and drop it on the floor, so a step declared to return a
+   * single value returned an array at runtime.
+   */
+  reduce?: (results: unknown[]) => unknown;
 }
 
 export interface ParallelStepConfig<INPUT, DATA> {
@@ -218,9 +224,7 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
    * Iterates over items and executes a function for each.
    */
   andLoop<OUTPUT>(
-    config: LoopStepConfig<INPUT, DATA> & {
-      reduce?: (results: unknown[], item: unknown) => OUTPUT;
-    },
+    config: LoopStepConfig<INPUT, DATA> & { reduce?: (results: unknown[]) => OUTPUT },
   ): WorkflowChain<INPUT, OUTPUT, RESULT> {
     this.steps.push({ kind: "loop", config });
     return this as unknown as WorkflowChain<INPUT, OUTPUT, RESULT>;
@@ -263,10 +267,67 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
       suspended: new Set(),
     };
 
+    // Finally steps are pulled out of the sequence so they can run on both paths: the docstring promises
+    // "always executes, even on error" and the plain loop only ever reached the happy path.
+    const finallySteps = this.steps.filter((step) => step.kind === "finally");
+    const bodySteps = this.steps.filter((step) => step.kind !== "finally");
+
     const events: WorkflowEvent[] = [];
     const emit = (event: WorkflowEvent) => {
       events.push(event);
       this.emit(event);
+    };
+
+    const buildCtx = (stepId: string, data: unknown): StepContext<INPUT, unknown> => ({
+      data,
+      input,
+      state,
+      getStepOutput: <T = unknown>(id: string) => state.outputs[id] as T,
+      suspend: async (reason, suspendData) => {
+        state.suspended.add(stepId);
+        emit({
+          type: "workflow:suspend",
+          stepId,
+          data: { reason, suspendData },
+          timestamp: new Date().toISOString(),
+        });
+        throw new SuspendError(stepId, reason, suspendData);
+      },
+      resumeData: stepId === options?.resumeStepId ? options?.resumeData : undefined,
+      retryCount: 0,
+      signal: options?.signal,
+      emit,
+    });
+
+    /**
+     * Run the finally steps in declaration order. `swallow` is the error path: there, a failing cleanup
+     * is recorded and forgotten so it cannot mask the failure that caused it.
+     */
+    const runFinallySteps = async (data: unknown, swallow: boolean): Promise<unknown> => {
+      let current = data;
+      for (const step of finallySteps) {
+        const stepId = step.config.id;
+        emit({ type: "step:start", stepId, timestamp: new Date().toISOString() });
+        try {
+          current = await executeStep(step, buildCtx(stepId, current), current);
+          state.outputs[stepId] = current;
+          emit({
+            type: "step:complete",
+            stepId,
+            data: current,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (err) {
+          emit({
+            type: "step:error",
+            stepId,
+            data: { error: err instanceof Error ? err.message : String(err) },
+            timestamp: new Date().toISOString(),
+          });
+          if (!swallow) throw err;
+        }
+      }
+      return current;
     };
 
     // Completed steps with a compensate action; run in reverse on failure.
@@ -287,7 +348,7 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
     try {
       let data: unknown = input;
 
-      for (const step of this.steps) {
+      for (const step of bodySteps) {
         if (options?.signal?.aborted) {
           throw new Error("Workflow aborted");
         }
@@ -311,26 +372,7 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
           continue;
         }
 
-        const ctx: StepContext<INPUT, unknown> = {
-          data,
-          input,
-          state,
-          getStepOutput: <T = unknown>(id: string) => state.outputs[id] as T,
-          suspend: async (reason, suspendData) => {
-            state.suspended.add(stepId);
-            emit({
-              type: "workflow:suspend",
-              stepId,
-              data: { reason, suspendData },
-              timestamp: new Date().toISOString(),
-            });
-            throw new SuspendError(stepId, reason, suspendData);
-          },
-          resumeData: stepId === options?.resumeStepId ? options?.resumeData : undefined,
-          retryCount: 0,
-          signal: options?.signal,
-          emit,
-        };
+        const ctx: StepContext<INPUT, unknown> = buildCtx(stepId, data);
 
         emit({
           type: "step:start",
@@ -404,6 +446,8 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
         }
       }
 
+      data = await runFinallySteps(data, false);
+
       const result = data as RESULT;
       emit({
         type: "workflow:complete",
@@ -417,6 +461,10 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
         // Already handled above
         throw err;
       }
+
+      // Captured before the finally steps, which set their own currentStep: the report names the step
+      // that failed, not the cleanup that ran afterwards.
+      const failedStep = state.currentStep;
 
       // Saga compensation: undo completed steps in reverse order. A failing
       // compensation is recorded as an event but never masks the original error.
@@ -438,6 +486,10 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
         }
       }
 
+      // Cleanup runs after compensation, on the error path too, and cannot replace the original error.
+      // There is no surviving step data here, so a cleanup step gets `undefined` as its data.
+      await runFinallySteps(undefined, true);
+
       const error = err instanceof Error ? err.message : String(err);
       emit({
         type: "workflow:error",
@@ -448,7 +500,7 @@ class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
       return {
         status: "error",
         error,
-        stepId: state.currentStep,
+        stepId: failedStep,
         events,
       };
     }
@@ -497,7 +549,9 @@ async function executeStep<INPUT>(
         results.push(result);
       }
 
-      return results;
+      // A loop that hands back an array when the caller asked for one value is a step whose declared
+      // output type lies, so `reduce` is honoured here rather than accepted and ignored.
+      return step.config.reduce ? step.config.reduce(results) : results;
     }
 
     case "parallel": {

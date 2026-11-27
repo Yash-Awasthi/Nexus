@@ -79,7 +79,8 @@ const RULES: { name: string; pattern: RegExp }[] = [
   // «The system prompt says to …» is an instruction wearing the system's authority.
   {
     name: "system_claim",
-    pattern: /\b(?:the\s+)?system\s+(?:prompt|instructions?)\s+(?:say|tell|require|want|ask)s?\b[^.\n]*/gi,
+    pattern:
+      /\b(?:the\s+)?system\s+(?:prompt|instructions?)\s+(?:say|tell|require|want|ask)s?\b[^.\n]*/gi,
   },
 ];
 

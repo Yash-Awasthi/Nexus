@@ -1,5 +1,5 @@
 {
-  "$comment": "Milliseconds from importing apps/api/src/server.ts to a served GET /health, with DATABASE_URL=pglite://:memory: and nothing else configured, plus a cap on how many route lines may be registered. Measured by scripts/api-boot-budget.mjs; raising either number is a commit somebody justifies.",
-  "bootMs": 9000,
+  "$comment": "Milliseconds from importing apps/api/src/server.ts to a served GET /health, with DATABASE_URL=pglite://:memory: and nothing else configured, plus a cap on how many route lines may be registered. Measured by scripts/api-boot-budget.mjs, which boots five times in five child processes and enforces the FASTEST sample: another process can only slow a boot down, so the minimum measures the boot path and the maximum measures the machine. The boot path costs 6.9-7.3 s on a quiet 20-core Windows box. 15 000 ms leaves room for the worst pollution observed there (single boots read 7.3 / 9.7 / 11.5 / 12.5 s with nothing in the boot path changed, while a VM held ~7 GB), because a budget that is red on arrival is a budget that gets deleted — and the failure it is aimed at (a module that awaits a socket or a download while registering) costs seconds, not milliseconds. The route cap below is the precise half of this gate. Raising either number is a commit somebody justifies.",
+  "bootMs": 15000,
   "maxRoutes": 450
 }

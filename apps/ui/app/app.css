@@ -93,8 +93,13 @@
   --accent: oklch(0.95 0.012 268);
   --accent-foreground: oklch(0.25 0.03 268);
   --destructive: oklch(0.58 0.22 25);
-  --success: oklch(0.56 0.14 155);
-  --warning: oklch(0.7 0.15 70);
+  /* Tinted banner surfaces: a destructive or success message needs a background that is
+     recognisably itself without becoming the text colour. */
+  --destructive-surface: oklch(0.96 0.03 25);
+  --success-surface: oklch(0.96 0.03 155);
+  --warning-surface: oklch(0.97 0.03 85);
+  --success: oklch(0.52 0.14 155);
+  --warning: oklch(0.55 0.15 70);
   --border: oklch(0.91 0.005 265);
   --input: oklch(0.89 0.006 265);
   --ring: oklch(0.52 0.2 268);
@@ -103,6 +108,20 @@
   --chart-3: oklch(0.66 0.15 150);
   --chart-4: oklch(0.72 0.15 70);
   --chart-5: oklch(0.6 0.2 20);
+  /*
+   * Categorical hues: the identity colours for entity types, provider glyphs and landing-scene
+   * speakers. They exist as tokens because the alternative is a literal in a component, which is
+   * exactly what the token rule forbids — and because a category colour must not change when the
+   * theme does. Same hue in both themes, tuned lightness for each.
+   */
+  --cat-1: oklch(0.55 0.18 275);
+  --cat-2: oklch(0.68 0.12 210);
+  --cat-3: oklch(0.68 0.14 155);
+  --cat-4: oklch(0.62 0.2 300);
+  --cat-5: oklch(0.66 0.18 355);
+  --cat-6: oklch(0.72 0.15 85);
+  --cat-7: oklch(0.6 0.16 25);
+  --cat-8: oklch(0.58 0.03 265);
   --radius: 0.5rem;
   --sidebar: oklch(0.975 0.003 265);
   --sidebar-foreground: oklch(0.3 0.012 265);
@@ -130,6 +149,9 @@
   --accent: oklch(0.25 0.02 270);
   --accent-foreground: oklch(0.93 0.01 270);
   --destructive: oklch(0.68 0.19 22);
+  --destructive-surface: oklch(0.28 0.06 22);
+  --success-surface: oklch(0.28 0.05 155);
+  --warning-surface: oklch(0.3 0.06 80);
   --success: oklch(0.72 0.15 155);
   --warning: oklch(0.8 0.14 75);
   --border: oklch(0.27 0.007 265);
@@ -140,6 +162,14 @@
   --chart-3: oklch(0.74 0.14 150);
   --chart-4: oklch(0.8 0.14 75);
   --chart-5: oklch(0.7 0.18 20);
+  --cat-1: oklch(0.7 0.16 275);
+  --cat-2: oklch(0.78 0.11 205);
+  --cat-3: oklch(0.8 0.13 155);
+  --cat-4: oklch(0.74 0.18 300);
+  --cat-5: oklch(0.76 0.15 355);
+  --cat-6: oklch(0.84 0.14 85);
+  --cat-7: oklch(0.72 0.15 25);
+  --cat-8: oklch(0.68 0.025 265);
   --sidebar: oklch(0.135 0.006 265);
   --sidebar-foreground: oklch(0.8 0.008 265);
   --sidebar-primary: oklch(0.68 0.16 270);
@@ -154,6 +184,15 @@
   --font-sans: "Inter Variable", sans-serif;
   --font-display: "Instrument Serif", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  /*
+   * The small end of the type scale. These exist because the UI needs labels smaller than 12px
+   * and `text-[10px]` is a literal; with named steps the sizes are decided once, and the token
+   * check can refuse the next arbitrary one. No line-height is set, matching the utilities they
+   * replace — a line-height here would silently reflow every label.
+   */
+  --text-4xs: 0.5625rem;
+  --text-3xs: 0.625rem;
+  --text-2xs: 0.6875rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -170,6 +209,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-warning-surface: var(--warning-surface);
   --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -277,6 +317,24 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-marquee {
     animation: none !important;
+  }
+
+  /* Asked not to move is asked not to move: entrance animations, skeleton pulses and transitions all
+     collapse to a single instant frame. A spinner is the one exception — it reports that work is
+     happening, and freezing it turns "wait" into "broken". */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 0.9s !important;
+    animation-iteration-count: infinite !important;
+    animation-timing-function: linear !important;
   }
 }
 

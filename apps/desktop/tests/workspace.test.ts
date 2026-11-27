@@ -22,7 +22,7 @@ import {
   saveWorkspace,
   workspaceEnv,
   workspaceProblem,
-} from "../src/workspace.ts";
+} from "../src/workspace";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "nexus-workspace-"));
 

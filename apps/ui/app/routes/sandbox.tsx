@@ -30,8 +30,9 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 
-import { Page, PageHeader } from "~/components/page";
 import { CoachMark } from "~/components/coach-mark";
+import { Page, PageHeader } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -543,12 +544,7 @@ export default function Sandbox() {
 
       <CoachMark page="/sandbox" />
 
-      {err && (
-        <p className="text-destructive text-sm flex items-center gap-2">
-          <XCircle className="w-4 h-4" />
-          {err}
-        </p>
-      )}
+      {err && <PageError title="The sandbox could not answer" message={err} />}
 
       {/* ── Execute Tab ── */}
       {tab === "execute" && (
@@ -568,11 +564,15 @@ export default function Sandbox() {
                       ? sandboxStatus.languages
                       : ["javascript", "python"]
                     ).map((l) => (
-                      <SelectItem key={l}
-                        value={l} className="capitalize" title={sandboxStatus?.runtimes?.find((r) => r.language === l)?.pin}>
+                      <SelectItem
+                        key={l}
+                        value={l}
+                        className="capitalize"
+                        title={sandboxStatus?.runtimes?.find((r) => r.language === l)?.pin}
+                      >
                         {l}
                         {runtimeVersion(l) ? (
-                          <span className="ml-1.5 text-[10px] text-muted-foreground">
+                          <span className="ml-1.5 text-3xs text-muted-foreground">
                             {runtimeVersion(l)}
                           </span>
                         ) : null}
@@ -698,7 +698,8 @@ export default function Sandbox() {
                         className="text-xs text-muted-foreground font-mono"
                         title={`CPU ${result.resources.cpuMs} ms, peak memory sampled (${result.resources.method})`}
                       >
-                        cpu {result.resources.cpuMs}ms · peak {formatBytes(result.resources.peakRssBytes)}
+                        cpu {result.resources.cpuMs}ms · peak{" "}
+                        {formatBytes(result.resources.peakRssBytes)}
                       </span>
                     )}
                     {result.truncated && (

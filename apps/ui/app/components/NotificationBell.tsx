@@ -57,7 +57,7 @@ export function NotificationBell() {
         <Bell className="size-3.5" />
         {unread > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground"
+            className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full bg-destructive text-4xs font-bold text-destructive-foreground"
             style={{ minWidth: "14px", height: "14px", padding: "0 2px" }}
           >
             {unread > 9 ? "9+" : unread}
@@ -72,7 +72,7 @@ export function NotificationBell() {
             {items.length > 0 && (
               <button
                 onClick={() => void dismissAll()}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-3xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Dismiss all
               </button>
@@ -106,11 +106,11 @@ export function NotificationBell() {
                       {n.title}
                     </p>
                     {n.message && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                      <p className="text-3xs text-muted-foreground mt-0.5 line-clamp-2">
                         {n.message}
                       </p>
                     )}
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                    <p className="text-3xs text-muted-foreground/60 mt-1">
                       {new Date(n.createdAt).toLocaleString()}
                     </p>
                   </div>

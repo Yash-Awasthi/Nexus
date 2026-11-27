@@ -3,6 +3,7 @@
 
 import type { FastifyInstance } from "fastify";
 
+import { emitAuditEvent } from "../lib/audit-emitter.ts";
 import {
   cancelApproval,
   decide,
@@ -41,13 +42,41 @@ export async function orgGovernanceRoutes(app: FastifyInstance): Promise<void> {
     orgReply(reply, () => budgetOverview(ownerOf(request), request.params.id)),
   );
 
-  app.put<Id & { Body: PolicyInput }>("/org/companies/:id/budgets", async (request, reply) =>
-    orgReply(reply, () => upsertPolicy(ownerOf(request), request.params.id, request.body ?? {})),
-  );
+  app.put<Id & { Body: PolicyInput }>("/org/companies/:id/budgets", async (request, reply) => {
+    const response = await orgReply(reply, () =>
+      upsertPolicy(ownerOf(request), request.params.id, request.body ?? {}),
+    );
+    // A budget change moves the stop line for real spend, so it is evidence rather than a preference.
+    void emitAuditEvent(
+      {
+        entityType: "budget_policy",
+        entityId: request.params.id,
+        action: "budget.policy_set",
+        actor: ownerOf(request),
+        payload: { companyId: request.params.id, policy: request.body ?? {} },
+      },
+      request.log,
+    );
+    return response;
+  });
 
-  app.delete<Id>("/org/budgets/:id", async (request, reply) =>
-    orgReply(reply, () => deletePolicy(ownerOf(request), request.params.id)),
-  );
+  app.delete<Id>("/org/budgets/:id", async (request, reply) => {
+    const response = await orgReply(reply, () => {
+      deletePolicy(ownerOf(request), request.params.id);
+      return { ok: true };
+    });
+    void emitAuditEvent(
+      {
+        entityType: "budget_policy",
+        entityId: request.params.id,
+        action: "budget.policy_deleted",
+        actor: ownerOf(request),
+        payload: { policyId: request.params.id },
+      },
+      request.log,
+    );
+    return response;
+  });
 
   app.post<Id & { Body: { action?: string; amountUsd?: number } }>(
     "/org/budget-incidents/:id/resolve",

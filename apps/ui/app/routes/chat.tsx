@@ -33,14 +33,6 @@ import { SendToCompany } from "~/components/org/SendToCompany";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
-  canQueueOffline,
-  isNetworkFailure,
-  offlineNotice,
-  queueOffline,
-  queuedInsteadOfFailed,
-  readOfflineState,
-} from "~/lib/offline-notice";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -92,6 +84,14 @@ import {
 import { dictationSupported, startDictation } from "~/lib/dictation";
 import { hostCan, hostInvoke, hostOn } from "~/lib/host";
 import { Markdown } from "~/lib/markdown";
+import {
+  canQueueOffline,
+  isNetworkFailure,
+  offlineNotice,
+  queueOffline,
+  queuedInsteadOfFailed,
+  readOfflineState,
+} from "~/lib/offline-notice";
 import { opinionParts, verdictParts } from "~/lib/opinion";
 import { applySTM, loadActiveSTM, saveActiveSTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 import { cn } from "~/lib/utils";
@@ -611,7 +611,7 @@ export default function Chat() {
           </h1>
           {queued > 0 && (
             <span
-              className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+              className="shrink-0 rounded-full border px-2 py-0.5 text-2xs text-muted-foreground"
               title={offlineNotice(queued)}
             >
               {queued} queued
@@ -940,7 +940,11 @@ function ThreadList({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {shown.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            data-state="empty"
+            className="px-2 py-6 text-center text-xs text-muted-foreground"
+          >
             {query.trim() ? "No deliberation matches." : "Your deliberations will appear here."}
           </p>
         ) : (
@@ -1312,7 +1316,7 @@ function MemberCard({
             {opinionParts(text).map((part, i) => (
               <div key={i} className="space-y-2">
                 {i > 0 && (
-                  <p className="flex items-center gap-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  <p className="flex items-center gap-2 text-2xs font-medium tracking-wide text-muted-foreground uppercase">
                     <span className="h-px flex-1 bg-border" /> After reading the others
                     <span className="h-px flex-1 bg-border" />
                   </p>
@@ -1320,7 +1324,7 @@ function MemberCard({
                 {part.body && <Markdown text={part.body} />}
                 {part.final && (
                   <div className="rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2">
-                    <p className="text-[11px] font-medium tracking-wide text-primary uppercase">
+                    <p className="text-2xs font-medium tracking-wide text-primary uppercase">
                       Final position
                     </p>
                     <Markdown text={part.final} />
@@ -1357,7 +1361,7 @@ function MemberStack({ members }: { members: CouncilMember[] }) {
         <span
           key={m.id}
           className={cn(
-            "flex size-5 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-card",
+            "flex size-5 items-center justify-center rounded-full text-3xs font-semibold text-white ring-2 ring-card",
             SWATCH[i % SWATCH.length],
           )}
         >

@@ -96,7 +96,10 @@
    */
   async function attachPage(chrome, tabId) {
     if (!chrome || !chrome.scripting || typeof tabId !== "number") return null;
-    var results = await chrome.scripting.executeScript({ target: { tabId: tabId }, func: captureFunc });
+    var results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: captureFunc,
+    });
     var hit = Array.isArray(results) ? results[0] : null;
     return pageFrom(hit && hit.result);
   }

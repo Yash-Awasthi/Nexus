@@ -305,9 +305,7 @@ describe("through the real ingest path", () => {
     if (stored?.text) expect(stored.text).toBe(hostile.text);
 
     // What the model would see is safe.
-    const prompt = sourcesPrompt(
-      numberSources([chunkOf(0, stored?.text ?? hostile.text)]),
-    );
+    const prompt = sourcesPrompt(numberSources([chunkOf(0, stored?.text ?? hostile.text)]));
     expect(prompt).not.toContain(hostile.mustGo);
     expect(prompt).toContain(REMOVED);
     expect(prompt).toContain(UNTRUSTED_NOTE);

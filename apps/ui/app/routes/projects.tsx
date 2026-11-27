@@ -218,7 +218,10 @@ export default function ProjectsPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       {error && (
-        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+        <div
+          role="alert"
+          className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2"
+        >
           {error}
           <button onClick={() => setError(null)} className="font-bold">
             ✕

@@ -215,7 +215,7 @@ export default function Discussion() {
                   type="button"
                   onClick={() => setMaxContributions(n)}
                   disabled={running}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium border transition-colors ${
+                  className={`px-2 py-0.5 rounded-md text-2xs font-medium border transition-colors ${
                     maxContributions === n
                       ? "bg-primary text-primary-foreground border-primary"
                       : "border-border text-muted-foreground hover:text-foreground"
@@ -259,7 +259,7 @@ export default function Discussion() {
               <>
                 <span>Participants:</span>
                 {members.map((m) => (
-                  <Badge key={m.id ?? m.label} variant="outline" className="text-[10px]">
+                  <Badge key={m.id ?? m.label} variant="outline" className="text-3xs">
                     {m.label}
                   </Badge>
                 ))}
@@ -298,11 +298,11 @@ export default function Discussion() {
                   entry.kind === "digest" ? "border-primary/30 bg-primary/5" : "border-border"
                 }`}
               >
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-1.5">
+                <div className="flex items-center gap-2 text-2xs text-muted-foreground mb-1.5">
                   <span className="font-mono">L{entry.line}</span>
                   <span className="font-medium text-foreground">{entry.author}</span>
                   {entry.kind === "digest" && (
-                    <Badge variant="outline" className="text-[10px] h-4 px-1">
+                    <Badge variant="outline" className="text-3xs h-4 px-1">
                       record
                     </Badge>
                   )}

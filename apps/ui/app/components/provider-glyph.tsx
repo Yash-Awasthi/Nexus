@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { CATEGORY_COLORS } from "~/lib/tokens";
 import { cn } from "~/lib/utils";
 
 /**
@@ -13,34 +14,17 @@ import { cn } from "~/lib/utils";
  * reload.
  */
 
-/** Twelve hues that keep their contrast against both the light and dark surfaces. */
-const HUES = [
-  "#7c83ff",
-  "#3fd0e0",
-  "#6ee7a8",
-  "#c084fc",
-  "#fbbf24",
-  "#f472b6",
-  "#60a5fa",
-  "#34d399",
-  "#fb923c",
-  "#a78bfa",
-  "#2dd4bf",
-  "#f87171",
-];
+/**
+ * The categorical tokens, in order. They live in `app.css` rather than here so the same eight hues
+ * are available to a graph, a chart legend and a glyph — and so the theme can tune them once.
+ */
+const HUES: string[] = [...CATEGORY_COLORS];
 
 /** Stable per name: `openai` is always the same hue, and hashing never touches the clock. */
 export function hueFor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
   return HUES[Math.abs(hash) % HUES.length]!;
-}
-
-/** `openai:gpt-4o` → `gpt-4o`, `anthropic/claude` → `claude`: the mark names the model, not the vendor. */
-function modelLetter(model: string): string {
-  const tail = model.includes(":") ? model.split(":").pop()! : model.split("/").pop()!;
-  const first = (tail.match(/[a-z0-9]/i)?.[0] ?? model.match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase();
-  return first;
 }
 
 export function ProviderGlyph({
@@ -72,7 +56,7 @@ export function ProviderGlyph({
       }}
       title={name}
     >
-      {(text.match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase()}
+      {(/[a-z0-9]/i.exec(text)?.[0] ?? "?").toUpperCase()}
     </span>
   );
 }
@@ -96,6 +80,3 @@ export function ModelGlyph({
     />
   );
 }
-
-/** Kept for the one caller that wants the initial of a model id rather than a chip. */
-export { modelLetter };

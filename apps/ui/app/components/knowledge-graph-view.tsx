@@ -5,15 +5,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphEdge, GraphHandle, GraphNode } from "~/components/graph-3d";
 import { Button } from "~/components/ui/button";
 import { apiFetch } from "~/lib/api";
+import { CATEGORY_COLORS } from "~/lib/tokens";
 
+/**
+ * Entity type -> its categorical token. Seven types, seven slots, so two types never share a hue
+ * and a new type appends rather than shifting every existing colour.
+ */
 const LEGEND: [string, string, string][] = [
-  ["PERSON", "People", "#7c83ff"],
-  ["ORG", "Organisations", "#3fd0e0"],
-  ["LOCATION", "Places", "#6ee7a8"],
-  ["PRODUCT", "Products", "#c084fc"],
-  ["EVENT", "Events", "#f472b6"],
-  ["DATE", "Dates", "#fbbf24"],
-  ["OTHER", "Other", "#9aa0b4"],
+  ["PERSON", "People", CATEGORY_COLORS[0]!],
+  ["ORG", "Organisations", CATEGORY_COLORS[1]!],
+  ["LOCATION", "Places", CATEGORY_COLORS[2]!],
+  ["PRODUCT", "Products", CATEGORY_COLORS[3]!],
+  ["EVENT", "Events", CATEGORY_COLORS[4]!],
+  ["DATE", "Dates", CATEGORY_COLORS[5]!],
+  ["OTHER", "Other", CATEGORY_COLORS[7]!],
 ];
 
 interface Drawn {

@@ -47,7 +47,8 @@ test("a fresh install signs up, works, and keeps it all across a restart", async
 
   // First launch: no account yet, so the app asks for one instead of showing a guest.
   await expect(page).toHaveURL(/\/login$/, { timeout: 60_000 });
-  await page.waitForLoadState("networkidle");
+  // No `networkidle` here: the signed-in shell holds a stream open for the life of the tab, so that wait can
+  // never pass, and the click below already waits for the link to be actionable.
   await page.getByRole("link", { name: "Create an account" }).click();
   // The register chunk loads before the route changes; the login form has #email too.
   await page.getByRole("heading", { name: "Create your account" }).waitFor();

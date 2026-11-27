@@ -138,7 +138,11 @@ if (invokedDirectly) {
   if (argv.includes("--json")) {
     console.log(
       JSON.stringify(
-        rows.map(([route, c]) => ({ route, gzipKb: Math.round(c.gzipBytes / 1024), rawKb: Math.round(c.rawBytes / 1024) })),
+        rows.map(([route, c]) => ({
+          route,
+          gzipKb: Math.round(c.gzipBytes / 1024),
+          rawKb: Math.round(c.rawBytes / 1024),
+        })),
         null,
         2,
       ),
@@ -153,7 +157,9 @@ if (invokedDirectly) {
       const { gzipKb, limit, problems } = judgeRoute(route, closure, budget);
       const over = problems.filter((p) => p.kind === "over-budget");
       const mark = problems.length ? "✖" : "✔";
-      console.log(`${mark} ${route.padEnd(26)} ${String(Math.round(gzipKb)).padStart(5)} kB / ${limit} kB`);
+      console.log(
+        `${mark} ${route.padEnd(26)} ${String(Math.round(gzipKb)).padStart(5)} kB / ${limit} kB`,
+      );
       for (const problem of problems) {
         console.log(`    ${problem.message}`);
       }
@@ -162,7 +168,8 @@ if (invokedDirectly) {
         const biggest = [...closure.files]
           .map((file) => ({ file, ...sizedReader(BUILD)(file) }))
           .sort((a, b) => b.gzip - a.gzip)[0];
-        if (biggest) console.log(`    largest: ${biggest.file} (${Math.round(biggest.gzip / 1024)} kB)`);
+        if (biggest)
+          console.log(`    largest: ${biggest.file} (${Math.round(biggest.gzip / 1024)} kB)`);
       }
       if (problems.length) failed++;
     }

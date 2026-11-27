@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** A floor that can be lowered silently is not a floor: the arithmetic is the guarantee. */
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { belowFloor, byPackage, ratchet, unmeasured, unrecorded } from "./coverage-floors.mjs";
@@ -97,4 +98,15 @@ test("a package measured for the first time gets a floor", () => {
 test("a measured package with no floor is named", () => {
   const measured = { "packages/llm": {}, "packages/new": {} };
   assert.deepEqual(unrecorded(measured, { "packages/llm": { lines: 1 } }), ["packages/new"]);
+});
+
+/**
+ * A floor for a package that no longer exists is the quiet version of a lowered floor: the check
+ * reports it as "recorded, not measured", nobody reads that line, and the file slowly becomes a
+ * list of history. Folding four single-consumer packages is exactly how that starts.
+ */
+test("every floor names a workspace package that still exists", () => {
+  const floors = JSON.parse(readFileSync(".github/coverage-floors.json", "utf8"));
+  const gone = Object.keys(floors).filter((key) => !existsSync(key));
+  assert.deepEqual(gone, [], `floors for packages that are gone: ${gone.join(", ")}`);
 });

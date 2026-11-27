@@ -230,7 +230,7 @@ export default function MemoryPage() {
             <div className="flex flex-wrap items-center gap-1 text-xs">
               <span className="text-muted-foreground">Related entities:</span>
               {related.map((name) => (
-                <Badge key={name} variant="secondary" className="text-[10px] font-normal">
+                <Badge key={name} variant="secondary" className="text-3xs font-normal">
                   {name}
                 </Badge>
               ))}
@@ -254,12 +254,12 @@ export default function MemoryPage() {
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="text-xs text-muted-foreground">{day(entry.createdAt)}</span>
                       {typeof entry.metadata?.category === "string" && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-3xs">
                           {entry.metadata.category}
                         </Badge>
                       )}
                       {entry.score !== undefined && (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-3xs">
                           {Math.round(entry.score * 100)}% match
                         </Badge>
                       )}

@@ -9,29 +9,29 @@ go build -o bin/mcp-bridge ./cmd/mcp-bridge
 VB_URL=http://127.0.0.1:4100 VB_CHANNEL=sprint-6 ./bin/mcp-bridge
 ```
 
-| Variable                     | Default                 | Meaning                                              |
-| ---------------------------- | ----------------------- | ---------------------------------------------------- |
-| `VB_URL`                     | `http://127.0.0.1:4100` | The broker to talk to.                               |
-| `VB_CHANNEL`                 | `default`               | The board this bridge acts on.                       |
-| `OPEN_BOARD_MCP_READ_ONLY`   | unset                   | `1` refuses every write, before any approval step.   |
+| Variable                   | Default                 | Meaning                                            |
+| -------------------------- | ----------------------- | -------------------------------------------------- |
+| `VB_URL`                   | `http://127.0.0.1:4100` | The broker to talk to.                             |
+| `VB_CHANNEL`               | `default`               | The board this bridge acts on.                     |
+| `OPEN_BOARD_MCP_READ_ONLY` | unset                   | `1` refuses every write, before any approval step. |
 
 ## Tools
 
 Read tools never need approval. Write tools do, every time.
 
-| Tool            | Kind  | What it does                                                                 |
-| --------------- | ----- | ---------------------------------------------------------------------------- |
+| Tool            | Kind  | What it does                                                                  |
+| --------------- | ----- | ----------------------------------------------------------------------------- |
 | `board_threads` | read  | Threads with their message counts.                                            |
-| `board_tail`    | read  | A thread's messages after a cursor.                                          |
+| `board_tail`    | read  | A thread's messages after a cursor.                                           |
 | `board_inbox`   | read  | Messages mentioning you or `@all`; `peek` reads without advancing the cursor. |
-| `board_tasks`   | read  | Tasks, filtered by thread or state.                                          |
-| `board_agents`  | read  | Registered agents and their states.                                          |
-| `board_slice`   | read  | A local file's slice by line range or symbol name.                           |
-| `board_post`    | write | Post a message; a status verb also performs its effect.                      |
-| `board_claim`   | write | Take a lease on a task.                                                      |
-| `board_done`    | write | Complete a task you hold.                                                    |
-| `board_lock`    | write | Take a file lock before editing.                                             |
-| `board_unlock`  | write | Release a file lock you hold.                                                |
+| `board_tasks`   | read  | Tasks, filtered by thread or state.                                           |
+| `board_agents`  | read  | Registered agents and their states.                                           |
+| `board_slice`   | read  | A local file's slice by line range or symbol name.                            |
+| `board_post`    | write | Post a message; a status verb also performs its effect.                       |
+| `board_claim`   | write | Take a lease on a task.                                                       |
+| `board_done`    | write | Complete a task you hold.                                                     |
+| `board_lock`    | write | Take a file lock before editing.                                              |
+| `board_unlock`  | write | Release a file lock you hold.                                                 |
 
 The list is the policy: `pkg/mcp.WriteTools` names the writes, `tools/list` annotates each tool
 with `readOnlyHint`/`destructiveHint` from that same list, and a test fails if a write tool is

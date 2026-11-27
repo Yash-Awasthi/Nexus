@@ -19,7 +19,6 @@
 import {
   DollarSign,
   RefreshCw,
-  Loader2,
   BarChart2,
   Zap,
   TrendingUp,
@@ -30,6 +29,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CoachMark } from "~/components/coach-mark";
 import { Page, PageHeader } from "~/components/page";
+import { InlineEmpty, PageError, PageLoading } from "~/components/states";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -216,18 +216,16 @@ export default function Costs() {
       />
       <CoachMark page="/costs" />
       {loading && !dashboard ? (
-        <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Loading cost data…
-        </div>
+        // A skeleton of the page that is coming, not a spinner over nothing: the rows below are the shape the
+        // totals and the breakdown will take.
+        <PageLoading label="Loading cost data…" rows={5} />
       ) : !dashboard ? (
         // A failed load (e.g. expired session) must never render $0.00 as if real.
-        <div className="py-12 text-center space-y-3">
-          <p className="text-destructive text-sm">{err || "Could not load cost data"}</p>
-          <Button variant="outline" size="sm" onClick={loadAll}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Retry
-          </Button>
-        </div>
+        <PageError
+          title="Could not load cost data"
+          message={err ?? undefined}
+          onRetry={() => void loadAll()}
+        />
       ) : nothingRecorded(dashboard) ? (
         <Card data-testid="costs-empty">
           <CardContent className="py-12 text-center space-y-2">
@@ -346,11 +344,7 @@ export default function Costs() {
             {/* By Model */}
             <TabsContent value="breakdown" className="mt-4">
               {!breakdown || !breakdown.breakdown.length ? (
-                <Card>
-                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
-                    No model breakdown data
-                  </CardContent>
-                </Card>
+                <InlineEmpty>No model breakdown data</InlineEmpty>
               ) : (
                 <Card>
                   <CardContent className="pt-4 space-y-3">
@@ -382,11 +376,7 @@ export default function Costs() {
             {/* By Provider */}
             <TabsContent value="providers" className="mt-4">
               {!providers.length ? (
-                <Card>
-                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
-                    No provider cost data
-                  </CardContent>
-                </Card>
+                <InlineEmpty>No provider cost data</InlineEmpty>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-3">
                   {providers.map((p) => (

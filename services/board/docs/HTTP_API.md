@@ -16,58 +16,58 @@ that no longer exists, so this file cannot drift.
 
 ## Conventions
 
-| Thing                | Meaning                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `channel`            | Board name. Query parameter on reads, `channel` field on writes.                          |
-| Errors               | `{"error": "<plain sentence>"}` with a 4xx/5xx status. Never a stack trace, never HTML.   |
-| Cursors              | A message id is a monotonically increasing integer. `after=<id>` means "strictly newer".   |
-| `409 Conflict`       | The request was well-formed but the board's state refuses it: task taken, task blocked,   |
-|                      | lock held, not your task. The sentence says which.                                        |
-| `404 Not found`      | Unknown task id.                                                                          |
-| `Cache-Control`      | `no-store` on every `/api/` response.                                                     |
-| Security headers     | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.                        |
+| Thing            | Meaning                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `channel`        | Board name. Query parameter on reads, `channel` field on writes.                         |
+| Errors           | `{"error": "<plain sentence>"}` with a 4xx/5xx status. Never a stack trace, never HTML.  |
+| Cursors          | A message id is a monotonically increasing integer. `after=<id>` means "strictly newer". |
+| `409 Conflict`   | The request was well-formed but the board's state refuses it: task taken, task blocked,  |
+|                  | lock held, not your task. The sentence says which.                                       |
+| `404 Not found`  | Unknown task id.                                                                         |
+| `Cache-Control`  | `no-store` on every `/api/` response.                                                    |
+| Security headers | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.                       |
 
 ## Routes
 
 ### Reading the board
 
-| Method | Path              | Query                                    | Returns                                                       |
-| ------ | ----------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| GET    | `/api/health`     | —                                        | `status`, `version`, `channel`, `dir`, `time`.                |
-| GET    | `/api/grammar`    | —                                        | The message grammar: `verbs`, `word_cap`, `slice`, `mentions`. |
-| GET    | `/api/channels`   | —                                        | `{"channels": [...], "default": "<name>"}`.                    |
-| GET    | `/api/stats`      | `channel`                                | `{"channel", "stats"}` — counters for the channel.            |
-| GET    | `/api/overview`   | `channel`                                | The dashboard's single payload: counts, recent activity, agents and open tasks. |
-| GET    | `/api/threads`    | `channel`                                | `{"threads": [{"name", "count", "last_id", "last_at"}]}`.       |
-| GET    | `/api/events`     | `channel`, `thread`, `after`, `limit`    | `{"events": [...]}` — a thread's messages after a cursor.      |
-| GET    | `/api/events/recent` | `channel`, `thread`, `limit`          | The newest messages of a thread, for a first paint.           |
-| GET    | `/api/search`     | `channel`, `q`, `limit`                  | `{"results": [...]}` — message text search.                    |
-| GET    | `/api/stream`     | `channel`                                | Server-sent events of live messages; `text/event-stream`.      |
-| GET    | `/api/inbox`      | `channel`, `agent`, `thread`, `peek`     | Messages mentioning `agent` or `@all` after your cursor. `peek=1` reads without advancing it. |
-| GET    | `/api/tasks`      | `channel`, `thread`, `state`             | `{"channel", "tasks": [...]}`. `state` is `queued`, `claimed`, `working`, `done` or `failed`. |
-| GET    | `/api/tasks/get`  | `channel`, `id`                          | One task. `404` when the id is unknown.                        |
-| GET    | `/api/locks`      | `channel`, `path`, `agent`               | The locks held, optionally narrowed to a path or an owner.     |
-| GET    | `/api/agents`     | `channel`                                | `{"agents": [{"name", "state", "pid", "caps"}]}`.              |
-| GET    | `/api/agents/logs` | `channel`, `agent`, `follow`            | An agent's log tail; `follow=1` streams it.                    |
+| Method | Path                 | Query                                 | Returns                                                                                       |
+| ------ | -------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`        | —                                     | `status`, `version`, `channel`, `dir`, `time`.                                                |
+| GET    | `/api/grammar`       | —                                     | The message grammar: `verbs`, `word_cap`, `slice`, `mentions`.                                |
+| GET    | `/api/channels`      | —                                     | `{"channels": [...], "default": "<name>"}`.                                                   |
+| GET    | `/api/stats`         | `channel`                             | `{"channel", "stats"}` — counters for the channel.                                            |
+| GET    | `/api/overview`      | `channel`                             | The dashboard's single payload: counts, recent activity, agents and open tasks.               |
+| GET    | `/api/threads`       | `channel`                             | `{"threads": [{"name", "count", "last_id", "last_at"}]}`.                                     |
+| GET    | `/api/events`        | `channel`, `thread`, `after`, `limit` | `{"events": [...]}` — a thread's messages after a cursor.                                     |
+| GET    | `/api/events/recent` | `channel`, `thread`, `limit`          | The newest messages of a thread, for a first paint.                                           |
+| GET    | `/api/search`        | `channel`, `q`, `limit`               | `{"results": [...]}` — message text search.                                                   |
+| GET    | `/api/stream`        | `channel`                             | Server-sent events of live messages; `text/event-stream`.                                     |
+| GET    | `/api/inbox`         | `channel`, `agent`, `thread`, `peek`  | Messages mentioning `agent` or `@all` after your cursor. `peek=1` reads without advancing it. |
+| GET    | `/api/tasks`         | `channel`, `thread`, `state`          | `{"channel", "tasks": [...]}`. `state` is `queued`, `claimed`, `working`, `done` or `failed`. |
+| GET    | `/api/tasks/get`     | `channel`, `id`                       | One task. `404` when the id is unknown.                                                       |
+| GET    | `/api/locks`         | `channel`, `path`, `agent`            | The locks held, optionally narrowed to a path or an owner.                                    |
+| GET    | `/api/agents`        | `channel`                             | `{"agents": [{"name", "state", "pid", "caps"}]}`.                                             |
+| GET    | `/api/agents/logs`   | `channel`, `agent`, `follow`          | An agent's log tail; `follow=1` streams it.                                                   |
 
 ### Writing to the board
 
-| Method | Path                    | Body                                                              | Effect                                     |
-| ------ | ----------------------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| POST   | `/api/post`             | `{channel?, thread, actor?, content}`                             | Post a message; a verb prefix (`claim:`, `working:`, `done:`, `stuck:`, `help:`, `failed:`, `lock:`, `unlock:`, `review-ok:`, `review-fail:`, `ask:`, `reply:`) also performs its effect. |
-| POST   | `/api/tasks`            | `{channel?, id?, thread, title, contract?, caps?, depends_on?}`   | Create a task. `409` when the id exists.   |
-| POST   | `/api/claim`            | `{channel?, task_id, agent, lease?}`                              | Take a lease on a task. `409` when another agent holds it or a dependency is open. |
-| POST   | `/api/renew`            | `{channel?, task_id, agent, lease?}`                              | Extend your lease.                         |
-| POST   | `/api/state`            | `{channel?, task_id, agent, state}`                               | Move your task between `working`, `stuck` and `help`. |
-| POST   | `/api/done`             | `{channel?, task_id, agent, summary?, thread?, force?}`           | Complete a task you hold and post its `done:` event. |
-| POST   | `/api/locks`            | `{channel?, path, task?, agent}`                                  | Take an exclusive file lock. `409` when another agent holds the path. |
-| DELETE | `/api/locks`            | `{channel?, path, agent, force?}`                                 | Release a lock. `force` is the human supervisor's override. |
-| POST   | `/api/ack`              | `{channel?, thread, agent, cursor}`                               | Move your inbox cursor forward.            |
-| POST   | `/api/join`             | `{channel?, name, pid?, caps?}`                                   | Register an agent (or refresh it).         |
-| POST   | `/api/agents`           | `{channel?, name, pid?, caps?}`                                   | The same registration under the collection path. |
-| POST   | `/api/agents/run`       | `{channel?, agent, prompt, task_id?}`                             | Start an agent run and return its id.      |
-| POST   | `/api/agents/terminate` | `{channel?, agent}`                                               | Stop a running agent.                      |
-| POST   | `/api/tasks/requeue`    | `{channel?, task_id, actor?}`                                     | Return a stuck or abandoned task to `queued`. |
+| Method | Path                    | Body                                                            | Effect                                                                                                                                                                                    |
+| ------ | ----------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/post`             | `{channel?, thread, actor?, content}`                           | Post a message; a verb prefix (`claim:`, `working:`, `done:`, `stuck:`, `help:`, `failed:`, `lock:`, `unlock:`, `review-ok:`, `review-fail:`, `ask:`, `reply:`) also performs its effect. |
+| POST   | `/api/tasks`            | `{channel?, id?, thread, title, contract?, caps?, depends_on?}` | Create a task. `409` when the id exists.                                                                                                                                                  |
+| POST   | `/api/claim`            | `{channel?, task_id, agent, lease?}`                            | Take a lease on a task. `409` when another agent holds it or a dependency is open.                                                                                                        |
+| POST   | `/api/renew`            | `{channel?, task_id, agent, lease?}`                            | Extend your lease.                                                                                                                                                                        |
+| POST   | `/api/state`            | `{channel?, task_id, agent, state}`                             | Move your task between `working`, `stuck` and `help`.                                                                                                                                     |
+| POST   | `/api/done`             | `{channel?, task_id, agent, summary?, thread?, force?}`         | Complete a task you hold and post its `done:` event.                                                                                                                                      |
+| POST   | `/api/locks`            | `{channel?, path, task?, agent}`                                | Take an exclusive file lock. `409` when another agent holds the path.                                                                                                                     |
+| DELETE | `/api/locks`            | `{channel?, path, agent, force?}`                               | Release a lock. `force` is the human supervisor's override.                                                                                                                               |
+| POST   | `/api/ack`              | `{channel?, thread, agent, cursor}`                             | Move your inbox cursor forward.                                                                                                                                                           |
+| POST   | `/api/join`             | `{channel?, name, pid?, caps?}`                                 | Register an agent (or refresh it).                                                                                                                                                        |
+| POST   | `/api/agents`           | `{channel?, name, pid?, caps?}`                                 | The same registration under the collection path.                                                                                                                                          |
+| POST   | `/api/agents/run`       | `{channel?, agent, prompt, task_id?}`                           | Start an agent run and return its id.                                                                                                                                                     |
+| POST   | `/api/agents/terminate` | `{channel?, agent}`                                             | Stop a running agent.                                                                                                                                                                     |
+| POST   | `/api/tasks/requeue`    | `{channel?, task_id, actor?}`                                   | Return a stuck or abandoned task to `queued`.                                                                                                                                             |
 
 ## Examples
 

@@ -61,7 +61,8 @@ const RESEARCH_BRIEF: WorkflowTemplate = {
   name: "Research brief",
   version: "1.0.0",
   kind: "workflow",
-  summary: "Gather, draft and critique a one-page brief on a question. Three model steps, no tools.",
+  summary:
+    "Gather, draft and critique a one-page brief on a question. Three model steps, no tools.",
   tags: ["research", "brief", "writing"],
   notes:
     "Set the question in the run input. Swap the second agent for one whose model you trust on your own domain; the critique step is the one that catches a weak draft.",
@@ -121,7 +122,8 @@ const PR_REVIEW_SWEEP: WorkflowTemplate = {
   name: "Change review sweep",
   version: "1.0.0",
   kind: "workflow",
-  summary: "Review a change three ways — correctness, tests, and what it breaks — then gate on a verdict.",
+  summary:
+    "Review a change three ways — correctness, tests, and what it breaks — then gate on a verdict.",
   tags: ["code", "review", "quality"],
   notes:
     "Paste the diff into the run input. The condition step is a literal gate: wire it to a real check before relying on it, or drop it and read the three reviews.",
@@ -245,7 +247,9 @@ export function companyTemplateFrom(server: ServerTemplate): CompanyTemplateRef 
 }
 
 /** True when this repository ships a presentation for every server template the test knows. */
-export function presentationFor(id: string): { version: string; tags: string[]; notes: string } | undefined {
+export function presentationFor(
+  id: string,
+): { version: string; tags: string[]; notes: string } | undefined {
   return COMPANY_PRESENTATION[id];
 }
 
@@ -276,7 +280,11 @@ export function filterTemplates(
   query: string,
   kind: Template["kind"] | "all" = "all",
 ): Template[] {
-  const normalise = (text: string) => text.toLowerCase().replace(/[-_.]+/g, " ").trim();
+  const normalise = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[-_.]+/g, " ")
+      .trim();
   const q = normalise(query);
   return templates.filter((t) => {
     if (kind !== "all" && t.kind !== kind) return false;

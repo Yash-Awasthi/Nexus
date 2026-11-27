@@ -1,0 +1,33 @@
+# Baseline screenshots at 1440x900
+# Regenerate: NEXUS_CAPTURE_BASELINE=1 pnpm test:e2e baseline-screenshots
+1440/home.jpg
+1440/login.jpg
+1440/dashboard.jpg
+1440/chat.jpg
+1440/discussion.jpg
+1440/archetypes.jpg
+1440/org.jpg
+1440/projects.jpg
+1440/workspaces.jpg
+1440/workflows.jpg
+1440/templates.jpg
+1440/skills.jpg
+1440/knowledge.jpg
+1440/search.jpg
+1440/sandbox.jpg
+1440/terminals.jpg
+1440/knowledge-graph.jpg
+1440/costs.jpg
+1440/settings.jpg
+1440/provider-keys.jpg
+1440/mcp-servers.jpg
+1440/api-tokens.jpg
+1440/admin-users.jpg
+1440/admin-analytics.jpg
+1440/admin-traces.jpg
+1440/gateway.jpg
+1440/admin-audit.jpg
+1440/moderation.jpg
+1440/admin-feedback.jpg
+1440/admin-feature-flags.jpg
+1440/admin-system.jpg

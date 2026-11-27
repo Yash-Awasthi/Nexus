@@ -58,6 +58,28 @@ export function waitForTimeouts(files) {
   return files.filter(({ text }) => /waitForTimeout\(/.test(text)).map(({ file }) => file);
 }
 
+/**
+ * Files that wait on `networkidle`.
+ *
+ * A signed-in shell keeps `/api/notifications/stream` open for the life of the tab, so `networkidle` never
+ * fires and every navigation waits out its timeout instead. This is the rule that would have caught the
+ * craft audit burning 15 minutes on eight waits and failing without naming a page: the condition a spec
+ * wants is "the route has finished asking", which is `waitForPaint` in `fixtures.ts`.
+ */
+export function networkIdleWaits(files) {
+  return files
+    .map(({ file, text }) => ({
+      file,
+      lines: text
+        .split("\n")
+        .map((line, index) => ({ line, number: index + 1 }))
+        // The comment that explains why it is banned is allowed to say the word.
+        .filter(({ line }) => /networkidle/.test(line) && !/^\s*(\/\/|\*)/.test(line)),
+    }))
+    .filter(({ lines }) => lines.length > 0)
+    .map(({ file, lines }) => `${file}:${lines[0].number}`);
+}
+
 function specFiles() {
   const files = [];
   for (const dir of E2E_DIRS) {
@@ -83,6 +105,15 @@ test("read the whole e2e surface, or the rules below prove nothing", () => {
 
 test("no spec calls waitForTimeout", () => {
   assert.deepEqual(waitForTimeouts(FILES), []);
+});
+
+test("no spec waits for networkidle, which a signed-in shell never reaches", () => {
+  assert.deepEqual(networkIdleWaits(FILES), []);
+  // And the helper that replaced it is the one the specs use.
+  assert.ok(
+    FILES.some(({ text }) => text.includes("waitForPaint")),
+    "no spec uses waitForPaint",
+  );
 });
 
 test("a fixed sleep of 200 ms or more lives in a polling helper", () => {

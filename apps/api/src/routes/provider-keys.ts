@@ -20,6 +20,7 @@ import { sha256hex } from "../lib/crypto-utils.ts";
 import { compatibleEndpointError, invalidateUserDrivers } from "../lib/provider-keys.ts";
 import { unsafeUrlReason } from "../lib/public-url.ts";
 import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.ts";
+import { CURRENT_KEY_MATERIAL_VERSION } from "../lib/secret-rotation.ts";
 import { requireAuthWithTier, requireUserId } from "../middleware/auth.ts";
 
 const VALID_PROVIDERS = [
@@ -145,6 +146,11 @@ export async function providerKeysRoutes(app: FastifyInstance): Promise<void> {
         provider,
         label: label ?? existing?.label ?? null,
         encryptedKey,
+        // A key written now carries the current envelope; a carried-over key keeps whatever version it had, so the
+        // count of "still on the old form" does not reset every time somebody edits a label.
+        keyMaterialVersion: apiKey
+          ? CURRENT_KEY_MATERIAL_VERSION
+          : (existing?.keyMaterialVersion ?? 1),
         keyPrefix,
         keyHash,
         baseUrl: effectiveBaseUrl,
@@ -210,6 +216,7 @@ export async function providerKeysRoutes(app: FastifyInstance): Promise<void> {
         .select({
           id: userProviderCredentials.id,
           userId: userProviderCredentials.userId,
+          provider: userProviderCredentials.provider,
         })
         .from(userProviderCredentials)
         .where(
@@ -226,6 +233,18 @@ export async function providerKeysRoutes(app: FastifyInstance): Promise<void> {
         .set({ deletedAt: new Date(), active: false })
         .where(eq(userProviderCredentials.id, request.params.id));
       invalidateUserDrivers(userId);
+      // A removed key is the one an account takeover would want quiet: it is audited with the id and the
+      // provider only, never the prefix or the material.
+      void emitAuditEvent(
+        {
+          entityType: "provider_credential",
+          entityId: row.id,
+          action: "provider_key.delete",
+          actor: userId,
+          payload: { provider: row.provider },
+        },
+        request.log,
+      );
       return reply.send({ ok: true });
     },
   );

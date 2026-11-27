@@ -6,6 +6,12 @@
  * contributor which piece is missing before the first chat fails. Checks that
  * legitimately have no local requirement (no Redis, embedded PGlite, no
  * Docker) say so instead of failing.
+ *
+ * `required` is what the exit code is about, and it is a product decision, not a judgement about
+ * importance: the app runs on Node plus pnpm with embedded stores, so Docker (sandboxed code
+ * execution) and Ollama (one of several model sources) are optional. Marking them `fail` made the
+ * README's copy-paste quickstart exit 1 on a machine where everything it needed was present, and a
+ * `pnpm exec` that aborts on a green report teaches people to skip the check.
  */
 import { execFile } from "node:child_process";
 import { connect } from "node:net";
@@ -20,6 +26,18 @@ export interface DoctorRow {
   status: DoctorStatus;
   detail: string;
   fix?: string;
+  /** Whether a non-ok status should make the command exit non-zero. */
+  required?: boolean;
+}
+
+/** The exit code `nexus doctor` returns: non-zero only when something required is missing. */
+export function doctorExitCode(rows: readonly DoctorRow[]): number {
+  return rows.some((row) => row.required !== false && row.status !== "ok") ? 1 : 0;
+}
+
+/** The optional checks that are not ok, for a closing line that keeps them visible. */
+export function optionalMisses(rows: readonly DoctorRow[]): DoctorRow[] {
+  return rows.filter((row) => row.required === false && row.status !== "ok");
 }
 
 export interface DoctorDeps {
@@ -114,32 +132,35 @@ export async function collectDoctor(
   const docker = await deps.run("docker", ["--version"]);
   rows.push(
     docker
-      ? { name: "docker", status: "ok", detail: docker.trim().replace(/^Docker version /, "") }
+      ? {
+          name: "docker",
+          status: "ok",
+          detail: docker.trim().replace(/^Docker version /, ""),
+          required: false,
+        }
       : {
           name: "docker",
-          status: "fail",
-          detail: "not found",
-          fix: "install Docker Desktop; sandboxed code execution needs it",
+          status: "warn",
+          detail: "not found (sandboxed code execution needs it)",
+          fix: "install Docker Desktop; everything else runs without it",
+          required: false,
         },
   );
 
   const image = env.NEXUS_SANDBOX_IMAGE ?? "nexus-sandbox:local";
-  if (!docker) {
-    rows.push({
-      name: "sandbox image",
-      status: "warn",
-      detail: `${image} not checked (no Docker)`,
-    });
-  } else {
+  // Without Docker there is nothing to inspect, and the docker row above already says what that
+  // costs: a second "not checked" line would look like another thing to fix.
+  if (docker) {
     const listed = await deps.run("docker", ["image", "inspect", image]);
     rows.push(
       listed
-        ? { name: "sandbox image", status: "ok", detail: image }
+        ? { name: "sandbox image", status: "ok", detail: image, required: false }
         : {
             name: "sandbox image",
-            status: "fail",
+            status: "warn",
             detail: `${image} missing`,
             fix: "docker build -t nexus-sandbox:local infra/sandbox",
+            required: false,
           },
     );
   }
@@ -150,9 +171,10 @@ export async function collectDoctor(
   if (!tags) {
     rows.push({
       name: "ollama",
-      status: "fail",
-      detail: "127.0.0.1:11434 unreachable",
-      fix: "install Ollama and run `ollama serve`",
+      status: "warn",
+      detail: "127.0.0.1:11434 unreachable (a driver key works instead)",
+      fix: "install Ollama and run `ollama serve`, or set GROQ_API_KEY / OPENAI_API_KEY in .env",
+      required: false,
     });
   } else {
     const names = (tags.models ?? []).flatMap((model) => (model.name ? [model.name] : []));
@@ -164,12 +186,13 @@ export async function collectDoctor(
     const wanted = env.OLLAMA_MODEL ?? "qwen2.5:7b";
     rows.push(
       names.includes(wanted) || names.some((name) => name.startsWith(wanted))
-        ? { name: "model", status: "ok", detail: wanted }
+        ? { name: "model", status: "ok", detail: wanted, required: false }
         : {
             name: "model",
             status: "warn",
             detail: `${wanted} not pulled`,
             fix: `ollama pull ${wanted}`,
+            required: false,
           },
     );
   }

@@ -19,8 +19,10 @@ function luhn(digits: string): boolean {
 const SECRET = new RegExp(
   [
     "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-    // A digit in the body keeps hyphenated slugs such as "sk-learn-..." out.
-    "\\b(?:sk|gsk|nxk|pk|rk)[-_](?=[\\w-]*\\d)[\\w-]{20,}",
+    // The shape is loose here on purpose: a slug is excluded by the check below, not by the pattern,
+    // because a digit somewhere in the body (a year, a version) is not what separates a key from a
+    // package name — the length of the final run is.
+    "\\b(?:sk|gsk|nxk|pk|rk)[-_][\\w-]{20,}",
     "\\bgh[pousr]_\\w{36,}",
     "\\bgithub_pat_\\w{40,}",
     "\\bAKIA[0-9A-Z]{16}\\b",
@@ -31,8 +33,25 @@ const SECRET = new RegExp(
   "g",
 );
 
+/**
+ * Is this candidate a credential, or a hyphenated name that merely starts with a key prefix?
+ *
+ * A key ends in one long run — a project key is `sk-proj-` followed by a long random body, and the other
+ * families are the same shape after their prefix. A package name ends in a word: `sk-learn-preprocessing-
+ * pipeline-helpers`, or `sk-learn-pipelines-2024`. So the final segment must be at least twenty characters,
+ * there are at most four segments, and the body must contain a digit. Requiring an uppercase letter instead
+ * would have been simpler and would have stopped matching lowercase personal access tokens.
+ */
+function looksLikeKey(match: string): boolean {
+  // The other alternatives in the same pattern (a PEM block, a GitHub token) are not this shape at all.
+  if (!/^(?:sk|gsk|nxk|pk|rk)[-_]/.test(match)) return true;
+  const body = match.replace(/^(?:sk|gsk|nxk|pk|rk)[-_]/, "");
+  const segments = body.split(/[-_]/);
+  return segments.length <= 4 && (segments.at(-1) ?? "").length >= 20 && /\d/.test(body);
+}
+
 const PII: { type: string; re: RegExp; check?: (m: string) => boolean }[] = [
-  { type: "secret", re: SECRET },
+  { type: "secret", re: SECRET, check: looksLikeKey },
   { type: "email", re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g },
   {
     type: "card number",

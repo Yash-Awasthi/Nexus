@@ -54,16 +54,16 @@ running the desktop app (the owner is the operator there).
 
 ### 4.1 Internet → API
 
-| Threat                            | Control                                                                                                                                                                                 |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A route accidentally public       | `/api/v1` has no scope-wide auth; the route census test fails on any unlisted public route                                                                                              |
-| Session theft / replay            | 15-minute access tokens bound to a session (`sid`); revocation in the security KV checked by both verifiers; refresh rotation with replay detection                                     |
-| Password guessing                 | Per-address exponential lockout plus an account-wide ceiling in the security KV                                                                                                         |
-| MFA bypass                        | TOTP checked inside login; each code accepted once; hashed single-use recovery codes                                                                                                    |
-| Account takeover through SSO      | Verified email (Google, OIDC, SAML) or immutable id (GitHub, Slack team+user); first SSO sign-in strips an unverified account's other credentials; state bound to the browser by cookie |
-| Spend abuse on public completions | Per-client (IPv6 /64) and global ceilings keyed on `request.ip`                                                                                                                         |
-| Forged webhooks                   | Slack HMAC over raw bytes, Bot Framework JWT for Teams, secret token for Telegram; each refuses when unconfigured; replies only to the verified service URL                             |
-| Session thief moving the account  | Changing the sign-in email needs the current password; security notices are emailed, an email change to the old address                                                                 |
+| Threat                            | Control                                                                                                                                                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A route accidentally public       | `/api/v1` has no scope-wide auth; the route census test fails on any unlisted public route                                                                                                                                                                                             |
+| Session theft / replay            | 15-minute access tokens bound to a session (`sid`); revocation in the security KV checked by both verifiers; refresh rotation with replay detection                                                                                                                                    |
+| Password guessing                 | Per-address exponential lockout plus an account-wide ceiling in the security KV                                                                                                                                                                                                        |
+| MFA bypass                        | TOTP checked inside login; each code accepted once; hashed single-use recovery codes                                                                                                                                                                                                   |
+| Account takeover through SSO      | Verified email (Google, OIDC, SAML) or immutable id (GitHub, Slack team+user); first SSO sign-in strips an unverified account's other credentials; state bound to the browser by cookie                                                                                                |
+| Spend abuse on public completions | Per-client (IPv6 /64) and global ceilings keyed on `request.ip`                                                                                                                                                                                                                        |
+| Forged webhooks                   | Slack HMAC over raw bytes, Bot Framework JWT for Teams, secret token for Telegram; each refuses when unconfigured; replies only to the verified service URL                                                                                                                            |
+| Session thief moving the account  | Changing the sign-in email needs the current password; security notices are emailed, an email change to the old address                                                                                                                                                                |
 | Endless hammering of one route    | Fixed-window limits per route family, bucketed on the strongest identity (user, else API key hash, else address); `Retry-After` counts the window down rather than repeating it, and an idle-then-busy caller recovers exactly at the boundary (`tests/lib/rate-limit-window.test.ts`) |
 
 ### 4.2 User or model input → execution
@@ -113,12 +113,12 @@ file asserts that order explicitly.
 
 ### 4.5 API ↔ data stores
 
-| Threat                      | Control                                                                                                              |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Job injection through Redis | Redis is a trust boundary: loopback in development; the security check fails a remote `REDIS_URL` without a password |
-| Plaintext secrets at rest   | AES-256-GCM for provider keys, the secret store and TOTP secrets (`NEXUS_MFA_KEY`)                                   |
-| Audit log tampering         | HMAC chain with `NEXUS_AUDIT_KEY`; the security check fails when it falls back to the published default              |
-| Database in clear text      | The security check warns on a remote `DATABASE_URL` without `sslmode`                                                |
+| Threat                      | Control                                                                                                                                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Job injection through Redis | Redis is a trust boundary: loopback in development; the security check fails a remote `REDIS_URL` without a password                                                                                                                            |
+| Plaintext secrets at rest   | AES-256-GCM for provider keys, the secret store and TOTP secrets (`NEXUS_MFA_KEY`)                                                                                                                                                              |
+| Audit log tampering         | HMAC chain with `NEXUS_AUDIT_KEY`; the security check fails when it falls back to the published default                                                                                                                                         |
+| Database in clear text      | The security check warns on a remote `DATABASE_URL` without `sslmode`                                                                                                                                                                           |
 | Cross-account read by id    | Every collection with item routes gets a fixture or a written reason to skip in `tests/security/cross-account.test.ts`; a new collection fails the census until it has one. Sandbox results are covered by `tests/routes/sandbox-owner.test.ts` |
 
 ### 4.6 Desktop shell

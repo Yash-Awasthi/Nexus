@@ -30,8 +30,8 @@ import { styleText } from "node:util";
 import { Command } from "commander";
 
 import { api, fail } from "./lib/client.ts";
-import { collectDoctor, formatDoctor } from "./lib/doctor.ts";
 import { buildBundle, writeBundle } from "./lib/diagnostic-bundle.ts";
+import { collectDoctor, doctorExitCode, formatDoctor, optionalMisses } from "./lib/doctor.ts";
 import { runLocalAgent } from "./lib/local-agent.ts";
 import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.ts";
 import { registerOrgCommands } from "./lib/org.ts";
@@ -80,15 +80,24 @@ program
       const dir = typeof options.bundle === "string" ? options.bundle : ".";
       const written = writeBundle(dir, bundle);
       console.log(styleText("green", "✓"), `wrote ${written.jsonPath}`);
-      console.log(
-        "  read it, then attach it to your report; see SUPPORT.md for where that goes",
-      );
+      console.log("  read it, then attach it to your report; see SUPPORT.md for where that goes");
       if (bundle.redacted.length) console.log(`  redacted: ${bundle.redacted.join(", ")}`);
       return;
     }
     if (options.json) console.log(JSON.stringify(rows, null, 2));
-    else console.log(formatDoctor(rows));
-    if (rows.some((row) => row.status === "fail")) process.exitCode = 1;
+    else {
+      console.log(formatDoctor(rows));
+      // A warning that scrolls past is a warning nobody read: name the optional gaps once, in the
+      // words of the person who has to decide whether they care.
+      const optional = optionalMisses(rows);
+      if (optional.length) {
+        console.log(
+          `\n! ${optional.length} optional check(s) need attention: ${optional.map((row) => row.name).join(", ")}`,
+        );
+        console.log("  the app runs without them; each line above says what it enables");
+      }
+    }
+    process.exitCode = doctorExitCode(rows);
   });
 
 // ── health ────────────────────────────────────────────────────────────────────

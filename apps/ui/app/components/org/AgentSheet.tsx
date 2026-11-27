@@ -293,7 +293,7 @@ export function AgentSheet({
                     ["Runs", `${rec.succeeded}/${rec.runs}`],
                   ].map(([label, v]) => (
                     <div key={label} className="rounded-lg border bg-card p-2">
-                      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+                      <p className="text-3xs uppercase text-muted-foreground">{label}</p>
                       <p className="font-mono">{v}</p>
                     </div>
                   ))}

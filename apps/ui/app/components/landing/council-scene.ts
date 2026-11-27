@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: canvas painting — the ring is drawn into a 2D context with per-frame alpha ramps, which cannot read a CSS custom property
 /**
  * The landing page's 3D council: seven members on a ring around a core. Scrolling changes what
  * they do (take their seats, argue along arcs, gather around a synthesis with the contrarian
@@ -40,6 +41,13 @@ import {
 } from "three";
 
 import { SCENES, sceneAt, type SceneAnchor, type SceneState } from "./scene-state";
+
+import {
+  SAMPLE_FRAMES,
+  nextQualityStep,
+  pixelRatioFor,
+  shouldAnimate,
+} from "~/lib/adaptive-quality";
 
 const MEMBERS = [
   { name: "Architect", color: 0x7c83ff },
@@ -166,7 +174,12 @@ export function mountCouncilScene(host: HTMLElement, opts: MountOptions): (() =>
   }
   const lowPower =
     (navigator.hardwareConcurrency ?? 8) <= 4 || window.matchMedia("(max-width: 640px)").matches;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPower ? 1.25 : 1.75));
+  // The same policy the graph view uses: measure, then spend less. `lowPower` starts one step in so a
+  // phone does not have to stutter its way there.
+  let quality = lowPower ? 1 : 0;
+  let measuredFrames = 0;
+  let measuredFrom = performance.now();
+  renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
   renderer.setClearColor(0x000000, 0);
   const canvas = renderer.domElement;
   canvas.style.cssText = "width:100%;height:100%;display:block";
@@ -563,6 +576,26 @@ export function mountCouncilScene(host: HTMLElement, opts: MountOptions): (() =>
     renderer.setAnimationLoop((now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
+
+      measuredFrames += 1;
+      if (measuredFrames >= SAMPLE_FRAMES) {
+        const fps = (measuredFrames * 1000) / Math.max(1, now - measuredFrom);
+        const next = nextQualityStep(quality, fps);
+        if (next !== quality) {
+          quality = next;
+          renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
+          resize();
+          if (!shouldAnimate(quality)) {
+            // Cheapest step: one last frame, then the scene waits for a pointer or a scroll.
+            renderer.setAnimationLoop(null);
+            frame(0);
+            return;
+          }
+        }
+        measuredFrames = 0;
+        measuredFrom = now;
+      }
+
       frame(dt);
     });
   }

@@ -57,8 +57,17 @@
     "verify": "node scripts/verify.mjs",
     "verify:fast": "node scripts/verify.mjs --fast",
     "perf": "node scripts/perf-budget.mjs",
+    "tokens:check": "node scripts/design-tokens.mjs",
     "bundle:budget": "node scripts/bundle-budget.mjs",
-    "boot:budget": "node scripts/api-boot-budget.mjs"
+    "boot:budget": "node scripts/api-boot-budget.mjs",
+    "evals": "node scripts/evals.mjs --write",
+    "evals:check": "node scripts/evals.mjs --check",
+    "council:evals": "node scripts/council-evals.mjs --write",
+    "council:evals:check": "node scripts/council-evals.mjs --check",
+    "costs:report": "node apps/api/src/cost-report.ts",
+    "release:notes": "node scripts/sync-release-notes.mjs --write",
+    "release:notes:check": "node scripts/sync-release-notes.mjs --check",
+    "slo:review": "node scripts/slo-review.mjs --check"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

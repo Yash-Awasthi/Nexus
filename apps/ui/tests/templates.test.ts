@@ -33,9 +33,11 @@ function serverCompanyIds(): { id: string; name: string; description: string }[]
   const source = fs.readFileSync(path.join(API, "lib/org-portability.ts"), "utf8");
   const start = source.indexOf("export const TEMPLATES");
   const block = source.slice(start, source.indexOf("\n];", start));
-  return [...block.matchAll(/id:\s*"([^"]+)",\s*\n\s*name:\s*"([^"]+)",\s*\n\s*description:\s*\n?\s*"([^"]*)"/g)].map(
-    (m) => ({ id: m[1]!, name: m[2]!, description: m[3] ?? "" }),
-  );
+  return [
+    ...block.matchAll(
+      /id:\s*"([^"]+)",\s*\n\s*name:\s*"([^"]+)",\s*\n\s*description:\s*\n?\s*"([^"]*)"/g,
+    ),
+  ].map((m) => ({ id: m[1]!, name: m[2]!, description: m[3] ?? "" }));
 }
 
 /** What `GET /org/templates` would answer for this checkout. */
@@ -58,7 +60,10 @@ describe("the server's company registry", () => {
     // A server template with no presentation still lists, but with a generic version and note.
     // That is a real gap in the gallery, so it fails here rather than shipping quietly.
     for (const row of serverCompanyIds()) {
-      expect(presentationFor(row.id), `${row.id} has no presentation in lib/templates.ts`).toBeDefined();
+      expect(
+        presentationFor(row.id),
+        `${row.id} has no presentation in lib/templates.ts`,
+      ).toBeDefined();
     }
   });
 });
@@ -173,7 +178,9 @@ describe("the gallery list", () => {
 
   it("searches by id, name, summary and tag, and filters by kind", () => {
     const all = allTemplates(SERVER);
-    expect(filterTemplates(all, "postmortem").map((t) => t.id)).toContain("workflow.incident-postmortem");
+    expect(filterTemplates(all, "postmortem").map((t) => t.id)).toContain(
+      "workflow.incident-postmortem",
+    );
     expect(filterTemplates(all, "research-brief").length).toBeGreaterThan(0);
     expect(filterTemplates(all, "", "company").every((t) => t.kind === "company")).toBe(true);
     expect(filterTemplates(all, "  ").length).toBe(all.length);

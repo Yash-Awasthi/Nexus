@@ -71,7 +71,11 @@ it("removes the erased account's stored records and keeps everyone else's", asyn
     url: `/api/v1/users/${gone.id}/data`,
     headers: gone.headers,
   });
-  expect(erase.statusCode, erase.body).toBe(204);
+  expect(erase.statusCode, erase.body).toBe(200);
+  // The receipt names what was kept, because "deleted" is not the whole answer.
+  expect(
+    erase.json<{ retained: { what: string; why: string }[] }>().retained.length,
+  ).toBeGreaterThan(0);
 
   expect(await owned(gone.id)).toBe(0);
   expect(await owned(kept.id)).toBeGreaterThan(0);

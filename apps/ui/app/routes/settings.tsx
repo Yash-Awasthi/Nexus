@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/settings";
 
 import { Page, PageHeader, Section, SettingRow } from "~/components/page";
+import { PageError } from "~/components/states";
 import { Switch } from "~/components/ui/switch";
 import { useTheme } from "~/context/ThemeContext";
 import { cn } from "~/lib/utils";
@@ -48,13 +49,30 @@ const SELECT =
 export default function SettingsPage() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
+  // A failed load must say so. It used to fall back to DEFAULTS silently, which showed a person's
+  // preferences switched off and invited them to "fix" settings that were never broken.
   useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
     void fetch("/api/settings/preferences")
-      .then((r) => (r.ok ? (r.json() as Promise<Partial<Prefs>>) : {}))
-      .then((p) => setPrefs({ ...DEFAULTS, ...p }))
-      .catch(() => undefined);
-  }, []);
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<Partial<Prefs>>)
+          : Promise.reject(new Error(r.statusText || `HTTP ${r.status}`)),
+      )
+      .then((p) => {
+        if (!cancelled) setPrefs({ ...DEFAULTS, ...p });
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setLoadError(e.message || "The preferences could not be read.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }));
@@ -98,6 +116,14 @@ export default function SettingsPage() {
           </span>
         }
       />
+
+      {loadError && (
+        <PageError
+          title="Your preferences could not be loaded"
+          message={loadError}
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
+      )}
 
       <Section title="Council">
         <SettingRow

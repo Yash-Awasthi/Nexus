@@ -107,7 +107,7 @@ export function OpenApiTools() {
             <code className="block break-all text-xs text-muted-foreground">{s.url}</code>
             <div className="flex flex-wrap gap-1">
               {s.tools.map((t) => (
-                <Badge key={t} variant="secondary" className="text-[10px] font-normal">
+                <Badge key={t} variant="secondary" className="text-3xs font-normal">
                   {t}
                 </Badge>
               ))}

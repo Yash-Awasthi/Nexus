@@ -293,16 +293,29 @@ export class InMemoryKGStore implements KGStore {
 // ── Deterministic ID helpers ──────────────────────────────────────────────────
 
 /**
- * Deterministic node id: sha256(name.lower().trim()|type).slice(0,16).
+ * Deterministic node id: sha256(normalised name|type).slice(0,16).
  *
- * The same entity text + type always produces the same id, enabling
- * cross-document deduplication without a lookup table.
+ * The same entity text + type always produces the same id, enabling cross-document deduplication
+ * without a lookup table.
+ *
+ * The name is normalised three ways before hashing, each of which is a merge that was missed until
+ * the merge-quality evaluation measured it: Unicode NFKC (so full-width and composed forms agree),
+ * runs of whitespace collapsed to one space (a line break inside a name is not a different entity),
+ * and trailing sentence punctuation dropped (``Acme Corp.`` is ``Acme Corp``). Case folding was
+ * always here. This is *not* a fuzzy matcher: abbreviations (``St.`` vs ``Saint``) and aliases still
+ * produce two nodes, and that limitation is documented rather than guessed at.
+ *
+ * Changing the normalisation changes ids, so an existing graph re-ingests its documents once; the
+ * ids are content hashes, so nothing needs a migration table.
  */
 export function makeNodeId(name: string, type: EntityType): string {
-  return createHash("sha256")
-    .update(`${name.toLowerCase().trim()}|${type}`)
-    .digest("hex")
-    .slice(0, 16);
+  const normalised = name
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:!?]+$/, "");
+  return createHash("sha256").update(`${normalised}|${type}`).digest("hex").slice(0, 16);
 }
 
 /**

@@ -287,7 +287,7 @@ export function TaskSheet({
               <ol className="mt-2 space-y-2" aria-label="Comments">
                 {detail.comments.map((c) => (
                   <li key={c.id} className="rounded-lg border p-2">
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-2xs text-muted-foreground">
                       {who(c.author)} · {timeAgo(c.createdAt)}
                     </p>
                     <Markdown text={c.body} />

@@ -1,4 +1,5 @@
-<!-- verified: c6e5d6c 2026-11-24 -->
+<!-- verified: 8065a84 2026-11-25 -->
+
 # Keyboard shortcuts
 
 The command palette is the entry point: it opens every page, the handful of actions worth a
@@ -7,13 +8,13 @@ box. Everything else on this page works without it.
 
 ## The palette
 
-| Key | Does |
-| --- | --- |
-| `⌘K` / `Ctrl K` | Open the palette from anywhere, including inside another input. Press it again to close. |
-| `↑` `↓` | Move the highlight. The list does not wrap past the ends — it wraps, but never scrolls you out of view. |
-| `↵` | Run the highlighted entry: open the page, run the action, open the item. |
-| `Tab` | Complete the box to the highlighted label, so you can keep typing to narrow further. |
-| `Esc` | Close without running anything. |
+| Key             | Does                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| `⌘K` / `Ctrl K` | Open the palette from anywhere, including inside another input. Press it again to close.                |
+| `↑` `↓`         | Move the highlight. The list does not wrap past the ends — it wraps, but never scrolls you out of view. |
+| `↵`             | Run the highlighted entry: open the page, run the action, open the item.                                |
+| `Tab`           | Complete the box to the highlighted label, so you can keep typing to narrow further.                    |
+| `Esc`           | Close without running anything.                                                                         |
 
 What it searches, in the order it ranks:
 
@@ -36,16 +37,16 @@ the words people type to that list rather than renaming the page.
 
 ## Everywhere
 
-| Key | Does |
-| --- | --- |
+| Key                 | Does                                                         |
+| ------------------- | ------------------------------------------------------------ |
 | `Tab` / `Shift Tab` | Move focus. Nothing in the app traps focus outside a dialog. |
-| `Esc` | Close the open dialog, menu or palette. |
-| `↵` | Submit the focused form. |
+| `Esc`               | Close the open dialog, menu or palette.                      |
+| `↵`                 | Submit the focused form.                                     |
 
 ## Accessibility contract
 
 - Every action reachable by mouse is reachable by keyboard, and the palette never becomes the
-  *only* way to reach something.
+  _only_ way to reach something.
 - Focus is visible on every interactive element (a 2 px ring, not a colour shift alone).
 - The palette is a real dialog: `role="dialog"`, a labelled input, focus moved in on open and
   returned to the page on close, and the list is announced as it filters.

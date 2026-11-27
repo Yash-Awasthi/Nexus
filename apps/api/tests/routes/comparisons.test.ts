@@ -20,9 +20,8 @@ process.env.DATABASE_URL = DB;
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.NEXUS_SECRETS_KEY = "cd".repeat(32);
 
-const { compareRuns, jaccard, summarise, terms, sideMetrics } = await import(
-  "../../src/lib/comparison.ts"
-);
+const { compareRuns, jaccard, summarise, terms, sideMetrics } =
+  await import("../../src/lib/comparison.ts");
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { getPgPool } = await import("../../src/lib/pg-pool.ts");
 const { buildServer } = await import("../../src/server.ts");
@@ -59,8 +58,20 @@ function run(over: Partial<Run> & { id: string }): Run {
     startedAt: at(0),
     finishedAt: at(60_000),
     entries: [
-      { line: 1, at: at(10_000), author: "Ada", kind: "contribution", text: "Ship it with a kill switch." },
-      { line: 2, at: at(20_000), author: "Grace", kind: "contribution", text: "Agreed, add rollback steps." },
+      {
+        line: 1,
+        at: at(10_000),
+        author: "Ada",
+        kind: "contribution",
+        text: "Ship it with a kill switch.",
+      },
+      {
+        line: 2,
+        at: at(20_000),
+        author: "Grace",
+        kind: "contribution",
+        text: "Agreed, add rollback steps.",
+      },
       { line: 3, at: at(50_000), author: "Chair", kind: "digest", text: "Verdict." },
     ],
     ...over,
@@ -69,7 +80,12 @@ function run(over: Partial<Run> & { id: string }): Run {
 
 describe("the arithmetic", () => {
   it("drops stop words and one-letter noise from the terms it compares", () => {
-    expect(terms("The ship is a go, and we will roll back")).toEqual(["ship", "go", "roll", "back"]);
+    expect(terms("The ship is a go, and we will roll back")).toEqual([
+      "ship",
+      "go",
+      "roll",
+      "back",
+    ]);
   });
 
   it("scores overlap as a Jaccard index, and treats two silent verdicts as agreement", () => {
@@ -112,12 +128,17 @@ describe("the arithmetic", () => {
     expect(diff.cost.delta).toBe(500);
     expect(diff.cost.ratio).toBe(1.5);
     expect(diff.latency.deltaMs).toBe(120_000);
-    expect(summarise(run({ id: "left" }), run({
-      id: "right",
-      digest: "No, postpone the migration until Monday after the freeze.",
-      totalTokens: 1_500,
-      finishedAt: at(180_000),
-    }))).toMatch(/verdict overlap \d+%, \+500 tokens, \+120s/);
+    expect(
+      summarise(
+        run({ id: "left" }),
+        run({
+          id: "right",
+          digest: "No, postpone the migration until Monday after the freeze.",
+          totalTokens: 1_500,
+          finishedAt: at(180_000),
+        }),
+      ),
+    ).toMatch(/verdict overlap \d+%, \+500 tokens, \+120s/);
   });
 
   it("counts per author, and keeps a participant who only spoke in one run", () => {
@@ -232,9 +253,16 @@ describe("the surface", () => {
       ownerId: owner,
     } as unknown as Parameters<typeof _seedDiscussionForTests>[0]);
 
-    expect((await call("POST", "/api/v1/comparisons", { left: "cmp-e", right: "cmp-other" })).status).toBe(404);
-    expect((await call("POST", "/api/v1/comparisons", { left: "cmp-e", right: "cmp-e" })).status).toBe(400);
-    const running = await call("POST", "/api/v1/comparisons", { left: "cmp-e", right: "cmp-running" });
+    expect(
+      (await call("POST", "/api/v1/comparisons", { left: "cmp-e", right: "cmp-other" })).status,
+    ).toBe(404);
+    expect(
+      (await call("POST", "/api/v1/comparisons", { left: "cmp-e", right: "cmp-e" })).status,
+    ).toBe(400);
+    const running = await call("POST", "/api/v1/comparisons", {
+      left: "cmp-e",
+      right: "cmp-running",
+    });
     expect(running.status).toBe(409);
     expect(((await running.json()) as { message: string }).message).toMatch(/must be finished/);
     expect((await call("POST", "/api/v1/comparisons", {})).status).toBe(400);
@@ -244,12 +272,20 @@ describe("the surface", () => {
     await finished("cmp-f");
     await finished("cmp-g");
     const saved = (await (
-      await call("POST", "/api/v1/comparisons", { left: "cmp-f", right: "cmp-g", label: "Friday A/B" })
+      await call("POST", "/api/v1/comparisons", {
+        left: "cmp-f",
+        right: "cmp-g",
+        label: "Friday A/B",
+      })
     ).json()) as { id: string; label: string };
     expect(saved.label).toBe("Friday A/B");
     const otherAuth = { authorization: `Bearer ${tokenFor(other)}` };
-    expect((await call("GET", `/api/v1/comparisons/${saved.id}`, undefined, otherAuth)).status).toBe(404);
-    expect((await call("DELETE", `/api/v1/comparisons/${saved.id}`, undefined, otherAuth)).status).toBe(404);
+    expect(
+      (await call("GET", `/api/v1/comparisons/${saved.id}`, undefined, otherAuth)).status,
+    ).toBe(404);
+    expect(
+      (await call("DELETE", `/api/v1/comparisons/${saved.id}`, undefined, otherAuth)).status,
+    ).toBe(404);
     expect((await call("DELETE", `/api/v1/comparisons/${saved.id}`)).status).toBe(204);
     expect((await call("GET", `/api/v1/comparisons/${saved.id}`)).status).toBe(404);
   });

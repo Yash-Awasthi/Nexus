@@ -64,7 +64,11 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T | null; ms: nu
 export function statusProbes(deps: {
   dockerReady: Promise<boolean>;
   sandboxReady: () => boolean;
-}): { name: StatusRow["name"]; critical: boolean; probe: () => Promise<{ ok: boolean; detail: string }> }[] {
+}): {
+  name: StatusRow["name"];
+  critical: boolean;
+  probe: () => Promise<{ ok: boolean; detail: string }>;
+}[] {
   return [
     {
       name: "postgres",
@@ -150,7 +154,10 @@ export async function statusRoutes(
   app: FastifyInstance,
   deps: { dockerReady: Promise<boolean>; sandboxReady?: () => boolean },
 ): Promise<void> {
-  const probes = statusProbes({ dockerReady: deps.dockerReady, sandboxReady: deps.sandboxReady ?? (() => true) });
+  const probes = statusProbes({
+    dockerReady: deps.dockerReady,
+    sandboxReady: deps.sandboxReady ?? (() => true),
+  });
   const startedAt = Date.now();
   let cached: { at: number; status: StatusReport["status"]; report: StatusReport } | null = null;
 

@@ -39,9 +39,14 @@ import { gatewayLog } from "./gateway.ts";
 
 // ── SLO tracker singleton (records HTTP 2xx vs 5xx) ──────────────────────────
 // Available for other routes to call sloTracker.record() on each response.
+//
+// The targets are the ones `docs/slos.md` promises, not stricter ones: a tracker configured for 99.9%
+// while the SLO says 99.5% makes `budgetRemaining` reach zero at a fifth of the error the promise
+// allows, so an operator is told the budget is gone with four fifths of it left. `node
+// scripts/slo-review.mjs --check` reads both and fails if they drift apart again.
 export const sloTracker = new SloTracker({
   windowMs: 5 * 60_000,
-  targets: { availabilityTarget: 0.999, errorRateTarget: 0.001, p99LatencyTargetMs: 2_000 },
+  targets: { availabilityTarget: 0.995, errorRateTarget: 0.005, p99LatencyTargetMs: 500 },
   onViolation: (v) => {
     process.stderr.write(`[SLO VIOLATION] sli=${v.sli} actual=${v.actual} target=${v.target}\n`);
   },

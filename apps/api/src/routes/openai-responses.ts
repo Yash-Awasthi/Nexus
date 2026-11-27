@@ -24,7 +24,12 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { LlmMessage, LlmRequestOptions, LlmResponse, LlmToolDefinition } from "@nexus/llm/drivers";
+import type {
+  LlmMessage,
+  LlmRequestOptions,
+  LlmResponse,
+  LlmToolDefinition,
+} from "@nexus/llm/drivers";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { PersistentStore } from "../lib/persistent-store.ts";
@@ -107,7 +112,13 @@ export function contentText(content: InputItem["content"]): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .filter((part) => part?.type === undefined || part.type === "input_text" || part.type === "output_text" || part.type === "text")
+    .filter(
+      (part) =>
+        part?.type === undefined ||
+        part.type === "input_text" ||
+        part.type === "output_text" ||
+        part.type === "text",
+    )
     .map((part) => part?.text ?? "")
     .join("");
 }
@@ -148,8 +159,7 @@ export function toConversation(
     if (item.type === "function_call_output") {
       messages.push({
         role: "tool",
-        content:
-          typeof item.output === "string" ? item.output : JSON.stringify(item.output ?? ""),
+        content: typeof item.output === "string" ? item.output : JSON.stringify(item.output ?? ""),
         ...(item.call_id ? { toolCallId: item.call_id } : {}),
       });
       continue;
@@ -207,7 +217,11 @@ export function toTools(tools: ToolInput[] | undefined): LlmToolDefinition[] | u
 }
 
 /** The driver request for one Responses call. */
-export function toRequest(body: ResponsesBody, model: string, prior?: StoredResponse): LlmRequestOptions {
+export function toRequest(
+  body: ResponsesBody,
+  model: string,
+  prior?: StoredResponse,
+): LlmRequestOptions {
   const { messages, systemPrompt } = toConversation(body, prior);
   const tools = toTools(body.tools);
   const choice = body.tool_choice;
@@ -219,7 +233,9 @@ export function toRequest(body: ResponsesBody, model: string, prior?: StoredResp
     ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
     ...(body.top_p !== undefined ? { topP: body.top_p } : {}),
     ...(tools ? { tools } : {}),
-    ...(choice === "auto" || choice === "none" || choice === "required" ? { toolChoice: choice } : {}),
+    ...(choice === "auto" || choice === "none" || choice === "required"
+      ? { toolChoice: choice }
+      : {}),
   };
 }
 
@@ -378,7 +394,9 @@ export async function openaiResponsesRoutes(app: FastifyInstance): Promise<void>
     });
     let seq = 0;
     const emit = (type: string, payload: Record<string, unknown>) => {
-      raw.write(`event: ${type}\ndata: ${JSON.stringify({ type, sequence_number: seq++, ...payload })}\n\n`);
+      raw.write(
+        `event: ${type}\ndata: ${JSON.stringify({ type, sequence_number: seq++, ...payload })}\n\n`,
+      );
     };
 
     emit("response.created", { response: inProgress(id, createdAt, body.model) });
@@ -387,7 +405,13 @@ export async function openaiResponsesRoutes(app: FastifyInstance): Promise<void>
     const messageId = `msg_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
     emit("response.output_item.added", {
       output_index: 0,
-      item: { type: "message", id: messageId, status: "in_progress", role: "assistant", content: [] },
+      item: {
+        type: "message",
+        id: messageId,
+        status: "in_progress",
+        role: "assistant",
+        content: [],
+      },
     });
     emit("response.content_part.added", {
       item_id: messageId,
@@ -440,13 +464,28 @@ export async function openaiResponsesRoutes(app: FastifyInstance): Promise<void>
           content: [{ type: "output_text", text, annotations: [] }],
         },
       });
-      const done = responseObject({ id, createdAt, model: body.model, res: { ...res, content: text }, metadata: body.metadata });
-      const items = (done.output as { type: string; call_id?: string; name?: string; arguments?: string; id: string }[]).filter(
-        (item) => item.type === "function_call",
-      );
+      const done = responseObject({
+        id,
+        createdAt,
+        model: body.model,
+        res: { ...res, content: text },
+        metadata: body.metadata,
+      });
+      const items = (
+        done.output as {
+          type: string;
+          call_id?: string;
+          name?: string;
+          arguments?: string;
+          id: string;
+        }[]
+      ).filter((item) => item.type === "function_call");
       let index = 1;
       for (const call of items) {
-        emit("response.output_item.added", { output_index: index, item: { ...call, status: "in_progress" } });
+        emit("response.output_item.added", {
+          output_index: index,
+          item: { ...call, status: "in_progress" },
+        });
         emit("response.function_call_arguments.done", {
           item_id: call.id,
           output_index: index,
@@ -456,7 +495,8 @@ export async function openaiResponsesRoutes(app: FastifyInstance): Promise<void>
         index++;
       }
       emit("response.completed", { response: done });
-      if (body.store !== false) remember(store, id, createdAt, body.model, opts, { ...res, content: text });
+      if (body.store !== false)
+        remember(store, id, createdAt, body.model, opts, { ...res, content: text });
     } catch (err) {
       emit("response.failed", {
         response: {
@@ -474,9 +514,15 @@ export async function openaiResponsesRoutes(app: FastifyInstance): Promise<void>
     await loaded();
     const record = responses.for(request).get(request.params.id);
     if (!record) {
-      return openaiError(reply, 404, "invalid_request_error", `No stored response with id ${request.params.id}.`, {
-        code: "not_found",
-      });
+      return openaiError(
+        reply,
+        404,
+        "invalid_request_error",
+        `No stored response with id ${request.params.id}.`,
+        {
+          code: "not_found",
+        },
+      );
     }
     return {
       id: record.id,

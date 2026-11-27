@@ -1,27 +1,27 @@
 {
   "packages/llm": {
-    "statements": 83.1,
-    "branches": 68.5,
-    "functions": 88,
-    "lines": 85.9
+    "statements": 84.5,
+    "branches": 69.5,
+    "functions": 90.6,
+    "lines": 87.3
   },
   "packages/agent-core": {
-    "statements": 88.5,
-    "branches": 79.3,
-    "functions": 88.8,
-    "lines": 89.5
+    "statements": 95.1,
+    "branches": 84.2,
+    "functions": 96.2,
+    "lines": 96
   },
   "packages/council": {
-    "statements": 95.7,
-    "branches": 82.4,
-    "functions": 98.2,
-    "lines": 97.9
+    "statements": 96.2,
+    "branches": 84.5,
+    "functions": 99,
+    "lines": 98.4
   },
   "packages/search": {
-    "statements": 84.5,
-    "branches": 74.5,
-    "functions": 87.6,
-    "lines": 86.5
+    "statements": 85.6,
+    "branches": 74.9,
+    "functions": 89.1,
+    "lines": 87.5
   },
   "packages/governance": {
     "statements": 93.3,
@@ -30,16 +30,16 @@
     "lines": 93
   },
   "packages/lsp": {
-    "statements": 78.7,
-    "branches": 66.5,
-    "functions": 91.3,
-    "lines": 84.4
+    "statements": 80.4,
+    "branches": 68,
+    "functions": 92,
+    "lines": 86.3
   },
   "packages/mcp-client": {
-    "statements": 90.2,
-    "branches": 79.6,
-    "functions": 86.7,
-    "lines": 92.3
+    "statements": 92.5,
+    "branches": 82.8,
+    "functions": 96.7,
+    "lines": 93.6
   },
   "packages/plugin-sdk": {
     "statements": 91.3,
@@ -60,15 +60,57 @@
     "lines": 93.6
   },
   "packages/browser-automation": {
-    "statements": 88.3,
-    "branches": 70.8,
-    "functions": 70.6,
-    "lines": 91.7
+    "statements": 89.3,
+    "branches": 73.6,
+    "functions": 76.5,
+    "lines": 92.7
   },
   "packages/db": {
-    "statements": 45.6,
-    "branches": 31.6,
-    "functions": 15.3,
-    "lines": 46
+    "statements": 67.8,
+    "branches": 65.4,
+    "functions": 31.7,
+    "lines": 67.1
+  },
+  "packages/doc-pipeline": {
+    "statements": 96.5,
+    "branches": 85.4,
+    "functions": 100,
+    "lines": 96.1
+  },
+  "packages/gateway": {
+    "statements": 94.1,
+    "branches": 84.7,
+    "functions": 88.6,
+    "lines": 96.4
+  },
+  "packages/llm-tracer": {
+    "statements": 98.1,
+    "branches": 71.1,
+    "functions": 100,
+    "lines": 100
+  },
+  "packages/pipeline-signal": {
+    "statements": 96.4,
+    "branches": 73.7,
+    "functions": 90.6,
+    "lines": 97.4
+  },
+  "packages/sdk": {
+    "statements": 88.9,
+    "branches": 96.8,
+    "functions": 70,
+    "lines": 87.1
+  },
+  "packages/session-sync": {
+    "statements": 94.7,
+    "branches": 89.1,
+    "functions": 100,
+    "lines": 97.8
+  },
+  "packages/trigger-engine": {
+    "statements": 96.3,
+    "branches": 91.7,
+    "functions": 100,
+    "lines": 97.7
   }
 }

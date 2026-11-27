@@ -15,7 +15,7 @@ import {
   trayTitle,
   trayTooltip,
   type TrayState,
-} from "../src/tray.ts";
+} from "../src/tray";
 
 const idle: TrayState = { running: 0, failed: 0, apiBase: "http://127.0.0.1:4100", local: true };
 const busy: TrayState = { ...idle, running: 3, failed: 1 };
@@ -55,9 +55,12 @@ describe("the tray says what the app is doing", () => {
     expect(local[1]!.label).toContain("Local API");
     expect(local[1]!.label).toContain("127.0.0.1:4100");
 
-    const remote = trayMenu({ ...idle, local: false, apiBase: "https://nexus.example.com" }, {
-      copyApiBase: () => {},
-    });
+    const remote = trayMenu(
+      { ...idle, local: false, apiBase: "https://nexus.example.com" },
+      {
+        copyApiBase: () => {},
+      },
+    );
     expect(remote[1]!.label).toContain("Remote API");
   });
 
@@ -100,25 +103,31 @@ describe("the queue and the workspace in the tray", () => {
 
   it("offers the folder when none is chosen, and names it once one is", () => {
     let asked = 0;
-    const bare = trayMenu({ ...idle, workspace: null }, {
-      copyApiBase: () => {},
-      chooseWorkspace: () => {
-        asked += 1;
+    const bare = trayMenu(
+      { ...idle, workspace: null },
+      {
+        copyApiBase: () => {},
+        chooseWorkspace: () => {
+          asked += 1;
+        },
       },
-    });
+    );
     const choose = bare.find((item) => item.label.startsWith("Choose workspace"))!;
     choose.click?.();
     expect(asked).toBe(1);
     expect(bare.some((item) => item.label.startsWith("Forget"))).toBe(false);
 
     let forgotten = 0;
-    const chosen = trayMenu({ ...idle, workspace: "/home/yash/nexus" }, {
-      copyApiBase: () => {},
-      chooseWorkspace: () => {},
-      forgetWorkspace: () => {
-        forgotten += 1;
+    const chosen = trayMenu(
+      { ...idle, workspace: "/home/yash/nexus" },
+      {
+        copyApiBase: () => {},
+        chooseWorkspace: () => {},
+        forgetWorkspace: () => {
+          forgotten += 1;
+        },
       },
-    });
+    );
     expect(chosen.find((item) => item.label.startsWith("Workspace:"))!.label).toBe(
       "Workspace: /home/yash/nexus",
     );

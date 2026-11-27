@@ -32,14 +32,14 @@ export class GithubModelsDriver extends OpenAICompatibleDriver {
 
 What the base class gives you, and what you get for free by extending it:
 
-| Behaviour | Where it comes from |
-| --- | --- |
-| `Authorization: Bearer <key>` | `OpenAICompatibleDriver.constructor` |
-| `systemPrompt` → a leading `system` message | `buildMessages` |
-| tool definitions and tool-call parsing | `toTools` / `fromToolCalls` |
-| streaming, including partial tool arguments | `stream` + `toolCallDeltas` |
-| `usage` → `{ inputTokens, outputTokens }` | `parseUsage` |
-| `countTokens` | `estimateTokens`, ~1 token per 4 characters |
+| Behaviour                                   | Where it comes from                         |
+| ------------------------------------------- | ------------------------------------------- |
+| `Authorization: Bearer <key>`               | `OpenAICompatibleDriver.constructor`        |
+| `systemPrompt` → a leading `system` message | `buildMessages`                             |
+| tool definitions and tool-call parsing      | `toTools` / `fromToolCalls`                 |
+| streaming, including partial tool arguments | `stream` + `toolCallDeltas`                 |
+| `usage` → `{ inputTokens, outputTokens }`   | `parseUsage`                                |
+| `countTokens`                               | `estimateTokens`, ~1 token per 4 characters |
 
 Three rules that bite:
 
@@ -59,7 +59,7 @@ export type ProviderName =
   // …
   | "qwen"
   | "github_models"
-  | "ai360"
+  | "ai360";
 ```
 
 ## 2 — The factory
@@ -104,7 +104,7 @@ content and usage parse, and the constructor accepts `{ apiKey }` alone. Run it:
 pnpm --filter @nexus/llm test      # or: cd packages/llm && ../../node_modules/.bin/vp test run
 ```
 
-A provider whose API is *openai-shaped but slightly not* — a different tool-call field, a
+A provider whose API is _openai-shaped but slightly not_ — a different tool-call field, a
 `usage` object with other keys, an SSE format that needs a different parser — gets its own
 `describe` block in the same file. Write the fake response from the vendor's documentation
 and assert on the parse, not on the URL: the URL is already covered by the table.

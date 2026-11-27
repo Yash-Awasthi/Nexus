@@ -41,6 +41,7 @@ import {
   HunyuanDriver,
   SparkDriver,
   AzureOpenAIDriver,
+  OpenAIDriver,
   CloudflareWorkersAIDriver,
   XinferenceDriver,
   ReplicateDriver,
@@ -1112,6 +1113,95 @@ describe("GeminiDriver", () => {
 });
 
 // ── LlmError ──────────────────────────────────────────────────────────────────
+
+// ── OpenAI (official ChatGPT API) ─────────────────────────────────────────────
+// This driver was added for the default ChatGPT council member, which had no driver at all until then. The
+// tests are here because a member nobody can call is a runtime error, not a missing feature: the registry
+// must resolve "openai", the default model must be one the API still serves, and the request must be a plain
+// chat-completions call with the key in the usual header.
+
+describe("OpenAIDriver", () => {
+  let t: MockTransport;
+  let d: OpenAIDriver;
+  const previous = process.env["OPENAI_API_KEY"];
+
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new OpenAIDriver({ apiKey: "sk-test" }, t);
+  });
+
+  afterEach(() => {
+    if (previous === undefined) delete process.env["OPENAI_API_KEY"];
+    else process.env["OPENAI_API_KEY"] = previous;
+  });
+
+  it("provider is 'openai'", () => expect(d.provider).toBe("openai"));
+
+  it("posts to api.openai.com by default", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://api.openai.com/v1/chat/completions");
+  });
+
+  it("honours a baseUrl override, which is how a proxy or a gateway is used", async () => {
+    const proxied = new OpenAIDriver({ apiKey: "sk-test", baseUrl: "https://proxy.test/v1" }, t);
+    await proxied.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://proxy.test/v1/chat/completions");
+  });
+
+  it("defaults to a model the API still serves, not the retired gpt-4o", () => {
+    const fresh = new OpenAIDriver({ apiKey: "sk-test" }, t);
+    expect(fresh.model).toBe("gpt-5.6-sol");
+    expect(fresh.model).not.toBe("gpt-4o");
+  });
+
+  it("takes a model override", () => {
+    expect(new OpenAIDriver({ apiKey: "sk-test", model: "gpt-5.6-terra" }, t).model).toBe(
+      "gpt-5.6-terra",
+    );
+  });
+
+  it("sends the key as a Bearer token and parses content + usage", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toBe("Bearer sk-test");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.inputTokens).toBe(5);
+    expect(r.usage.outputTokens).toBe(10);
+  });
+
+  it("falls back to OPENAI_API_KEY when the config carries no key", async () => {
+    process.env["OPENAI_API_KEY"] = "sk-from-env";
+    const fromEnv = new OpenAIDriver({}, t);
+    await fromEnv.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toBe("Bearer sk-from-env");
+  });
+
+  it("registers under its provider name, so a member can resolve it", () => {
+    const reg = new DriverRegistry();
+    reg.register(d);
+    expect(reg.get("openai")).toBe(d);
+    expect(reg.list()).toContain("openai");
+  });
+
+  it("sends a tool-call request as an ordinary chat-completions body", async () => {
+    await d.complete(
+      makeOpts({
+        tools: [
+          {
+            name: "lookup",
+            description: "Look a fact up",
+            parameters: { type: "object", properties: {} },
+          },
+        ],
+      }),
+    );
+    const body = t.calls[0]!.body as {
+      tools?: { function: { name: string } }[];
+      model: string;
+    };
+    expect(body.model).toBe("test-model");
+    expect(body.tools?.[0]?.function.name).toBe("lookup");
+  });
+});
 
 describe("LlmError", () => {
   it("has code, provider, statusCode", () => {

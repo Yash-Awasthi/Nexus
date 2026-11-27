@@ -42,9 +42,14 @@ export function ProjectInstructions({ projectId }: ProjectInstructionsProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {/* Header */}
-      <div style={{ padding: "10px 14px", borderBottom: "1px solid #1a1a1a" }}>
+      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
         <span
-          style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "1px" }}
+          style={{
+            fontSize: 11,
+            color: "var(--muted-foreground)",
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+          }}
         >
           Instructions
         </span>
@@ -59,9 +64,9 @@ export function ProjectInstructions({ projectId }: ProjectInstructionsProps) {
           rows={6}
           style={{
             width: "100%",
-            background: "#0a0a0a",
-            border: "1px solid #2a2a2a",
-            color: "#e5e7eb",
+            background: "var(--background)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
             borderRadius: 6,
             padding: "8px 10px",
             fontSize: 12,
@@ -82,7 +87,12 @@ export function ProjectInstructions({ projectId }: ProjectInstructionsProps) {
             marginTop: 6,
           }}
         >
-          <span style={{ fontSize: 10, color: remaining < 100 ? "#ef4444" : "#555" }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: remaining < 100 ? "var(--destructive)" : "var(--muted-foreground)",
+            }}
+          >
             {remaining} chars left
           </span>
           <button
@@ -90,9 +100,9 @@ export function ProjectInstructions({ projectId }: ProjectInstructionsProps) {
             disabled={saving}
             style={{
               fontSize: 11,
-              color: saved ? "#22c55e" : "#e5e7eb",
-              background: saved ? "#0a2a0a" : "#1e1e1e",
-              border: `1px solid ${saved ? "#16a34a" : "#333"}`,
+              color: saved ? "var(--success)" : "var(--foreground)",
+              background: saved ? "var(--success-surface)" : "var(--secondary)",
+              border: `1px solid ${saved ? "var(--success)" : "var(--border)"}`,
               borderRadius: 5,
               padding: "4px 12px",
               cursor: saving ? "not-allowed" : "pointer",
@@ -103,8 +113,10 @@ export function ProjectInstructions({ projectId }: ProjectInstructionsProps) {
           </button>
         </div>
 
-        {failed && <div style={{ marginTop: 6, fontSize: 11, color: "#ef4444" }}>Save failed</div>}
-        <div style={{ marginTop: 8, fontSize: 10, color: "#555" }}>
+        {failed && (
+          <div style={{ marginTop: 6, fontSize: 11, color: "var(--destructive)" }}>Save failed</div>
+        )}
+        <div style={{ marginTop: 8, fontSize: 10, color: "var(--muted-foreground)" }}>
           Work handed from this project to a company follows these instructions.
         </div>
       </div>

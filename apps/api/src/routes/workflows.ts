@@ -401,12 +401,16 @@ export async function workflowsRoutes(
       // A workflow run answers long before it finishes, so the completion also goes out as
       // a webhook: an integrator with a server should not have to poll `GET /workflows/:id`
       // for a schedule it did not trigger.
-      publish("workflow.completed", {
-        workflowId: wf.id,
-        name: wf.name,
-        status: result.status,
-        ...(wf.ownerId ? { ownerId: wf.ownerId } : {}),
-      }, wf.ownerId ?? userId);
+      publish(
+        "workflow.completed",
+        {
+          workflowId: wf.id,
+          name: wf.name,
+          status: result.status,
+          ...(wf.ownerId ? { ownerId: wf.ownerId } : {}),
+        },
+        wf.ownerId ?? userId,
+      );
       return result as unknown as { status: string } & Record<string, unknown>;
     } catch (err) {
       wf.status = "error";

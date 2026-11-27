@@ -154,20 +154,30 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
 
   return (
     <div
-      style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d0d0d" }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "var(--background)",
+      }}
     >
       {/* Header */}
       <div
         style={{
           padding: "10px 14px",
-          borderBottom: "1px solid #1a1a1a",
+          borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
         }}
       >
         <span
-          style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "1px" }}
+          style={{
+            fontSize: 11,
+            color: "var(--muted-foreground)",
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+          }}
         >
           Files ({files.length}/{MAX_FILES})
         </span>
@@ -175,9 +185,9 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
           onClick={() => inputRef.current?.click()}
           style={{
             fontSize: 11,
-            color: "#3b82f6",
+            color: "var(--primary)",
             background: "none",
-            border: "1px solid #1d4ed8",
+            border: "1px solid var(--primary)",
             borderRadius: 4,
             padding: "2px 8px",
             cursor: "pointer",
@@ -204,17 +214,20 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
           style={{
             margin: "8px 14px",
             padding: "6px 10px",
-            background: "#2b0d0d",
-            border: "1px solid #7f1d1d",
+            background: "var(--destructive-surface)",
+            border: "1px solid var(--destructive)",
             borderRadius: 5,
             fontSize: 11,
-            color: "#fca5a5",
+            color: "var(--destructive)",
             display: "flex",
             justifyContent: "space-between",
           }}
         >
           {error}
-          <span onClick={() => setError(null)} style={{ cursor: "pointer", color: "#f87171" }}>
+          <span
+            onClick={() => setError(null)}
+            style={{ cursor: "pointer", color: "var(--destructive)" }}
+          >
             ×
           </span>
         </div>
@@ -234,9 +247,9 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
             onClick={() => inputRef.current?.click()}
             style={{
               margin: "12px 14px",
-              border: `2px dashed ${dragging ? "#3b82f6" : "#333"}`,
+              border: `2px dashed ${dragging ? "var(--primary)" : "var(--border)"}`,
               borderRadius: 8,
-              background: dragging ? "#0d1b2e" : "#111",
+              background: dragging ? "var(--accent)" : "var(--card)",
               padding: "28px 16px",
               textAlign: "center",
               cursor: "pointer",
@@ -244,8 +257,12 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
             }}
           >
             <div style={{ fontSize: 20, marginBottom: 8 }}>📂</div>
-            <div style={{ fontSize: 12, color: "#666" }}>Drop files here or click to browse</div>
-            <div style={{ fontSize: 10, color: "#444", marginTop: 4 }}>{ACCEPTED.join("  ")}</div>
+            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+              Drop files here or click to browse
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 4 }}>
+              {ACCEPTED.join("  ")}
+            </div>
           </div>
         ) : (
           <>
@@ -256,11 +273,11 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
                 onMouseLeave={() => setHoveredId(null)}
                 style={{
                   padding: "7px 14px",
-                  borderBottom: "1px solid #141414",
+                  borderBottom: "1px solid var(--secondary)",
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
-                  background: hoveredId === f.id ? "#141414" : "transparent",
+                  background: hoveredId === f.id ? "var(--secondary)" : "transparent",
                 }}
               >
                 <span style={{ fontSize: 14, flexShrink: 0 }}>{fileIcon(f.filename)}</span>
@@ -268,7 +285,7 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#e5e7eb",
+                      color: "var(--foreground)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -276,7 +293,7 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
                   >
                     {f.filename}
                   </div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 1 }}>
                     {formatSize(f.size)} · {formatDate(f.added_at)}
                   </div>
                 </div>
@@ -284,7 +301,7 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
                   <span
                     onClick={() => removeFile(f.id)}
                     style={{
-                      color: "#ef4444",
+                      color: "var(--destructive)",
                       cursor: "pointer",
                       fontSize: 14,
                       flexShrink: 0,
@@ -307,12 +324,12 @@ export function ProjectFileAttachments({ projectId }: ProjectFileAttachmentsProp
                 onDrop={onDrop}
                 style={{
                   margin: "8px 14px",
-                  border: `1px dashed ${dragging ? "#3b82f6" : "#222"}`,
+                  border: `1px dashed ${dragging ? "var(--primary)" : "var(--border)"}`,
                   borderRadius: 6,
                   padding: "8px",
                   textAlign: "center",
                   fontSize: 11,
-                  color: "#444",
+                  color: "var(--muted-foreground)",
                   cursor: "default",
                   transition: "all 0.15s",
                 }}

@@ -144,7 +144,7 @@ export default function AdminAuditPage() {
                       <td className="px-4 py-3">
                         <Badge
                           variant="outline"
-                          className={"text-[10px] font-mono " + (ACTION_COLORS[entry.action] ?? "")}
+                          className={"text-3xs font-mono " + (ACTION_COLORS[entry.action] ?? "")}
                         >
                           {entry.action}
                         </Badge>

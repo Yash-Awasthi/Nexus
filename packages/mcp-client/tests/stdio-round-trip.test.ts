@@ -43,4 +43,34 @@ describe("stdio round trip", () => {
     await expect(client.initialize()).rejects.toThrow();
     await transport.close();
   });
+
+  it("sends a notification without expecting a reply, and keeps working afterwards", async () => {
+    const transport = new McpStdioTransport({
+      command: process.execPath,
+      args: [fixture],
+      timeoutMs: 20_000,
+    });
+    const client = new McpClient(transport);
+    await client.initialize();
+
+    // `notifications/initialized` is the one every MCP client must send, and no id means no promise: a
+    // transport that awaited one would hang here instead of returning.
+    expect(() => transport.notify("notifications/initialized")).not.toThrow();
+    expect(() => transport.notify("notifications/initialized", { reason: "test" })).not.toThrow();
+
+    // The connection is still usable: a notification must not consume the id sequence.
+    const tools = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toContain("open_session");
+    await transport.close();
+  });
+
+  it("ignores a notify before the child process exists instead of crashing", () => {
+    const idle = new McpStdioTransport({
+      command: process.execPath,
+      args: [fixture],
+      timeoutMs: 5_000,
+    });
+    // Nothing has been sent yet, so there is no child: the call is a no-op rather than a TypeError.
+    expect(() => idle.notify("notifications/initialized")).not.toThrow();
+  });
 });

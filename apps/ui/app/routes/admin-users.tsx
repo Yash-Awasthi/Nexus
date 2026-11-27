@@ -191,7 +191,7 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <Avatar className="size-7">
-                            <AvatarFallback className="text-[10px]">{user.initials}</AvatarFallback>
+                            <AvatarFallback className="text-3xs">{user.initials}</AvatarFallback>
                           </Avatar>
                           <span className="text-sm font-medium">{user.name}</span>
                         </div>
@@ -214,7 +214,7 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] ${
+                          className={`text-3xs ${
                             user.status === "active" ? "text-success" : "text-muted-foreground"
                           }`}
                         >

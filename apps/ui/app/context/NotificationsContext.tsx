@@ -226,7 +226,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               {toast.title}
             </p>
             {toast.message && (
-              <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{toast.message}</p>
+              <p className="text-2xs text-muted-foreground mt-1 line-clamp-2">{toast.message}</p>
             )}
           </div>
         </div>

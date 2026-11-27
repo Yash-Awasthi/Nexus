@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { prefersReducedMotion } from "./motion";
 
+import { token } from "~/lib/tokens";
 import { cn } from "~/lib/utils";
 
 interface Example {
@@ -23,21 +24,21 @@ const EXAMPLES: Example[] = [
       {
         persona: "The Contrarian",
         model: "Groq · gpt-oss-120b",
-        color: "#ff7a59",
+        color: token("cat-7"),
         agrees: false,
         text: "What if Kubernetes is the cheap option? Managed clusters remove a later migration.",
       },
       {
         persona: "The Empiricist",
         model: "Gemini · Flash",
-        color: "#3fd0e0",
+        color: token("cat-2"),
         agrees: true,
         text: "Small teams lose real hours to cluster upkeep. Until load demands it, the evidence says wait.",
       },
       {
         persona: "The Pragmatist",
         model: "Mistral · Small",
-        color: "#fbbf24",
+        color: token("cat-6"),
         agrees: true,
         text: "Ship on a PaaS now. Revisit when you run more than a handful of services.",
       },
@@ -52,21 +53,21 @@ const EXAMPLES: Example[] = [
       {
         persona: "The Architect",
         model: "Anthropic · Sonnet",
-        color: "#7c83ff",
+        color: token("cat-1"),
         agrees: false,
         text: "The boundary is clean and the service is small. A rewrite behind the same interface is contained.",
       },
       {
         persona: "The Empiricist",
         model: "Gemini · Flash",
-        color: "#3fd0e0",
+        color: token("cat-2"),
         agrees: true,
         text: "Nothing shows the current service is slow. Profile first; rewrites are where schedules go to die.",
       },
       {
         persona: "The Historian",
         model: "Mistral · Small",
-        color: "#f472b6",
+        color: token("cat-5"),
         agrees: true,
         text: "Money code that works is rarely worth touching. Wrap it in tests and leave it alone.",
       },
@@ -81,21 +82,21 @@ const EXAMPLES: Example[] = [
       {
         persona: "The Futurist",
         model: "OpenAI · mini",
-        color: "#c084fc",
+        color: token("cat-4"),
         agrees: true,
         text: "Early taste compounds. One good designer sets a bar every later hire is measured against.",
       },
       {
         persona: "The Pragmatist",
         model: "Groq · gpt-oss-20b",
-        color: "#fbbf24",
+        color: token("cat-6"),
         agrees: true,
         text: "Contract one for a month. You get the bar without the payroll before you know what to build.",
       },
       {
         persona: "The Minimalist",
         model: "Mistral · Small",
-        color: "#6ee7a8",
+        color: token("cat-3"),
         agrees: false,
         text: "Before fit, every hour on polish is an hour not spent on learning. Use a component kit.",
       },
@@ -241,7 +242,7 @@ export function DeliberationDemo() {
   return (
     <div ref={root} className="grid gap-6 lg:grid-cols-[minmax(0,15rem)_1fr] lg:items-start">
       <div className="flex flex-wrap gap-2 lg:flex-col" role="group" aria-label="Example questions">
-        <p className="w-full font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
+        <p className="w-full font-mono text-2xs tracking-[0.18em] text-muted-foreground uppercase">
           Pick a question
         </p>
         {EXAMPLES.map((ex, i) => (
@@ -271,7 +272,7 @@ export function DeliberationDemo() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-white/10 bg-background/70 shadow-2xl shadow-black/40 backdrop-blur-md">
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 font-mono text-2xs tracking-[0.14em] text-muted-foreground uppercase">
           <span className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-success" /> Example deliberation
           </span>
@@ -298,9 +299,7 @@ export function DeliberationDemo() {
               <div className="flex items-center gap-2 text-xs">
                 <span className="size-2 rounded-full" style={{ background: m.color }} />
                 <span className="font-medium">{m.persona}</span>
-                <span className="truncate font-mono text-[11px] text-muted-foreground">
-                  {m.model}
-                </span>
+                <span className="truncate font-mono text-2xs text-muted-foreground">{m.model}</span>
               </div>
               <p
                 ref={(el) => {
@@ -312,7 +311,7 @@ export function DeliberationDemo() {
           ))}
 
           <div className="rounded-lg border border-white/10 p-3">
-            <p className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+            <p className="font-mono text-2xs tracking-[0.14em] text-muted-foreground uppercase">
               Positions
             </p>
             <div className="relative mt-3 h-6">

@@ -43,7 +43,7 @@ export function GoalTree({ companyId, refreshKey }: { companyId: string; refresh
       >
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{g.title}</p>
-          <p className="text-[11px] uppercase text-muted-foreground">{g.level}</p>
+          <p className="text-2xs uppercase text-muted-foreground">{g.level}</p>
         </div>
         <StatusPill status={g.status} />
         <select

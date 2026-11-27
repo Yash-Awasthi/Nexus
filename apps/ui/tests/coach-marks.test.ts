@@ -79,7 +79,9 @@ describe("the hint registry", () => {
       const file = wired[mark.page];
       expect(file, `${mark.page} has no page component in this test`).toBeDefined();
       const source = fs.readFileSync(path.resolve(__dirname, "../../..", file!), "utf8");
-      expect(source, `${file} renders no coach mark`).toContain(`<CoachMark page="${mark.page}" />`);
+      expect(source, `${file} renders no coach mark`).toContain(
+        `<CoachMark page="${mark.page}" />`,
+      );
     }
   });
 });

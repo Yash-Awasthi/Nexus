@@ -28,7 +28,7 @@ export interface CircuitBreakerConfig {
   recoveryTimeoutMs: number;
   /** Maximum number of requests allowed in half-open state */
   halfOpenMaxRequests: number;
-  /** Percentage of requests that must succeed in half-open to close */
+  /** Fraction (0–1) of the half-open probe budget that must succeed for the circuit to close */
   halfOpenSuccessRate: number;
   /** Name for metrics/tracing */
   name: string;

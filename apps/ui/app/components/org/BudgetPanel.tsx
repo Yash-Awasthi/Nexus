@@ -176,7 +176,7 @@ export function BudgetPanel({
           ["All time", view.spend.lifetimeMicros],
         ].map(([label, v]) => (
           <div key={label} className="rounded-lg border bg-card p-3">
-            <p className="text-[11px] uppercase text-muted-foreground">{label}</p>
+            <p className="text-2xs uppercase text-muted-foreground">{label}</p>
             <p className="font-mono text-lg" data-testid={`spend-${label}`}>
               {m(v as number)}
             </p>

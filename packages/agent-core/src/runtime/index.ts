@@ -29,6 +29,9 @@ import {
 import { withToolSpan, withTurnSpan } from "@nexus/telemetry";
 
 import { HookDispatcher, type AgentHooks, type HookDecision } from "./hooks.ts";
+import { classifyToolFailure, type ToolFailure } from "./tool-failure.ts";
+
+export { classifyToolFailure, type ToolFailure, type ToolFailureKind } from "./tool-failure.ts";
 
 export {
   HookDispatcher,
@@ -63,6 +66,11 @@ export interface ToolResult {
   name: string;
   output: unknown;
   error?: string;
+  /**
+   * Why the call failed, in the shape a model and a person each need. Present whenever `error` is
+   * set, so no consumer has to re-parse an error string to tell a timeout from bad arguments.
+   */
+  failure?: ToolFailure;
 }
 
 /** Step input interface definition. */
@@ -387,13 +395,15 @@ export class RuntimeToolSet {
   ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {
-      return { name, output: null, error: `Tool not found: ${name}` };
+      const error = `Tool not found: ${name}`;
+      return { name, output: null, error, failure: classifyToolFailure(name, error) };
     }
     try {
       const output = await tool.handler(args, ctx);
       return { name, output };
     } catch (err) {
-      return { name, output: null, error: err instanceof Error ? err.message : String(err) };
+      const error = err instanceof Error ? err.message : String(err);
+      return { name, output: null, error, failure: classifyToolFailure(name, err) };
     }
   }
 

@@ -71,7 +71,13 @@ describe("GET /api/sandbox/status", () => {
     const res = await app.inject({ method: "GET", url: "/api/sandbox/status" });
     const body = res.json<{
       languages: string[];
-      runtimes: { language: string; via: string; serverRuns: boolean; version: string | null; pin: string }[];
+      runtimes: {
+        language: string;
+        via: string;
+        serverRuns: boolean;
+        version: string | null;
+        pin: string;
+      }[];
       note: string;
     }>();
     // One entry per advertised language, in the same order, and none invented.

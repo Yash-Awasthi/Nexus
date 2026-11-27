@@ -12,6 +12,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { report } from "./lib-inventory.mjs";
+import { canonical, formatDoc } from "./lib/generated-doc.mjs";
 
 const DOC = "docs/ARCHITECTURE.md";
 const BEGIN = "<!-- begin:generated layers (scripts/arch-diagrams.mjs) -->";
@@ -148,7 +149,9 @@ if (import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1]
       ? `${doc.trimEnd()}\n\n## Layer diagrams\n\n${generated()}\n`
       : `${doc.slice(0, start)}${generated()}${doc.slice(end + END.length)}`;
   if (check) {
-    if (body !== doc) {
+    // Compare content, not alignment: the committed file is padded by `vp fmt`, the generator emits cells
+    // unpadded, and comparing raw text would make this gate fight `format:check` forever.
+    if (canonical(body) !== canonical(doc)) {
       console.error(
         "✖ docs/ARCHITECTURE.md layer diagrams are out of date — run `node scripts/arch-diagrams.mjs`",
       );
@@ -157,6 +160,7 @@ if (import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1]
     console.log(`arch diagrams: ${LAYERS.length} layers match the tree`);
   } else {
     writeFileSync(DOC, body);
+    formatDoc(DOC);
     console.log(`arch diagrams: wrote ${LAYERS.length} layers into ${DOC}`);
   }
 }

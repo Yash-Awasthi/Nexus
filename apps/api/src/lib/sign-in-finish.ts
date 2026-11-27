@@ -8,9 +8,12 @@
  * JSON answer.
  */
 
+import { retentionTtlMs } from "@nexus/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000;
+// One month, stated once in the retention policy: the cookie's Max-Age and the row's `expires_at` are the same
+// lifetime, so a browser that keeps a cookie the database has already expired is not a failure mode we can have.
+const REFRESH_TOKEN_TTL_MS = retentionTtlMs("sessions");
 
 /**
  * The browser keeps its refresh token in this cookie, out of reach of page

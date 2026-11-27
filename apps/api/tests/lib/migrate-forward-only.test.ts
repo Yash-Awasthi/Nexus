@@ -7,10 +7,12 @@
  * that is the schema the running release knows — then the newest migration on top of
  * rows in the shape the *older* code wrote.
  *
- * The newest migration in this repo (0022) is a backfill: it moves the memory owner
- * between `user_id` and `metadata.userId`. A backfill is exactly the kind of migration
- * that looks fine on an empty database and damages one with history, so the rows below
- * are the two halves each side wrote before it existed.
+ * The memory-owner backfill (0022) is the split point: it moves the owner between `user_id` and
+ * `metadata.userId`, which is exactly the kind of migration that looks fine on an empty database and
+ * damages one with history, so the rows below are the two halves each side wrote before it existed.
+ * Every migration after it is applied in the same deploy, so a later migration is also proven to survive
+ * rows the older code wrote — the file stops being a test of one migration and becomes a test of the
+ * newest release.
  */
 import { cpSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -47,12 +49,17 @@ describe("a migration applies over the previous release's data", () => {
     const all = readdirSync(MIGRATIONS)
       .filter((name) => name.includes("_00"))
       .sort();
-    const newest = all.at(-1)!;
-    expect(newest).toMatch(/0022/);
+    const backfill = all.findIndex((name) => /_0022_/.test(name));
+    expect(
+      backfill,
+      "the memory-owner backfill migration is the split point of this test",
+    ).toBeGreaterThan(0);
+    const previousRelease = all.slice(0, backfill);
+    const deploy = all.slice(backfill);
 
     // The previous release: every migration the running code already knows.
     const dir = mkdtempSync(path.join(tmpdir(), "nexus-forward-only-"));
-    for (const name of all.slice(0, -1))
+    for (const name of previousRelease)
       cpSync(path.join(MIGRATIONS, name), path.join(dir, name), { recursive: true });
 
     const previous = process.env.NEXUS_MIGRATIONS_DIR;
@@ -60,7 +67,7 @@ describe("a migration applies over the previous release's data", () => {
       process.env.NEXUS_MIGRATIONS_DIR = dir;
       const pool = getPgPool(PREVIOUS)!;
       const first = await migrateEmbedded(pool);
-      expect(first.applied).not.toContain(newest);
+      for (const name of deploy) expect(first.applied).not.toContain(name);
 
       // Rows written by the older code: one side stored the owner in metadata only, the
       // other in user_id only. Neither copy is visible to the other page.
@@ -77,10 +84,10 @@ describe("a migration applies over the previous release's data", () => {
       );
       const before = await shape(pool);
 
-      // The deploy: the newest migration runs against that data.
+      // The deploy: the backfill and everything after it run against that data.
       delete process.env.NEXUS_MIGRATIONS_DIR;
       const second = await migrateEmbedded(pool);
-      expect(second.applied).toEqual([newest]);
+      expect(second.applied).toEqual(deploy);
 
       const rows = await pool.query<{
         id: string;
@@ -95,9 +102,11 @@ describe("a migration applies over the previous release's data", () => {
       // Forward-only means additive: every table and column that existed still exists.
       const after = await shape(pool);
       for (const [table, columns] of Object.entries(before)) {
-        expect(after[table], `table ${table} was removed by ${newest}`).toBeDefined();
+        expect(after[table], `table ${table} was removed by ${deploy.join(", ")}`).toBeDefined();
         for (const column of columns)
-          expect(after[table], `${table}.${column} was removed by ${newest}`).toContain(column);
+          expect(after[table], `${table}.${column} was removed by ${deploy.join(", ")}`).toContain(
+            column,
+          );
       }
     } finally {
       if (previous === undefined) delete process.env.NEXUS_MIGRATIONS_DIR;

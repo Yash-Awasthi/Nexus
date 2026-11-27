@@ -5,6 +5,7 @@ import {
   uuid,
   text,
   boolean,
+  integer,
   jsonb,
   timestamp,
   index,
@@ -36,6 +37,12 @@ export const userProviderCredentials = pgTable(
      * connections (e.g. ollama, custom base URLs) may have no key.
      */
     encryptedKey: text("encrypted_key"),
+    /**
+     * 1 = legacy bare base64, 2 = current `v1:` envelope. Bumped by the rotation pass
+     * (apps/api/src/rotate-secrets.ts) so "how much of the table is still on the old key" is a
+     * count rather than a decryption sweep. Default 1 describes existing rows correctly.
+     */
+    keyMaterialVersion: integer("key_material_version").notNull().default(1),
     /** First 8 chars of the raw key, for display */
     keyPrefix: text("key_prefix"),
     /** SHA-256 hex of the raw key, for dedup */

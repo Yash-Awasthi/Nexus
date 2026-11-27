@@ -347,7 +347,7 @@ export class MissionRunner {
         const toolOutput = res.steps.flatMap((s) =>
           s.toolResults.map(
             (r) =>
-              `Tool ${r.name}: ${r.error ? `error: ${r.error}` : (typeof r.output === "string" ? r.output : JSON.stringify(r.output)).slice(0, 2000)}`,
+              `Tool ${r.name}: ${r.failure ? r.failure.userMessage : r.error ? `error: ${r.error}` : (typeof r.output === "string" ? r.output : JSON.stringify(r.output)).slice(0, 2000)}`,
           ),
         );
         reviewedWork = [actingOutput, ...toolOutput].filter((t) => t.trim()).join("\n\n");

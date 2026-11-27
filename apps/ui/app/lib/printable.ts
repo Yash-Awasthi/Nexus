@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// design-tokens-allow-file: standalone document — docToHtml() returns a complete HTML file that is opened outside the app, so it must carry its own colours
 /**
  * Print and PDF export: the page the user is looking at, on paper.
  *
@@ -169,7 +170,10 @@ export function deliberationDoc(input: DeliberationInput): PrintableDoc {
         label: "Ended because",
         value: input.reasonText ?? input.outcome?.reason ?? "still running",
       },
-      { label: "Contributions", value: String(input.outcome?.contributions ?? contributions.length) },
+      {
+        label: "Contributions",
+        value: String(input.outcome?.contributions ?? contributions.length),
+      },
       { label: "Tokens", value: String(input.outcome?.totalTokens ?? 0) },
       { label: "Council", value: input.members.map((m) => m.label).join(", ") || "none seated" },
     ],
@@ -215,7 +219,10 @@ export function workflowRunDoc(input: WorkflowRunInput): PrintableDoc {
     generatedAt: input.generatedAt ?? new Date().toISOString(),
     meta: [
       { label: "Status", value: input.status },
-      { label: "Steps", value: input.steps.map((step) => `${step.name} (${step.kind})`).join(" → ") },
+      {
+        label: "Steps",
+        value: input.steps.map((step) => `${step.name} (${step.kind})`).join(" → "),
+      },
     ],
     sections: [
       { heading: "Result", body: input.result.trim() || "(the run produced no output)" },
@@ -226,7 +233,13 @@ export function workflowRunDoc(input: WorkflowRunInput): PrintableDoc {
 
 export interface CompanyReportInput {
   company: { name: string; mission: string; description?: string };
-  agents: { name: string; title: string; role: string; status?: string; reportsTo?: string | null }[];
+  agents: {
+    name: string;
+    title: string;
+    role: string;
+    status?: string;
+    reportsTo?: string | null;
+  }[];
   tasks?: { title: string; status: string; assignee?: string }[];
   budgets?: { label: string; used: string; limit: string }[];
   generatedAt?: string;
@@ -261,7 +274,9 @@ export function companyReportDoc(input: CompanyReportInput): PrintableDoc {
         heading: "Open work",
         body: "",
         items: openTasks.map((task) =>
-          task.assignee ? `${task.title} — ${task.assignee} (${task.status})` : `${task.title} (${task.status})`,
+          task.assignee
+            ? `${task.title} — ${task.assignee} (${task.status})`
+            : `${task.title} (${task.status})`,
         ),
         ...(openTasks.length ? {} : { note: "No open tasks." }),
       },

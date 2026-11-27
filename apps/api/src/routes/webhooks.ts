@@ -21,6 +21,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { ownerIdFor } from "../lib/owner.ts";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { fail } from "../lib/reply-errors.ts";
 import {
   createSubscription,
@@ -31,7 +32,6 @@ import {
   type WebhookDelivery,
   type WebhookSubscription,
 } from "../lib/webhooks.ts";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.ts";
 import { requireAuthWithTier } from "../middleware/auth.ts";
 
 const AUTH = { preHandler: requireAuthWithTier };
@@ -103,7 +103,9 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     if (!subscription) return fail(reply, 404, "not_found");
     return {
       ...subscription,
-      deliveries: deliveriesFor(subscription.ownerId, subscription.id).slice(0, 50).map(deliveryView),
+      deliveries: deliveriesFor(subscription.ownerId, subscription.id)
+        .slice(0, 50)
+        .map(deliveryView),
     };
   });
 

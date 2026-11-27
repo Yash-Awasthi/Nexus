@@ -18,14 +18,14 @@ Three checks answer most reports in under a minute:
 
 ## Where to go
 
-| What you have                        | Where it goes                                                                 | Response                  |
-| ------------------------------------ | ----------------------------------------------------------------------------- | ------------------------- |
-| A reproducible bug                   | a [bug report](.github/ISSUE_TEMPLATE/bug.yml) — the form asks for the version, the command and what you expected | best effort, in the open  |
-| A feature request                    | a [feature request](.github/ISSUE_TEMPLATE/feature.yml)                       | triaged in the open       |
-| A new provider, adapter or policy    | an [adapter proposal](.github/ISSUE_TEMPLATE/adapter-proposal.yml)            | in the open               |
-| A security vulnerability             | **never** the issue tracker — [`SECURITY.md`](SECURITY.md)                    | privately, acknowledged within 72h |
-| A question about how something works | [discussions](../../discussions), or read [`docs/`](docs/) first              | community                 |
-| A paid deployment is broken          | the private channel in your contract                                          | paged, per [`docs/slos.md`](docs/slos.md) |
+| What you have                        | Where it goes                                                                                                     | Response                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| A reproducible bug                   | a [bug report](.github/ISSUE_TEMPLATE/bug.yml) — the form asks for the version, the command and what you expected | best effort, in the open                  |
+| A feature request                    | a [feature request](.github/ISSUE_TEMPLATE/feature.yml)                                                           | triaged in the open                       |
+| A new provider, adapter or policy    | an [adapter proposal](.github/ISSUE_TEMPLATE/adapter-proposal.yml)                                                | in the open                               |
+| A security vulnerability             | **never** the issue tracker — [`SECURITY.md`](SECURITY.md)                                                        | privately, acknowledged within 72h        |
+| A question about how something works | [discussions](../../discussions), or read [`docs/`](docs/) first                                                  | community                                 |
+| A paid deployment is broken          | the private channel in your contract                                                                              | paged, per [`docs/slos.md`](docs/slos.md) |
 
 ## What a good report contains
 

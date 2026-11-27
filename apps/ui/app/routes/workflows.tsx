@@ -34,10 +34,12 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 
+import { CoachMark } from "~/components/coach-mark";
 import { selectClass } from "~/components/org/AgentDialog";
 import { EmptyState, Page, PageHeader } from "~/components/page";
-import { ModelGlyph, ProviderGlyph } from "~/components/provider-glyph";
 import { PrintButton } from "~/components/print-button";
+import { ModelGlyph, ProviderGlyph } from "~/components/provider-glyph";
+import { PageError } from "~/components/states";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -60,6 +62,7 @@ import {
 import { Textarea } from "~/components/ui/textarea";
 import { canManage, orgApi, type Agent, type Company } from "~/lib/org";
 import { workflowRunDoc } from "~/lib/printable";
+import { token } from "~/lib/tokens";
 
 import "@xyflow/react/dist/style.css";
 
@@ -138,43 +141,43 @@ const nodeTypeStyles: Record<
   { border: string; label: string; icon: React.ElementType; description: string }
 > = {
   input: {
-    border: "#10b981",
+    border: token("chart-3"),
     label: "Query Input",
     icon: MessageSquare,
     description: "Entry point for user input",
   },
   llm: {
-    border: "#3b82f6",
+    border: token("chart-1"),
     label: "LLM Node",
     icon: Brain,
     description: "AI model processing step",
   },
   output: {
-    border: "#f59e0b",
+    border: token("chart-4"),
     label: "Result Output",
     icon: BarChart2,
     description: "Final output collector",
   },
   branch: {
-    border: "#a855f7",
+    border: token("cat-4"),
     label: "Branch/Condition",
     icon: GitFork,
     description: "Conditional routing logic",
   },
   tool: {
-    border: "#06b6d4",
+    border: token("chart-2"),
     label: "Tool Call",
     icon: Wrench,
     description: "External tool integration",
   },
   code: {
-    border: "#64748b",
+    border: token("muted-foreground"),
     label: "Code Block",
     icon: Code2,
     description: "Custom code execution",
   },
   org: {
-    border: "#ef4444",
+    border: token("destructive"),
     label: "Company Task",
     icon: Building2,
     description: "Hand the data to a company agent",
@@ -188,7 +191,7 @@ function NodePalette({ onAddNode }: { onAddNode: (type: string) => void }) {
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Node Palette
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">Drag or click to add</p>
+        <p className="text-3xs text-muted-foreground mt-0.5">Drag or click to add</p>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {Object.entries(nodeTypeStyles).map(([type, cfg]) => {
@@ -207,7 +210,7 @@ function NodePalette({ onAddNode }: { onAddNode: (type: string) => void }) {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium leading-none">{cfg.label}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                <p className="text-3xs text-muted-foreground mt-0.5 leading-tight">
                   {cfg.description}
                 </p>
               </div>
@@ -449,7 +452,7 @@ function PropertiesPanel({
           </div>
           <div>
             <p className="text-xs font-medium">{cfg.label}</p>
-            <p className="text-[10px] text-muted-foreground">Node ID: {selectedNode.id}</p>
+            <p className="text-3xs text-muted-foreground">Node ID: {selectedNode.id}</p>
           </div>
         </div>
 
@@ -480,7 +483,7 @@ function PropertiesPanel({
                       <ProviderGlyph provider={m.provider} size={14} />
                       <span className="truncate">{m.id}</span>
                       {m.available === false && (
-                        <span className="text-[10px] text-muted-foreground">(no key)</span>
+                        <span className="text-3xs text-muted-foreground">(no key)</span>
                       )}
                     </span>
                   </SelectItem>
@@ -514,7 +517,7 @@ function PropertiesPanel({
           <label className="text-xs font-medium text-muted-foreground">Node Type</label>
           <Badge
             variant="outline"
-            className="text-[10px]"
+            className="text-3xs"
             style={{ borderColor: cfg.border, color: cfg.border }}
           >
             {cfg.label}
@@ -562,9 +565,11 @@ function WorkflowEditor({
   const [isRunning, setIsRunning] = useState(false);
   const [runOutput, setRunOutput] = useState<string | null>(null);
   /** The last run as data, for the printable document; `runOutput` is the same run as prose. */
-  const [runDetail, setRunDetail] = useState<{ result: string; trace: string; status: string } | null>(
-    null,
-  );
+  const [runDetail, setRunDetail] = useState<{
+    result: string;
+    trace: string;
+    status: string;
+  } | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(true);
   const [models, setModels] = useState<GatewayModel[]>(FALLBACK_MODELS);
   const [schedule, setSchedule] = useState(workflow.schedule ?? "");
@@ -789,10 +794,7 @@ function WorkflowEditor({
         <div className="w-px h-5 bg-border" />
         <GitBranch className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium">{workflow.name}</span>
-        <Badge
-          variant="outline"
-          className={`text-[10px] ml-1 ${statusConfig[workflow.status].color}`}
-        >
+        <Badge variant="outline" className={`text-3xs ml-1 ${statusConfig[workflow.status].color}`}>
           {statusConfig[workflow.status].label}
         </Badge>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -991,15 +993,25 @@ export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
+  // "The server did not answer" is not "you have no workflows", and the fallback copy on this device
+  // must not be presented as if it were the server's list.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Load workflows — API first. An empty server list is authoritative
   // (server-created workflows only; demo data was removed); localStorage is a
   // fallback for when the API is unreachable, not a source of stale demos.
   useEffect(() => {
+    setLoadError(null);
     fetch("/api/workflows?limit=100")
-      .then((r) => (r.ok ? (r.json() as Promise<unknown>) : Promise.reject(new Error())))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<unknown>)
+          : Promise.reject(new Error(r.statusText || `HTTP ${r.status}`)),
+      )
       .then((data) => setWorkflows(workflowList(data).map(normalizeWorkflow)))
-      .catch(() => {
+      .catch((e: Error) => {
+        setLoadError(e.message || "The workflow list could not be read.");
         // Network/server error only — fall back to locally-saved workflows.
         try {
           const raw = localStorage.getItem("workflows");
@@ -1011,7 +1023,7 @@ export default function WorkflowsPage() {
           // Nothing usable saved locally either.
         }
       });
-  }, []);
+  }, [reloadKey]);
 
   // Save workflows to localStorage whenever they change
   useEffect(() => {
@@ -1107,6 +1119,17 @@ export default function WorkflowsPage() {
         }
       />
       <CoachMark page="/workflows" />
+      {loadError && (
+        <PageError
+          title="The server could not send your workflows"
+          message={`${loadError} ${
+            workflows.length > 0
+              ? "Showing the copies saved on this device."
+              : "Nothing is saved on this device either."
+          }`}
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
+      )}
       {workflows.length === 0 && (
         <EmptyState
           icon={GitFork}
@@ -1139,14 +1162,14 @@ export default function WorkflowsPage() {
                   <span>Last run: {wf.lastRun}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-3">
-                  <Badge variant="outline" className={`text-[10px] ${st.color}`}>
+                  <Badge variant="outline" className={`text-3xs ${st.color}`}>
                     {st.label}
                   </Badge>
                   <div className="ml-auto flex items-center gap-1.5">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-6 px-2.5 text-[11px] gap-1"
+                      className="h-6 px-2.5 text-2xs gap-1"
                       onClick={() => setEditingWorkflow(wf)}
                     >
                       Edit

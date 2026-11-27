@@ -17,11 +17,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
-const {
-  unsafeUrlReason,
-  fetchPublic,
-  FETCH_REDIRECT_LIMIT,
-} = await import("../../src/lib/public-url.ts");
+const { unsafeUrlReason, fetchPublic, FETCH_REDIRECT_LIMIT } =
+  await import("../../src/lib/public-url.ts");
 
 const ORIGINAL_DESKTOP = process.env.NEXUS_DESKTOP;
 afterEach(() => {
