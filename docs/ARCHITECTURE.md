@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: fcff384 2026-11-25 -->
+<!-- verified: 1410186 2026-11-26 -->
 
 # Nexus — Architecture & Repository Layout
 
@@ -49,7 +49,7 @@ How the apps, packages, and infrastructure fit together. For per-feature detail 
 │  │                                                                      │   │
 │  │  governance · hooks · kv · llm-cache · llm-oauth · llm-tracer ·      │   │
 │  │  feature-flags · doc-pipeline · nlp-utils · pipeline-signal ·        │   │
-│  │  trigger-engine · stream-recovery · stealth-browser · researcher ·   │   │
+│  │  stream-recovery · stealth-browser · researcher ·                    │   │
 │  │  browser-automation · session-sync · pty · exec-policy ·             │   │
 │  │  search-orchestrator · llm-accounts · mcp-openapi · ...              │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
@@ -227,8 +227,6 @@ graph LR
   pkg_api --> pkg_stream_recovery
   pkg_telemetry["@nexus/telemetry · packages/telemetry"]
   pkg_api --> pkg_telemetry
-  pkg_trigger_engine["@nexus/trigger-engine · packages/trigger-engine"]
-  pkg_api --> pkg_trigger_engine
   pkg_worker["@nexus/worker · apps/worker"]
   pkg_api --> pkg_worker
 ```
@@ -338,7 +336,6 @@ the count grows.
 | `@nexus/sdk`                 | `@nexus/api`    |
 | `@nexus/search-orchestrator` | `@nexus/api`    |
 | `@nexus/session-sync`        | `@nexus/api`    |
-| `@nexus/trigger-engine`      | `@nexus/api`    |
 | `@nexus/worker`              | `@nexus/api`    |
 
 #### `apps/api/src/lib` by domain

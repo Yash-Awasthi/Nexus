@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
+ * Cron and interval triggers: when a scheduled thing is due, once per minute.
+ *
+ * Folded in from `@nexus/trigger-engine` (ADR 0025): two source files, no runtime dependency, imported
+ * only by this app (`lib/org-scheduler.ts` and `routes/workflows.ts`). The package boundary was a
+ * `package.json`, a build-graph edge and a second tsconfig describing a directory move.
+ */
+
+/**
  * Five-field cron expressions (minute hour day-of-month month day-of-week):
  * `*`, numbers, `a-b` ranges, `,` lists and `/n` steps; day-of-week 7 is Sunday.
  * No names or `L`/`W`.

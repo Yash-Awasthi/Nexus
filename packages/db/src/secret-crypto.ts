@@ -73,6 +73,26 @@ export function encryptWithKey(key: Buffer, plaintext: string): string {
 /** The prefix written today. Rows stored before it existed carry no prefix and are read as v1. */
 export const SECRET_ENVELOPE = "v1:";
 
+/**
+ * Raised for a `vN:` envelope this build does not know.
+ *
+ * Without this check an unknown prefix is just base64-shaped text, and the failure surfaces as a GCM tag error —
+ * which says "wrong key" to an operator looking at a row that is actually from a newer build. Naming the version
+ * keeps that diagnosis honest, and refusing means a downgrade cannot silently treat future ciphertext as v1.
+ */
+export class SecretEnvelopeVersionError extends Error {
+  readonly code = "secret_envelope_unknown_version";
+  readonly version: string;
+  constructor(version: string) {
+    super(
+      `Unknown secret envelope version "${version}". This build reads "${SECRET_ENVELOPE}" and the prefixless ` +
+        `legacy form; upgrade before reading these rows.`,
+    );
+    this.name = "SecretEnvelopeVersionError";
+    this.version = version;
+  }
+}
+
 /** Low-level AES-256-GCM decrypt with an explicit 32-byte key. Throws on tamper. */
 export function decryptWithKey(key: Buffer, stored: string): string {
   const buf = Buffer.from(stored, "base64");
@@ -101,9 +121,15 @@ export function decryptSecret(stored: string): string {
 /**
  * Strip the envelope prefix. A row written before the prefix existed is returned unchanged, which is exactly how
  * rotation knows there is work to do: `stored === unwrap(stored)` means it is still version 1 on disk.
+ *
+ * A `vN:` prefix other than ours is refused by name rather than decoded as if it were base64. Base64 cannot contain
+ * `:`, so the two shapes are unambiguous and the legacy form is never mistaken for a version.
  */
 export function unwrap(stored: string): string {
-  return stored.startsWith(SECRET_ENVELOPE) ? stored.slice(SECRET_ENVELOPE.length) : stored;
+  if (stored.startsWith(SECRET_ENVELOPE)) return stored.slice(SECRET_ENVELOPE.length);
+  const versioned = /^(v\d+:)/.exec(stored);
+  if (versioned) throw new SecretEnvelopeVersionError(versioned[1]!);
+  return stored;
 }
 
 /** True when a stored value already carries the current envelope. */

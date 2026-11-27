@@ -106,11 +106,5 @@
     "branches": 89.1,
     "functions": 100,
     "lines": 97.8
-  },
-  "packages/trigger-engine": {
-    "statements": 96.3,
-    "branches": 91.7,
-    "functions": 100,
-    "lines": 97.7
   }
 }

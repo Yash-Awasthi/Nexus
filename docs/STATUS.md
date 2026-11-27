@@ -1,4 +1,4 @@
-<!-- verified: 8065a84 2026-11-25 -->
+<!-- verified: 1410186 2026-11-26 -->
 
 # Nexus — Feature Status (local, no paid APIs)
 
@@ -15,7 +15,7 @@ _Last verified 2026-11-24 (`node scripts/baseline.mjs --write`; unit, e2e and pr
 
 | Measure   | Value                                                                                    |
 | --------- | ---------------------------------------------------------------------------------------- |
-| Workspace | 46 packages, 7 apps, 2 services                                                          |
+| Workspace | 45 packages, 7 apps, 2 services                                                          |
 | API spec  | 429 paths, 537 operations: 371 durable, 161 bridge, 5 dedicated-volatile, 0 unclassified |
 
 <!-- baseline:measured -->

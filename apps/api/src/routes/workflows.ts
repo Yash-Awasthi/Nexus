@@ -19,13 +19,13 @@
 import crypto from "node:crypto";
 
 import type { DriverRegistry, LlmDriver, LlmRole } from "@nexus/llm/drivers";
-import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 import type { FastifyInstance } from "fastify";
 
 import { handOff } from "../lib/org-work.ts";
 import { ANON_OWNER, claimable, ownsRow } from "../lib/owner.ts";
 import { PersistentStore } from "../lib/persistent-store.ts";
 import { emitReaction, provideReactionDeps } from "../lib/reactions.ts";
+import { isDue, minuteKey, nextCronRun, parseCron } from "../lib/trigger-engine/index.ts";
 import { publish } from "../lib/webhooks.ts";
 
 const now = (): string => new Date().toISOString();

@@ -15,6 +15,7 @@
  *
  *   node scripts/perf-budget.mjs                  measure everything, print a table
  *   node scripts/perf-budget.mjs --only test      measure one workload
+ *   node scripts/perf-budget.mjs --samples 2      override the samples per workload
  *   node scripts/perf-budget.mjs --record         write .github/perf-baseline.json
  *   node scripts/perf-budget.mjs --check          fail on a >25% regression here
  *
@@ -26,13 +27,29 @@ import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "no
 import { cpus, platform, totalmem } from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { measureBoot } from "./api-boot-budget.mjs";
-
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BASELINE = `${ROOT}.github/perf-baseline.json`;
 
 /** Over this much slower than the recorded baseline, a workload fails `--check`. */
 export const TOLERANCE_PCT = 25;
+
+/**
+ * How many times each workload runs before the gate believes a number.
+ *
+ * Same argument as `scripts/api-boot-budget.mjs`: another process can only make a
+ * wall time longer, never shorter, so the fastest of a few samples measures the code
+ * and the slowest measures the machine. One sample from a box with a VM running read
+ * 27.5 s for a cold build that costs 12.4 s on the same host idle; five read 12.6 s.
+ * The test suite is the exception and takes two, because a five-fold suite is the
+ * thing being avoided, not measured. `--samples N` overrides both.
+ */
+export const SAMPLES = 5;
+
+/** The fastest sample, which is the one a budget is about. */
+export function fastest(samples) {
+  if (samples.length === 0) throw new Error("at least one sample is required");
+  return samples.reduce((a, b) => (b < a ? b : a));
+}
 
 /**
  * Which machine produced a number.
@@ -148,15 +165,13 @@ export const WORKLOADS = {
   },
   test: {
     what: "`pnpm test` — every workspace suite through turbo",
+    // The one slow workload: two samples, not five, because the suite is the cost.
+    samples: 2,
     run: async () => time("test", "pnpm", ["test"]),
   },
   uiDev: {
     what: "UI dev server: spawn to the first 200 on http://127.0.0.1:5173/",
     run: async () => measureDevServer(),
-  },
-  apiBoot: {
-    what: "API: `import server.ts` to a served GET /health, embedded database",
-    run: async () => (await measureBoot()).elapsedMs,
   },
 };
 
@@ -206,22 +221,35 @@ if (invokedDirectly) {
     }
   }
 
+  const countIndex = argv.indexOf("--samples");
+  const count = countIndex === -1 ? SAMPLES : Number(argv[countIndex + 1]);
+  if (!Number.isInteger(count) || count < 1) {
+    console.error(`✖ --samples needs a positive integer, got ${argv[countIndex + 1]}`);
+    process.exit(2);
+  }
+
   const baseline = readBaseline();
   const results = {};
   let failed = 0;
-  console.log(`perf: host ${HERE}`);
+  console.log(`perf: host ${HERE} (fastest sample wins)`);
   for (const name of names) {
+    const runs = countIndex !== -1 ? count : (WORKLOADS[name].samples ?? count);
     console.log(`\n▶ ${name} — ${WORKLOADS[name].what}`);
-    let ms;
-    try {
-      ms = await WORKLOADS[name].run();
-    } catch (error) {
-      console.error(`✖ ${name} failed: ${error.message}`);
-      process.exit(1);
+    const samples = [];
+    for (let i = 0; i < runs; i++) {
+      try {
+        samples.push(Math.round(await WORKLOADS[name].run()));
+      } catch (error) {
+        console.error(`✖ ${name} failed: ${error.message}`);
+        process.exit(1);
+      }
     }
+    const ms = fastest(samples);
     const verdict = judge(name, ms, baseline);
-    results[name] = { ms: Math.round(ms), host: HERE, at: new Date().toISOString() };
-    console.log(`${verdict.ok ? "✔" : "✖"} ${name}: ${Math.round(ms)}ms — ${verdict.reason}`);
+    results[name] = { ms, samples, host: HERE, at: new Date().toISOString() };
+    console.log(
+      `${verdict.ok ? "✔" : "✖"} ${name}: best ${ms}ms of ${samples.join("/")}ms — ${verdict.reason}`,
+    );
     if (!verdict.ok && argv.includes("--check")) failed++;
   }
 

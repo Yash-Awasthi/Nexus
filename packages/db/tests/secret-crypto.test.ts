@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import {
   SECRET_ENVELOPE,
   SecretCryptoUnavailableError,
+  SecretEnvelopeVersionError,
   decryptSecret,
   decryptSecretAnyKey,
   decryptWithKey,
@@ -125,6 +126,30 @@ describe("round trip and envelope", () => {
   it("decrypts a bare-base64 value from a stored key directly", () => {
     const key = getSecretKey()!;
     expect(decryptWithKey(key, encryptWithKey(key, "low level"))).toBe("low level");
+  });
+});
+
+describe("envelope versions", () => {
+  it("refuses a version this build does not read, by name, instead of decoding it as base64", () => {
+    const body = encryptWithKey(getSecretKey()!, "from a newer build");
+    for (const version of ["v2:", "v9:"]) {
+      expect(() => decryptSecret(version + body), version).toThrow(SecretEnvelopeVersionError);
+    }
+    try {
+      decryptSecret("v9:" + body);
+    } catch (err) {
+      expect((err as SecretEnvelopeVersionError).code).toBe("secret_envelope_unknown_version");
+      expect((err as Error).message).toContain("v9:");
+      expect((err as Error).message).not.toContain(body);
+    }
+    // The rotation path names the version too, rather than reporting it as a bad key.
+    expect(() => decryptSecretAnyKey("v9:" + body)).toThrow(/v9:/);
+  });
+
+  it("keeps the prefixless legacy form working, since base64 cannot look like a version", () => {
+    const legacy = encryptWithKey(getSecretKey()!, "legacy row");
+    expect(legacy).not.toMatch(/^v\d+:/);
+    expect(decryptSecret(legacy)).toBe("legacy row");
   });
 });
 

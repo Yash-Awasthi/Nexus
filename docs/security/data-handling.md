@@ -113,7 +113,9 @@ account — because a positive-only test passes on a route that dumps the whole 
 Provider keys are stored as AES-256-GCM ciphertext under `NEXUS_SECRETS_KEY` (`packages/db/src/secret-crypto.ts`),
 written as a `v1:`-prefixed envelope. Rows written before the envelope existed are bare base64 and still decrypt,
 which is why the ciphertext carries a version (`user_provider_credentials.key_material_version`, added in
-migration 0023) instead of the application guessing at the shape.
+migration 0023) instead of the application guessing at the shape. An envelope prefix this build does not know is
+refused by name (`SecretEnvelopeVersionError`, code `secret_envelope_unknown_version`) rather than decoded as the
+prefixless form, so a downgrade cannot silently misread ciphertext from a newer release.
 
 A rotation is **two deploys**, and `apps/api/src/lib/secret-rotation.ts` is the middle step:
 

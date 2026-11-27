@@ -75,7 +75,6 @@
     "@nexus/stealth-browser": "workspace:*",
     "@nexus/stream-recovery": "workspace:*",
     "@nexus/telemetry": "workspace:*",
-    "@nexus/trigger-engine": "workspace:*",
     "@nexus/worker": "workspace:*",
     "@node-saml/node-saml": "^5.1.0",
     "@opentelemetry/api": "catalog:",

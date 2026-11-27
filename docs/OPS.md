@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: 8065a84 2026-11-25 -->
+<!-- verified: ce2cf09 2026-11-26 -->
 
 # Nexus — Operational reference (health, SSE, durable stores)
 
@@ -530,25 +530,59 @@ second type-aware invocation appears in `scripts/lint.mjs`.
 ## 10. Performance budgets — measured numbers, and what fails on regression
 
 Four workloads are measured, recorded, and enforced. The numbers below are the baseline in
-`.github/perf-baseline.json`; a run more than 25 % slower than the baseline fails
-`scripts/perf-budget.mjs`, and CI's `budgets` job (`.github/workflows/build.yml`) prints the
-table in the step summary of every build.
+`.github/perf-baseline.json`; each workload runs five times (the test suite twice) and the
+**fastest** sample is judged, because another process can only make a wall time longer. A run
+more than 25 % slower than the baseline fails `scripts/perf-budget.mjs`, and CI's `budgets` job
+(`.github/workflows/build.yml`) prints the table in the step summary of every build.
 
-| Workload    | Baseline          | What it covers                                                                       |
-| ----------- | ----------------- | ------------------------------------------------------------------------------------ |
-| `buildCold` | 12 356 ms         | `pnpm build` with every `tsbuildinfo` removed — the wall time a fresh clone pays.    |
-| `buildWarm` | 627 ms            | The same build with the incremental state in place — what a second local run costs.  |
-| `uiDev`     | 8 900 ms          | `vite` answering its first HTTP 200 — how long a contributor waits for a page.       |
-| `apiBoot`   | 5 837 ms          | Import of `apps/api/src/server.ts` to a served `/health` — cold start for a replica. |
-| `test`      | recorded per host | `turbo run test` across the workspace.                                               |
+| Workload    | Baseline          | What it covers                                                                      |
+| ----------- | ----------------- | ----------------------------------------------------------------------------------- |
+| `buildCold` | 12 356 ms         | `pnpm build` with every `tsbuildinfo` removed — the wall time a fresh clone pays.   |
+| `buildWarm` | 627 ms            | The same build with the incremental state in place — what a second local run costs. |
+| `uiDev`     | 8 900 ms          | `vite` answering its first HTTP 200 — how long a contributor waits for a page.      |
+| `test`      | recorded per host | `turbo run test` across the workspace.                                              |
+
+Measured **2026-11-26** on `win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb`, with a QEMU
+VM holding the box at 72–100 % CPU for every sample — the worst conditions these numbers have
+ever been taken under. The `test` samples are turbo wall times from failing runs; the pass
+counts are below the table.
+
+| Workload    | Samples (ms)                                                          | Fastest | Quiet baseline |
+| ----------- | --------------------------------------------------------------------- | ------- | -------------- |
+| `buildCold` | 27 455 / 17 246 / 30 419 / 14 521 / 12 646 / 14 048 / 18 117 / 14 749 | 12 646  | 12 356         |
+| `buildWarm` | 2 603 / 7 524 / 5 552 / 1 277 / 675 / 904 / 878 / 887                 | 675     | 627            |
+| `uiDev`     | 19 294 / 19 593 / 12 405 / 4 992 / 5 866                              | 4 992   | 8 900          |
+| `test`      | 607 005 / 277 619 (turbo 10 m 07 s / 4 m 36 s)                        | 277 619 | none yet       |
+
+How each sample was taken:
+
+- `buildCold` — delete `.turbo/cache`, `apps/ui/build`, `.react-router` and every `.tsbuildinfo`,
+  then time `pnpm build`. Every sample is its own clean, so each pays the cold path.
+- `buildWarm` — the same `pnpm build` immediately after a cold one, with all caches in place.
+- `uiDev` — spawn `pnpm --filter @nexus/ui dev` and poll `http://127.0.0.1:5173/` every 250 ms until
+  the first HTTP 200; the clock stops on the response, not on the process.
+- `test` — `pnpm test` (`turbo run test`) from spawn to exit. Both samples ran 49 of 50 tasks
+  (48 then 49 cached), and both failed in `@nexus/api`: the first with 264 files passed / 3 failed
+  and 1 629 tests passed / 5 failed, the second with 265 / 2 and 1 630 / 4. The failures are one
+  30 s timeout under the VM and `encryption_unavailable` because no secret key is configured in
+  this working tree. They are why the `test` workload has no committed baseline yet: the wall
+  time is reported because the plan asks for it, not because the suite is green.
+
+The loaded host is why this is a minimum and not a mean: single cold-build samples read 17–30 s
+while the VM was busy, and the fastest of five read 12 646 ms — 2 % over the quiet baseline on
+code that did not change. The committed baselines are therefore **not** re-recorded from this
+run: a budget raised to fit a VM is a budget that no longer catches the regression it was written
+for. `buildWarm` is the most machine-dependent number in the set (process startup and filesystem
+work, not compilation), so it needs the retries most; judge the fastest sample, and re-record only
+on an idle machine.
 
 The host is part of the record: `win32-13th Gen Intel(R) Core(TM) i7-13650HX-20c-24gb`. A run
 on a different host is reported but not compared, because two machines are two baselines and a
 comparison between them measures the machine. Re-record on the machine you intend to trust:
 
 ```bash
-node scripts/perf-budget.mjs --record          # every workload
-node scripts/perf-budget.mjs --only uiDev,apiBoot --record
+node scripts/perf-budget.mjs --record                     # every workload, fastest sample
+node scripts/perf-budget.mjs --samples 2 --only test --record
 ```
 
 Two size budgets sit beside it:

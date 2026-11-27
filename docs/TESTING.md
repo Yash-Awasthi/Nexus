@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- verified: 8065a84 2026-11-25 -->
+<!-- verified: eeef071 2026-11-26 -->
 
 # Nexus — Testing
 
@@ -120,7 +120,10 @@ Stability protocol: run the selection five times
 retried in place — `test.fixme` with the reason and the failing step written in the
 spec — and it comes back only with a fix. The two specs that failed on the Windows
 development host during the M1.1 baseline (`chat-history`, `skills`) still need
-that decision, and it needs a machine with browsers: `needs-verify`.
+that decision, and it needs a machine with browsers: `needs-verify`. Quarantined tests are
+listed in `docs/E2E-QUARANTINE.md` with the failing step and the condition that brings them
+back; the first entry is `states.spec.ts` `every route shows one offline bar when the network
+disappears`, quarantined 2026-11-26.
 
 ## Skipped tests
 
@@ -133,7 +136,7 @@ node scripts/baseline.mjs --skips        # units (16 on a host without python/de
 node scripts/baseline.mjs --json         # adds the e2e counts
 ```
 
-All 27 current skips are intentional; none is dead.
+All 31 current skips are intentional; none is dead.
 
 ### Unit skips (16)
 
@@ -147,20 +150,23 @@ All 27 current skips are intentional; none is dead.
 | `apps/api/tests/lib/migrate-concurrent.test.ts` — 1 test, "concurrent migrations on Postgres"         | `NEXUS_TEST_POSTGRES_URL` unset (`describe.runIf(PG_URL.length > 0)`)                                             | The `migrations` CI job, which provisions PostgreSQL 18                               |
 | `apps/api/tests/routes/provider-keys.test.ts` — 3 tests, "BYOK /api/user/provider-keys (integration)" | Needs `DATABASE_URL`, `NEXUS_SECRETS_KEY`, `NEXUS_JWT_SECRET` and `NEXUS_API_KEY` all set (`describe.runIf(RUN)`) | All four are present, i.e. a provisioned instance with secrets                        |
 
-### Browser E2E skips (11)
+### Browser E2E skips (15)
 
-All 11 are in `apps/ui/tests/e2e/org-models.spec.ts` and are skipped unless a model
-is configured (`E2E_MODELS=1`, plus `E2E_PRICED` for the ones that price a replay).
-They exercise answers, budget hard stops, hire approval, discussion threads, replay
-diffs and scorecard-driven model moves — all of which need a live model, which the
-offline harness deliberately does not provide. The other specs (`org.spec.ts`,
-`terminals.spec.ts`) skip individual cases when `GET /api/local/status` does not
-answer 200, i.e. on a hosted server.
+15 of the 70 e2e tests do not run on this host: 11 in
+`apps/ui/tests/e2e/org-models.spec.ts`, which need a model (`E2E_MODELS=1`, plus
+`E2E_PRICED` for the ones that price a replay); 3 in
+`apps/ui/tests/e2e/baseline-screenshots.spec.ts`, which need `NEXUS_CAPTURE_BASELINE=1`;
+and 1 quarantined, the offline-bar test in `states.spec.ts`, listed in
+`docs/E2E-QUARANTINE.md`. The org-models cases exercise answers, budget hard stops,
+hire approval, discussion threads, replay diffs and scorecard-driven model moves -
+all of which need a live model, which the offline harness deliberately does not
+provide. The other specs (`org.spec.ts`, `terminals.spec.ts`) skip individual cases
+when `GET /api/local/status` does not answer 200, i.e. on a hosted server.
 
 ### Where the skips actually run
 
 A skip with a switch that nothing ever flips is a dead test with better manners. Of
-the 27, four run in CI on Linux: the two POSIX-only cases above, and
+the 31, four run in CI on Linux: the two POSIX-only cases above, and
 `apps/api/tests/lib/migrate-concurrent.test.ts` in the `migrations` job. The rest
 run only on a host that has the missing piece — a local Python or Deno install, an
 LSP binary, the four secret variables, or `E2E_MODELS`. That is deliberate for the

@@ -19,7 +19,6 @@
 import crypto from "node:crypto";
 
 import { UNTRUSTED_NOTE, screenUntrusted } from "@nexus/shared";
-import { isDue, minuteKey, nextCronRun, parseCron } from "@nexus/trigger-engine";
 
 import { budgetOverview } from "./org-budget.ts";
 import { wakeApprovedGrants } from "./org-cli-adapters.ts";
@@ -54,6 +53,7 @@ import {
 } from "./org-work.ts";
 import { PersistentStore } from "./persistent-store.ts";
 import { decryptSecret, encryptSecret, isSecretCryptoAvailable } from "./secret-crypto.ts";
+import { isDue, minuteKey, nextCronRun, parseCron } from "./trigger-engine/index.ts";
 
 // ── Wake on events ───────────────────────────────────────────────────────────
 

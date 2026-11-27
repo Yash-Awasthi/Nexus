@@ -12,7 +12,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { TOLERANCE_PCT, WORKLOADS, hostLabel, judge, readBaseline } from "./perf-budget.mjs";
+import {
+  SAMPLES,
+  TOLERANCE_PCT,
+  WORKLOADS,
+  fastest,
+  hostLabel,
+  judge,
+  readBaseline,
+} from "./perf-budget.mjs";
 
 const scratch = mkdtempSync(join(tmpdir(), "perf-budget-"));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -20,11 +28,20 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 const HOST = "test-host";
 
 test("the four things the plan names are measured", () => {
-  for (const name of ["buildCold", "buildWarm", "test", "uiDev", "apiBoot"]) {
+  for (const name of ["buildCold", "buildWarm", "test", "uiDev"]) {
     assert.ok(WORKLOADS[name], `${name} is not measured`);
     assert.equal(typeof WORKLOADS[name].run, "function");
     assert.ok(WORKLOADS[name].what.length > 10, `${name} does not say what its number means`);
   }
+  assert.equal(WORKLOADS.test.samples, 2, "the expensive suite is sampled twice, not five times");
+});
+
+test("every workload is sampled more than once, and the fastest sample is the one judged", () => {
+  assert.ok(SAMPLES >= 2, "the plan asks for at least two samples");
+  // Noise is one-sided: another process can only add time, so the minimum is the code.
+  assert.equal(fastest([27_455, 12_400, 19_000]), 12_400);
+  assert.equal(fastest([900]), 900);
+  assert.throws(() => fastest([]), /at least one sample/);
 });
 
 test("a workload with no baseline is recorded, not judged", () => {

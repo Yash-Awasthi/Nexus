@@ -15,6 +15,9 @@ import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 const DB = "pglite://:memory:account-export";
 process.env.NEXUS_JWT_SECRET = "account-export-secret";
 process.env.DATABASE_URL = DB;
+// A provider key is stored encrypted, so the key must be set here: turbo passes only the env
+// a task declares, so an ambient key is present locally and absent in CI.
+process.env.NEXUS_SECRETS_KEY = crypto.randomBytes(32).toString("hex");
 
 const { migrateEmbedded } = await import("../../src/lib/migrate-embedded.ts");
 const { closePgPools, getPgPool } = await import("../../src/lib/pg-pool.ts");

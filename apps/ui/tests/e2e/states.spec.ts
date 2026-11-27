@@ -109,7 +109,13 @@ test("every route renders with an empty backend and says something", async ({ pa
   expect(failures, failures.join("\n")).toEqual([]);
 });
 
-test("every route shows one offline bar when the network disappears", async ({ page, request }) => {
+// Quarantined 2026-11-26: failed 2 of 5 full-suite runs on a 20 s condition timeout --
+// the `main, nav` visibility wait (fixtures.ts:102) and waitForPaint still requesting.
+// See docs/E2E-QUARANTINE.md and plan.md row 183.
+test.fixme("every route shows one offline bar when the network disappears", async ({
+  page,
+  request,
+}) => {
   test.setTimeout(600_000);
   await signInPage(page, await signIn(request, `e2e-offline-${Date.now()}@example.com`));
   const failures: string[] = [];

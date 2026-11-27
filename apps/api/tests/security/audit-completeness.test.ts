@@ -20,6 +20,8 @@ const DB = "pglite://:memory:audit-completeness";
 const SECRET = "audit-completeness-secret";
 process.env.NEXUS_JWT_SECRET = SECRET;
 process.env.DATABASE_URL = DB;
+// Provider keys are written encrypted; see the note in `routes/account-export-delete.test.ts`.
+process.env.NEXUS_SECRETS_KEY = crypto.randomBytes(32).toString("hex");
 process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-audit-"));
 
 const ROOT = path.resolve(import.meta.dirname, "../../../..");

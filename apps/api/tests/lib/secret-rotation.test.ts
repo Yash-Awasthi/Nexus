@@ -170,6 +170,18 @@ describe("provider key rotation", () => {
     expect(describeRotation(report)).toMatch(/2 skipped/);
   });
 
+  it("stops reading the old ciphertext once the previous key is dropped, while the rewrite still reads", async () => {
+    const before = encryptWithKey(Buffer.from(PREVIOUS, "hex"), "rotated once");
+    const table = fakeTable([{ id: "k", encrypted_key: before, key_material_version: 1 }]);
+
+    await rotateProviderKeys(table.pool);
+    const after = table.rows[0]!.encrypted_key!;
+
+    delete process.env.NEXUS_SECRETS_KEY_PREVIOUS;
+    expect(() => decryptSecret(before)).toThrow();
+    expect(decryptSecret(after)).toBe("rotated once");
+  });
+
   it("says which key it used when both are available", async () => {
     const { decryptSecretAnyKey } = await import("../../src/lib/secret-crypto.ts");
     const fromPrevious = SECRET_ENVELOPE + encryptWithKey(Buffer.from(PREVIOUS, "hex"), "x");

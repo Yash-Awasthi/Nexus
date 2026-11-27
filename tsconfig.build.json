@@ -135,9 +135,6 @@
     },
     {
       "path": "packages/telemetry"
-    },
-    {
-      "path": "packages/trigger-engine"
     }
   ]
 }

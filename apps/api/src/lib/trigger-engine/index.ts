@@ -2,6 +2,8 @@
 /**
  * Scheduled triggers: a five-field cron or an interval, fired at most once per minute. The
  * caller runs `isDue` on each tick and records `minuteKey(at)` when it fires.
+ *
+ * Folded in from `@nexus/trigger-engine` (ADR 0025): no runtime dependency, two importers, both here.
  */
 import { cronMatches } from "./cron.ts";
 

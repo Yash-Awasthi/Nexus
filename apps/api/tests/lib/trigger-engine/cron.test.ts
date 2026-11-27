@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vite-plus/test";
 
-import { cronMatches, nextCronRun, parseCron } from "../src/index.ts";
+import { cronMatches, nextCronRun, parseCron } from "../../../src/lib/trigger-engine/index.ts";
 
 describe("cron", () => {
   it("rejects malformed expressions", () => {

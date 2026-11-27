@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vite-plus/test";
 
-import { isDue, minuteKey } from "../src/index.ts";
+import { isDue, minuteKey } from "../../../src/lib/trigger-engine/index.ts";
 
 describe("isDue", () => {
   const at = new Date(2026, 8, 28, 9, 0, 30); // cron reads local time
