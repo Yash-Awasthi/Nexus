@@ -24,7 +24,8 @@ test("an OpenAPI spec becomes MCP tools from the MCP page", async ({ page }) => 
   await page.getByRole("button", { name: "Add API" }).click();
 
   const card = page.locator("div.rounded-lg").filter({ hasText: name });
-  await expect(card.getByText("listPets")).toBeVisible();
+  // The saved server joins a list that is still loading; give that condition a budget instead of the 5 s default.
+  await expect(card.getByText("listPets")).toBeVisible({ timeout: 30_000 });
   await expect(card.getByText("getPet")).toBeVisible();
   await expect(card.getByText(/\/api\/v1\/mcp\/openapi\/.+\/mcp/)).toBeVisible();
 

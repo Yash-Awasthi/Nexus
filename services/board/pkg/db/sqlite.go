@@ -122,12 +122,16 @@ func OpenFile(path string) (*DB, error) {
 		return nil, fmt.Errorf("create database directory: %w", err)
 	}
 
-	dsn := abs + "?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
+	// _txlock=immediate starts every transaction with the write lock already held. A claim reads
+	// the task and then writes it; with a deferred transaction two agents can both read a free
+	// task and the second update silently overwrites the first owner.
+	dsn := abs + "?_txlock=immediate&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
-	// One writer at a time keeps SQLite's busy handling predictable.
+	// WAL lets readers run while one writer commits; the pool only has to hold the concurrent
+	// handlers, because SQLite serializes the writes themselves.
 	conn.SetMaxOpenConns(8)
 
 	d := &DB{conn: conn, path: abs}
@@ -480,11 +484,11 @@ func (d *DB) Mentioned(agent, thread string, afterID int64, limit int) ([]Event,
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	pattern := "%,@" + strings.ToLower(strings.TrimPrefix(agent, "@")) + ",%"
+	pattern := mentionLike(agent)
 	all := "%,@all,%"
 	rows, err := d.conn.Query(`
 		SELECT `+eventColumns+` FROM events
-		WHERE thread = ? AND id > ? AND (mentions LIKE ? OR mentions LIKE ?)
+		WHERE thread = ? AND id > ? AND (mentions LIKE ? ESCAPE '\' OR mentions LIKE ? ESCAPE '\')
 		ORDER BY id ASC LIMIT ?
 	`, thread, afterID, pattern, all, limit)
 	if err != nil {
@@ -998,7 +1002,7 @@ func (d *DB) UpsertAgent(name, caps string, pid int, state string) error {
 func (d *DB) TouchAgent(name, state string) error {
 	_, err := d.conn.Exec(`
 		INSERT INTO agents (name, capabilities, pid, state, last_seen)
-		VALUES (?, 'fs:read,fs:write,cmd:run', 0, COALESCE(NULLIF(?, ''), 'idle'), ?)
+		VALUES (?, 'fs:read,fs:write,cmd:run', 0, NULLIF(?, ''), ?)
 		ON CONFLICT(name) DO UPDATE SET
 			state = COALESCE(NULLIF(excluded.state, ''), agents.state),
 			last_seen = excluded.last_seen
@@ -1087,9 +1091,17 @@ func (d *DB) UnreadMentions(agent, thread string) (int, error) {
 	var n int
 	err = d.conn.QueryRow(`
 		SELECT COUNT(*) FROM events
-		WHERE thread = ? AND id > ? AND (mentions LIKE ? OR mentions LIKE ?)
-	`, thread, cursor, "%,@"+strings.ToLower(strings.TrimPrefix(agent, "@"))+",%", "%,@all,%").Scan(&n)
+		WHERE thread = ? AND id > ? AND (mentions LIKE ? ESCAPE '\' OR mentions LIKE ? ESCAPE '\')
+	`, thread, cursor, mentionLike(agent), "%,@all,%").Scan(&n)
 	return n, err
+}
+
+// mentionLike is the LIKE pattern for a mention. An agent name may contain "_", which LIKE
+// reads as a wildcard, so the name is escaped and every query that uses this uses ESCAPE '\'.
+func mentionLike(agent string) string {
+	name := strings.ToLower(strings.TrimPrefix(agent, "@"))
+	name = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(name)
+	return "%,@" + name + ",%"
 }
 
 func quoteIdent(s string) string {

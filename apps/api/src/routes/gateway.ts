@@ -71,7 +71,7 @@ import { getMemoryStore } from "../lib/memory-store.ts";
 import { createOAuthTokenStore } from "../lib/oauth-token-store.ts";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.ts";
 import { listUserDrivers, listUserModels } from "../lib/provider-keys.ts";
-import { gatewayError } from "../lib/reply-errors.ts";
+import { fail, gatewayError } from "../lib/reply-errors.ts";
 import { getSharedKV } from "../lib/shared-kv.ts";
 import { createDefaultRegistry } from "../lib/tool-registry.ts";
 import type { ToolRegistry } from "../lib/tool-registry.ts";
@@ -1127,7 +1127,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     Body: { name: string; input?: unknown };
   }>("/gateway/tools/invoke", { preHandler: requireAuth }, async (request, reply) => {
     const { name, input = {} } = request.body;
-    if (!name) return reply.code(400).send({ error: "name is required" });
+    if (!name) return fail(reply, 400, "name is required");
     const result = await _toolRegistry.invoke(name, input);
     return reply.code(result.success ? 200 : 422).send(result);
   });

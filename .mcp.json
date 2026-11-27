@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "open-board": {
+      "command": "node",
+      "args": ["scripts/board-mcp.mjs"],
+      "env": {
+        "VB_URL": "http://127.0.0.1:4100",
+        "VB_CHANNEL": "nexus"
+      }
+    }
+  }
+}

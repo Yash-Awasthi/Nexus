@@ -472,6 +472,46 @@ export async function buildServer(): Promise<FastifyInstance> {
     await stopTracing().catch(() => {});
   });
 
+  // ── Global error handler ──────────────────────────────────────────────────
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    app.log.error(error);
+
+    // A path or query parameter is free text, so a malformed uuid reaches Postgres and comes back
+    // as SQLSTATE 22P02 (invalid_text_representation). That is a client mistake, not a server
+    // fault: answer 400 without echoing the failed SQL back to the caller.
+    const sqlState =
+      (error as { cause?: { code?: string } }).cause?.code ?? (error as { code?: string }).code;
+    // Drivers differ in whether they attach the SQLSTATE to the wrapped error, and drizzle wraps
+    // the driver error in a DrizzleQueryError; the message is the one signal every driver keeps.
+    const invalidUuid =
+      sqlState === "22P02" || /invalid input syntax for type uuid/i.test(error.message);
+    if (invalidUuid) {
+      reply.code(400).send({
+        error: "invalid_request",
+        message: "An id in the path or query is not a valid identifier.",
+        statusCode: 400,
+      });
+      return;
+    }
+
+    const statusCode = error.statusCode ?? 500;
+
+    // Capture unexpected 500s in Sentry (fire-and-forget)
+    if (statusCode >= 500) {
+      sentryReporter.captureException(error, {
+        request_id: request.id,
+        url: request.url,
+        method: request.method,
+        userId: request.nexusUserId,
+      });
+    }
+
+    reply.code(statusCode).send({
+      error: statusCode >= 500 ? "Internal Server Error" : error.message,
+      statusCode,
+    });
+  });
+
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
   await app.register(healthRoutes);
 
@@ -684,27 +724,6 @@ export async function buildServer(): Promise<FastifyInstance> {
       return reply.sendFile("index.html");
     });
   }
-
-  // ── Global error handler ──────────────────────────────────────────────────
-  app.setErrorHandler((error: FastifyError, request, reply) => {
-    app.log.error(error);
-    const statusCode = error.statusCode ?? 500;
-
-    // Capture unexpected 500s in Sentry (fire-and-forget)
-    if (statusCode >= 500) {
-      sentryReporter.captureException(error, {
-        request_id: request.id,
-        url: request.url,
-        method: request.method,
-        userId: request.nexusUserId,
-      });
-    }
-
-    reply.code(statusCode).send({
-      error: statusCode >= 500 ? "Internal Server Error" : error.message,
-      statusCode,
-    });
-  });
 
   attachChannels(app.server);
   return app;

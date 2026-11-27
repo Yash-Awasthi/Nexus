@@ -569,7 +569,7 @@ app.whenReady().then(
         reachable: boolean;
       }> => {
         try {
-          const res = await fetch(`${host.url}/api/v1/workflows`, {
+          const res = await fetch(`${host.url}/api/workflows`, {
             headers: auth.getSession()?.accessToken
               ? { Authorization: `Bearer ${auth.getSession()!.accessToken}` }
               : {},
@@ -601,7 +601,7 @@ app.whenReady().then(
         if (!entry.sessionId)
           return { ok: false, permanent: true, error: "the prompt has no conversation" };
         try {
-          const res = await fetch(`${host.url}/api/v1/threads/${entry.sessionId}/messages`, {
+          const res = await fetch(`${host.url}/api/threads/${entry.sessionId}/messages`, {
             method: "POST",
             headers: {
               "content-type": "application/json",

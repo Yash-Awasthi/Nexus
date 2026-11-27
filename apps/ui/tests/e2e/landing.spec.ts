@@ -7,7 +7,10 @@ test("the home page runs its 3D scene under the CSP and fits a phone", async ({ 
   page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("One question");
+  // First paint on a loaded host can outlast the 5 s expect default; the condition is unchanged.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("One question", {
+    timeout: 30_000,
+  });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 
   // Headless runs without a GPU fall back to the CSS backdrop, so only insist on the canvas with WebGL.

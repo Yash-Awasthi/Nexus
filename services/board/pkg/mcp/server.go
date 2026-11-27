@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -249,7 +250,7 @@ func toolDefinitions() []map[string]any {
 				"peek":   boolean("Read without advancing your cursor"),
 			}, "agent", "thread"),
 		tool("board_threads", "List the board's threads with their message counts.",
-			map[string]any{}, "thread"),
+			map[string]any{}),
 		tool("board_agents", "List the agents registered on the board and their states.",
 			map[string]any{}),
 		tool("board_tasks", "List tasks and their states, optionally filtered by thread or state.",
@@ -286,6 +287,17 @@ func toolDefinitions() []map[string]any {
 				"path":   str("File path"),
 				"target": str("Symbol name or line range such as 10-60"),
 			}, "path"),
+		tool("board_connectors", "List the optional local MCP servers (connectors) configured for this board, or one connector's tools.",
+			map[string]any{
+				"connector": str("Optional: one connector name to list its tools"),
+			}),
+		tool("board_connector_call", "Call a tool on a configured local MCP server (for example rubrik). This is a write: read the preview, then repeat with the token.",
+			map[string]any{
+				"connector": str("Connector name"),
+				"tool":      str("Tool name on that connector"),
+				"arguments": map[string]any{"type": "object", "description": "Tool arguments as a JSON object"},
+				"thread":    str("Optional thread to note the call on"),
+			}, "connector", "tool"),
 	}
 }
 
@@ -360,13 +372,14 @@ func callTool(ctx context.Context, c *Client, name string, raw json.RawMessage, 
 		if err := json.Unmarshal(raw, &args); err != nil {
 			return "", err
 		}
-		path := "/api/tasks?"
+		query := url.Values{}
 		if args.Thread != "" {
-			path += "thread=" + args.Thread + "&"
+			query.Set("thread", args.Thread)
 		}
 		if args.State != "" {
-			path += "state=" + args.State
+			query.Set("state", args.State)
 		}
+		path := "/api/tasks?" + query.Encode()
 		var out json.RawMessage
 		err := c.call(ctx, http.MethodGet, path, nil, &out)
 		return pretty(out), err
@@ -422,7 +435,9 @@ func callTool(ctx context.Context, c *Client, name string, raw json.RawMessage, 
 			return "", err
 		}
 		var out json.RawMessage
-		err := c.call(ctx, http.MethodDelete, fmt.Sprintf("/api/locks?path=%s&agent=%s&force=%t", args.Path, args.Agent, args.Force), nil, &out)
+		// A path can contain "&", "+" or a space; anything unescaped truncates the query and
+		// releases the wrong lock (or none). Escape the values, not the separators.
+		err := c.call(ctx, http.MethodDelete, fmt.Sprintf("/api/locks?path=%s&agent=%s&force=%t", url.QueryEscape(args.Path), url.QueryEscape(args.Agent), args.Force), nil, &out)
 		return pretty(out), err
 	case "board_slice":
 		var args struct {
@@ -433,6 +448,36 @@ func callTool(ctx context.Context, c *Client, name string, raw json.RawMessage, 
 			return "", err
 		}
 		return slice.Extract(args.Path, args.Target)
+	case "board_connectors":
+		var args struct {
+			Connector string `json:"connector"`
+		}
+		if err := json.Unmarshal(raw, &args); err != nil {
+			return "", err
+		}
+		path := "/api/connectors"
+		if args.Connector != "" {
+			path = "/api/connectors/tools?name=" + url.QueryEscape(args.Connector)
+		}
+		var out json.RawMessage
+		err := c.call(ctx, http.MethodGet, path, nil, &out)
+		return pretty(out), err
+	case "board_connector_call":
+		var args struct {
+			Connector string         `json:"connector"`
+			Tool      string         `json:"tool"`
+			Arguments map[string]any `json:"arguments"`
+			Thread    string         `json:"thread"`
+		}
+		if err := json.Unmarshal(raw, &args); err != nil {
+			return "", err
+		}
+		var out json.RawMessage
+		err := c.call(ctx, http.MethodPost, "/api/connectors/call", map[string]any{
+			"channel": c.Channel, "thread": args.Thread, "connector": args.Connector,
+			"tool": args.Tool, "arguments": args.Arguments,
+		}, &out)
+		return pretty(out), err
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}

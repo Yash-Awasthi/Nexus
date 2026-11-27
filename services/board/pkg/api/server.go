@@ -14,6 +14,7 @@ import (
 
 	"open-board/pkg/agents"
 	"open-board/pkg/cloud"
+	"open-board/pkg/connectors"
 	"open-board/pkg/db"
 	"open-board/pkg/grammar"
 	"open-board/pkg/locks"
@@ -36,10 +37,13 @@ type Server struct {
 	Wake       *wake.Launcher
 	Cloud      *cloud.Config
 	Supervisor *agents.Supervisor
+	Connectors *connectors.Manager
 	Log        Logger
 
-	mu      sync.Mutex
-	clients map[chan string]struct{}
+	mu sync.Mutex
+	// clients is keyed by channel: a stream opened for one board must not receive another
+	// channel's events, even though every channel shares this process.
+	clients map[string]map[chan string]struct{}
 	now     func() time.Time
 }
 
@@ -51,7 +55,7 @@ func NewServer(store *Store, defaultChannel string) *Server {
 	return &Server{
 		Store:   store,
 		Channel: defaultChannel,
-		clients: map[chan string]struct{}{},
+		clients: map[string]map[chan string]struct{}{},
 		now:     time.Now,
 	}
 }
@@ -75,7 +79,7 @@ func (s *Server) Broadcast(env envelope) {
 	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", env.Type, data)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for ch := range s.clients {
+	for ch := range s.clients[env.Channel] {
 		select {
 		case ch <- frame:
 		default:
@@ -120,6 +124,10 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("/api/agents/terminate", s.handleAgentTerminate)
 	mux.HandleFunc("/api/tasks/requeue", s.handleTaskRequeue)
 	mux.HandleFunc("/api/join", s.handleJoin)
+	mux.HandleFunc("/api/connectors", s.handleConnectors)
+	mux.HandleFunc("/api/connectors/tools", s.handleConnectorTools)
+	mux.HandleFunc("/api/connectors/call", s.handleConnectorCall)
+	mux.HandleFunc("/api/connectors/presets", s.handleConnectorPresets)
 
 	return securityHeaders(mux)
 }
@@ -484,11 +492,17 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	ch := make(chan string, 64)
 	s.mu.Lock()
-	s.clients[ch] = struct{}{}
+	if s.clients[channel] == nil {
+		s.clients[channel] = map[chan string]struct{}{}
+	}
+	s.clients[channel][ch] = struct{}{}
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
-		delete(s.clients, ch)
+		delete(s.clients[channel], ch)
+		if len(s.clients[channel]) == 0 {
+			delete(s.clients, channel)
+		}
 		s.mu.Unlock()
 	}()
 
@@ -562,7 +576,14 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 	warnings := []string{}
 	locker := locks.New(d)
 	verb := parsed.Verb
-	taskID := grammar.TaskRef(parsed.Argument)
+	// Only the task verbs take a task id. For lock/unlock the argument is a path (and a path
+	// can contain spaces), so reading its first word as a task id would attach the lock to a
+	// filename and then never release it.
+	taskID := ""
+	switch verb {
+	case "claim", "working", "done", "failed", "review-ok":
+		taskID = grammar.TaskRef(parsed.Argument)
+	}
 
 	switch verb {
 	case "claim":
@@ -571,12 +592,12 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "lock":
-		path := strings.Fields(parsed.Argument)
-		if len(path) == 0 {
+		path := strings.TrimSpace(parsed.Argument)
+		if path == "" {
 			writeErr(w, http.StatusBadRequest, "lock: needs a path")
 			return
 		}
-		if _, err := locker.Acquire(path[0], taskID, actor); err != nil {
+		if _, err := locker.Acquire(path, taskID, actor); err != nil {
 			writeBoardErr(w, err)
 			return
 		}
@@ -613,16 +634,16 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "unlock":
-		path := strings.Fields(parsed.Argument)
-		if len(path) == 0 {
+		path := strings.TrimSpace(parsed.Argument)
+		if path == "" {
 			writeErr(w, http.StatusBadRequest, "unlock: needs a path")
 			return
 		}
-		if ok, err := locker.Release(path[0], actor, false); err != nil {
+		if ok, err := locker.Release(path, actor, false); err != nil {
 			writeBoardErr(w, err)
 			return
 		} else if !ok {
-			warnings = append(warnings, "no lock held by "+actor+" on "+path[0])
+			warnings = append(warnings, "no lock held by "+actor+" on "+path)
 		}
 	}
 
@@ -1173,12 +1194,21 @@ func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"agents": agentViews(list), "running": processViews(s.Supervisor)})
 	case http.MethodPost:
 		var req struct {
-			Name string `json:"name"`
-			Caps string `json:"caps"`
-			PID  int    `json:"pid"`
+			Channel string `json:"channel"`
+			Name    string `json:"name"`
+			Caps    string `json:"caps"`
+			PID     int    `json:"pid"`
 		}
 		if !decodeBody(w, r, &req) {
 			return
+		}
+		if req.Channel != "" && req.Channel != channel {
+			next, err := s.Store.Get(req.Channel)
+			if err != nil {
+				writeBoardErr(w, badRequest("%v", err))
+				return
+			}
+			channel, d = req.Channel, next
 		}
 		if !validActor(req.Name) {
 			writeErr(w, http.StatusBadRequest, "name is required (max 64, no whitespace)")

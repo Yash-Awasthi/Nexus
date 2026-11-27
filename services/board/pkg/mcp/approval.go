@@ -24,6 +24,9 @@ var WriteTools = map[string]bool{
 	"board_done":   true,
 	"board_lock":   true,
 	"board_unlock": true,
+	// A connector call can change a system outside this board, so it costs the same
+	// approval as a board write: show the call, then run it with the token.
+	"board_connector_call": true,
 }
 
 // IsWrite reports whether a tool changes board state.

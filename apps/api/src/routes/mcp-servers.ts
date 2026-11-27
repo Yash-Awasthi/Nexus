@@ -18,7 +18,7 @@
 import { isSafeUrl, pinnedFetch } from "@nexus/agent-core/kernel";
 import { db } from "@nexus/db";
 import { mcpServers } from "@nexus/db/schema";
-import { McpClient } from "@nexus/mcp-client";
+import { McpClient, McpStdioTransport } from "@nexus/mcp-client";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -29,7 +29,10 @@ import {
 } from "../lib/secret-crypto.ts";
 import { requireAuthWithTier, requireUserId } from "../middleware/auth.ts";
 
-const TRANSPORTS = ["http", "stdio", "websocket"] as const;
+// Only transports this API can actually run are offered. `websocket` has no client transport
+// in @nexus/mcp-client, and `stdio` spawns a local command, so it is accepted only when this
+// process is the user's own desktop app (NEXUS_DESKTOP=1) — see validateStdioConfig.
+const TRANSPORTS = ["http", "stdio"] as const;
 type Transport = (typeof TRANSPORTS)[number];
 
 // Columns safe to return over HTTP — explicitly excludes encrypted_api_key.
@@ -65,6 +68,67 @@ const SAFE_COLUMNS = {
  * only at request time (DNS rebinding) still passes here; the /test outbound call
  * pins the socket via `pinnedFetch` (safeLookup) to block that at connect time.
  */
+/**
+ * True when this API is the user's desktop process. A stdio MCP server is a local command, so
+ * spawning one is a desktop-only capability: a hosted API must never execute a command taken
+ * from a database row. This mirrors the local-pty gate.
+ */
+function stdioAllowed(): boolean {
+  return process.env.NEXUS_DESKTOP === "1";
+}
+
+/**
+ * Validate a stdio server's command line. The transport spawns without a shell, so the endpoint
+ * is an executable path, never a shell string; args and env are typed and bounded so a stored row
+ * cannot turn into an unbounded spawn.
+ */
+export function validateStdioConfig(
+  endpoint: string,
+  config: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!stdioAllowed()) {
+    return "stdio_transport_unavailable: local MCP servers can only be started by the desktop app";
+  }
+  const command = endpoint.trim();
+  if (!command) return "command is required";
+  // A control character in an executable path is never legitimate and would hide part of the
+  // command from an operator reading the row; check code points rather than a regex so the lint
+  // rule against control characters stays meaningful.
+  let hasControl = false;
+  for (let i = 0; i < command.length; i += 1) {
+    if (command.charCodeAt(i) < 0x20) {
+      hasControl = true;
+      break;
+    }
+  }
+  if (command.length > 512 || hasControl) {
+    return "command must be a single executable path (no control characters, max 512 characters)";
+  }
+  const args = config?.args;
+  if (args !== undefined) {
+    if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string")) {
+      return "config.args must be an array of strings";
+    }
+    if (args.length > 64 || args.some((arg) => (arg as string).length > 512)) {
+      return "config.args is limited to 64 entries of 512 characters";
+    }
+  }
+  const env = config?.env;
+  if (env !== undefined) {
+    if (typeof env !== "object" || env === null || Array.isArray(env)) {
+      return "config.env must be an object of string values";
+    }
+    for (const [key, value] of Object.entries(env)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== "string") {
+        return "config.env keys must be environment variable names with string values";
+      }
+    }
+  }
+  const cwd = config?.cwd;
+  if (cwd !== undefined && typeof cwd !== "string") return "config.cwd must be a string";
+  return null;
+}
+
 export function validateMcpEndpoint(endpoint: string): string | null {
   const trimmed = endpoint.trim();
   let url: URL;
@@ -118,12 +182,16 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
 
     if (!name?.trim()) return reply.code(400).send({ error: "name is required" });
     if (!endpoint?.trim()) return reply.code(400).send({ error: "endpoint is required" });
-    // Validate endpoint URL: only http/https schemes, block internal/loopback SSRF
-    const endpointErr = validateMcpEndpoint(endpoint);
-    if (endpointErr) return reply.code(400).send({ error: endpointErr });
     if (!TRANSPORTS.includes(transportType as Transport)) {
       return reply.code(400).send({ error: "invalid_transport", valid: TRANSPORTS });
     }
+    // An http endpoint is a URL and must pass the SSRF guard; a stdio "endpoint" is the
+    // executable to spawn and is validated as a command line instead.
+    const endpointErr =
+      transportType === "stdio"
+        ? validateStdioConfig(endpoint, config)
+        : validateMcpEndpoint(endpoint);
+    if (endpointErr) return reply.code(400).send({ error: endpointErr });
 
     let encryptedApiKey: string | null = null;
     let keyPrefix: string | null = null;
@@ -189,11 +257,14 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
     if (transportType && !TRANSPORTS.includes(transportType as Transport)) {
       return reply.code(400).send({ error: "invalid_transport", valid: TRANSPORTS });
     }
-    // Validate endpoint URL on update (mirrors create validation)
-    if (endpoint?.trim()) {
-      const endpointErr = validateMcpEndpoint(endpoint);
-      if (endpointErr) return reply.code(400).send({ error: endpointErr });
-    }
+    // Validate the endpoint under the transport the row will end up with (mirrors create).
+    const nextTransport = transportType ?? existing.transportType;
+    const nextEndpoint = endpoint?.trim() ?? existing.endpoint;
+    const endpointErr =
+      nextTransport === "stdio"
+        ? validateStdioConfig(nextEndpoint, config ?? existing.config)
+        : validateMcpEndpoint(nextEndpoint);
+    if (endpointErr) return reply.code(400).send({ error: endpointErr });
 
     // Key is write-only: an empty/absent apiKey keeps the stored one.
     let encryptedApiKey = existing.encryptedApiKey;
@@ -265,18 +336,57 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
       if (!server) return reply.code(404).send({ error: "not_found" });
       if (server.userId !== userId) return reply.code(403).send({ error: "forbidden" });
 
+      if (server.transportType === "stdio") {
+        // A local command may only be spawned by the desktop app; the same gate as create and
+        // update keeps a hosted API from executing a command read out of a database row.
+        const configErr = validateStdioConfig(server.endpoint, server.config);
+        if (configErr) return reply.code(400).send({ error: configErr });
+        const config = (server.config ?? {}) as {
+          args?: string[];
+          env?: Record<string, string>;
+          cwd?: string;
+        };
+        const transport = new McpStdioTransport({
+          command: server.endpoint,
+          args: config.args ?? [],
+          env: config.env,
+          cwd: config.cwd,
+          timeoutMs: 15_000,
+        });
+        try {
+          const client = new McpClient(transport);
+          const serverInfo = await client.initialize();
+          const tools = await client.listTools();
+          const toolNames = tools.map((tool) => tool.name);
+          await db
+            .update(mcpServers)
+            .set({ status: "active", tools: toolNames, lastHealthCheckAt: new Date() })
+            .where(eq(mcpServers.id, server.id));
+          return reply.send({ ok: true, serverInfo, tools: toolNames });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          await db
+            .update(mcpServers)
+            .set({ status: "error", lastHealthCheckAt: new Date() })
+            .where(eq(mcpServers.id, server.id));
+          return reply.code(502).send({ ok: false, error: "connection_failed", message });
+        } finally {
+          await transport.close();
+        }
+      }
+
+      if (server.transportType !== "http") {
+        return reply
+          .code(400)
+          .send({ error: "unsupported_transport", message: "Only http and stdio can be tested." });
+      }
+
       // Defense-in-depth: re-validate the stored endpoint at the live-call sink.
       // Create/update already guard, but a row written under an older/weaker guard
       // (or via direct DB access) could hold a private/IMDS endpoint the current
       // isSafeUrl rejects — never make the outbound request to it.
       const endpointErr = validateMcpEndpoint(server.endpoint);
       if (endpointErr) return reply.code(400).send({ error: endpointErr });
-
-      if (server.transportType !== "http") {
-        return reply
-          .code(400)
-          .send({ error: "unsupported_transport", message: "Only http transport can be tested." });
-      }
 
       let apiKey: string | undefined;
       if (server.encryptedApiKey) {

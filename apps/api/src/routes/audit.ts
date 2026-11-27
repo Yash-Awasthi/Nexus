@@ -96,9 +96,15 @@ export async function auditRoutes(app: FastifyInstance): Promise<void> {
       let firstBroken: number | undefined;
 
       for (const entry of rows) {
-        const payloadHash = createHash("sha256")
-          .update(JSON.stringify(entry.payload, Object.keys(entry.payload as object).sort()))
-          .digest("hex");
+        // This must hash exactly what audit-emitter's payloadHash hashed when it wrote the row:
+        // a null payload is JSON.stringify(null) ("null"), not an empty object, and Object.keys
+        // on null would throw and turn the whole verification into a 500.
+        const payload = entry.payload ?? null;
+        const serialized =
+          payload && typeof payload === "object"
+            ? JSON.stringify(payload, Object.keys(payload as object).sort())
+            : JSON.stringify(payload);
+        const payloadHash = createHash("sha256").update(serialized).digest("hex");
 
         const expected = createHmac("sha256", auditKey)
           .update(prevChainHash + payloadHash)

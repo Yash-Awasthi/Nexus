@@ -42,7 +42,7 @@ import {
 import { Textarea } from "~/components/ui/textarea";
 import { authFetch } from "~/lib/api";
 
-const TRANSPORTS = ["http", "stdio", "websocket"] as const;
+const TRANSPORTS = ["http", "stdio"] as const;
 type Transport = (typeof TRANSPORTS)[number];
 
 interface McpServer {
@@ -51,6 +51,8 @@ interface McpServer {
   description?: string | null;
   transportType: Transport;
   endpoint: string;
+  /** stdio only: the argv after the executable, and the child's environment. */
+  config?: { args?: string[]; env?: Record<string, string> } | null;
   keyPrefix?: string | null;
   tools?: string[] | null;
   status?: string | null;
@@ -89,6 +91,9 @@ export default function McpServersPage() {
   const [transportType, setTransportType] = useState<Transport>("http");
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // stdio servers take their configuration as text so the dialog stays two fields, not a form.
+  const [argsText, setArgsText] = useState("");
+  const [envText, setEnvText] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Per-server test state.
@@ -124,6 +129,8 @@ export default function McpServersPage() {
     setTransportType("http");
     setEndpoint("");
     setApiKey("");
+    setArgsText("");
+    setEnvText("");
     setDialogOpen(true);
   };
 
@@ -134,6 +141,12 @@ export default function McpServersPage() {
     setTransportType(s.transportType);
     setEndpoint(s.endpoint);
     setApiKey("");
+    setArgsText((s.config?.args ?? []).join("\n"));
+    setEnvText(
+      Object.entries(s.config?.env ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join("\n"),
+    );
     setDialogOpen(true);
   };
 
@@ -142,6 +155,24 @@ export default function McpServersPage() {
     setError("");
     setSuccess("");
     try {
+      // "KEY=value" per line; values may contain '='. Blank lines and lines without '=' are ignored.
+      const env: Record<string, string> = {};
+      for (const line of envText.split("\n")) {
+        const trimmed = line.trim();
+        const at = trimmed.indexOf("=");
+        if (at > 0) env[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1).trim();
+      }
+      const args = argsText
+        .split("\n")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const config =
+        transportType === "stdio"
+          ? {
+              ...(args.length > 0 ? { args } : {}),
+              ...(Object.keys(env).length > 0 ? { env } : {}),
+            }
+          : undefined;
       const body = {
         name: name.trim(),
         description: description.trim() || undefined,
@@ -149,6 +180,7 @@ export default function McpServersPage() {
         endpoint: endpoint.trim(),
         // Empty key on edit keeps the stored one; on create it stays unset.
         apiKey: apiKey.trim() || undefined,
+        ...(config ? { config } : {}),
       };
       const res = editingId
         ? await authFetch(`/api/v1/mcp/servers/${editingId}`, {
@@ -303,9 +335,7 @@ export default function McpServersPage() {
                       onClick={() => test(s.id)}
                       disabled={testing[s.id]}
                       aria-label={`Test ${s.name}`}
-                      title={
-                        s.transportType === "http" ? "Test connection" : "Only http is testable"
-                      }
+                      title="Test connection"
                     >
                       {testing[s.id] ? (
                         <Loader2 className="size-4 animate-spin" />
@@ -368,16 +398,52 @@ export default function McpServersPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="mcp-endpoint">Endpoint</Label>
+              <Label htmlFor="mcp-endpoint">
+                {transportType === "stdio" ? "Command" : "Endpoint"}
+              </Label>
               <Input
                 id="mcp-endpoint"
-                placeholder="https://mcp.example.com/sse"
+                placeholder={
+                  transportType === "stdio"
+                    ? "C:/tools/mcp-bridge.exe"
+                    : "https://mcp.example.com/mcp"
+                }
                 value={endpoint}
                 onChange={(e) => setEndpoint(e.target.value)}
                 autoComplete="off"
               />
+              {transportType === "stdio" && (
+                <p className="text-xs text-muted-foreground">
+                  The executable to start. stdio servers run on this machine and are only available
+                  in the desktop app.
+                </p>
+              )}
             </div>
-            <div className="space-y-1.5">
+            {transportType === "stdio" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mcp-args">Arguments (one per line, optional)</Label>
+                  <Textarea
+                    id="mcp-args"
+                    placeholder={"--channel&#10;nexus"}
+                    value={argsText}
+                    onChange={(e) => setArgsText(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mcp-env">Environment (KEY=value per line, optional)</Label>
+                  <Textarea
+                    id="mcp-env"
+                    placeholder="VB_URL=http://127.0.0.1:4100"
+                    value={envText}
+                    onChange={(e) => setEnvText(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+            <div className={transportType === "stdio" ? "hidden" : "space-y-1.5"}>
               <Label htmlFor="mcp-key">
                 API key {editingId ? "(leave blank to keep current)" : "(optional)"}
               </Label>

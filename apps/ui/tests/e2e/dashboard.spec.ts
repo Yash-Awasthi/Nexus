@@ -21,5 +21,7 @@ test("home hands a question to the council", async ({ page }) => {
   await page.goto("/dashboard");
   await page.getByLabel("Ask the council").fill("Is this handed over?");
   await page.getByRole("button", { name: "Ask" }).click();
+  // The question opens the chat route; assert on the destination, not the 5 s default after a click.
+  await page.waitForURL(/\/chat(?:\?|$)/);
   await expect(page.getByLabel("Message the council")).toHaveValue("Is this handed over?");
 });

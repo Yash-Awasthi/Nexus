@@ -81,3 +81,22 @@ per action because that is what makes it approval.
 `pkg/mcp/approval_test.go` drives the bridge through `tools/call` and counts what reached the
 broker: a challenged call reaches it zero times, the approved repeat once, a replayed token leaves
 the count at one, and a read-only bridge never reaches it at all.
+
+## Attaching it to this repository
+
+The board is vendored at `services/board` and the workspace ships a checked-in client entry,
+`.mcp.json`, so an MCP-capable agent picks it up with no per-machine paths:
+
+```bash
+pnpm board:build          # bin/vb.exe and bin/mcp-bridge.exe
+pnpm board:serve          # broker on http://127.0.0.1:4100, channel nexus
+```
+
+`.mcp.json` runs `node scripts/board-mcp.mjs`, which prefers `bin/mcp-bridge` — the build that
+gives every write the two-step approval and honours `OPEN_BOARD_MCP_READ_ONLY=1` — and falls back
+to `vb mcp` if only the CLI was built. Both read `VB_URL` and `VB_CHANNEL`, which `.mcp.json`
+sets to the local broker and the `nexus` channel.
+
+`board_connectors` is a read tool; `board_connector_call` is a write, because a connector (Rubrik,
+filesystem, anything else in `connectors.json`) can change a system outside the board. Configure
+one with `vb connector add <name>` or drop a file at `.nexus/board/connectors.json`.
